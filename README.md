@@ -14,6 +14,8 @@ Install packages and dependencies:
 $ go get
 ```
 
+Run the app:
+
 ```bash
 $ go run .
 ```
