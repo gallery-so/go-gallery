@@ -8,6 +8,12 @@ https://golang.org/doc/install
 
 ### Start app
 
+Install packages and dependencies:
+
+```bash
+$ go get
+```
+
 ```bash
 $ go run .
 ```
