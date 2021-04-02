@@ -15,16 +15,16 @@ import (
 import "github.com/mikeydub/go-gallery/internal/db"
 
 type RequestHandlers struct {
-	ctx context.Context
+	ctx     context.Context
 	storage db.Storage
 }
 
-func NewRequestHandlers(ctx context.Context, storage db.Storage) *RequestHandlers{
+func NewRequestHandlers(ctx context.Context, storage db.Storage) *RequestHandlers {
 	return &RequestHandlers{ctx: ctx, storage: storage}
 }
 
 // this is really handlers
-func (s *RequestHandlers) NFTSForUser(w http.ResponseWriter, r *http.Request){
+func (s *RequestHandlers) NFTSForUser(w http.ResponseWriter, r *http.Request) {
 	nfts, err := s.storage.GetNFTsByUserID(s.ctx, "7bfaafcc-722e-4dce-986f-fe0d9bee2047")
 	if err != nil {
 		// return 404
@@ -53,7 +53,7 @@ func GenerateRouter(s *RequestHandlers) http.Handler {
 	return routerWithCORS
 }
 
-func Run(ctx context.Context, storage db.Storage, port int){
+func Run(ctx context.Context, storage db.Storage, port int) {
 	handlers := NewRequestHandlers(ctx, storage)
 	router := GenerateRouter(handlers)
 

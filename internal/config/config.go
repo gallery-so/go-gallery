@@ -7,21 +7,20 @@ import (
 )
 
 const (
-	appEnv           = "APP_ENV"
-	baseURL          = "BASE_URL"
-	webBaseURL       = "WEB_BASE_URL"
-	port             = "PORT"
-	postgresURI		 = "POSTGRES_URI"
+	appEnv      = "APP_ENV"
+	baseURL     = "BASE_URL"
+	webBaseURL  = "WEB_BASE_URL"
+	port        = "PORT"
+	postgresURI = "POSTGRES_URI"
 )
 
 type Config struct {
-	AppEnv           string
-	BaseURL          string
-	WebBaseURL       string
-	Port             int
-	PostgresURI      string
+	AppEnv      string
+	BaseURL     string
+	WebBaseURL  string
+	Port        int
+	PostgresURI string
 }
-
 
 func LoadConfig() *Config {
 	viper.SetDefault(appEnv, "local")
@@ -37,10 +36,10 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		AppEnv: viper.GetString(appEnv),
-		BaseURL: viper.GetString(baseURL),
-		WebBaseURL: viper.GetString(webBaseURL),
-		Port: viper.GetInt(port),
+		AppEnv:      viper.GetString(appEnv),
+		BaseURL:     viper.GetString(baseURL),
+		WebBaseURL:  viper.GetString(webBaseURL),
+		Port:        viper.GetInt(port),
 		PostgresURI: viper.GetString(postgresURI),
 	}
 }

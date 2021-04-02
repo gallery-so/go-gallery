@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/georgysavva/scany/pgxscan"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type Storage interface {
