@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-import "github.com/philangist/gallery/internal/db"
+import "github.com/mikeydub/go-gallery/internal/db"
 
 type RequestHandlers struct {
 	ctx context.Context

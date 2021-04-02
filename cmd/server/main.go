@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/philangist/gallery/internal/config"
-	"github.com/philangist/gallery/internal/db"
-	"github.com/philangist/gallery/internal/server"
+	"github.com/mikeydub/go-gallery/internal/config"
+	"github.com/mikeydub/go-gallery/internal/db"
+	"github.com/mikeydub/go-gallery/internal/server"
 )
 
 func main(){

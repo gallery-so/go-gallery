@@ -1,4 +1,4 @@
-module github.com/philangist/gallery
+module github.com/mikeydub/go-gallery
 
 go 1.16
 
