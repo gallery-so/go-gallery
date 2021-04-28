@@ -20,6 +20,10 @@ Run the app:
 $ go run .
 ```
 
+```bash
+$ go build -o ./bin/main ./cmd/server/main.go
+```
+
 ### Healthcheck
 
 ```bash

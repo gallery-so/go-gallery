@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+//-------------------------------------------------------------
 const (
 	appEnv      = "APP_ENV"
 	baseURL     = "BASE_URL"
@@ -22,6 +23,7 @@ type Config struct {
 	PostgresURI string
 }
 
+//-------------------------------------------------------------
 func LoadConfig() *Config {
 	viper.SetDefault(appEnv, "local")
 	viper.SetDefault(baseURL, "http://localhost:4000")

@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/internal/server"
 )
 
+//-------------------------------------------------------------
 func main() {
 	ctx := context.Background()
 	cfg := config.LoadConfig()

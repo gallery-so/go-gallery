@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+//-------------------------------------------------------------
 type Storage interface {
 	GetNFTsByUserID(ctx context.Context, userID string) ([]*NFT, error)
 	Cleanup()
@@ -17,6 +18,7 @@ type DB struct {
 	pool *pgxpool.Pool
 }
 
+//-------------------------------------------------------------
 func NewDB(ctx context.Context, uri string) (*DB, error) {
 	pool, err := pgxpool.Connect(ctx, uri)
 	if err != nil {
@@ -26,6 +28,7 @@ func NewDB(ctx context.Context, uri string) (*DB, error) {
 	return &DB{pool: pool}, nil
 }
 
+//-------------------------------------------------------------
 func (db *DB) GetNFTsByUserID(ctx context.Context, userID string) ([]*NFT, error) {
 	var nfts []*NFT
 
@@ -57,6 +60,7 @@ WHERE user_id='%s'
 	return nfts, nil
 }
 
+//-------------------------------------------------------------
 func (db *DB) Cleanup() {
 	db.pool.Close()
 }
