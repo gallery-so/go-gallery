@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/internal/config"
-	"github.com/mikeydub/go-gallery/internal/db"
-	"github.com/mikeydub/go-gallery/internal/server"
+	"github.com/mikeydub/go-gallery/config"
+	"github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/server"
 )
 
 //-------------------------------------------------------------

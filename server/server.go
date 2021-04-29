@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
-	"github.com/mikeydub/go-gallery/internal/db"
+	"github.com/mikeydub/go-gallery/db"
 )
 
 //-------------------------------------------------------------
