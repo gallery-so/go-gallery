@@ -2,6 +2,7 @@ package db
 
 import "time"
 
+//-------------------------------------------------------------
 // Define NFT struct
 // Query Function by user_id
 // 7bfaafcc-722e-4dce-986f-fe0d9bee2047
