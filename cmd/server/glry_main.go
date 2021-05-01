@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	// "context"
 	log "github.com/sirupsen/logrus"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/config"
@@ -16,7 +15,6 @@ func main() {
 	
 	log.SetOutput(os.Stdout)
 	
-	// ctx := context.Background()
 	cfg := config.LoadConfig()
 	
 	
@@ -29,7 +27,7 @@ func main() {
 	mongoDBnameStr := cfg.MongoDBnameStr
 
 
-	db, gErr := db.Init(mongoDBhostStr, mongoDBnameStr, runtimeSys) // cfg.PostgresURI)
+	db, gErr := db.Init(mongoDBhostStr, mongoDBnameStr, runtimeSys)
 	if gErr != nil {
 		log.WithFields(log.Fields{
 			"db_host": mongoDBhostStr,

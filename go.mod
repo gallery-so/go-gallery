@@ -6,6 +6,7 @@ replace github.com/gloflow/gloflow => ./../gloflow
 
 require (
 	github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/georgysavva/scany v0.2.7 // indirect
 	github.com/gloflow/gloflow v0.0.0-20210429233436-b11394c9fc1d // indirect
@@ -15,6 +16,7 @@ require (
 	github.com/jackc/pgx/v4 v4.10.1 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/parnurzeal/gorequest v0.2.16 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
