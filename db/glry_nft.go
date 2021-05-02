@@ -7,7 +7,7 @@ import (
 
 //-------------------------------------------------------------
 // legacy NFT type, this is the schema in the initial v0 prototype of the system
-type NFTlegacy struct {
+type GLRYnftLegacy struct {
 
 	ID int64 `bson:"_id" json:"id"`
 
@@ -30,7 +30,7 @@ type NFTlegacy struct {
 	ImagePreviewURL   string    `bson:"image_preview_url"   json:"image_preview_url"`
 }
 
-type NFT struct {
+type GLRYnft struct {
 	Version           int64     `bson:"version"             json:"version"` // schema version for this model
 	ID                int64     `bson:"id"                  json:"id"`
 	ImageURL          string    `bson:"image_url"           json:"image_url"`
@@ -49,7 +49,7 @@ type NFT struct {
 }
 
 //-------------------------------------------------------------
-func NFTcreate(pNFT *NFT,
+func NFTcreate(pNFT *GLRYnft,
 	pCtx        context.Context,
 	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
 
@@ -77,7 +77,8 @@ func NFTcreate(pNFT *NFT,
 
 //-------------------------------------------------------------
 func NFTgetByUserID(pUserIDstr string,
-	pCtx context.Context) ([]*NFT, *gfcore.Gf_error) {
+	pCtx context.Context,
+	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYnft, *gfcore.Gf_error) {
 
 
 

@@ -17,22 +17,16 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 	gfrpclib.Create_handler__http("/glry/v1/nfts",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 
-
 			//------------------
 			// INPUT
 
 			//------------------
 
 			userIDstr := "7bfaafcc-722e-4dce-986f-fe0d9bee2047"
-			nfts, err := db.NFTgetByUserID(userIDstr, pCtx)
-			if err != nil {
-				
-
-				return nil, err
+			nfts, gErr := db.NFTgetByUserID(userIDstr, pCtx, pRuntimeSys)
+			if gErr != nil {
+				return nil, gErr
 			}
-
-
-
 
 			//------------------
 			// OUTPUT
@@ -42,8 +36,6 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 
 			//------------------
 
-
-
 			return data_map, nil
 		},
 		pRuntimeSys)
@@ -51,8 +43,8 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 	//-------------------------------------------------------------
 	// NFTS_FOR_USER
 	gfrpclib.Create_handler__http("/glry/v1/nfts_opensea",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
-
+		func(pCtx context.Context, pResp http.ResponseWriter,
+			pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 
 			//------------------
 			// INPUT
@@ -60,8 +52,10 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 			//------------------
 
 			ownerWalletAddressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
-			extern_services.OpenSeaGetAssetsForAccount(ownerWalletAddressStr, pCtx)
-
+			_, gErr := extern_services.OpenSeaGetAssetsForAccount(ownerWalletAddressStr, pCtx, pRuntimeSys)
+			if gErr != nil {
+				return nil, gErr
+			}
 
 
 			//------------------
@@ -71,8 +65,6 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 			}
 
 			//------------------
-
-
 
 			return data_map, nil
 		},

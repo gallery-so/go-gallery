@@ -34,7 +34,7 @@ func Init(pMongoHostStr string,
 			return nil, gErr
 		}
 		log.Info("mongodb connected...")
-
+		
 		return mongoDB, nil
 	}
 
@@ -43,8 +43,6 @@ func Init(pMongoHostStr string,
 	if gErr != nil {
 		return nil, gErr
 	}
-
-	
 
 	db := &DB{
 		Mongo: mongoDB,

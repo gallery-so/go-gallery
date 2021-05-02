@@ -5,14 +5,29 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	log "github.com/sirupsen/logrus"
 	"github.com/parnurzeal/gorequest"
 	"github.com/mitchellh/mapstructure"
-	"github.com/davecgh/go-spew/spew"
+	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
+type GLRYopenSeaAsset struct {
+	IDstr               string `mapstructure:"id"`
+	TokenIDstr          string `mapstructure:"token_id"`
+	PermaLinkStr        string `mapstructure:"permalink"`
+	ImageThumbURLstr    string `mapstructure:"image_thumbnail_url"`
+	ImageOriginalURLstr string `mapstructure:"image_original_url"`
+	NameStr             string `mapstructure:"name"`
+	DescriptionStr      string `mapstructure:"description"`
+	ExternLinkStr       string `mapstructure:"external_link"`
+}
+
+//-------------------------------------------------------------
 func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
-	pCtx context.Context) {
+	pCtx context.Context,
+	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYopenSeaAsset, *gfcore.Gf_error) {
 
 	/*{
 		"id": 21976544,
@@ -115,7 +130,7 @@ func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
 
 
 	offsetInt := 0
-	limitInt := 20
+	limitInt := 50
 	qsArgsMap := map[string]string{
 		"owner":           pOwnerWalletAddressStr,
 		"order_direction": "desc",
@@ -125,7 +140,8 @@ func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
 	}
 
 
-	fmt.Println("DDDDDDDDDDDDDDDDDDDD")
+
+
 	qsLst := []string{}
 	for k, v := range qsArgsMap {
 		qsLst = append(qsLst, fmt.Sprintf("%s=%s", k, v))
@@ -133,58 +149,60 @@ func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
 	qsStr := strings.Join(qsLst, "&")
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?%s", qsStr)
 
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println(urlStr)
 
 
-
-	type openSeaAsset struct {
-		IDstr               string `mapstructure:"id"`
-		TokenIDstr          string `mapstructure:"token_id"`
-		PermaLinkStr        string `mapstructure:"permalink"`
-		ImageThumbURLstr    string `mapstructure:"image_thumbnail_url"`
-		ImageOriginalURLstr string `mapstructure:"image_original_url"`
-		NameStr             string `mapstructure:"name"`
-		DescriptionStr      string `mapstructure:"description"`
-		ExternLinkStr       string `mapstructure:"external_link"`
-	}
-	  
-	
+	log.WithFields(log.Fields{
+			"url":                  urlStr,
+			"owner_wallet_address": pOwnerWalletAddressStr,
+		}).Info("making HTTP request to OpenSea API")
 	_, respBytes, errs := gorequest.New().Get(urlStr).EndBytes()
+	if len(errs) > 0 {
+		
 
+	}
 
 	var response map[string]interface{}
 	err := json.Unmarshal(respBytes, &response)
+	if err != nil {
+		gErr := gfcore.Error__create(fmt.Sprintf("failed to parse json response from OpenSea API"), 
+			"json_decode_error",
+			map[string]interface{}{"url": urlStr,},
+			err, "glry_extern_services", pRuntimeSys)
+		return nil, gErr
+	}
+
+
+
 
 	assetsLst := response["assets"].([]interface{})
 
 
-	assetsParsedLst := []openSeaAsset{}
+
+	
+
+	assetsParsedLst := []*GLRYopenSeaAsset{}
+
 	for _, aMap := range assetsLst {
 
-		var asset openSeaAsset
+		var asset GLRYopenSeaAsset
 		err := mapstructure.Decode(aMap, &asset)
 		if err != nil {
-
-
+			
+			gErr := gfcore.Error__create("failed to load OpenSea asset map into a GLRYopenSeaAsset struct",
+				"mapstruct__decode",
+				map[string]interface{}{
+					"url":                  urlStr,
+					"owner_wallet_address": pOwnerWalletAddressStr,
+				},
+				err, "glry_extern_services", pRuntimeSys)
+			
+			return nil, gErr
 		}
 
-
-		assetsParsedLst = append(assetsParsedLst, asset)
-
-
-
-
-
-
+		assetsParsedLst = append(assetsParsedLst, &asset)
 	}
+	
+	// spew.Dump(assetsParsedLst)
 
-	fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaa")
-	fmt.Println(err)
-	fmt.Println(errs)
-
-
-
-
-	spew.Dump(assetsParsedLst)
+	return assetsParsedLst, nil
 }
