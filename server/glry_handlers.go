@@ -52,7 +52,7 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 			//------------------
 
 			ownerWalletAddressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
-			_, gErr := extern_services.OpenSeaGetAssetsForAccount(ownerWalletAddressStr, pCtx, pRuntimeSys)
+			_, gErr := extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}

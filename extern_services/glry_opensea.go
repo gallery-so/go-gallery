@@ -25,7 +25,7 @@ type GLRYopenSeaAsset struct {
 }
 
 //-------------------------------------------------------------
-func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
+func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
 	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYopenSeaAsset, *gfcore.Gf_error) {
 
@@ -180,7 +180,7 @@ func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
 
 	
 
-	assetsParsedLst := []*GLRYopenSeaAsset{}
+	assetsForAccLst := []*GLRYopenSeaAsset{}
 
 	for _, aMap := range assetsLst {
 
@@ -199,10 +199,10 @@ func OpenSeaGetAssetsForAccount(pOwnerWalletAddressStr string,
 			return nil, gErr
 		}
 
-		assetsParsedLst = append(assetsParsedLst, &asset)
+		assetsForAccLst = append(assetsForAccLst, &asset)
 	}
 	
-	// spew.Dump(assetsParsedLst)
+	// spew.Dump(assetsForAccLst)
 
-	return assetsParsedLst, nil
+	return assetsForAccLst, nil
 }

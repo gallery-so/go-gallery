@@ -9,7 +9,7 @@ import (
 // legacy NFT type, this is the schema in the initial v0 prototype of the system
 type GLRYnftLegacy struct {
 
-	ID int64 `bson:"_id" json:"id"`
+	IDstr string `bson:"_id" json:"id"`
 
 	// removed from newer NFT model, NFT's might be associated with multiple Users,
 	// so we dont want to limit to a single user.
@@ -19,33 +19,39 @@ type GLRYnftLegacy struct {
 	Description       string    `bson:"description"         json:"description"`
 	Name              string    `bson:"name"                json:"name"`
 	CollectionName    string    `bson:"collection_name"     json:"collection_name"`
-	Position          int64     `bson:"position"            json:"position"`
+	
 	ExternalURL       string    `bson:"external_url"        json:"external_url"`
-	CreatedDate       float64   `bson:"created_date"        json:"created_date"`
+	CreatedDateF      float64   `bson:"creation_time_f"     json:"creation_time_f"`
 	CreatorAddress    string    `bson:"creator_address"     json:"creator_address"`
 	ContractAddress   string    `bson:"contract_address"    json:"contract_address"`
 	TokenID           int64     `bson:"token_id"            json:"token_id"`
-	Hidden            bool      `bson:"hidden"              json:"hidden"`
 	ImageThumbnailURL string    `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURL   string    `bson:"image_preview_url"   json:"image_preview_url"`
+
+	Position          int64     `bson:"position"            json:"position"`
+	Hidden            bool      `bson:"hidden"              json:"hidden"`
 }
 
 type GLRYnft struct {
-	Version           int64     `bson:"version"             json:"version"` // schema version for this model
-	ID                int64     `bson:"id"                  json:"id"`
+	VersionInt        int64     `bson:"version"             json:"version"` // schema version for this model
+	IDstr             string    `bson:"_id"                 json:"id"`
 	ImageURL          string    `bson:"image_url"           json:"image_url"`
 	Description       string    `bson:"description"         json:"description"`
 	Name              string    `bson:"name"                json:"name"`
 	CollectionName    string    `bson:"collection_name"     json:"collection_name"`
-	Position          int64     `bson:"position"            json:"position"`
+	
 	ExternalURL       string    `bson:"external_url"        json:"external_url"`
-	CreatedDate       float64   `bson:"created_date"        json:"created_date"`
+	CreationTimeF     float64   `bson:"creation_time_f"     json:"creation_time_f"`
 	CreatorAddress    string    `bson:"creator_address"     json:"creator_address"`
 	ContractAddress   string    `bson:"contract_address"    json:"contract_address"`
-	TokenID           int64     `bson:"token_id"            json:"token_id"`
-	Hidden            bool      `bson:"hidden"              json:"hidden"`
+	OpenSeaTokenID    int64     `bson:"opensea_token_id"    json:"opensea_token_id"`
+
+	
 	ImageThumbnailURL string    `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURL   string    `bson:"image_preview_url"   json:"image_preview_url"`
+
+	PositionInt       int64     `bson:"position"            json:"position"`
+	HiddenBool        bool      `bson:"hidden"              json:"hidden"`
 }
 
 //-------------------------------------------------------------
