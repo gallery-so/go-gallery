@@ -1,4 +1,4 @@
-package db
+package core
 
 import (
 	"fmt"
@@ -8,12 +8,48 @@ import (
 )
 
 //-------------------------------------------------------------
+type Runtime struct {
+	DB         *DB
+	RuntimeSys *gfcore.Runtime_sys
+}
+
 type DB struct {
-	Mongo *mongo.Database
+	MongoDB *mongo.Database
 }
 
 //-------------------------------------------------------------
-func Init(pMongoHostStr string,
+func RuntimeGet(pMongoDBhostStr string,
+	pMongoDBnameStr string) (*Runtime, *gfcore.Gf_error) {
+
+	// RUNTIME_SYS
+	runtimeSys := &gfcore.Runtime_sys{
+		Service_name_str: "gallery",
+	}
+
+	// DB
+	db, gErr := DBinit(pMongoDBhostStr, pMongoDBnameStr, runtimeSys)
+	if gErr != nil {
+		log.WithFields(log.Fields{
+			"db_host": pMongoDBhostStr,
+			"db_name": pMongoDBnameStr,
+		}).Fatal("Error acquiring database connection")
+
+		return nil, gErr
+	}
+
+	runtimeSys.Mongo_db = db.MongoDB
+
+	// RUNTIME
+	runtime := &Runtime{
+		DB:         db, 
+		RuntimeSys: runtimeSys,
+	}
+
+	return runtime, nil
+}
+
+//-------------------------------------------------------------
+func DBinit(pMongoHostStr string,
 	pMongoDBNamestr string,
 	pRuntimeSys     *gfcore.Runtime_sys) (*DB, *gfcore.Gf_error) {
 
@@ -45,7 +81,7 @@ func Init(pMongoHostStr string,
 	}
 
 	db := &DB{
-		Mongo: mongoDB,
+		MongoDB: mongoDB,
 	}
 
 	return db, nil

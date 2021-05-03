@@ -5,12 +5,13 @@ import (
 	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	gfrpclib "github.com/gloflow/gloflow/go/gf_rpc_lib"
+	"github.com/mikeydub/go-gallery/core"
 	"github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/extern_services"
 )
 
 //-------------------------------------------------------------
-func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
+func initHandlers(pRuntime *core.Runtime) {
 
 	//-------------------------------------------------------------
 	// NFTS_FOR_USER
@@ -23,7 +24,7 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 			//------------------
 
 			userIDstr := "7bfaafcc-722e-4dce-986f-fe0d9bee2047"
-			nfts, gErr := db.NFTgetByUserID(userIDstr, pCtx, pRuntimeSys)
+			nfts, gErr := db.NFTgetByUserID(userIDstr, pCtx, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -38,7 +39,7 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 
 			return data_map, nil
 		},
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
 	// NFTS_FOR_USER
@@ -52,7 +53,7 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 			//------------------
 
 			ownerWalletAddressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
-			_, gErr := extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntimeSys)
+			gErr := extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -68,7 +69,7 @@ func initHandlers(pRuntimeSys *gfcore.Runtime_sys) {
 
 			return data_map, nil
 		},
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
 
