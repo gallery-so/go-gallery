@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -45,6 +46,9 @@ func RuntimeGet(pMongoDBhostStr string,
 		RuntimeSys: runtimeSys,
 	}
 
+
+
+	
 	return runtime, nil
 }
 

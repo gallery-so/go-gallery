@@ -14,7 +14,7 @@ import (
 
 //-------------------------------------------------------------
 type GLRYopenSeaAsset struct {
-	IDstr               string `bson:"id"        mapstructure:"id"`
+	IDint               int    `bson:"id"        mapstructure:"id"`
 	TokenIDstr          string `bson:"token_id"  mapstructure:"token_id"`
 	NumberOfSalesInt    int    `bson:"num_sales" mapstructure:"num_sales"`
 	
@@ -35,9 +35,9 @@ type GLRYopenSeaAsset struct {
 	// IMPORTANT!! - OpenSea (unlike Gallery) only allows an Asset to be in a single collection 
 	Collection GLRYopenSeaCollection `bson:"collection" mapstructure:"collection"`
 	
-	Creator        GLRYopenSeaCreator `bson:"creator"      mapstructure:"creator"`
-	LastSaleStr    string             `bson:"last_sale"    mapstructure:"last_sale"`
-	ListingDateStr string             `bson:"listing_date" mapstructure:"listing_date"`
+	Creator        GLRYopenSeaCreator   `bson:"creator"      mapstructure:"creator"`
+	ListingDateStr string               `bson:"listing_date" mapstructure:"listing_date"`
+	LastSale       *GLRYopenSeaLastSale `bson:"last_sale" mapstructure:"last_sale"`
 }
 
 type GLRYopenSeaAssetContract struct {
@@ -50,9 +50,9 @@ type GLRYopenSeaAssetContract struct {
 }
 
 type GLRYopenSeaOwner struct {
-	UserStr            string `bson:"user"            mapstructure:"user"`
-	ProfileImageURLstr string `bson:"profile_img_url" mapstructure:"profile_img_url"`
-	AddressStr         string `bson:"address"         mapstructure:"address"`
+	User               GLRYopenSeaUser `bson:"user"            mapstructure:"user"`
+	ProfileImageURLstr string          `bson:"profile_img_url" mapstructure:"profile_img_url"`
+	AddressStr         string          `bson:"address"         mapstructure:"address"`
 }
 
 type GLRYopenSeaCollection struct {
@@ -67,9 +67,51 @@ type GLRYopenSeaCollection struct {
 }
 
 type GLRYopenSeaCreator struct {
-	UserStr            string `bson:"user"            mapstructure:"user"`
-	ProfileImageURLstr string `bson:"profile_img_url" mapstructure:"profile_img_url"`
-	AddressStr         string `bson:"address"         mapstructure:"address"`
+	User               GLRYopenSeaUser `bson:"user"            mapstructure:"user"`
+	ProfileImageURLstr string          `bson:"profile_img_url" mapstructure:"profile_img_url"`
+	AddressStr         string          `bson:"address"         mapstructure:"address"`
+}
+
+type GLRYopenSeaUser struct {
+	UsernameStr string `bson:"username" mapstructure:"username"`
+}
+
+// LAST_SALE
+// ADD!! - this is a single LastSale, not a chain of custody, 
+//         so if this chain is to be rebuilt this LastSale has to be continuously queried
+//         for an assert and results persisted for future reference.
+type GLRYopenSeaLastSale struct {
+	TokenIDstr        string                     `bson:"token_id"` // this is nested in "asset" field, but I wanted surfaced as a top attribute, so no mapstructure
+	EventTimestampStr string                     `bson:"event_timestamp" mapstructure:"eventtimestamp"` 
+	EventTypeStr      string                     `bson:"event_type"      mapstructure:"event_type"`
+	PaymentToken GLRYopenSeaLastSalePaymentToken `bson:"payment_token"   mapstructure:"payment_token"`
+	QuantityStr  string                          `bson:"quantity"        mapstructure:"quantity"`
+	Transaction  GLRYopenSeaLastSaleTx           `bson:"transaction"     mapstructure:"transaction"`
+}
+
+type GLRYopenSeaLastSalePaymentToken struct {
+	EthPriceStr string `bson:"eth_price" mapstructure:"eth_price"`
+	SymbolStr   string `bson:"symbol"    mapstructure:"symbol"`
+	USDpriceStr string `bson:"usd_price" mapstructure:"usd_price"`
+}
+
+// TX
+type GLRYopenSeaLastSaleTx struct {
+	IDf            float64        `bson:"id"           mapstructure:"id"`
+	TimestampStr   string         `bson:"timestamp"    mapstructure:"timestamp"`
+	BlockHashStr   string         `bson:"block_hash"   mapstructure:"block_hash"`
+	BlockNumberStr string         `bson:"block_number" mapstructure:"block_number"`
+	FromAcc        GLRYopenSeaAcc `bson:"from_acc"     mapstructure:"from_account"`
+	ToAcc          GLRYopenSeaAcc `bson:"to_acc"       mapstructure:"to_account"`
+	TxHashStr      string         `bson:"tx_hash"      mapstructure:"transaction_hash"`
+	TxIndexStr     string         `bson:"tx_index"     mapstructure:"transaction_index"`
+}
+
+// ACC
+type GLRYopenSeaAcc struct {
+	AddressStr       string            `bson:"address"         mapstructure:"address"`
+	ProfileImgURLstr string            `bson:"profile_img_url" mapstructure:"profile_img_url"`
+	UserMap          map[string]string `bson:"user"            mapstructure:"user"`
 }
 
 //-------------------------------------------------------------
@@ -174,7 +216,60 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		"is_presale": false,
 		"transfer_fee_payment_token": null,
 		"transfer_fee": null
-	},*/
+	}
+	
+	
+	LAST_SALE:
+	map[
+		asset:map[
+			decimals: <nil>
+	*		token_id: 98168371784320387514732815439041609751844866237332060982262479279862392553473
+		]
+		asset_bundle:    <nil>
+		auction_type:    <nil>
+	*	created_date:    2021-03-18T17:22:56.965029
+	*	event_timestamp: 2021-03-18T17:22:37
+	*	event_type:      successful
+		payment_token: map[
+			address:   0x0000000000000000000000000000000000000000
+			decimals:  18
+	*		eth_price: 1.000000000000000
+			id:        1
+			image_url: https://lh3.googleusercontent.com/7hQyiGtBt8vmUTq4T0aIUhIhT00dPhnav87TuFQ5cLtjlk724JgXdjQjoH_CzYz-z37JpPuMFbRRQuyC7I9abyZRKA
+			name:      Ether
+	*		symbol:    ETH
+	*		usd_price: 3446.929999999999836000
+		]
+	*	quantity:    1
+		total_price: 250000000000000000
+		transaction: map[
+	*		block_hash:   0x16b63828a3ee23184949ed0ddbf6f24a1718cea610c59e83497d4db0a4ed6d50
+	*		block_number: 12063985
+	*		from_account: map[
+	*			address: 0xbb3f043290841b97b9c92f6bc001a020d4b33255
+				config:
+				discord_id:
+	*			profile_img_url: https://storage.googleapis.com/opensea-static/opensea-profile/8.png
+				user: map[
+	*				username:mikeybitcoin
+				]
+			] 
+	*		id:         9.1561879e+07 
+	*		timestamp:  2021-03-18T17:22:37 
+	*		to_account: map[
+	*			address: 0x7be8076f4ea4a4ad08075c2508e481d6c946d12b
+				config:  verified
+				discord_id: 
+	*			profile_img_url: https://storage.googleapis.com/opensea-static/opensea-profile/22.png
+				user: map[
+	*				username:OpenSea-Orders
+				]
+			]
+	*		transaction_hash:  0xb49f436bf95b22c6ddd35494e393d41eae728045045cf4cefbb2df599933adbd 
+	*		transaction_index: 68
+		]
+	]
+	*/
 
 
 	offsetInt := 0
@@ -184,7 +279,6 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		"order_direction": "desc",
 		"offset":          fmt.Sprintf("%d", offsetInt),
 		"limit":           fmt.Sprintf("%d", limitInt),
-
 	}
 
 
@@ -206,7 +300,7 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	_, respBytes, errs := gorequest.New().Get(urlStr).EndBytes()
 	if len(errs) > 0 {
 		
-
+		// FIX!! - add error capture here!!!
 	}
 
 	var response map[string]interface{}
@@ -222,12 +316,7 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 
 
 
-	assetsLst := response["assets"].([]interface{})
-
-
-
-	
-
+	assetsLst       := response["assets"].([]interface{})
 	assetsForAccLst := []*GLRYopenSeaAsset{}
 
 	for _, aMap := range assetsLst {
@@ -246,6 +335,21 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 			
 			return nil, gErr
 		}
+
+
+
+
+		// LAST_SALE - for some assets this is null, for others its specified.
+		//             this loading of token_id is done manually here to avoid another nested struct "asset"
+		//             with just a single attribute "token_id".
+		//             allthough this special case conditional adds confusion and is not consistent with how
+		//             all other substructs are loaded.
+		if asset.LastSale != nil {
+			asset.LastSale.TokenIDstr = aMap.(map[string]interface{})["last_sale"].(map[string]interface{})["asset"].(map[string]interface{})["token_id"].(string)
+		}
+
+
+
 
 		assetsForAccLst = append(assetsForAccLst, &asset)
 	}

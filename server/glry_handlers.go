@@ -53,7 +53,7 @@ func initHandlers(pRuntime *core.Runtime) {
 			//------------------
 
 			ownerWalletAddressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
-			gErr := extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntime.RuntimeSys)
+			_, gErr := extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}

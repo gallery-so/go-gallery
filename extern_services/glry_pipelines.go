@@ -13,7 +13,7 @@ import (
 //-------------------------------------------------------------
 func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
+	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYopenSeaAsset, *gfcore.Gf_error) {
 
 
 
@@ -22,15 +22,13 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 		pCtx,
 		pRuntimeSys)
 	if gErr != nil {
-		return gErr
+		return nil, gErr
 	}
 
 
 
 	// DB_PERSIST
 	for _, openSeaAsset := range openSeaAssetsForAccLst {
-
-
 
 		creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
 		nft := &db.GLRYnft{
@@ -61,20 +59,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 			// try to persist the rest of OpenSea NFT's
 			continue
 		}
-
 	}
 
-
-
-
-
-
-	return nil
-
-
-
-
-
-
-
+	return openSeaAssetsForAccLst, nil
 }

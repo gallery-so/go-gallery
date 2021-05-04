@@ -1,8 +1,10 @@
 package db
 
 import (
+	// "fmt"
 	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -66,7 +68,6 @@ func NFTcreate(pNFT *GLRYnft,
 
 
 	collNameStr := "glry_nfts"
-	
 	gErr := gfcore.Mongo__insert(pNFT,
 		collNameStr,
 		map[string]interface{}{
