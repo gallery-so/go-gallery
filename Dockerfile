@@ -4,12 +4,12 @@ FROM ubuntu:20.04
 
 
 
-RUN useradd -b /home/gly
+RUN useradd -m glry
 
 
+WORKDIR /home/glry
+ADD bin/.env .env
+ADD bin/main main
 
-
-ADD bin/main /home/gly/main
-
-
-ENTRYPOINT ["/home/gly/main"]
+CMD "./main"
+# ENTRYPOINT ["/home/glry/main"]

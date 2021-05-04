@@ -38,7 +38,7 @@ func LoadConfig() *Config {
 	viper.SetDefault(mongoDBname, "")
 	// viper.SetDefault(postgresURI, "")
 
-	viper.SetConfigFile(".env")
+	viper.SetConfigFile("./.env")
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.WithFields(log.Fields{"err": err,}).Fatal("Error reading in env file")
