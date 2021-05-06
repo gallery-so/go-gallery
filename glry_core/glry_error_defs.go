@@ -1,4 +1,4 @@
-package core
+package glry_core
 
 import (
 	gfcore "github.com/gloflow/gloflow/go/gf_core"

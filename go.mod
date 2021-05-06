@@ -10,10 +10,14 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/georgysavva/scany v0.2.7 // indirect
 	github.com/gloflow/gloflow v0.0.0-20210429233436-b11394c9fc1d // indirect
+	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/go-playground/validator v9.31.0+incompatible // indirect
+	github.com/go-playground/validator/v10 v10.5.0 // indirect
 	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
 	github.com/jackc/pgx/v4 v4.10.1 // indirect
+	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/parnurzeal/gorequest v0.2.16 // indirect

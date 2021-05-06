@@ -1,4 +1,4 @@
-package extern_services
+package glry_extern_services
 
 import (
 	"fmt"

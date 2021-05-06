@@ -1,4 +1,4 @@
-package db
+package glry_db
 
 import (
 	// "fmt"
@@ -12,6 +12,7 @@ type GLRYnft struct {
 	VersionInt         int64     `bson:"version"              json:"version"` // schema version for this model
 	IDstr              string    `bson:"_id"                  json:"id"`
 	CreationTimeF      float64   `bson:"creation_time"        json:"creation_time"`
+
 	NameStr            string    `bson:"name"                 json:"name"`
 	DescriptionStr     string    `bson:"description"          json:"description"`
 	CollectionNamesLst []string  `bson:"collection_names"     json:"collection_names"`
@@ -32,6 +33,7 @@ type GLRYnft struct {
 	HiddenBool  bool  `bson:"hidden"   json:"hidden"`
 }
 
+// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
 // DEPRECATED!! - will be removed once we fully migrate to v1 server/db schema.
 //                legacy NFT type, this is the schema in the initial v0 prototype of the system.
 type GLRYnftLegacy struct {
@@ -71,9 +73,9 @@ func NFTcreate(pNFT *GLRYnft,
 	gErr := gfcore.Mongo__insert(pNFT,
 		collNameStr,
 		map[string]interface{}{
-			"nft_name":           pNFT.NameStr,
-			"nft_image_url":      pNFT.ImageURLstr,
-			"caller_err_msg_str": "failed to insert a new NFT into the DB",
+			"nft_name":       pNFT.NameStr,
+			"nft_image_url":  pNFT.ImageURLstr,
+			"caller_err_msg": "failed to insert a new NFT into the DB",
 		},
 		pCtx,
 		pRuntimeSys)

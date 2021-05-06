@@ -4,7 +4,7 @@ import (
 	"os"
 	log "github.com/sirupsen/logrus"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
-	"github.com/mikeydub/go-gallery/core"
+	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/config"
 	// "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/server"
@@ -28,7 +28,7 @@ func main() {
 	
 
 	// RUNTIME
-	runtime, gErr := core.RuntimeGet(mongoDBhostStr, mongoDBnameStr)
+	runtime, gErr := glry_core.RuntimeGet(mongoDBhostStr, mongoDBnameStr)
 	if gErr != nil {
 		panic(gErr.Error)
 	}

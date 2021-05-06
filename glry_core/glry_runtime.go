@@ -1,9 +1,10 @@
-package core
+package glry_core
 
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/go-playground/validator"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -11,6 +12,7 @@ import (
 //-------------------------------------------------------------
 type Runtime struct {
 	DB         *DB
+	Validator  *validator.Validate
 	RuntimeSys *gfcore.Runtime_sys
 }
 
@@ -40,9 +42,14 @@ func RuntimeGet(pMongoDBhostStr string,
 
 	runtimeSys.Mongo_db = db.MongoDB
 
+	// CHECK!! - is Validator threadsafe, so that it can be used
+	//           by several (possibly concurrently) threads.
+	validator := validator.New()
+
 	// RUNTIME
 	runtime := &Runtime{
-		DB:         db, 
+		DB:         db,
+		Validator:  validator,
 		RuntimeSys: runtimeSys,
 	}
 

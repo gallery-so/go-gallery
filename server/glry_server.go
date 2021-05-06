@@ -5,15 +5,16 @@ import (
 	// log "github.com/sirupsen/logrus"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	gfrpclib "github.com/gloflow/gloflow/go/gf_rpc_lib"
-	"github.com/mikeydub/go-gallery/core"
+	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/mikeydub/go-gallery/glry_lib"
 )
 
 //-------------------------------------------------------------
 func Init(pPortInt int,
-	pRuntime *core.Runtime) {
+	pRuntime *glry_core.Runtime) {
 
 	// HANDLERS
-	initHandlers(pRuntime)
+	glry_lib.HandlersInit(pRuntime)
 	
 
 
