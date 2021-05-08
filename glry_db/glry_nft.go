@@ -1,17 +1,21 @@
 package glry_db
 
 import (
-	// "fmt"
+	"fmt"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
+type GLRYnftID string
 type GLRYnft struct {
 	VersionInt         int64     `bson:"version"              json:"version"` // schema version for this model
-	IDstr              string    `bson:"_id"                  json:"id"`
+	IDstr              GLRYnftID `bson:"_id"                  json:"id"`
 	CreationTimeF      float64   `bson:"creation_time"        json:"creation_time"`
+	DeletedBool        bool      `bson:"deleted"`
 
 	NameStr            string    `bson:"name"                 json:"name"`
 	DescriptionStr     string    `bson:"description"          json:"description"`
@@ -24,7 +28,7 @@ type GLRYnft struct {
 	// OPEN_SEA_TOKEN_ID
 	OpenSeaTokenIDstr string `bson:"opensea_token_id" json:"opensea_token_id"`
 
-	// IMAGES
+	// IMAGES - OPENSEA
 	ImageURLstr          string `bson:"image_url"           json:"image_url"`
 	ImageThumbnailURLstr string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURLstr   string `bson:"image_preview_url"   json:"image_preview_url"`
@@ -33,7 +37,7 @@ type GLRYnft struct {
 	HiddenBool  bool  `bson:"hidden"   json:"hidden"`
 }
 
-// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
+/*// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
 // DEPRECATED!! - will be removed once we fully migrate to v1 server/db schema.
 //                legacy NFT type, this is the schema in the initial v0 prototype of the system.
 type GLRYnftLegacy struct {
@@ -60,6 +64,37 @@ type GLRYnftLegacy struct {
 
 	PositionInt int64 `bson:"position" json:"position"`
 	HiddenBool  bool  `bson:"hidden"   json:"hidden"`
+}*/
+
+//-------------------------------------------------------------
+func NFTcreateBulk(pNFTlst []*GLRYnft,
+	pCtx        context.Context,
+	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
+
+
+	IDsLst     := []string{}
+	recordsLst := []interface{}{}
+	for _, n := range pNFTlst {
+		IDsLst     = append(IDsLst, string(n.IDstr))
+		recordsLst = append(recordsLst, interface{}(n))
+	}
+
+
+	collNameStr := "glry_nfts"
+	gErr := gfcore.Mongo__insert_bulk(IDsLst, recordsLst,
+		collNameStr,
+		map[string]interface{}{
+			"nft_ids":            IDsLst,
+			"caller_err_msg_str": "failed to bulk insert NFTs (GLRYnft) into DB",
+		},
+		pCtx,
+		pRuntimeSys)
+	if gErr != nil {
+		return gErr
+	}
+
+
+	return nil
 }
 
 //-------------------------------------------------------------
@@ -90,7 +125,7 @@ func NFTcreate(pNFT *GLRYnft,
 
 //-------------------------------------------------------------
 func NFTgetByUserID(pUserIDstr string,
-	pCtx context.Context,
+	pCtx        context.Context,
 	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYnft, *gfcore.Gf_error) {
 
 
@@ -98,4 +133,19 @@ func NFTgetByUserID(pUserIDstr string,
 
 
 	return nil, nil
+}
+
+//-------------------------------------------------------------
+func NFTcreateID(pNameStr string,
+	pCreatorAddressStr string,
+	pCreationTimeUNIXf float64) GLRYnftID {
+	
+	h := md5.New()
+	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
+	h.Write([]byte(pNameStr))
+	h.Write([]byte(pCreatorAddressStr))
+	sum    := h.Sum(nil)
+	hexStr := hex.EncodeToString(sum)
+	ID     := GLRYnftID(hexStr)
+	return ID
 }

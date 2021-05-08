@@ -3,121 +3,90 @@ package glry_extern_services
 import (
 	"fmt"
 	"context"
+	"time"
 	"encoding/json"
 	"strings"
 	log "github.com/sirupsen/logrus"
 	"github.com/parnurzeal/gorequest"
 	"github.com/mitchellh/mapstructure"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/mikeydub/go-gallery/glry_db"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
-type GLRYopenSeaAsset struct {
-	IDint               int    `bson:"id"        mapstructure:"id"`
-	TokenIDstr          string `bson:"token_id"  mapstructure:"token_id"`
-	NumberOfSalesInt    int    `bson:"num_sales" mapstructure:"num_sales"`
-	
-	// IMAGES
-	ImageURLstr         string                   `bson:"image_url"           mapstructure:"image_url"`
-	ImagePreviewURLstr  string                   `bson:"image_preview_url"   mapstructure:"image_preview_url"`
-	ImageThumbURLstr    string                   `bson:"image_thumbnail_url" mapstructure:"image_thumbnail_url"`
-	ImageOriginalURLstr string                   `bson:"image_original_url"  mapstructure:"image_original_url"`
-	AnimationURLstr     string                   `bson:"animation_url"       mapstructure:"animation_url"`
+// OPEN_SEA_PIPELINE__ASSETS_FOR_ACC
 
-	NameStr             string                   `bson:"name"           mapstructure:"name"`
-	DescriptionStr      string                   `bson:"description"    mapstructure:"description"`
-	ExternLinkStr       string                   `bson:"external_link"  mapstructure:"external_link"`
-	AssetContract       GLRYopenSeaAssetContract `bson:"asset_contract" mapstructure:"asset_contract"`
-	Owner               GLRYopenSeaOwner         `bson:"owner"          mapstructure:"owner"`
-	PermaLinkStr        string                   `bson:"permalink"      mapstructure:"permalink"`
+// ADD!! - persist OpenSea fetched assets as well.
 
-	// IMPORTANT!! - OpenSea (unlike Gallery) only allows an Asset to be in a single collection 
-	Collection GLRYopenSeaCollection `bson:"collection" mapstructure:"collection"`
-	
-	Creator        GLRYopenSeaCreator   `bson:"creator"      mapstructure:"creator"`
-	ListingDateStr string               `bson:"listing_date" mapstructure:"listing_date"`
-	LastSale       *GLRYopenSeaLastSale `bson:"last_sale" mapstructure:"last_sale"`
-}
+func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
+	pCtx        context.Context,
+	pRuntimeSys *gfcore.Runtime_sys) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
 
-type GLRYopenSeaAssetContract struct {
-	AddressStr     string `bson:"address"      mapstructure:"address"`
-	CreatedDateStr string `bson:"created_date" mapstructure:"created_date"`
-	NameStr        string `bson:"name"         mapstructure:"name"`
-	OwnerInt       int    `bson:"owner"        mapstructure:"owner"`
-	SymbolStr      string `bson:"symbol"       mapstructure:"symbol"`
-	DescriptionStr string `bson:"description"  mapstructure:"description"`
-}
 
-type GLRYopenSeaOwner struct {
-	User               GLRYopenSeaUser `bson:"user"            mapstructure:"user"`
-	ProfileImageURLstr string          `bson:"profile_img_url" mapstructure:"profile_img_url"`
-	AddressStr         string          `bson:"address"         mapstructure:"address"`
-}
+	//--------------------
+	// OPENSEA_FETCH
+	openSeaAssetsForAccLst, gErr := OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr,
+		pCtx,
+		pRuntimeSys)
+	if gErr != nil {
+		return nil, gErr
+	}
 
-type GLRYopenSeaCollection struct {
-	CreatedDateStr       string `bson:"created_date"       mapstructure:"created_date"`
-	DescriptionStr       string `bson:"description"        mapstructure:"description"`
-	ExternalURLstr       string `bson:"external_url"       mapstructure:"external_url"`
-	ImageURLstr          string `bson:"image_url"          mapstructure:"image_url"`
-	NameStr              string `bson:"name"               mapstructure:"name"`
-	PayoutAddressStr     string `bson:"payout_address"     mapstructure:"payout_address"`
-	TwitterUsernameStr   string `bson:"twitter_username"   mapstructure:"twitter_username"`
-	InstagramUsernameStr string `bson:"instagram_username" mapstructure:"instagram_username"`
-}
+	//--------------------
 
-type GLRYopenSeaCreator struct {
-	User               GLRYopenSeaUser `bson:"user"            mapstructure:"user"`
-	ProfileImageURLstr string          `bson:"profile_img_url" mapstructure:"profile_img_url"`
-	AddressStr         string          `bson:"address"         mapstructure:"address"`
-}
 
-type GLRYopenSeaUser struct {
-	UsernameStr string `bson:"username" mapstructure:"username"`
-}
 
-// LAST_SALE
-// ADD!! - this is a single LastSale, not a chain of custody, 
-//         so if this chain is to be rebuilt this LastSale has to be continuously queried
-//         for an assert and results persisted for future reference.
-type GLRYopenSeaLastSale struct {
-	TokenIDstr        string                     `bson:"token_id"` // this is nested in "asset" field, but I wanted surfaced as a top attribute, so no mapstructure
-	EventTimestampStr string                     `bson:"event_timestamp" mapstructure:"eventtimestamp"` 
-	EventTypeStr      string                     `bson:"event_type"      mapstructure:"event_type"`
-	PaymentToken GLRYopenSeaLastSalePaymentToken `bson:"payment_token"   mapstructure:"payment_token"`
-	QuantityStr  string                          `bson:"quantity"        mapstructure:"quantity"`
-	Transaction  GLRYopenSeaLastSaleTx           `bson:"transaction"     mapstructure:"transaction"`
-}
+	// DB_PERSIST
+	nftsLst := []*glry_db.GLRYnft{}
+	for _, openSeaAsset := range openSeaAssetsForAccLst {
 
-type GLRYopenSeaLastSalePaymentToken struct {
-	EthPriceStr string `bson:"eth_price" mapstructure:"eth_price"`
-	SymbolStr   string `bson:"symbol"    mapstructure:"symbol"`
-	USDpriceStr string `bson:"usd_price" mapstructure:"usd_price"`
-}
+		creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
+		nameStr           := openSeaAsset.NameStr
+		creatorAddressStr := openSeaAsset.Creator.AddressStr
+		IDstr             := glry_db.NFTcreateID(nameStr, creatorAddressStr, creationTimeUNIXf)
 
-// TX
-type GLRYopenSeaLastSaleTx struct {
-	IDf            float64        `bson:"id"           mapstructure:"id"`
-	TimestampStr   string         `bson:"timestamp"    mapstructure:"timestamp"`
-	BlockHashStr   string         `bson:"block_hash"   mapstructure:"block_hash"`
-	BlockNumberStr string         `bson:"block_number" mapstructure:"block_number"`
-	FromAcc        GLRYopenSeaAcc `bson:"from_acc"     mapstructure:"from_account"`
-	ToAcc          GLRYopenSeaAcc `bson:"to_acc"       mapstructure:"to_account"`
-	TxHashStr      string         `bson:"tx_hash"      mapstructure:"transaction_hash"`
-	TxIndexStr     string         `bson:"tx_index"     mapstructure:"transaction_index"`
-}
+		nft := &glry_db.GLRYnft{
+			VersionInt:         0,
+			
+			IDstr:              IDstr,
+			CreationTimeF:      creationTimeUNIXf,
+			NameStr:            nameStr,
+			DescriptionStr:     openSeaAsset.DescriptionStr,
+			CollectionNamesLst: []string{openSeaAsset.Collection.NameStr, },
 
-// ACC
-type GLRYopenSeaAcc struct {
-	AddressStr       string            `bson:"address"         mapstructure:"address"`
-	ProfileImgURLstr string            `bson:"profile_img_url" mapstructure:"profile_img_url"`
-	UserMap          map[string]string `bson:"user"            mapstructure:"user"`
+			ExternalURLstr:     openSeaAsset.ExternLinkStr,
+			CreatorAddressStr:  creatorAddressStr,
+			ContractAddressStr: openSeaAsset.AssetContract.AddressStr,
+
+			OpenSeaTokenIDstr: openSeaAsset.TokenIDstr,       
+
+			ImageURLstr:          openSeaAsset.ImageURLstr,
+			ImageThumbnailURLstr: openSeaAsset.ImageThumbURLstr,
+			ImagePreviewURLstr:   openSeaAsset.ImagePreviewURLstr,
+
+			PositionInt: 0,
+			HiddenBool:  false,
+		}
+		nftsLst = append(nftsLst, nft)
+	}
+
+
+
+	// CREATE_BULK
+	gErr = glry_db.NFTcreateBulk(nftsLst, pCtx, pRuntimeSys)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+
+	return openSeaAssetsForAccLst, nil
 }
 
 //-------------------------------------------------------------
 func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYopenSeaAsset, *gfcore.Gf_error) {
+	pCtx        context.Context,
+	pRuntimeSys *gfcore.Runtime_sys) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
 
 	/*{
 	*	"id": 21976544,
@@ -317,11 +286,11 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 
 
 	assetsLst       := response["assets"].([]interface{})
-	assetsForAccLst := []*GLRYopenSeaAsset{}
+	assetsForAccLst := []*glry_db.GLRYopenSeaAsset{}
 
 	for _, aMap := range assetsLst {
 
-		var asset GLRYopenSeaAsset
+		var asset glry_db.GLRYopenSeaAsset
 		err := mapstructure.Decode(aMap, &asset)
 		if err != nil {
 			

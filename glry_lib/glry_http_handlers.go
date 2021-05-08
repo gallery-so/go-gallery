@@ -1,6 +1,7 @@
 package glry_lib
 
 import (
+	"fmt"
 	"net/http"
 	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
@@ -13,10 +14,40 @@ import (
 //-------------------------------------------------------------
 func HandlersInit(pRuntime *glry_core.Runtime) {
 
+
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
 
-	
+	gfrpclib.Create_handler__http("/glry/v1/auth/users",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
+
+
+
+			//------------------
+			// INPUT
+
+			qMap := pReq.URL.Query()
+			userPublicAddrStr := qMap["pubaddr"]
+			//------------------
+			
+
+			fmt.Println(userPublicAddrStr)
+
+			//------------------
+			// OUTPUT
+			data_map := map[string]interface{}{
+			
+			}
+
+			//------------------
+
+			return data_map, nil
+		},
+		pRuntime.RuntimeSys)
+
+	//-------------------------------------------------------------
+	// COLLECTION_CREATE
+
 	gfrpclib.Create_handler__http("/glry/v1/collections/create",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 
@@ -29,10 +60,13 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				return nil, gErr
 			}
 
+			// FINISH!! - get user_id mechanism
+			userIDstr := ""
+
 			//------------------
 
 
-			gErr = CollPipelineCreate(inputParsed.(*GLRYcollInputCreate), pRuntime)
+			coll, gErr := CollPipelineCreate(inputParsed.(*GLRYcollInputCreate), userIDstr, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -40,7 +74,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// OUTPUT
 			data_map := map[string]interface{}{
-				
+				"coll_id": coll.IDstr,
 			}
 
 			//------------------
@@ -146,10 +180,4 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
-
-
-
-
-
-
 }

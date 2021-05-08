@@ -6,6 +6,7 @@ import (
 )
 
 //-------------------------------------------------------------
+// VALIDATE
 func HTTPvalidate(pInput interface{},
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
