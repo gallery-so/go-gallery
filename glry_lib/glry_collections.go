@@ -8,30 +8,33 @@ import (
 )
 
 //-------------------------------------------------------------
-type GLRYcollInputCreate struct {
-	NameStr        string `json:"name"        validate:"required, min=4, max=50"`
-	DescriptionStr string `json:"description" validate:"required, min=0, max=500"`
+// INPUT
+type GLRYcollCreateInput struct {
+	NameStr        string `json:"name"        validate:"required,min=4,max=50"`
+	DescriptionStr string `json:"description" validate:"required,min=0,max=500"`
 }
 
+// INPUT
 // FIX!! - currently coll IDs are mongodb ID's, 
 //         have some mongodb agnostic ID format.
-type GLRYcollInputDelete struct {
-	IDstr string `json:"id" validate:"rDstr := pUserIDstr
-	IDstr    quired, len=24"`
+type GLRYcollDeleteInput struct {
+	IDstr string `json:"id" validate:"required,len=24"`
 }
 
 //-------------------------------------------------------------
 // CREATE
-func CollPipelineCreate(pInput *GLRYcollInputCreate,
+func CollPipelineCreate(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
 	pRuntime   *glry_core.Runtime) (*glry_db.GLRYcollection, *gfcore.Gf_error) {
 
+	//------------------
 	// VALIDATE
-	gErr := HTTPvalidate(pInput, pRuntime)
+	gErr := glry_core.Validate(pInput, pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
 
+	//------------------
 
 	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
 	nameStr        := pInput.NameStr
@@ -55,14 +58,17 @@ func CollPipelineCreate(pInput *GLRYcollInputCreate,
 
 //-------------------------------------------------------------
 // DELETE
-func CollPipelineDelete(pInput *GLRYcollInputDelete,
+func CollPipelineDelete(pInput *GLRYcollDeleteInput,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
-
+	
+	//------------------
 	// VALIDATE
-	gErr := HTTPvalidate(pInput, pRuntime)
+	gErr := glry_core.Validate(pInput, pRuntime)
 	if gErr != nil {
 		return gErr
 	}
+
+	//------------------
 
 
 

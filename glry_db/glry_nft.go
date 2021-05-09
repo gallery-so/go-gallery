@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/mikeydub/go-gallery/glry_core"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -68,8 +69,8 @@ type GLRYnftLegacy struct {
 
 //-------------------------------------------------------------
 func NFTcreateBulk(pNFTlst []*GLRYnft,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
 
 	IDsLst     := []string{}
@@ -88,7 +89,7 @@ func NFTcreateBulk(pNFTlst []*GLRYnft,
 			"caller_err_msg_str": "failed to bulk insert NFTs (GLRYnft) into DB",
 		},
 		pCtx,
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 	if gErr != nil {
 		return gErr
 	}
@@ -99,8 +100,8 @@ func NFTcreateBulk(pNFTlst []*GLRYnft,
 
 //-------------------------------------------------------------
 func NFTcreate(pNFT *GLRYnft,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
 
 
@@ -113,7 +114,7 @@ func NFTcreate(pNFT *GLRYnft,
 			"caller_err_msg": "failed to insert a new NFT into the DB",
 		},
 		pCtx,
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 	if gErr != nil {
 		return gErr
 	}
@@ -125,8 +126,8 @@ func NFTcreate(pNFT *GLRYnft,
 
 //-------------------------------------------------------------
 func NFTgetByUserID(pUserIDstr string,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) ([]*GLRYnft, *gfcore.Gf_error) {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) ([]*GLRYnft, *gfcore.Gf_error) {
 
 
 

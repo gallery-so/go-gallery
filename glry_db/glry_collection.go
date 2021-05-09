@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"go.mongodb.org/mongo-driver/bson"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/mikeydub/go-gallery/glry_core"
 )
 
 //-------------------------------------------------------------
@@ -25,8 +26,8 @@ type GLRYcollection struct {
 
 //-------------------------------------------------------------
 func CollCreate(pColl *GLRYcollection,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) *gfcore.Gf_error {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
 	collNameStr := "glry_collections"
 	gErr := gfcore.Mongo__insert(pColl,
@@ -36,7 +37,7 @@ func CollCreate(pColl *GLRYcollection,
 			"caller_err_msg": "failed to insert a new GLRYcollection into the DB",
 		},
 		pCtx,
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 	if gErr != nil {
 		return gErr
 	}
@@ -46,11 +47,11 @@ func CollCreate(pColl *GLRYcollection,
 
 //-------------------------------------------------------------
 func CollGetByID(pIDstr string,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) (*GLRYcollection, *gfcore.Gf_error) {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYcollection, *gfcore.Gf_error) {
 
 	var coll *GLRYcollection
-	err := pRuntimeSys.Mongo_db.Collection("glry_collections").FindOne(pCtx, bson.M{
+	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_collections").FindOne(pCtx, bson.M{
 			"_id":     pIDstr,
 			"deleted": false,
 		}).Decode(&coll)
@@ -59,7 +60,7 @@ func CollGetByID(pIDstr string,
 		gf_err := gfcore.Mongo__handle_error("failed to query GLRYcollection by ID",
 			"mongodb_find_error",
 			map[string]interface{}{"id": pIDstr,},
-			err, "glry_db", pRuntimeSys)
+			err, "glry_db", pRuntime.RuntimeSys)
 		return nil, gf_err
 	}
 

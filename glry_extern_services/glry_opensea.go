@@ -10,6 +10,7 @@ import (
 	"github.com/parnurzeal/gorequest"
 	"github.com/mitchellh/mapstructure"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -20,15 +21,15 @@ import (
 // ADD!! - persist OpenSea fetched assets as well.
 
 func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx        context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
 
 
 	//--------------------
 	// OPENSEA_FETCH
 	openSeaAssetsForAccLst, gErr := OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr,
 		pCtx,
-		pRuntimeSys)
+		pRuntime.RuntimeSys)
 	if gErr != nil {
 		return nil, gErr
 	}
@@ -74,7 +75,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 
 
 	// CREATE_BULK
-	gErr = glry_db.NFTcreateBulk(nftsLst, pCtx, pRuntimeSys)
+	gErr = glry_db.NFTcreateBulk(nftsLst, pCtx, pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
