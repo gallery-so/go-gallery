@@ -23,7 +23,7 @@ type GLRYcollDeleteInput struct {
 
 //-------------------------------------------------------------
 // CREATE
-func CollPipelineCreate(pInput *GLRYcollCreateInput,
+func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
 	pRuntime   *glry_core.Runtime) (*glry_db.GLRYcollection, *gfcore.Gf_error) {
 
@@ -58,7 +58,7 @@ func CollPipelineCreate(pInput *GLRYcollCreateInput,
 
 //-------------------------------------------------------------
 // DELETE
-func CollPipelineDelete(pInput *GLRYcollDeleteInput,
+func CollDeletePipeline(pInput *GLRYcollDeleteInput,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 	
 	//------------------

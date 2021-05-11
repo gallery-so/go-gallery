@@ -16,9 +16,9 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 
 	//-------------------------------------------------------------
-	// AUTH_USER_VERIFY_SIGNATURE
+	// AUTH_USER_LOGIN
 
-	gfrpclib.Create_handler__http("/glry/v1/auth/user_veryfiy_sig",
+	gfrpclib.Create_handler__http("/glry/v1/auth/login",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 
 			//------------------
@@ -61,7 +61,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			userAddrStr := qMap["addr"][0]
 
 			input := &GLRYauthUserGetPublicInfoInput{
-				AddressStr: userAddrStr,
+				AddressStr: glry_db.GLRYuserAddressStr(userAddrStr),
 			}
 
 			//------------------
@@ -114,8 +114,8 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				//------------------
 				// OUTPUT
 				dataMap := map[string]interface{}{
-					"id":    user.IDstr,
-					"nonce": user.NonceInt,
+					"id": user.IDstr,
+					// "nonce": user.NonceInt,
 				}
 
 				//------------------
@@ -148,7 +148,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 
 
-			coll, gErr := CollPipelineCreate(inputParsed.(*GLRYcollCreateInput), userIDstr, pRuntime)
+			coll, gErr := CollCreatePipeline(inputParsed.(*GLRYcollCreateInput), userIDstr, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -181,7 +181,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 
-			gErr = CollPipelineDelete(inputParsed.(*GLRYcollDeleteInput), pRuntime)
+			gErr = CollDeletePipeline(inputParsed.(*GLRYcollDeleteInput), pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}

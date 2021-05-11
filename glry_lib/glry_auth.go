@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 	"context"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
@@ -14,23 +15,26 @@ import (
 //-------------------------------------------------------------
 // INPUT
 type GLRYauthUserVerifySignatureInput struct {
-	NameStr      string `json:"name"    validate:"required,min=4,max=50"`
-	AddressStr   string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	SignatureStr string `json:"name"    validate:"required,min=4, max=50"`
+	NameStr      string                     `json:"name"    validate:"required,min=4,max=50"`
+	AddressStr   glry_db.GLRYuserAddressStr `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	SignatureStr string                     `json:"name"    validate:"required,min=4, max=50"`
 }
 
 // INPUT
 type GLRYauthUserGetPublicInfoInput struct {
-	AddressStr string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr glry_db.GLRYuserAddressStr `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // INPUT
 type GLRYauthUserCreateInput struct {
-	NameStr    string `json:"name"    validate:"required,min=4,max=50"`
-	AddressStr string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	NameStr    string                     `json:"name"    validate:"required,min=4,max=50"`
+	AddressStr glry_db.GLRYuserAddressStr `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 //-------------------------------------------------------------
+// USER
+//-------------------------------------------------------------
+// USER_VERIFY_SIGNATURE__PIPELINE
 func AuthUserUserVerifySignaturePipeline(pInput *GLRYauthUserVerifySignatureInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
@@ -73,10 +77,26 @@ func AuthUserGetPublicInfoPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 	// NO_USER_FOUND - user doesnt exist in the system, and so return an empty response
 	//                 to the front-end. subsequently the client has to create a new user.
 	if user == nil {
-		return 0, nil
+
+
+
+		// NONCE_CREATE
+		nonce, gErr := AuthNonceCreatePipeline(glry_db.GLRYuserID(""), pInput.AddressStr, pCtx, pRuntime)
+		if gErr != nil {
+			return 0, gErr
+		}
+
+
+		return nonce.NonceInt, nil
 	}
 
-	return user.NonceInt, nil
+	// NONCE_GET
+	nonce, gErr := glry_db.AuthNonceGet(pInput.AddressStr, pCtx, pRuntime)
+	if gErr != nil {
+		return 0, gErr
+	}
+	
+	return nonce.NonceInt, nil
 }
 
 //-------------------------------------------------------------
@@ -101,16 +121,15 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 		addressStr,
 		creationTimeUNIXf)
 
-	// NONCE
-	nonceInt := AuthNonceGenerate()
+	
 
 	user := &glry_db.GLRYuser{
 		VersionInt:    0,
 		IDstr:         IDstr,
 		CreationTimeF: creationTimeUNIXf,
 		NameStr:       nameStr,
-		AddressStr:    addressStr,
-		NonceInt:      nonceInt,
+		AddressesLst:  []glry_db.GLRYuserAddressStr{addressStr, },
+		// NonceInt:      nonceInt,
 	}
 
 	gErr = glry_db.AuthUserCreate(user, pCtx, pRuntime)
@@ -122,8 +141,8 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 }
 
 //-------------------------------------------------------------
-// USER_CREATE__PIPELINE
-func AuthUserDeletePipeline(pUserIDstr *glry_db.GLRYuserID,
+// USER_DELETE__PIPELINE
+func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
@@ -139,6 +158,40 @@ func AuthUserDeletePipeline(pUserIDstr *glry_db.GLRYuserID,
 
 	return nil
 }
+
+//-------------------------------------------------------------
+// NONCE
+//-------------------------------------------------------------
+// NONCE_CREATE__PIPELINE
+func AuthNonceCreatePipeline(pUserIDstr glry_db.GLRYuserID,
+	pUserAddressStr glry_db.GLRYuserAddressStr,
+	pCtx            context.Context,
+	pRuntime        *glry_core.Runtime) (*glry_db.GLRYuserNonce, *gfcore.Gf_error) {
+	
+	// NONCE
+	nonceInt := AuthNonceGenerate()
+
+	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
+	nonce := &glry_db.GLRYuserNonce{
+		VersionInt:    0,
+		ID:            primitive.NewObjectID(),
+		CreationTimeF: creationTimeUNIXf,
+		DeletedBool:   false,
+
+		NonceInt:   nonceInt,
+		UserIDstr:  pUserIDstr,
+		AddressStr: pUserAddressStr,
+	}
+
+	// DB_CREATE
+	gErr := glry_db.AuthNonceCreate(nonce, pCtx, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	return nonce, nil
+}
+
 //-------------------------------------------------------------
 // NONCE_GENERATE
 func AuthNonceGenerate() int {

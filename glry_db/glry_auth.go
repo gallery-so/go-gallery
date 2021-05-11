@@ -7,26 +7,44 @@ import (
 	"encoding/hex"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 )
 
 //-------------------------------------------------------------
-type GLRYuserID string
+type GLRYuserID         string
+type GLRYuserAddressStr string
 type GLRYuser struct {
 	VersionInt     int64      `bson:"version"` // schema version for this model
 	IDstr          GLRYuserID `bson:"_id"           json:"id"`
 	CreationTimeF  float64    `bson:"creation_time" json:"creation_time"`
 	DeletedBool    bool       `bson:"deleted"`
 
-	NameStr    string `bson:"name"    json:"name"`
-	AddressStr string `bson:"address" json:"address"`
+	NameStr      string               `bson:"name"     json:"name"`
+	AddressesLst []GLRYuserAddressStr `bson:"addresses json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
 
-	// FIX?? - this nonce changes on every user login, should it be stored in some
-	//         other DB coll/structure, separate from the user?
-	NonceInt int
+	// LAST_SEEN - last time user logged or out? or some other metric?
+	// FINISH!!  - nothing is setting this yet.
+	LastSeenTimeF float64 
 }
 
+type GLRYuserNonce struct {
+	VersionInt int64 `bson:"version"` // schema version for this model
+
+	// nonces are shortlived, and not something to be persisted across DB's
+	// other than mongo. so use mongo-native ID generation
+	ID             primitive.ObjectID `bson:"_id"`
+	CreationTimeF  float64       `bson:"creation_time"`
+	DeletedBool    bool          `bson:"deleted"`
+
+	NonceInt   int                `bson:"nonce"`
+	UserIDstr  GLRYuserID         `bson:"user_id"`
+	AddressStr GLRYuserAddressStr `bson:"address"`
+}
+
+//-------------------------------------------------------------
+// USER
 //-------------------------------------------------------------
 // USER_CREATE
 func AuthUserCreate(pUser *GLRYuser,
@@ -52,7 +70,7 @@ func AuthUserCreate(pUser *GLRYuser,
 
 //-------------------------------------------------------------
 // USER_DELETE
-func AuthUserDelete(pUserID *GLRYuserID,
+func AuthUserDelete(pUserID GLRYuserID,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
@@ -81,14 +99,14 @@ func AuthUserDelete(pUserID *GLRYuserID,
 
 //-------------------------------------------------------------
 // USER_GET_BY_ADDRESS
-func AuthUserGetByAddress(pAddressStr string,
+func AuthUserGetByAddress(pAddressStr GLRYuserAddressStr,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYuser, *gfcore.Gf_error) {
 
 
 	var user *GLRYuser
 	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users").FindOne(pCtx, bson.M{
-			"address": pAddressStr,
+			"addresses": bson.M{"$in": bson.A{pAddressStr, }},
 			"deleted": false,
 		}).Decode(&user)
 	
@@ -107,15 +125,68 @@ func AuthUserGetByAddress(pAddressStr string,
 }
 
 //-------------------------------------------------------------
+// NONCE
+//-------------------------------------------------------------
+// NONCE_GET
+func AuthNonceGet(pUserAddressStr GLRYuserAddressStr,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYuserNonce, *gfcore.Gf_error) {
+
+	var nonce *GLRYuserNonce
+	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_user_nonces").FindOne(pCtx, bson.M{
+			"address": pUserAddressStr,
+			"deleted": false,
+		}).Decode(&nonce)
+	
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		gErr := gfcore.Mongo__handle_error("failed to get user GLRYuserNonce by Address",
+			"mongodb_find_error",
+			map[string]interface{}{"address": pUserAddressStr,},
+			err, "glry_db", pRuntime.RuntimeSys)
+		return nil, gErr
+	}
+
+	return nonce, nil
+}
+
+//-------------------------------------------------------------
+// NONCE_CREATE
+func AuthNonceCreate(pNonce *GLRYuserNonce,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+
+
+	collNameStr := "glry_user_nonces"
+	gErr := gfcore.Mongo__insert(pNonce,
+		collNameStr,
+		map[string]interface{}{
+			"nonce_address":  pNonce.AddressStr,
+			"caller_err_msg": "failed to insert a new GLRYuser into the DB",
+		},
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return gErr
+	}
+
+	return nil
+}
+
+//-------------------------------------------------------------
+// VAR
+//-------------------------------------------------------------
 // CREATE_ID
 func AuthUserCreateID(pUsernameStr string,
-	pAddressStr        string,
+	pAddressStr        GLRYuserAddressStr,
 	pCreationTimeUNIXf float64) GLRYuserID {
 	
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
 	h.Write([]byte(pUsernameStr))
-	h.Write([]byte(pAddressStr))
+	h.Write([]byte(string(pAddressStr)))
 	sum    := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	ID     := GLRYuserID(hexStr)
