@@ -2,6 +2,7 @@ package glry_lib
 
 import (
 	"time"
+	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
@@ -14,6 +15,12 @@ type GLRYcollCreateInput struct {
 	DescriptionStr string `json:"description" validate:"required,min=0,max=500"`
 }
 
+// OUTPUT
+type GLRYcollCreateOutput struct {
+	IDstr   glry_db.GLRYcollID `json:"id"`
+	NameStr string             `json:"name"`
+}
+
 // INPUT
 // FIX!! - currently coll IDs are mongodb ID's, 
 //         have some mongodb agnostic ID format.
@@ -21,11 +28,17 @@ type GLRYcollDeleteInput struct {
 	IDstr string `json:"id" validate:"required,len=24"`
 }
 
+type GLRYcollDeleteOutput struct {
+
+}
+
+
 //-------------------------------------------------------------
 // CREATE
 func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
-	pRuntime   *glry_core.Runtime) (*glry_db.GLRYcollection, *gfcore.Gf_error) {
+	pCtx       context.Context,
+	pRuntime   *glry_core.Runtime) (*GLRYcollCreateOutput, *gfcore.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -53,26 +66,37 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 		NFTsLst:        []string{},
 	}
 
-	return coll, nil
+
+	// DB
+	gErr = glry_db.CollCreate(coll, pCtx, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	output := &GLRYcollCreateOutput{
+		IDstr:   coll.IDstr,
+		NameStr: coll.NameStr,
+	}
+
+	return output, nil
 }
 
 //-------------------------------------------------------------
 // DELETE
 func CollDeletePipeline(pInput *GLRYcollDeleteInput,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, *gfcore.Gf_error) {
 	
 	//------------------
 	// VALIDATE
 	gErr := glry_core.Validate(pInput, pRuntime)
 	if gErr != nil {
-		return gErr
+		return nil, gErr
 	}
 
 	//------------------
 
-
-
-	return nil
+	return nil, nil
 }
 
 //-------------------------------------------------------------

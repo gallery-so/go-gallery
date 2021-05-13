@@ -7,6 +7,9 @@ replace github.com/gloflow/gloflow => ./../gloflow
 require (
 	github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
+	github.com/ethereum/go-ethereum v1.10.3 // indirect
+	github.com/fatih/color v1.10.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/georgysavva/scany v0.2.7 // indirect
 	github.com/gloflow/gloflow v0.0.0-20210429233436-b11394c9fc1d // indirect

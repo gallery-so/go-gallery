@@ -13,16 +13,16 @@ import (
 )
 
 //-------------------------------------------------------------
-type GLRYuserID         string
-type GLRYuserAddressStr string
+type GLRYuserID      string
+type GLRYuserAddress string
 type GLRYuser struct {
 	VersionInt     int64      `bson:"version"` // schema version for this model
 	IDstr          GLRYuserID `bson:"_id"           json:"id"`
 	CreationTimeF  float64    `bson:"creation_time" json:"creation_time"`
 	DeletedBool    bool       `bson:"deleted"`
 
-	NameStr      string               `bson:"name"     json:"name"`
-	AddressesLst []GLRYuserAddressStr `bson:"addresses json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	NameStr      string            `bson:"name"     json:"name"`
+	AddressesLst []GLRYuserAddress `bson:"addresses json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
 
 	// LAST_SEEN - last time user logged or out? or some other metric?
 	// FINISH!!  - nothing is setting this yet.
@@ -35,12 +35,12 @@ type GLRYuserNonce struct {
 	// nonces are shortlived, and not something to be persisted across DB's
 	// other than mongo. so use mongo-native ID generation
 	ID             primitive.ObjectID `bson:"_id"`
-	CreationTimeF  float64       `bson:"creation_time"`
-	DeletedBool    bool          `bson:"deleted"`
+	CreationTimeF  float64            `bson:"creation_time"`
+	DeletedBool    bool               `bson:"deleted"`
 
-	NonceInt   int                `bson:"nonce"`
-	UserIDstr  GLRYuserID         `bson:"user_id"`
-	AddressStr GLRYuserAddressStr `bson:"address"`
+	ValueStr   string          `bson:"value"`
+	UserIDstr  GLRYuserID      `bson:"user_id"`
+	AddressStr GLRYuserAddress `bson:"address"`
 }
 
 //-------------------------------------------------------------
@@ -99,7 +99,7 @@ func AuthUserDelete(pUserID GLRYuserID,
 
 //-------------------------------------------------------------
 // USER_GET_BY_ADDRESS
-func AuthUserGetByAddress(pAddressStr GLRYuserAddressStr,
+func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYuser, *gfcore.Gf_error) {
 
@@ -128,7 +128,7 @@ func AuthUserGetByAddress(pAddressStr GLRYuserAddressStr,
 // NONCE
 //-------------------------------------------------------------
 // NONCE_GET
-func AuthNonceGet(pUserAddressStr GLRYuserAddressStr,
+func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYuserNonce, *gfcore.Gf_error) {
 
@@ -180,7 +180,7 @@ func AuthNonceCreate(pNonce *GLRYuserNonce,
 //-------------------------------------------------------------
 // CREATE_ID
 func AuthUserCreateID(pUsernameStr string,
-	pAddressStr        GLRYuserAddressStr,
+	pAddressStr        GLRYuserAddress,
 	pCreationTimeUNIXf float64) GLRYuserID {
 	
 	h := md5.New()

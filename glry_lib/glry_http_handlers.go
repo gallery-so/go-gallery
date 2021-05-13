@@ -1,7 +1,7 @@
 package glry_lib
 
 import (
-	// "fmt"
+	"fmt"
 	"net/http"
 	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
@@ -32,15 +32,26 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 			
-			// GET_PUBLIC_INFO
-			gErr = AuthUserUserVerifySignaturePipeline(inputParsed.(*GLRYauthUserVerifySignatureInput), pCtx, pRuntime)
+			// USER_LOGIN__PIPELINE
+			validBool, userJWTtokenStr, gErr := AuthUserLoginPipeline(inputParsed.(*GLRYauthUserVerifySignatureInput),
+				pCtx,
+				pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
 
+
+
+
+			// FINISH!! - set the JWT token as a header in the response
+			fmt.Println(userJWTtokenStr)
+
+
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{}
+			dataMap := map[string]interface{}{
+				"valid": validBool,
+			}
 
 			//------------------
 
@@ -61,13 +72,13 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			userAddrStr := qMap["addr"][0]
 
 			input := &GLRYauthUserGetPublicInfoInput{
-				AddressStr: glry_db.GLRYuserAddressStr(userAddrStr),
+				AddressStr: glry_db.GLRYuserAddress(userAddrStr),
 			}
 
 			//------------------
 			
 			// GET_PUBLIC_INFO
-			nonceInt, gErr := AuthUserGetPublicInfoPipeline(input, pCtx, pRuntime)
+			nonceStr, gErr := AuthUserGetPublicInfoPipeline(input, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -78,8 +89,8 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			// CHECK_USER_EXISTS - nonce == 0 is the empty-value, meaning that there is no user
 			//                     for the specified address. so the response should be empty as well.
-			if nonceInt > 0 {
-				dataMap["nonce"] = nonceInt
+			if len(nonceStr) > 0 {
+				dataMap["nonce"] = nonceStr
 			}
 
 			//------------------
@@ -148,7 +159,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 
 
-			coll, gErr := CollCreatePipeline(inputParsed.(*GLRYcollCreateInput), userIDstr, pRuntime)
+			coll, gErr := CollCreatePipeline(inputParsed.(*GLRYcollCreateInput), userIDstr, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -181,7 +192,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 
-			gErr = CollDeletePipeline(inputParsed.(*GLRYcollDeleteInput), pRuntime)
+			_, gErr = CollDeletePipeline(inputParsed.(*GLRYcollDeleteInput), pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}

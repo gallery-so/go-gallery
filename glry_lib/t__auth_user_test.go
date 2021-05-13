@@ -4,18 +4,23 @@ import (
 	"fmt"
 	"testing"
 	"context"
+	"github.com/fatih/color"
 	// "github.com/stretchr/testify/assert"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/mikeydub/go-gallery/glry_db"
 	"github.com/davecgh/go-spew/spew"
 )
 
 //---------------------------------------------------
-func TestFetchAssertsForAcc(pTest *testing.T) {
+func TestAuthUser(pTest *testing.T) {
 
-	fmt.Println("TEST__AUTH ==============================================")
+	cyan   := color.New(color.FgCyan).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	fmt.Println(cyan("TEST__AUTH_USER"), yellow("=============================================="))
 	
-	addressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
+	addressStr := glry_db.GLRYuserAddress("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15")
 
 	ctx := context.Background()
 
@@ -46,7 +51,7 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	// USER_GET_PUBLIC_INFO
 
 	userGetPublicInfoInput := &GLRYauthUserGetPublicInfoInput{
-		AddressStr: user.AddressStr,
+		AddressStr: user.AddressesLst[0],
 	}
 	nonceInt, gErr := AuthUserGetPublicInfoPipeline(userGetPublicInfoInput, ctx, runtime)
 	if gErr != nil {
@@ -56,7 +61,7 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	//--------------------
 	// USER_DELETE
 
-	gErr = AuthUserDeletePipeline(&user.IDstr, ctx, runtime)
+	gErr = AuthUserDeletePipeline(user.IDstr, ctx, runtime)
 	if gErr != nil {
 		pTest.Fail()
 	}
