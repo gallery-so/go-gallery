@@ -33,7 +33,8 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			
 			// USER_LOGIN__PIPELINE
-			validBool, userJWTtokenStr, gErr := AuthUserLoginPipeline(inputParsed.(*GLRYauthUserVerifySignatureInput),
+			validBool, userJWTtokenStr, gErr := AuthUserLoginAndMemorizeAttemptPipeline(inputParsed.(*GLRYauthUserVerifySignatureInput),
+				pReq,
 				pCtx,
 				pRuntime)
 			if gErr != nil {
@@ -78,19 +79,15 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			
 			// GET_PUBLIC_INFO
-			nonceStr, gErr := AuthUserGetPublicInfoPipeline(input, pCtx, pRuntime)
+			output, gErr := AuthUserGetPublicInfoPipeline(input, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
 
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{}
-
-			// CHECK_USER_EXISTS - nonce == 0 is the empty-value, meaning that there is no user
-			//                     for the specified address. so the response should be empty as well.
-			if len(nonceStr) > 0 {
-				dataMap["nonce"] = nonceStr
+			dataMap := map[string]interface{}{
+				"nonce": output.NonceStr,
 			}
 
 			//------------------

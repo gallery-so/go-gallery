@@ -5,11 +5,12 @@ import (
 	"testing"
 	"context"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	// "github.com/stretchr/testify/assert"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
-	"github.com/davecgh/go-spew/spew"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //---------------------------------------------------
@@ -44,8 +45,7 @@ func TestAuthUser(pTest *testing.T) {
 		pTest.Fail()
 	}
 
-
-	spew.Dump(user)
+	// spew.Dump(user)
 
 	//--------------------
 	// USER_GET_PUBLIC_INFO
@@ -66,13 +66,12 @@ func TestAuthUser(pTest *testing.T) {
 		pTest.Fail()
 	}
 	
-
-
-
 	//--------------------
 
 
-	fmt.Println(nonceInt)
+
+	log.WithFields(log.Fields{"nonce": nonceInt,}).Info("signature validity")
+	fmt.Println()
 
 	// assert.True(pTest, len(assetsForAccLst) > 0, "more then 0 OpenSea assets should be fetched for Account")
 	

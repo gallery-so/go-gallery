@@ -1,6 +1,7 @@
 package glry_core
 
 import (
+	"os"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -23,6 +24,16 @@ type DB struct {
 //-------------------------------------------------------------
 func RuntimeGet(pMongoDBhostStr string,
 	pMongoDBnameStr string) (*Runtime, *gfcore.Gf_error) {
+	
+	//------------------
+	// LOGS
+	log.SetOutput(os.Stdout)
+
+	// Only log the warning severity or above.
+	// log.SetLevel(log.WarnLevel)
+	log.SetLevel(log.DebugLevel)
+
+	//------------------
 
 	// RUNTIME_SYS
 	runtimeSys := &gfcore.Runtime_sys{
@@ -64,7 +75,7 @@ func DBinit(pMongoHostStr string,
 	pMongoDBNamestr string,
 	pRuntimeSys     *gfcore.Runtime_sys) (*DB, *gfcore.Gf_error) {
 
-	mongoURLstr  := fmt.Sprintf("mongodb://%s", pMongoHostStr)
+	mongoURLstr := fmt.Sprintf("mongodb://%s", pMongoHostStr)
 	log.WithFields(log.Fields{
 		"host":    pMongoHostStr,
 		"db_name": pMongoDBNamestr,

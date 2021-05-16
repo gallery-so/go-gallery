@@ -1,8 +1,7 @@
 package main
 
 import (
-	"os"
-	log "github.com/sirupsen/logrus"
+	// log "github.com/sirupsen/logrus"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/config"
@@ -13,8 +12,8 @@ import (
 //-------------------------------------------------------------
 func main() {
 	
-	log.SetOutput(os.Stdout)
 	
+
 	cfg := config.LoadConfig()
 	
 	

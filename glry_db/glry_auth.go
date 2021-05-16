@@ -13,8 +13,10 @@ import (
 )
 
 //-------------------------------------------------------------
-type GLRYuserID      string
-type GLRYuserAddress string
+type GLRYuserID         string
+type GLRYuserAddress    string
+type GLRYloginAttemptID string
+
 type GLRYuser struct {
 	VersionInt     int64      `bson:"version"` // schema version for this model
 	IDstr          GLRYuserID `bson:"_id"           json:"id"`
@@ -41,6 +43,53 @@ type GLRYuserNonce struct {
 	ValueStr   string          `bson:"value"`
 	UserIDstr  GLRYuserID      `bson:"user_id"`
 	AddressStr GLRYuserAddress `bson:"address"`
+}
+
+type GLRYuserLoginAttempt struct {
+	VersionInt     int64              `bson:"version"`
+	ID             GLRYloginAttemptID `bson:"_id"`
+	CreationTimeF  float64            `bson:"creation_time"`
+
+	AddressStr    GLRYuserAddress `bson:"address"`
+	SignatureStr  string          `bson:"signature"`
+	NonceValueStr string          `bson:"nonce_value"`
+	UsernameStr   string          `bson:"username"`
+	ValidBool     bool            `bson:"valid"`
+
+	ReqHostAddrStr string              `bson:"req_host_addr"`
+	ReqHeaders     map[string][]string `bson:"req_headers"`
+}
+
+// FINISH!! - persist this in the DB
+// USER_UPDATE - every update to user records is persisted
+//               as an event
+type GLRYuserUpdate struct {
+	CreationTimeF float64 `bson:"creation_time"`
+	NameNewStr    string  `bson:"name_new"`
+}
+
+//-------------------------------------------------------------
+// LOGIN_ATTEMPT
+//-------------------------------------------------------------
+func AuthUserLoginAttempt(pLoginAttempt *GLRYuserLoginAttempt,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+
+	collNameStr := "glry_users_login_attempts"
+	gErr := gfcore.Mongo__insert(pLoginAttempt,
+		collNameStr,
+		map[string]interface{}{
+			"address":        pLoginAttempt.AddressStr,
+			"username":       pLoginAttempt.UsernameStr,
+			"caller_err_msg": "failed to insert a new GLRYuserLoginAttempt into the DB",
+		},
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return gErr
+	}
+
+	return nil
 }
 
 //-------------------------------------------------------------
@@ -190,5 +239,22 @@ func AuthUserCreateID(pUsernameStr string,
 	sum    := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	ID     := GLRYuserID(hexStr)
+	return ID
+}
+
+// CREATE_LOGIN_ATTEMPT_ID
+func AuthUserLoginAttemptCreateID(pUsernameStr string,
+	pAddressStr        GLRYuserAddress,
+	pSignatureStr      string,
+	pCreationTimeUNIXf float64) GLRYloginAttemptID {
+	
+	h := md5.New()
+	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
+	h.Write([]byte(pUsernameStr))
+	h.Write([]byte(string(pAddressStr)))
+	h.Write([]byte(string(pSignatureStr)))
+	sum    := h.Sum(nil)
+	hexStr := hex.EncodeToString(sum)
+	ID     := GLRYloginAttemptID(hexStr)
 	return ID
 }
