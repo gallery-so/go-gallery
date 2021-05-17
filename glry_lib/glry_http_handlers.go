@@ -24,7 +24,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			var input GLRYauthUserVerifySignatureInput
+			var input GLRYauthUserLoginInput
 			inputParsed, gErr := gfrpclib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
@@ -33,7 +33,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			
 			// USER_LOGIN__PIPELINE
-			validBool, userJWTtokenStr, gErr := AuthUserLoginAndMemorizeAttemptPipeline(inputParsed.(*GLRYauthUserVerifySignatureInput),
+			validBool, userJWTtokenStr, gErr := AuthUserLoginAndMemorizeAttemptPipeline(inputParsed.(*GLRYauthUserLoginInput),
 				pReq,
 				pCtx,
 				pRuntime)

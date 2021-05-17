@@ -94,14 +94,14 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		//--------------------
-		// WALLET_LINK
+		/*// WALLET_LINK
 		map[string]string{
 			"name":           "wallet_link",
 			"wallet_address": "0x4e6Dde64f6cd29294282000214Fe586b9112739B",
 			"msg":            "testNonceValue",
 			"signature":      "0x44a9326081fa0fde15d1a07a975bde947b5230312857c6c4c0a21f077a87e10f34e4d7f907debb5f67881f1bae893e58ec573890dd49eace61a5a65dde940b5f1b",
 			"signature_type": "eth_sign",
-		},
+		},*/
 
 		//--------------------
 	}
@@ -119,7 +119,8 @@ func TestAuthSignatures(pTest *testing.T) {
 	
 	//--------------------
 	
-
+	// ADD!! - test negative cases as well, where incorrect signatures are passed it
+	//         and a failure is expected.
 	for _, v := range walletSignaturesLst {
 
 		testSignatureStr     := v["signature"]
@@ -146,6 +147,34 @@ func TestAuthSignatures(pTest *testing.T) {
 
 
 
+
+
+	//--------------------
+	// JWT
+
+	testSigningKeyStr := "test_jwt_signing_key"
+	JWTtokenStr, gErr := AuthJWTgenerate(testSigningKeyStr, runtime)
+	if gErr != nil {
+		pTest.Fail()
+	}
+
+
+
+
+	fmt.Println("aaaaaaaaaaaaaaaaaa")
+	fmt.Println(JWTtokenStr)
+
+
+
+
+
+	validBool, gErr := AuthJWTverify(JWTtokenStr, runtime)
+	if gErr != nil {
+		pTest.Fail()
+	}
+
+
+	//--------------------
 
 
 }

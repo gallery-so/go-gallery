@@ -16,6 +16,7 @@ import (
 type GLRYuserID         string
 type GLRYuserAddress    string
 type GLRYloginAttemptID string
+type GLRYuserJWTkeyID   string
 
 type GLRYuser struct {
 	VersionInt     int64      `bson:"version"` // schema version for this model
@@ -32,7 +33,7 @@ type GLRYuser struct {
 }
 
 type GLRYuserNonce struct {
-	VersionInt int64 `bson:"version"` // schema version for this model
+	VersionInt int64 `bson:"version"`
 
 	// nonces are shortlived, and not something to be persisted across DB's
 	// other than mongo. so use mongo-native ID generation
@@ -45,6 +46,18 @@ type GLRYuserNonce struct {
 	AddressStr GLRYuserAddress `bson:"address"`
 }
 
+// USER_JWT_KEY - is unique per user, and stored in the DB for now. 
+type GLRYuserJWTkey struct {
+	VersionInt    int64            `bson:"version"`
+	ID            GLRYuserJWTkeyID `bson:"_id"`
+	CreationTimeF float64          `bson:"creation_time"`
+	DeletedBool   bool             `bson:"deleted"`
+
+	ValueStr   string          `bson:"value"`
+	AddressStr GLRYuserAddress `bson:"address"`
+}
+
+// USER_LOGIN_ATTEMPT
 type GLRYuserLoginAttempt struct {
 	VersionInt     int64              `bson:"version"`
 	ID             GLRYloginAttemptID `bson:"_id"`
@@ -69,9 +82,61 @@ type GLRYuserUpdate struct {
 }
 
 //-------------------------------------------------------------
+// JWT
+//-------------------------------------------------------------
+// GET
+func AuthUserJWTkeyGet(pUserAddressStr GLRYuserAddress,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYuserJWTkey, *gfcore.Gf_error) {
+
+	var JWTkey *GLRYuserJWTkey
+	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users_jwt_keys").FindOne(pCtx, bson.M{
+			"address": pUserAddressStr,
+			"deleted": false,
+		}).Decode(&JWTkey)
+	
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		gErr := gfcore.Mongo__handle_error("failed to get user GLRYuserJWTkey by Address",
+			"mongodb_find_error",
+			map[string]interface{}{"address": pUserAddressStr,},
+			err, "glry_db", pRuntime.RuntimeSys)
+		return nil, gErr
+	}
+
+	return JWTkey, nil
+}
+
+//-------------------------------------------------------------
+// CREATE
+
+func AuthUserJWTkeyCreate(pJWTkey *GLRYuserJWTkey,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+
+	collNameStr := "glry_users_jwt_keys"
+	gErr := gfcore.Mongo__insert(pJWTkey,
+		collNameStr,
+		map[string]interface{}{
+			"address":        pJWTkey.AddressStr,
+			"caller_err_msg": "failed to insert a new GLRYuserJWTkey into the DB",
+		},
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return gErr
+	}
+
+	return nil
+}
+
+//-------------------------------------------------------------
 // LOGIN_ATTEMPT
 //-------------------------------------------------------------
-func AuthUserLoginAttempt(pLoginAttempt *GLRYuserLoginAttempt,
+// CREATE
+func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
@@ -95,7 +160,7 @@ func AuthUserLoginAttempt(pLoginAttempt *GLRYuserLoginAttempt,
 //-------------------------------------------------------------
 // USER
 //-------------------------------------------------------------
-// USER_CREATE
+// CREATE
 func AuthUserCreate(pUser *GLRYuser,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
@@ -118,7 +183,7 @@ func AuthUserCreate(pUser *GLRYuser,
 }
 
 //-------------------------------------------------------------
-// USER_DELETE
+// DELETE
 func AuthUserDelete(pUserID GLRYuserID,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
@@ -147,7 +212,7 @@ func AuthUserDelete(pUserID GLRYuserID,
 }
 
 //-------------------------------------------------------------
-// USER_GET_BY_ADDRESS
+// GET_BY_ADDRESS
 func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYuser, *gfcore.Gf_error) {
@@ -176,7 +241,7 @@ func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 //-------------------------------------------------------------
 // NONCE
 //-------------------------------------------------------------
-// NONCE_GET
+// GET
 func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYuserNonce, *gfcore.Gf_error) {
@@ -202,7 +267,7 @@ func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 }
 
 //-------------------------------------------------------------
-// NONCE_CREATE
+// CREATE
 func AuthNonceCreate(pNonce *GLRYuserNonce,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
@@ -256,5 +321,20 @@ func AuthUserLoginAttemptCreateID(pUsernameStr string,
 	sum    := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	ID     := GLRYloginAttemptID(hexStr)
+	return ID
+}
+
+// CREATE_JWT_KEY
+func AuthUserJWTkeyCreateID(pAddressStr GLRYuserAddress,
+	pJWTkeyStr         string,
+	pCreationTimeUNIXf float64) GLRYuserJWTkeyID {
+	
+	h := md5.New()
+	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
+	h.Write([]byte(string(pAddressStr)))
+	h.Write([]byte(string(pJWTkeyStr)))
+	sum    := h.Sum(nil)
+	hexStr := hex.EncodeToString(sum)
+	ID     := GLRYuserJWTkeyID(hexStr)
 	return ID
 }

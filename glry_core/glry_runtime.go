@@ -18,7 +18,8 @@ type Runtime struct {
 }
 
 type DB struct {
-	MongoDB *mongo.Database
+	MongoClient *mongo.Client
+	MongoDB     *mongo.Database
 }
 
 //-------------------------------------------------------------
@@ -83,27 +84,28 @@ func DBinit(pMongoHostStr string,
 
 	//-------------------------------------------------------------
 	// GF_GET_DB
-	GFgetDBfun := func() (*mongo.Database, *gfcore.Gf_error) {
+	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gfcore.Gf_error) {
 
-		mongoDB, gErr := gfcore.Mongo__connect_new(mongoURLstr,
+		mongoDB, mongoClient, gErr := gfcore.Mongo__connect_new(mongoURLstr,
 			pMongoDBNamestr,
 			pRuntimeSys)
 		if gErr != nil {
-			return nil, gErr
+			return nil, nil, gErr
 		}
 		log.Info("mongodb connected...")
 		
-		return mongoDB, nil
+		return mongoDB, mongoClient, nil
 	}
 
 	//-------------------------------------------------------------
-	mongoDB, gErr := GFgetDBfun()
+	mongoDB, mongoClient, gErr := GFgetDBfun()
 	if gErr != nil {
 		return nil, gErr
 	}
 
 	db := &DB{
-		MongoDB: mongoDB,
+		MongoClient: mongoClient,
+		MongoDB:     mongoDB,
 	}
 
 	return db, nil
