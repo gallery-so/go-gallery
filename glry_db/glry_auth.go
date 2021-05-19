@@ -8,8 +8,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/mitchellh/mapstructure"
+	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -18,6 +20,7 @@ type GLRYuserAddress    string
 type GLRYloginAttemptID string
 type GLRYuserJWTkeyID   string
 
+// USER
 type GLRYuser struct {
 	VersionInt     int64      `bson:"version"` // schema version for this model
 	IDstr          GLRYuserID `bson:"_id"           json:"id"`
@@ -32,29 +35,30 @@ type GLRYuser struct {
 	LastSeenTimeF float64 
 }
 
+// USER_NONCE
 type GLRYuserNonce struct {
-	VersionInt int64 `bson:"version"`
+	VersionInt int64 `bson:"version" mapstructure:"version"`
 
 	// nonces are shortlived, and not something to be persisted across DB's
 	// other than mongo. so use mongo-native ID generation
-	ID             primitive.ObjectID `bson:"_id"`
-	CreationTimeF  float64            `bson:"creation_time"`
-	DeletedBool    bool               `bson:"deleted"`
+	ID             primitive.ObjectID `bson:"_id"           mapstructure:"_id"`
+	CreationTimeF  float64            `bson:"creation_time" mapstructure:"creation_time"`
+	DeletedBool    bool               `bson:"deleted"       mapstructure:"deleted"`
 
-	ValueStr   string          `bson:"value"`
-	UserIDstr  GLRYuserID      `bson:"user_id"`
-	AddressStr GLRYuserAddress `bson:"address"`
+	ValueStr   string          `bson:"value"   mapstructure:"value"`
+	UserIDstr  GLRYuserID      `bson:"user_id" mapstructure:"user_id"`
+	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
 }
 
 // USER_JWT_KEY - is unique per user, and stored in the DB for now. 
 type GLRYuserJWTkey struct {
-	VersionInt    int64            `bson:"version"`
-	ID            GLRYuserJWTkeyID `bson:"_id"`
-	CreationTimeF float64          `bson:"creation_time"`
-	DeletedBool   bool             `bson:"deleted"`
+	VersionInt    int64            `bson:"version"       mapstructure:"version"`
+	ID            GLRYuserJWTkeyID `bson:"_id"           mapstructure:"_id"`
+	CreationTimeF float64          `bson:"creation_time" mapstructure:"creation_time"`
+	DeletedBool   bool             `bson:"deleted"       mapstructure:"deleted"`
 
-	ValueStr   string          `bson:"value"`
-	AddressStr GLRYuserAddress `bson:"address"`
+	ValueStr   string          `bson:"value"   mapstructure:"value"`
+	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
 }
 
 // USER_LOGIN_ATTEMPT
@@ -87,26 +91,49 @@ type GLRYuserUpdate struct {
 // GET
 func AuthUserJWTkeyGet(pUserAddressStr GLRYuserAddress,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYuserJWTkey, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYuserJWTkey, *gf_core.Gf_error) {
 
-	var JWTkey *GLRYuserJWTkey
-	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users_jwt_keys").FindOne(pCtx, bson.M{
+
+
+
+	record, gErr := gf_core.MongoFindLatest(bson.M{
 			"address": pUserAddressStr,
 			"deleted": false,
-		}).Decode(&JWTkey)
-	
-	if err == mongo.ErrNoDocuments {
-		return nil, nil
+		},
+		"creation_time", // p_time_field_name_str
+		map[string]interface{}{
+			"address":            pUserAddressStr,
+			"caller_err_msg_str": "failed to get JWT key from DB",
+		},
+		pRuntime.DB.MongoDB.Collection("glry_users_jwt_keys"),
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return nil, gErr
 	}
+
+
+
+	var JWTkey GLRYuserJWTkey
+	err := mapstructure.Decode(record, &JWTkey)
 	if err != nil {
-		gErr := gfcore.Mongo__handle_error("failed to get user GLRYuserJWTkey by Address",
-			"mongodb_find_error",
-			map[string]interface{}{"address": pUserAddressStr,},
+		gErr := gf_core.Error__create("failed to load DB result of GLRYuserJWTkey into its struct",
+			"mapstruct__decode",
+			map[string]interface{}{
+				"address": pUserAddressStr,
+			},
 			err, "glry_db", pRuntime.RuntimeSys)
 		return nil, gErr
 	}
 
-	return JWTkey, nil
+
+	spew.Dump(JWTkey)
+
+	return &JWTkey, nil
+
+
+
+	
 }
 
 //-------------------------------------------------------------
@@ -114,10 +141,10 @@ func AuthUserJWTkeyGet(pUserAddressStr GLRYuserAddress,
 
 func AuthUserJWTkeyCreate(pJWTkey *GLRYuserJWTkey,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	collNameStr := "glry_users_jwt_keys"
-	gErr := gfcore.Mongo__insert(pJWTkey,
+	gErr := gf_core.Mongo__insert(pJWTkey,
 		collNameStr,
 		map[string]interface{}{
 			"address":        pJWTkey.AddressStr,
@@ -138,10 +165,10 @@ func AuthUserJWTkeyCreate(pJWTkey *GLRYuserJWTkey,
 // CREATE
 func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	collNameStr := "glry_users_login_attempts"
-	gErr := gfcore.Mongo__insert(pLoginAttempt,
+	gErr := gf_core.Mongo__insert(pLoginAttempt,
 		collNameStr,
 		map[string]interface{}{
 			"address":        pLoginAttempt.AddressStr,
@@ -163,11 +190,11 @@ func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 // CREATE
 func AuthUserCreate(pUser *GLRYuser,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 
 	collNameStr := "glry_users"
-	gErr := gfcore.Mongo__insert(pUser,
+	gErr := gf_core.Mongo__insert(pUser,
 		collNameStr,
 		map[string]interface{}{
 			"user_name":       pUser.NameStr,
@@ -186,7 +213,7 @@ func AuthUserCreate(pUser *GLRYuser,
 // DELETE
 func AuthUserDelete(pUserID GLRYuserID,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	
 	_, err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users").UpdateMany(pCtx, bson.M{
@@ -201,7 +228,7 @@ func AuthUserDelete(pUserID GLRYuserID,
 		})
 
 	if err != nil {
-		gErr := gfcore.Mongo__handle_error("failed to update GLRYuser as deleted by ID",
+		gErr := gf_core.Mongo__handle_error("failed to update GLRYuser as deleted by ID",
 			"mongodb_update_error",
 			map[string]interface{}{"user_id": pUserID,},
 			err, "glry_db", pRuntime.RuntimeSys)
@@ -215,7 +242,7 @@ func AuthUserDelete(pUserID GLRYuserID,
 // GET_BY_ADDRESS
 func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYuser, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYuser, *gf_core.Gf_error) {
 
 
 	var user *GLRYuser
@@ -228,7 +255,7 @@ func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 		return nil, nil
 	}
 	if err != nil {
-		gErr := gfcore.Mongo__handle_error("failed to get user GLRYuser by Address",
+		gErr := gf_core.Mongo__handle_error("failed to get user GLRYuser by Address",
 			"mongodb_find_error",
 			map[string]interface{}{"address": pAddressStr,},
 			err, "glry_db", pRuntime.RuntimeSys)
@@ -244,37 +271,57 @@ func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 // GET
 func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYuserNonce, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYuserNonce, *gf_core.Gf_error) {
 
-	var nonce *GLRYuserNonce
-	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_user_nonces").FindOne(pCtx, bson.M{
+
+
+
+	record, gErr := gf_core.MongoFindLatest(bson.M{
 			"address": pUserAddressStr,
 			"deleted": false,
-		}).Decode(&nonce)
-	
-	if err == mongo.ErrNoDocuments {
-		return nil, nil
+		},
+		"creation_time", // p_time_field_name_str
+		map[string]interface{}{
+			"address":            pUserAddressStr,
+			"caller_err_msg_str": "failed to get user GLRYuserNonce by Address",
+		},
+		pRuntime.DB.MongoDB.Collection("glry_user_nonces"),
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return nil, gErr
 	}
+
+
+
+
+	spew.Dump(record)
+	
+	var nonce GLRYuserNonce
+	err := mapstructure.Decode(record, &nonce)
 	if err != nil {
-		gErr := gfcore.Mongo__handle_error("failed to get user GLRYuserNonce by Address",
-			"mongodb_find_error",
-			map[string]interface{}{"address": pUserAddressStr,},
+		gErr := gf_core.Error__create("failed to load DB result of GLRYuserNonce into its struct",
+			"mapstruct__decode",
+			map[string]interface{}{
+				"address": pUserAddressStr,
+			},
 			err, "glry_db", pRuntime.RuntimeSys)
 		return nil, gErr
 	}
 
-	return nonce, nil
+
+	return &nonce, nil
 }
 
 //-------------------------------------------------------------
 // CREATE
 func AuthNonceCreate(pNonce *GLRYuserNonce,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 
 	collNameStr := "glry_user_nonces"
-	gErr := gfcore.Mongo__insert(pNonce,
+	gErr := gf_core.Mongo__insert(pNonce,
 		collNameStr,
 		map[string]interface{}{
 			"nonce_address":  pNonce.AddressStr,

@@ -12,6 +12,7 @@ import (
 
 //-------------------------------------------------------------
 type Runtime struct {
+	Config     *GLRYconfig
 	DB         *DB
 	Validator  *validator.Validate
 	RuntimeSys *gfcore.Runtime_sys
@@ -24,7 +25,8 @@ type DB struct {
 
 //-------------------------------------------------------------
 func RuntimeGet(pMongoDBhostStr string,
-	pMongoDBnameStr string) (*Runtime, *gfcore.Gf_error) {
+	pMongoDBnameStr string,
+	pConfig         *GLRYconfig) (*Runtime, *gfcore.Gf_error) {
 	
 	//------------------
 	// LOGS
@@ -60,6 +62,7 @@ func RuntimeGet(pMongoDBhostStr string,
 
 	// RUNTIME
 	runtime := &Runtime{
+		Config:     pConfig,
 		DB:         db,
 		Validator:  validator,
 		RuntimeSys: runtimeSys,

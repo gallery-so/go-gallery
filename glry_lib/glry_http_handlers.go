@@ -1,7 +1,8 @@
 package glry_lib
 
 import (
-	"fmt"
+	// "fmt"
+	"time"
 	"net/http"
 	"context"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
@@ -41,12 +42,13 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				return nil, gErr
 			}
 
-
-
-
-			// FINISH!! - set the JWT token as a header in the response
-			fmt.Println(userJWTtokenStr)
-
+			// SET_JWT_COOKIE
+			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
+			http.SetCookie(pResp, &http.Cookie{
+				Name:    "glry_token",
+				Value:   userJWTtokenStr,
+				Expires: expirationTime,
+			})
 
 			//------------------
 			// OUTPUT

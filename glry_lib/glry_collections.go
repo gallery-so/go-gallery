@@ -28,10 +28,10 @@ type GLRYcollDeleteInput struct {
 	IDstr string `json:"id" validate:"required,len=24"`
 }
 
+// OUTPUT
 type GLRYcollDeleteOutput struct {
 
 }
-
 
 //-------------------------------------------------------------
 // CREATE

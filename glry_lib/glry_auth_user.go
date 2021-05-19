@@ -99,8 +99,6 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 	var jwtTokenStr string
 	if validBool {
 
-
-
 		//------------------
 		// JWT_GENERATION - signature is valid, so generate JWT key
 
@@ -310,15 +308,12 @@ func AuthUserGetPublicInfoPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 		if user == nil {
 
 			// NONCE_CREATE
-			nonce, gErr := AuthNonceCreatePipeline(glry_db.GLRYuserID(""), pInput.AddressStr, pCtx, pRuntime)
+			nonce, gErr = AuthNonceCreatePipeline(glry_db.GLRYuserID(""), pInput.AddressStr, pCtx, pRuntime)
 			if gErr != nil {
 				return gErr
 			}
 
 
-			output := &GLRYauthUserGetPublicInfoOutput{
-				NonceStr: nonce.ValueStr,
-			}
 			return nil
 		}
 

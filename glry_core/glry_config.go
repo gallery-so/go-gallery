@@ -1,4 +1,4 @@
-package config
+package glry_core
 
 import (
 	// "fmt"
@@ -8,35 +8,35 @@ import (
 
 //-------------------------------------------------------------
 const (
-	appEnv      = "APP_ENV"
+	env         = "ENV"
 	baseURL     = "BASE_URL"
 	webBaseURL  = "WEB_BASE_URL"
 	port        = "PORT"
 	mongoHost   = "MONGO_URI"
 	mongoDBname = "MONGO_DB_NAME"
-	// postgresURI = "POSTGRES_URI"
+	jwtTokenTTLsecInt = "JWT_TOKEN_TTL_SECS"
 )
 
-type Config struct {
-	AppEnv         string
-	BaseURL        string
-	WebBaseURL     string
+type GLRYconfig struct {
+	Env            string
+	BaseURL        string // USED?
+	WebBaseURL     string // USED?
 	Port           int
 	MongoHostStr   string
 	MongoDBnameStr string
-	// PostgresURI string
+	JWTtokenTTLsecInt int64
 }
 
 //-------------------------------------------------------------
-func LoadConfig() *Config {
+func LoadConfig() *GLRYconfig {
 
-	viper.SetDefault(appEnv, "local")
+	viper.SetDefault(env, "local")
 	viper.SetDefault(baseURL, "http://localhost:4000")
 	viper.SetDefault(webBaseURL, "http://localhost:3000")
 	viper.SetDefault(port, 4000)
 	viper.SetDefault(mongoHost, "")
 	viper.SetDefault(mongoDBname, "")
-	// viper.SetDefault(postgresURI, "")
+	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24)
 
 	viper.SetConfigFile("./.env")
 
@@ -45,8 +45,8 @@ func LoadConfig() *Config {
 		panic(-1)
 	}
 
-	config := &Config{
-		AppEnv:         viper.GetString(appEnv),
+	config := &GLRYconfig{
+		Env:            viper.GetString(env),
 		BaseURL:        viper.GetString(baseURL),
 		WebBaseURL:     viper.GetString(webBaseURL),
 		Port:           viper.GetInt(port),

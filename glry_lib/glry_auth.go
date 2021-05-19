@@ -7,13 +7,12 @@ import (
 	"time"
 	"context"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	
 	"github.com/dgrijalva/jwt-go"
-	
+	log "github.com/sirupsen/logrus"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -40,10 +39,20 @@ type GLRYauthUserCreateInput struct {
 	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
+
+// JWT_CLAIMS
+type GLRYjwtClaims struct {
+	AddressStr glry_db.GLRYuserAddress `json:"address"`
+	jwt.StandardClaims
+}
+
 //-------------------------------------------------------------
 // JWT
 //-------------------------------------------------------------
 // GENERATE__PIPELINE
+
+// ADD!! - mark all other JWT's for this address as deleted to exclude them from future use.
+
 func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (string, *gfcore.Gf_error) {
@@ -51,8 +60,11 @@ func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 
 	JWTkeyStr := AuthGenerateRandom()
 	
-	JWTissuerStr := string(pAddressStr)
-	JWTtokenStr, gErr := AuthJWTgenerate(JWTkeyStr, JWTissuerStr, pRuntime)
+	JWTissuerStr := "gallery" // string(pAddressStr)
+	JWTtokenStr, gErr := AuthJWTgenerate(JWTkeyStr,
+		JWTissuerStr,
+		pAddressStr,
+		pRuntime)
 	if gErr != nil {
 		return "", gErr
 	}
@@ -90,16 +102,27 @@ func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 // ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
 
 func AuthJWTgenerate(pSigningKeyStr string,
-	pIssuerStr string,
-	pRuntime   *glry_core.Runtime) (string, *gfcore.Gf_error) {
+	pIssuerStr  string,
+	pAddressStr glry_db.GLRYuserAddress,
+	pRuntime    *glry_core.Runtime) (string, *gfcore.Gf_error) {
 	
 	signingKeyBytesLst := []byte(pSigningKeyStr)
 
+	//------------------
 	// CLAIMS
-	JWTclaims := &jwt.StandardClaims{
-		ExpiresAt: 15000,
-		Issuer:    pIssuerStr,
+
+	// Create the Claims
+	creationTimeUNIXint := time.Now().UnixNano()/1000000000
+	expiresAtUNIXint    := creationTimeUNIXint + pRuntime.Config.JWTtokenTTLsecInt //60*60*24*2 // expire N number of secs from now
+	JWTclaims := GLRYjwtClaims{
+		pAddressStr,
+		jwt.StandardClaims{
+			ExpiresAt: expiresAtUNIXint,
+			Issuer:    pIssuerStr,
+		},
 	}
+
+	//------------------
 
 	// SYMETRIC_SIGNING - same secret is used to both sign and validate tokens
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, JWTclaims)
@@ -136,29 +159,34 @@ func AuthJWTverifyPipeline(pJWTtokenStr string,
 	JWTkeyValueStr := JWTkey.ValueStr
 	tokenValidBool, gErr := AuthJWTverify(pJWTtokenStr,
 		JWTkeyValueStr,
-		pCtx,
 		pRuntime)
 	if gErr != nil {
 		return false, gErr
 	}
-
+	
 	//------------------
+	
+	claimedAddressStr := JWTkey.AddressStr
+
+	if pUserAddressStr != claimedAddressStr {
+		return false, nil
+	}
+	
 	return tokenValidBool, nil
 }
 
 //-------------------------------------------------------------
 // VERIFY
 func AuthJWTverify(pJWTtokenStr string,
-	pJWTkeyStr string,
-	pCtx       context.Context, 
-	pRuntime   *glry_core.Runtime) (bool, *gfcore.Gf_error) {
+	pJWTsecretKeyStr string,
+	pRuntime         *glry_core.Runtime) (bool, *gfcore.Gf_error) {
 
 
-
-	token, err := jwt.ParseWithClaims(pJWTtokenStr,
-		&CustomClaimsExample{},
-		func(pToken *jwt.Token) (interface{}, error) {
-			return pJWTkeyStr, nil
+	claims := jwt.MapClaims{}
+	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
+		&claims,
+		func(pJWTtoken *jwt.Token) (interface{}, error) {
+			return []byte(pJWTsecretKeyStr), nil
 		})
 
 	if err != nil {
@@ -171,7 +199,14 @@ func AuthJWTverify(pJWTtokenStr string,
 
 
 
-	tokenValidBool := token.Valid
+	tokenValidBool := JWTtoken.Valid
+
+
+
+	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
+	spew.Dump(claims)
+
+
 	return tokenValidBool, nil
 }
 

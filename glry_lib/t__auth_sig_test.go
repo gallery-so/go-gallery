@@ -111,8 +111,18 @@ func TestAuthSignatures(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	mongodbHostStr := "127.0.0.1:27017"
-	runtime, gErr := glry_core.RuntimeGet(mongodbHostStr, "glry_test")
+	mongoHostStr   := "127.0.0.1:27017"
+	mongoDBnameStr := "glry_test"
+	config := &glry_core.GLRYconfig {
+		// Env            string
+		// BaseURL        string
+		// WebBaseURL     string
+		// Port              int
+		MongoHostStr:      mongoHostStr,
+		MongoDBnameStr:    mongoDBnameStr,
+		JWTtokenTTLsecInt: 86400,
+	}
+	runtime, gErr := glry_core.RuntimeGet(mongoHostStr, mongoDBnameStr, config)
 	if gErr != nil {
 		pTest.Fail()
 	}
@@ -144,37 +154,4 @@ func TestAuthSignatures(pTest *testing.T) {
 
 		assert.True(pTest, validBool, "test signature is not valid")
 	}
-
-
-
-
-
-	//--------------------
-	// JWT
-
-	testSigningKeyStr := "test_jwt_signing_key"
-	JWTtokenStr, gErr := AuthJWTgenerate(testSigningKeyStr, runtime)
-	if gErr != nil {
-		pTest.Fail()
-	}
-
-
-
-
-	fmt.Println("aaaaaaaaaaaaaaaaaa")
-	fmt.Println(JWTtokenStr)
-
-
-
-
-
-	validBool, gErr := AuthJWTverify(JWTtokenStr, runtime)
-	if gErr != nil {
-		pTest.Fail()
-	}
-
-
-	//--------------------
-
-
 }
