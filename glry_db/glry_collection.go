@@ -22,6 +22,9 @@ type GLRYcollection struct {
 	DescriptionStr string     `bson:"description"   json:"description"`
 	OwnerUserIDstr string     `bson:"owner_user_id" json:"owner_user_id"`
 	NFTsLst        []string   `bson:"nfts"          json:"nfts"`
+
+	// collections can be hidden from public-viewing
+	HiddeBool bool `bson:"hidden"`
 }
 
 //-------------------------------------------------------------

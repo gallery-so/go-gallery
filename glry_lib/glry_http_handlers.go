@@ -5,6 +5,7 @@ import (
 	"time"
 	"net/http"
 	"context"
+	log "github.com/sirupsen/logrus"
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	gfrpclib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -15,6 +16,60 @@ import (
 //-------------------------------------------------------------
 func HandlersInit(pRuntime *glry_core.Runtime) {
 
+
+
+	log.WithFields(log.Fields{}).Debug("initializing HTTP handlers")
+
+	//-------------------------------------------------------------
+	// HEALTH
+
+	gfrpclib.Create_handler__http("/glry/v1/health",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
+
+			//------------------
+			// INPUT
+
+
+			//------------------
+			
+
+			log.WithFields(log.Fields{}).Debug("/health")
+
+			//------------------
+			// OUTPUT
+			dataMap := map[string]interface{}{
+				"msg": "gallery operational",
+			}
+
+			//------------------
+
+			return dataMap, nil
+		},
+		pRuntime.RuntimeSys)
+	
+	//-------------------------------------------------------------
+	// ME
+
+	gfrpclib.Create_handler__http("/glry/v1/auth/me",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
+
+			//------------------
+			// INPUT
+
+
+			//------------------
+			
+			//------------------
+			// OUTPUT
+			dataMap := map[string]interface{}{
+				"msg": "gallery operational",
+			}
+
+			//------------------
+
+			return dataMap, nil
+		},
+		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
 	// AUTH_USER_LOGIN
@@ -42,18 +97,21 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				return nil, gErr
 			}
 
+			/*
+			// ADD!! - going forward we should follow this approach, after v1
 			// SET_JWT_COOKIE
 			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
 			http.SetCookie(pResp, &http.Cookie{
 				Name:    "glry_token",
 				Value:   userJWTtokenStr,
 				Expires: expirationTime,
-			})
+			})*/
 
 			//------------------
 			// OUTPUT
 			dataMap := map[string]interface{}{
-				"valid": validBool,
+				"valid":     validBool,
+				"jwt_token": userJWTtokenStr,
 			}
 
 			//------------------
@@ -63,9 +121,9 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
-	// AUTH_USER_PUBLIC_INFO
+	// AUTH_GET_PREFLIGHT
 
-	gfrpclib.Create_handler__http("/glry/v1/auth/user_public_info",
+	gfrpclib.Create_handler__http("/glry/v1/auth/get_preflight",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 
 			//------------------
@@ -81,7 +139,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			
 			// GET_PUBLIC_INFO
-			output, gErr := AuthUserGetPublicInfoPipeline(input, pCtx, pRuntime)
+			output, gErr := AuthUserGetPreflightPipeline(input, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -99,9 +157,9 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
-	// AUTH_USER_CREATE
+	// AUTH_SIGNUP
 
-	gfrpclib.Create_handler__http("/glry/v1/auth/user_create",
+	gfrpclib.Create_handler__http("/glry/v1/auth/signup",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gfcore.Gf_error) {
 			
 			if pReq.Method == "POST" {

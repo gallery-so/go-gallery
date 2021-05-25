@@ -37,12 +37,20 @@ func RuntimeGet(pMongoDBhostStr string,
 	log.SetLevel(log.DebugLevel)
 
 	//------------------
-
 	// RUNTIME_SYS
 	runtimeSys := &gfcore.Runtime_sys{
-		Service_name_str: "gallery",
+		Service_name_str:            "gallery",
+		Names_prefix_str:            "glry",
+		Errors_send_to_mongodb_bool: true,
 	}
 
+	//------------------
+	// ERRORS_SEND_TO_SENTRY
+	if pConfig.SentryEndpointStr != "" {
+		runtimeSys.Errors_send_to_sentry_bool = true
+	}
+
+	//------------------
 	// DB
 	db, gErr := DBinit(pMongoDBhostStr, pMongoDBnameStr, runtimeSys)
 	if gErr != nil {
@@ -56,6 +64,7 @@ func RuntimeGet(pMongoDBhostStr string,
 
 	runtimeSys.Mongo_db = db.MongoDB
 
+	//------------------
 	// CHECK!! - is Validator threadsafe, so that it can be used
 	//           by several (possibly concurrently) threads.
 	validator := validator.New()
@@ -63,7 +72,7 @@ func RuntimeGet(pMongoDBhostStr string,
 	// RUNTIME
 	runtime := &Runtime{
 		Config:     pConfig,
-		DB:         db,
+		// DB:         db,
 		Validator:  validator,
 		RuntimeSys: runtimeSys,
 	}

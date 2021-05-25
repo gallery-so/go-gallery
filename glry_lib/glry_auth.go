@@ -23,6 +23,11 @@ type GLRYauthUserLoginInput struct {
 	AddressStr   glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
+// OUTPUT
+type GLRYauthUserLoginOutput struct {
+	JWTtokenStr string `json:"nonce"`
+}
+
 // INPUT
 type GLRYauthUserGetPublicInfoInput struct {
 	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
@@ -33,12 +38,30 @@ type GLRYauthUserGetPublicInfoOutput struct {
 	NonceStr string `json:"nonce"`
 }
 
-// INPUT
+// INPUT - initial user creation is just an empty user, to store it in the DB.
+//         this is to allow for users interupting the onboarding flow, and to be able to come back to it later
+//         and the system recognize that their user already exists.
+//         the users entering details on the user as they onboard are all user-update operations.
 type GLRYauthUserCreateInput struct {
-	NameStr    string                  `json:"name"    validate:"required,min=2,max=20"`
-	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	// NameStr    string                  `json:"name"    validate:"required,min=2,max=20"`
+
+	// needed because this is a new user that cant be logged into, and the client creating
+	// the user still needs to prove ownership of their address.
+	SignatureStr string                  `json:"signature" validate:"required,min=4,max=50"`
+	AddressStr   glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
+// OUTPUT
+type GLRYauthUserCreateOutput struct {
+
+	// JWT token is sent back to user to use to continue onboarding
+	JWTtokenStr string `json:"nonce"`
+}
+
+// OUTPUT
+type GLRYauthUserGetPublicInfoOutput struct {
+	NonceStr string `json:"nonce"`
+}
 
 // JWT_CLAIMS
 type GLRYjwtClaims struct {
@@ -198,9 +221,7 @@ func AuthJWTverify(pJWTtokenStr string,
 	}
 
 
-
 	tokenValidBool := JWTtoken.Valid
-
 
 
 	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")

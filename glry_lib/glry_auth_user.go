@@ -280,7 +280,7 @@ func AuthVerifySignature(pSignatureStr string,
 
 //-------------------------------------------------------------
 // USER_GET_PUBLIC_INFO__PIPELINE
-func AuthUserGetPublicInfoPipeline(pInput *GLRYauthUserGetPublicInfoInput,
+func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPublicInfoOutput, *gf_core.Gf_error) {
 
