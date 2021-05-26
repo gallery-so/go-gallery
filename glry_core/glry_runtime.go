@@ -6,7 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"github.com/go-playground/validator"
-	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/gloflow/gloflow/go/gf_core"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -15,7 +15,7 @@ type Runtime struct {
 	Config     *GLRYconfig
 	DB         *DB
 	Validator  *validator.Validate
-	RuntimeSys *gfcore.Runtime_sys
+	RuntimeSys *gf_core.Runtime_sys
 }
 
 type DB struct {
@@ -26,7 +26,7 @@ type DB struct {
 //-------------------------------------------------------------
 func RuntimeGet(pMongoDBhostStr string,
 	pMongoDBnameStr string,
-	pConfig         *GLRYconfig) (*Runtime, *gfcore.Gf_error) {
+	pConfig         *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 	
 	//------------------
 	// LOGS
@@ -38,7 +38,7 @@ func RuntimeGet(pMongoDBhostStr string,
 
 	//------------------
 	// RUNTIME_SYS
-	runtimeSys := &gfcore.Runtime_sys{
+	runtimeSys := &gf_core.Runtime_sys{
 		Service_name_str:            "gallery",
 		Names_prefix_str:            "glry",
 		Errors_send_to_mongodb_bool: true,
@@ -52,7 +52,27 @@ func RuntimeGet(pMongoDBhostStr string,
 
 	//------------------
 	// DB
-	db, gErr := DBinit(pMongoDBhostStr, pMongoDBnameStr, runtimeSys)
+
+	var mongoUserStr string
+	var mongoPassStr string
+	if pConfig.AWSsecretsBool {
+		secretsMap, gErr := ConfigGetAWSsecrets(pConfig.EnvStr, runtimeSys)
+		if gErr != nil {
+			return nil, gErr
+		}
+		mongoUserStr = secretsMap["glry_mongo_user"]
+		mongoPassStr = secretsMap["glry_mongo_pass"]
+	} else {
+		mongoUserStr = pConfig.MongoUserStr
+		mongoPassStr = pConfig.MongoPassStr
+	}
+
+	db, gErr := DBinit(pMongoDBhostStr,
+		pMongoDBnameStr,
+		mongoUserStr,
+		mongoPassStr,
+		runtimeSys)
+
 	if gErr != nil {
 		log.WithFields(log.Fields{
 			"db_host": pMongoDBhostStr,
@@ -86,9 +106,30 @@ func RuntimeGet(pMongoDBhostStr string,
 //-------------------------------------------------------------
 func DBinit(pMongoHostStr string,
 	pMongoDBNamestr string,
-	pRuntimeSys     *gfcore.Runtime_sys) (*DB, *gfcore.Gf_error) {
+	pMongoUserStr string,
+	pMongoPassStr string,
+	pRuntimeSys   *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
 
-	mongoURLstr := fmt.Sprintf("mongodb://%s", pMongoHostStr)
+
+	// AWS CONN STRING
+	// mongodb://gallerydevmain:<insertYourPassword>@gallerydev.cluster-ckak4r22p2u9.us-east-1.docdb.amazonaws.com:27017?
+	// 		ssl=true
+	// 		ssl_ca_certs=rds-combined-ca-bundle.pem
+	// 		replicaSet=rs0
+	//		readPreference=secondaryPreferred
+	// 		retryWrites=false
+	
+	var mongoURLstr string
+	if pMongoUserStr != "" && pMongoPassStr != "" {
+
+		mongoURLstr = fmt.Sprintf("mongodb://%s:%s@%s", pMongoUserStr,
+			pMongoHostStr,
+			pMongoPassStr)
+	} else {
+		mongoURLstr = fmt.Sprintf("mongodb://%s", pMongoHostStr)
+	}
+
+
 	log.WithFields(log.Fields{
 		"host":    pMongoHostStr,
 		"db_name": pMongoDBNamestr,
@@ -96,9 +137,9 @@ func DBinit(pMongoHostStr string,
 
 	//-------------------------------------------------------------
 	// GF_GET_DB
-	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gfcore.Gf_error) {
+	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gf_core.Gf_error) {
 
-		mongoDB, mongoClient, gErr := gfcore.Mongo__connect_new(mongoURLstr,
+		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(mongoURLstr,
 			pMongoDBNamestr,
 			pRuntimeSys)
 		if gErr != nil {

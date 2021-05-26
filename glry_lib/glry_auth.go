@@ -58,11 +58,6 @@ type GLRYauthUserCreateOutput struct {
 	JWTtokenStr string `json:"nonce"`
 }
 
-// OUTPUT
-type GLRYauthUserGetPublicInfoOutput struct {
-	NonceStr string `json:"nonce"`
-}
-
 // JWT_CLAIMS
 type GLRYjwtClaims struct {
 	AddressStr glry_db.GLRYuserAddress `json:"address"`

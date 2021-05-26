@@ -198,7 +198,7 @@ func AuthUserCreate(pUser *GLRYuser,
 	gErr := gf_core.Mongo__insert(pUser,
 		collNameStr,
 		map[string]interface{}{
-			"user_name":       pUser.NameStr,
+			"user_name":       pUser.UserNameStr,
 			"caller_err_msg": "failed to insert a new GLRYuser into the DB",
 		},
 		pCtx,
@@ -341,13 +341,11 @@ func AuthNonceCreate(pNonce *GLRYuserNonce,
 // VAR
 //-------------------------------------------------------------
 // CREATE_ID
-func AuthUserCreateID(pUsernameStr string,
-	pAddressStr        GLRYuserAddress,
+func AuthUserCreateID(pAddressStr GLRYuserAddress,
 	pCreationTimeUNIXf float64) GLRYuserID {
 	
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
-	h.Write([]byte(pUsernameStr))
 	h.Write([]byte(string(pAddressStr)))
 	sum    := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)

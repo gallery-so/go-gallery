@@ -13,7 +13,7 @@ func main() {
 	
 	
 
-	config := glry_core.LoadConfig()
+	config := glry_core.ConfigLoad()
 	
 	
 	

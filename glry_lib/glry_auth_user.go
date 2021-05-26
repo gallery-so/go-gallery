@@ -368,10 +368,9 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 	//------------------
 
 	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	nameStr           := pInput.NameStr
+	// nameStr           := pInput.NameStr
 	addressStr        := pInput.AddressStr
-	IDstr := glry_db.AuthUserCreateID(nameStr,
-		addressStr,
+	IDstr := glry_db.AuthUserCreateID(addressStr,
 		creationTimeUNIXf)
 
 	
@@ -380,7 +379,7 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 		VersionInt:    0,
 		IDstr:         IDstr,
 		CreationTimeF: creationTimeUNIXf,
-		NameStr:       nameStr,
+		// NameStr:       nameStr,
 		AddressesLst:  []glry_db.GLRYuserAddress{addressStr, },
 		// NonceInt:      nonceInt,
 	}
