@@ -19,14 +19,12 @@ func main() {
 	
 
 	portStr := config.Port
-	mongoDBhostStr := config.MongoHostStr
-	mongoDBnameStr := config.MongoDBnameStr
 
 
 	
 
 	// RUNTIME
-	runtime, gErr := glry_core.RuntimeGet(mongoDBhostStr, mongoDBnameStr, config)
+	runtime, gErr := glry_core.RuntimeGet(config)
 	if gErr != nil {
 		panic(gErr.Error)
 	}

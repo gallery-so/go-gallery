@@ -3,11 +3,15 @@ package glry_core
 import (
 	"os"
 	"fmt"
+	"os/exec"
+	"io/ioutil"
+	"crypto/x509"
+	"crypto/tls"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"github.com/go-playground/validator"
 	"github.com/gloflow/gloflow/go/gf_core"
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -24,10 +28,14 @@ type DB struct {
 }
 
 //-------------------------------------------------------------
-func RuntimeGet(pMongoDBhostStr string,
-	pMongoDBnameStr string,
-	pConfig         *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
+func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 	
+
+
+
+	
+
+
 	//------------------
 	// LOGS
 	log.SetOutput(os.Stdout)
@@ -44,6 +52,12 @@ func RuntimeGet(pMongoDBhostStr string,
 		Errors_send_to_mongodb_bool: true,
 	}
 
+
+
+	// DBgetCustomTLSConfig(pConfig.MongoSslCAfilePathStr, runtimeSys)
+
+
+
 	//------------------
 	// ERRORS_SEND_TO_SENTRY
 	if pConfig.SentryEndpointStr != "" {
@@ -53,32 +67,61 @@ func RuntimeGet(pMongoDBhostStr string,
 	//------------------
 	// DB
 
-	var mongoUserStr string
-	var mongoPassStr string
+	var mongoURLstr           string
+	// var mongoSslCAfilePathStr string
+	// var mongoUserStr string
+	// var mongoPassStr string
+
 	if pConfig.AWSsecretsBool {
+		
+		log.WithFields(log.Fields{
+			"env": pConfig.EnvStr,
+		}).Info("Loading Mongo params from AWS Secrets Manager")
+
 		secretsMap, gErr := ConfigGetAWSsecrets(pConfig.EnvStr, runtimeSys)
 		if gErr != nil {
 			return nil, gErr
 		}
-		mongoUserStr = secretsMap["glry_mongo_user"]
-		mongoPassStr = secretsMap["glry_mongo_pass"]
+
+		// MONGO_URL
+		mongoURLstr = secretsMap["glry_mongo_url"]["main"].(string)
+
+
+
+		fmt.Println("==============")
+		spew.Dump(secretsMap)
+
+
+		/*//------------------
+		// MONGO_SSL_CA_FILE
+		mongoSslCAfilePathStr = "./glry_mongo_ssl_ca_file.pem"
+		mongoSslCAbase64str := secretsMap["glry_mongo_ssl_ca_file"]["main"].(string)
+
+
+
+		
+
+
+		err = ioutil.WriteFile(mongoSslCAfilePathStr, []byte(mongoSslCAstr), 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		//------------------*/
+
 	} else {
-		mongoUserStr = pConfig.MongoUserStr
-		mongoPassStr = pConfig.MongoPassStr
+		mongoURLstr           = pConfig.MongoURLstr
+		// mongoSslCAfilePathStr = pConfig.MongoSslCAfilePathStr
 	}
 
-	db, gErr := DBinit(pMongoDBhostStr,
-		pMongoDBnameStr,
-		mongoUserStr,
-		mongoPassStr,
+	mongoDBnameStr := pConfig.MongoDBnameStr
+
+	db, gErr := DBinit(mongoURLstr,
+		mongoDBnameStr,
+		pConfig,
 		runtimeSys)
 
 	if gErr != nil {
-		log.WithFields(log.Fields{
-			"db_host": pMongoDBhostStr,
-			"db_name": pMongoDBnameStr,
-		}).Fatal("Error acquiring database connection")
-
 		return nil, gErr
 	}
 
@@ -104,48 +147,58 @@ func RuntimeGet(pMongoDBhostStr string,
 }
 
 //-------------------------------------------------------------
-func DBinit(pMongoHostStr string,
+func DBinit(pMongoURLstr string,
 	pMongoDBNamestr string,
-	pMongoUserStr string,
-	pMongoPassStr string,
-	pRuntimeSys   *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
+	pConfig         *GLRYconfig,
+	pRuntimeSys     *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
 
 
 	// AWS CONN STRING
-	// mongodb://gallerydevmain:<insertYourPassword>@gallerydev.cluster-ckak4r22p2u9.us-east-1.docdb.amazonaws.com:27017?
+	// mongodb://gallerydevmain:<insertYourPassword>@host:27017?
 	// 		ssl=true
 	// 		ssl_ca_certs=rds-combined-ca-bundle.pem
 	// 		replicaSet=rs0
 	//		readPreference=secondaryPreferred
 	// 		retryWrites=false
 	
-	var mongoURLstr string
-	if pMongoUserStr != "" && pMongoPassStr != "" {
-
-		mongoURLstr = fmt.Sprintf("mongodb://%s:%s@%s", pMongoUserStr,
-			pMongoHostStr,
-			pMongoPassStr)
-	} else {
-		mongoURLstr = fmt.Sprintf("mongodb://%s", pMongoHostStr)
-	}
-
-
-	log.WithFields(log.Fields{
-		"host":    pMongoHostStr,
-		"db_name": pMongoDBNamestr,
-	}).Info("Mongo conn info")
+	log.WithFields(log.Fields{}).Info("mongo connecting...")
 
 	//-------------------------------------------------------------
 	// GF_GET_DB
 	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gf_core.Gf_error) {
 
-		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(mongoURLstr,
+
+		// wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+
+
+		fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+		fmt.Println(pConfig.MongoSslCAfilePathStr)
+		cmd := exec.Command("wget", "https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stdout
+
+		err := cmd.Run()
+		if err != nil {
+			panic(err)
+		}
+
+
+		CAfilePathStr := "rds-combined-ca-bundle.pem"
+
+		// TLS_CONFIG
+		TLSconfig, gErr := DBgetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
+		if gErr != nil {
+			return nil, nil, gErr
+		}
+
+		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(pMongoURLstr,
 			pMongoDBNamestr,
+			TLSconfig,
 			pRuntimeSys)
 		if gErr != nil {
 			return nil, nil, gErr
 		}
-		log.Info("mongodb connected...")
+		log.Info("mongo connected...")
 		
 		return mongoDB, mongoClient, nil
 	}
@@ -165,3 +218,40 @@ func DBinit(pMongoHostStr string,
 }
 
 //-------------------------------------------------------------
+func DBgetCustomTLSConfig(pCAfilePathStr string,
+	pRuntimeSys *gf_core.Runtime_sys) (*tls.Config, *gf_core.Gf_error) {
+
+	
+	certs, err := ioutil.ReadFile(pCAfilePathStr)
+
+	if err != nil {
+		gErr := gf_core.Error__create("failed to read local CA file for mongo TLS connection",
+			"file_read_error",
+			map[string]interface{}{
+				"ca_file_path": pCAfilePathStr,
+			}, err, "glry_core", pRuntimeSys)
+		return nil, gErr
+	}
+
+	tlsConfig        := new(tls.Config)
+	tlsConfig.RootCAs = x509.NewCertPool()
+
+	ok := tlsConfig.RootCAs.AppendCertsFromPEM(certs)
+	if !ok {
+		gErr := gf_core.Error__create("failed to parse local CA file for mongo TLS connection",
+			"crypto_cert_ca_parse",
+			map[string]interface{}{
+				"ca_file_path": pCAfilePathStr,
+			}, nil, "glry_core", pRuntimeSys)
+		return nil, gErr
+	}
+	
+
+
+	fmt.Println("###########################################")
+	spew.Dump(tlsConfig)
+
+
+	return tlsConfig, nil
+}
+
