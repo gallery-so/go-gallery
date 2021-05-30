@@ -14,7 +14,20 @@ import (
 )
 
 //-------------------------------------------------------------
-// USER
+func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
+
+
+
+
+
+	return nil
+
+
+	
+}
+
 //-------------------------------------------------------------
 // LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
@@ -279,8 +292,8 @@ func AuthVerifySignature(pSignatureStr string,
 }
 
 //-------------------------------------------------------------
-// USER_GET_PUBLIC_INFO__PIPELINE
-func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPublicInfoInput,
+// USER_GET_PREFLIGHT__PIPELINE
+func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPublicInfoOutput, *gf_core.Gf_error) {
 
@@ -294,6 +307,7 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 	//------------------
 
 	var nonce *glry_db.GLRYuserNonce
+	var userExistsBool bool
 	//-------------------------------------------------------------
 	dbTXfun := func() *gf_core.Gf_error {
 
@@ -307,14 +321,17 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 		//                 to the front-end. subsequently the client has to create a new user.
 		if user == nil {
 
+			
 			// NONCE_CREATE
 			nonce, gErr = AuthNonceCreatePipeline(glry_db.GLRYuserID(""), pInput.AddressStr, pCtx, pRuntime)
 			if gErr != nil {
 				return gErr
 			}
 
-
+			userExistsBool = false
 			return nil
+		} else {
+			userExistsBool = true
 		}
 
 		// NONCE_GET
@@ -347,8 +364,32 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPublicInfoInput,
 	
 	
 	output := &GLRYauthUserGetPublicInfoOutput{
-		NonceStr: nonce.ValueStr,
+		NonceStr:       nonce.ValueStr,
+		UserExistsBool: userExistsBool,
 	}
+	return output, nil
+}
+
+//-------------------------------------------------------------
+func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {
+
+
+
+	user, gErr := glry_db.AuthUserGetByAddress(pInput.AddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+
+	output := &GLRYauthUserGetOutput{
+		UserNameStr:    user.UserNameStr,
+		DescriptionStr: user.DescriptionStr, 
+	}
+
 	return output, nil
 }
 

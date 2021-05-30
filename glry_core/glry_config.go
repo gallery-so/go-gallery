@@ -108,7 +108,6 @@ func ConfigGetAWSsecrets(pEnvStr string,
 
 	secretsLst := []string{
 		"glry_mongo_url",
-		"glry_mongo_ssl_ca_file",
 	}
 
 	secretValuesMap := map[string]map[string]interface{}{}
