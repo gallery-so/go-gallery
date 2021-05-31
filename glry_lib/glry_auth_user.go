@@ -18,14 +18,20 @@ func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
+	
 
+	gErr := glry_db.AuthUserUpdate(pInput.AddressStr,
+		pInput.UserNameNewStr,
+		pInput.DescriptionNewStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return gErr
+	}
 
 
 
 	return nil
-
-
-	
 }
 
 //-------------------------------------------------------------
@@ -33,13 +39,13 @@ func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
 func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 	pReq     *http.Request,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (bool, string, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYauthUserLoginOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// LOGIN
-	validBool, jwtStr, nonceValueStr, gErr := AuthUserLoginPipeline(pInput, pCtx, pRuntime)
+	output, gErr := AuthUserLoginPipeline(pInput, pCtx, pRuntime)
 	if gErr != nil {
-		return false, "", gErr
+		return nil, gErr
 	}
 
 	//------------------
@@ -51,11 +57,13 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 		VersionInt:    0,
 		ID:            IDstr,
 		CreationTimeF: creationTimeUNIXf,
-		AddressStr:    pInput.AddressStr,
-		SignatureStr:  pInput.SignatureStr,
-		NonceValueStr: nonceValueStr,
-		UsernameStr:   pInput.UsernameStr,
-		ValidBool:     validBool,
+
+		AddressStr:         pInput.AddressStr,
+		SignatureStr:       pInput.SignatureStr,
+		NonceValueStr:      output.NonceValueStr,
+		UsernameStr:        pInput.UsernameStr,
+		UserExistsBool:     output.UserExistsBool,
+		SignatureValidBool: output.SignatureValidBool,
 
 		ReqHostAddrStr: pReq.RemoteAddr,
 		ReqHeaders:     map[string][]string(pReq.Header),
@@ -64,24 +72,42 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 	// DB
 	gErr = glry_db.AuthUserLoginAttemptCreate(loginAttempt, pCtx, pRuntime)
 	if gErr != nil {
-		return false, "", gErr
+		return nil, gErr
 	}
 
 	//------------------
-	return validBool, jwtStr, gErr
+	return output, gErr
 }
 
 //-------------------------------------------------------------
 // USER_LOGIN__PIPELINE
 func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (bool, string, string, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYauthUserLoginOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
 	gErr := glry_core.Validate(pInput, pRuntime)
 	if gErr != nil {
-		return false, "", "", gErr
+		return nil, gErr
+	}
+
+	//------------------
+	// OUTPUT
+	output := &GLRYauthUserLoginOutput{}
+
+	//------------------
+	// CHECK_USER_EXISTS
+	userExistsBool, gErr := glry_db.AuthUserExistsByAddr(pInput.AddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	output.UserExistsBool = userExistsBool
+	if !userExistsBool {
+		return output, nil
 	}
 
 	//------------------
@@ -91,41 +117,47 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 		pCtx,
 		pRuntime)
 	if gErr != nil {
-		return false, "", "", gErr
+		return nil, gErr
+	}
+
+	// NONCE_NOT_FOUND - for this particular user
+	if nonce == nil {
+		output.NonceValueStr = ""
+	} else {
+		output.NonceValueStr = nonce.ValueStr
 	}
 
 	//------------------
 	// VERIFY_SIGNATURE
 
 	dataStr := nonce.ValueStr
-	validBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
+	sigValidBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
 		pRuntime) 
 	if gErr != nil {
-		return false, "", "", gErr
+		return nil, gErr
+	}
+
+	output.SignatureValidBool = sigValidBool
+	if !sigValidBool {
+		return output, nil
 	}
 
 	//------------------
-	// SIGNATURE_VALID
-
-	var jwtTokenStr string
-	if validBool {
-
-		//------------------
-		// JWT_GENERATION - signature is valid, so generate JWT key
-
-		jwtTokenStr, gErr = AuthJWTgeneratePipeline(pInput.AddressStr,
-			pCtx,
-			pRuntime)
-		if gErr != nil {
-			return false, jwtTokenStr, "", gErr
-		}
-
-		//------------------
+	// JWT_GENERATION - signature is valid, so generate JWT key
+	jwtTokenStr, gErr := AuthJWTgeneratePipeline(pInput.AddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
 	}
 
-	return validBool, jwtTokenStr, nonce.ValueStr, nil
+	output.JWTtokenStr = jwtTokenStr
+
+	//------------------
+
+	return output, nil
 }
 
 //-------------------------------------------------------------
@@ -295,7 +327,7 @@ func AuthVerifySignature(pSignatureStr string,
 // USER_GET_PREFLIGHT__PIPELINE
 func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPublicInfoOutput, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPriflightOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -363,7 +395,7 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 
 	
 	
-	output := &GLRYauthUserGetPublicInfoOutput{
+	output := &GLRYauthUserGetPriflightOutput{
 		NonceStr:       nonce.ValueStr,
 		UserExistsBool: userExistsBool,
 	}
@@ -371,6 +403,7 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 }
 
 //-------------------------------------------------------------
+// USER_GET__PIPELINE
 func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {

@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
-	"github.com/davecgh/go-spew/spew"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -71,8 +71,9 @@ type GLRYuserLoginAttempt struct {
 	AddressStr    GLRYuserAddress `bson:"address"`
 	SignatureStr  string          `bson:"signature"`
 	NonceValueStr string          `bson:"nonce_value"`
-	UsernameStr   string          `bson:"username"`
-	ValidBool     bool            `bson:"valid"`
+	UsernameStr        string     `bson:"username"`
+	UserExistsBool     bool       `bson:"user_exists"`
+	SignatureValidBool bool       `bson:"signature_valid"`
 
 	ReqHostAddrStr string              `bson:"req_host_addr"`
 	ReqHeaders     map[string][]string `bson:"req_headers"`
@@ -127,14 +128,9 @@ func AuthUserJWTkeyGet(pUserAddressStr GLRYuserAddress,
 		return nil, gErr
 	}
 
-
-	spew.Dump(JWTkey)
+	// spew.Dump(JWTkey)
 
 	return &JWTkey, nil
-
-
-
-	
 }
 
 //-------------------------------------------------------------
@@ -187,6 +183,71 @@ func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 
 //-------------------------------------------------------------
 // USER
+//-------------------------------------------------------------
+func AuthUserUpdate(pAddressStr GLRYuserAddress,
+	pUserNameStr        string,
+	pUserDescriptionStr string,
+	pCtx                context.Context,
+	pRuntime            *glry_core.Runtime) *gf_core.Gf_error {
+
+	
+	//------------------
+	fieldsToUpdate := bson.M{}
+	if pUserNameStr != "" {
+		fieldsToUpdate["username"] = pUserNameStr
+	}
+
+	if pUserDescriptionStr != "" {
+		fieldsToUpdate["description"] = pUserNameStr
+	}
+
+	//------------------
+	// UPDATE
+	_, err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users").UpdateMany(pCtx, bson.M{
+			"address": pAddressStr,
+			"deleted": false,
+		},
+		bson.M{"$set": fieldsToUpdate, })
+
+	if err != nil {
+		gErr := gf_core.Mongo__handle_error("failed to update GLRYuser",
+			"mongodb_update_error",
+			map[string]interface{}{"address": pAddressStr,},
+			err, "glry_db", pRuntime.RuntimeSys)
+		return gErr
+	}
+
+	return nil
+}
+
+//-------------------------------------------------------------
+func AuthUserExistsByAddr(pAddressStr GLRYuserAddress,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
+
+
+	countInt, gErr := gf_core.MongoCount(bson.M{
+			"address": pAddressStr,
+			"deleted": false,
+		},
+		map[string]interface{}{
+			"address":        pAddressStr,
+			"caller_err_msg": "failed to check if user exists by address in the DB",
+		},
+		pRuntime.RuntimeSys.Mongo_db.Collection("glry_users"),
+		pCtx,
+		pRuntime.RuntimeSys)
+
+	if gErr != nil {
+		return false, gErr
+	}
+
+	if countInt > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 //-------------------------------------------------------------
 // CREATE
 func AuthUserCreate(pUser *GLRYuser,
@@ -293,10 +354,12 @@ func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 		return nil, gErr
 	}
 
+	// NONCE_NOT_FOUND
+	if record == nil {
+		return nil, nil
+	}
 
-
-
-	spew.Dump(record)
+	// spew.Dump(record)
 	
 	var nonce GLRYuserNonce
 	err := mapstructure.Decode(record, &nonce)
@@ -309,7 +372,6 @@ func AuthNonceGet(pUserAddressStr GLRYuserAddress,
 			err, "glry_db", pRuntime.RuntimeSys)
 		return nil, gErr
 	}
-
 
 	return &nonce, nil
 }

@@ -18,32 +18,13 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 
 
-	log.WithFields(log.Fields{}).Debug("initializing HTTP handlers")
+	// log.WithFields(log.Fields{}).Debug("initializing HTTP handlers")
 
 
 	// AUTH_HANDLERS
 	AuthHandlersInit(pRuntime)
 
-	//-------------------------------------------------------------
-	// HEALTH
-
-	gf_rpc_lib.Create_handler__http("/glry/v1/health",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
-
-			log.WithFields(log.Fields{}).Debug("/health")
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{
-				"msg": "gallery operational",
-				"env": pRuntime.Config.EnvStr,
-			}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+	
 	
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
@@ -171,6 +152,27 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			// OUTPUT
 			dataMap := map[string]interface{}{
 	
+			}
+
+			//------------------
+
+			return dataMap, nil
+		},
+		pRuntime.RuntimeSys)
+
+	//-------------------------------------------------------------
+	// HEALTH
+
+	gf_rpc_lib.Create_handler__http("/glry/v1/health",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			log.WithFields(log.Fields{}).Debug("/health")
+
+			//------------------
+			// OUTPUT
+			dataMap := map[string]interface{}{
+				"msg": "gallery operational",
+				"env": pRuntime.Config.EnvStr,
 			}
 
 			//------------------

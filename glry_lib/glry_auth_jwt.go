@@ -1,13 +1,9 @@
-
-
-
-
-
 package glry_lib
 
 import (
 	"time"
 	"context"
+	"net/http"
 	log "github.com/sirupsen/logrus"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/dgrijalva/jwt-go"
@@ -21,6 +17,38 @@ import (
 type GLRYjwtClaims struct {
 	AddressStr glry_db.GLRYuserAddress `json:"address"`
 	jwt.StandardClaims
+}
+
+//-------------------------------------------------------------
+func AuthJWTverifyHTTP(pUserAddressStr glry_db.GLRYuserAddress,
+	pReq     *http.Request,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (bool, map[string]interface{}, *gf_core.Gf_error) {
+
+	// JWT_HEADER
+	JTWtokenStr := pReq.Header.Get("glry-jwt")
+
+	tokenValidBool, gErr := AuthJWTverifyPipeline(JTWtokenStr,
+		pUserAddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return false, nil, gErr
+	}
+
+	if !tokenValidBool {
+		
+		//------------------
+		// OUTPUT
+		dataMap := map[string]interface{}{
+			"token_valid": false,
+		}
+		return false, dataMap, nil
+		
+		//------------------
+	}
+
+	return true, nil, nil
 }
 
 //-------------------------------------------------------------
