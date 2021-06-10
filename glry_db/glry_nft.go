@@ -27,14 +27,14 @@ type GLRYnft struct {
 	ContractAddressStr string    `bson:"contract_address"     json:"contract_address"`
 
 	// OPEN_SEA_TOKEN_ID
-	OpenSeaTokenIDstr string `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenSeaIDstr      string `bson:"opensea_id"       json:"opensea_id"`
+	OpenSeaTokenIDstr string `bson:"opensea_token_id" json:"opensea_token_id"` // add a comment describing what this is
 
 	// IMAGES - OPENSEA
 	ImageURLstr          string `bson:"image_url"           json:"image_url"`
 	ImageThumbnailURLstr string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURLstr   string `bson:"image_preview_url"   json:"image_preview_url"`
 
-	PositionInt int64 `bson:"position" json:"position"`
 	HiddenBool  bool  `bson:"hidden"   json:"hidden"`
 }
 

@@ -28,28 +28,43 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	mongoHostStr   := "127.0.0.1:27017"
+	mongoURLstr    := "mongodb://127.0.0.1:27017"
 	mongoDBnameStr := "glry_test"
 	config := &glry_core.GLRYconfig {
 		// Env            string
 		// BaseURL        string
 		// WebBaseURL     string
 		// Port              int
-		MongoHostStr:      mongoHostStr,
+		MongoURLstr:       mongoURLstr,
 		MongoDBnameStr:    mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
 	
-	runtime, gErr := glry_core.RuntimeGet(mongoHostStr, mongoDBnameStr, config)
+	runtime, gErr := glry_core.RuntimeGet(config)
 	if gErr != nil {
 		pTest.Fail()
 	}
 
 	//--------------------
+	// USER_GET_PREFLIGHT
+
+	userGetPublicInfoInput := &GLRYauthUserGetPreflightInput{
+		AddressStr: user.AddressesLst[0],
+	}
+	output, gErr := AuthUserGetPreflightPipeline(userGetPublicInfoInput, ctx, runtime)
+	if gErr != nil {
+		pTest.Fail()
+	}
+
+	nonceStr := output.NonceStr
+
+	//--------------------
 	// USER_CREATE
 	userCreateInput := &GLRYauthUserCreateInput{
-		NameStr:    "test_user",
-		AddressStr: addressStr,
+		
+		SignatureStr:  ,
+		AddressStr:    addressStr,
+		NonceValueStr: nonceStr,
 	}
 	user, gErr := AuthUserCreatePipeline(userCreateInput, ctx, runtime)
 	if gErr != nil {
@@ -57,17 +72,6 @@ func TestAuthUser(pTest *testing.T) {
 	}
 
 	// spew.Dump(user)
-
-	//--------------------
-	// USER_GET_PUBLIC_INFO
-
-	userGetPublicInfoInput := &GLRYauthUserGetPublicInfoInput{
-		AddressStr: user.AddressesLst[0],
-	}
-	nonceInt, gErr := AuthUserGetPublicInfoPipeline(userGetPublicInfoInput, ctx, runtime)
-	if gErr != nil {
-		pTest.Fail()
-	}
 
 	//--------------------
 	// USER_DELETE
@@ -81,7 +85,7 @@ func TestAuthUser(pTest *testing.T) {
 
 
 
-	log.WithFields(log.Fields{"nonce": nonceInt,}).Info("signature validity")
+	log.WithFields(log.Fields{"nonce": nonceStr,}).Info("signature validity")
 	fmt.Println()
 
 	// assert.True(pTest, len(assetsForAccLst) > 0, "more then 0 OpenSea assets should be fetched for Account")

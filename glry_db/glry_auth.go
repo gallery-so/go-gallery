@@ -163,7 +163,8 @@ func AuthUserJWTkeyCreate(pJWTkey *GLRYuserJWTkey,
 func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
-
+	
+	
 	collNameStr := "glry_users_login_attempts"
 	gErr := gf_core.Mongo__insert(pLoginAttempt,
 		collNameStr,
@@ -184,6 +185,7 @@ func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 //-------------------------------------------------------------
 // USER
 //-------------------------------------------------------------
+// UPDATE
 func AuthUserUpdate(pAddressStr GLRYuserAddress,
 	pUserNameStr        string,
 	pUserDescriptionStr string,
@@ -225,7 +227,6 @@ func AuthUserExistsByAddr(pAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
 
-
 	countInt, gErr := gf_core.MongoCount(bson.M{
 			"address": pAddressStr,
 			"deleted": false,
@@ -237,7 +238,7 @@ func AuthUserExistsByAddr(pAddressStr GLRYuserAddress,
 		pRuntime.RuntimeSys.Mongo_db.Collection("glry_users"),
 		pCtx,
 		pRuntime.RuntimeSys)
-
+	
 	if gErr != nil {
 		return false, gErr
 	}
@@ -277,7 +278,6 @@ func AuthUserDelete(pUserID GLRYuserID,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
-	
 	_, err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_users").UpdateMany(pCtx, bson.M{
 			"_id":     pUserID,
 			"deleted": false,
@@ -382,7 +382,6 @@ func AuthNonceCreate(pNonce *GLRYuserNonce,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
-
 	collNameStr := "glry_user_nonces"
 	gErr := gf_core.Mongo__insert(pNonce,
 		collNameStr,
@@ -415,6 +414,7 @@ func AuthUserCreateID(pAddressStr GLRYuserAddress,
 	return ID
 }
 
+//-------------------------------------------------------------
 // CREATE_LOGIN_ATTEMPT_ID
 func AuthUserLoginAttemptCreateID(pUsernameStr string,
 	pAddressStr        GLRYuserAddress,
@@ -432,6 +432,7 @@ func AuthUserLoginAttemptCreateID(pUsernameStr string,
 	return ID
 }
 
+//-------------------------------------------------------------
 // CREATE_JWT_KEY
 func AuthUserJWTkeyCreateID(pAddressStr GLRYuserAddress,
 	pJWTkeyStr         string,

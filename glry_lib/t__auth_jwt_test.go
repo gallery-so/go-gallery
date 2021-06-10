@@ -27,18 +27,18 @@ func TestAuthJWT(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	mongoHostStr   := "127.0.0.1:27017"
+	mongoURLstr    := "mongodb://127.0.0.1:27017"
 	mongoDBnameStr := "glry_test"
 	config := &glry_core.GLRYconfig {
 		// Env            string
 		// BaseURL        string
 		// WebBaseURL     string
 		// Port              int
-		MongoHostStr:      mongoHostStr,
+		MongoURLstr:       mongoURLstr,
 		MongoDBnameStr:    mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
-	runtime, gErr := glry_core.RuntimeGet(mongoHostStr, mongoDBnameStr, config)
+	runtime, gErr := glry_core.RuntimeGet(config)
 	if gErr != nil {
 		pTest.Fail()
 	}

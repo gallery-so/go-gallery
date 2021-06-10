@@ -66,7 +66,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 			ImageThumbnailURLstr: openSeaAsset.ImageThumbURLstr,
 			ImagePreviewURLstr:   openSeaAsset.ImagePreviewURLstr,
 
-			PositionInt: 0,
+			
 			HiddenBool:  false,
 		}
 		nftsLst = append(nftsLst, nft)

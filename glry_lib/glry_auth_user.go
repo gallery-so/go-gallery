@@ -14,13 +14,148 @@ import (
 )
 
 //-------------------------------------------------------------
+// USER_CREATE__PIPELINE
+func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYauthUserCreateOutput, *gf_core.Gf_error) {
+
+	//------------------
+	// VALIDATE
+	gErr := glry_core.Validate(pInput, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	//------------------
+	output := &GLRYauthUserCreateOutput{}
+
+	//------------------
+	// USER_CHECK
+	userExistsBool, nonceValueStr, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	// user already exists
+	if userExistsBool {
+		output.UserExistsBool = userExistsBool
+		return output, nil
+	}
+
+	// no nonce found for this user
+	if nonceValueStr == "" {
+		output.NonceValueStr = nonceValueStr
+		return output, nil
+	}
+
+	//------------------
+	// VERIFY_SIGNATURE
+
+	dataStr := nonceValueStr
+	sigValidBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
+		dataStr,
+		pInput.AddressStr,
+		pRuntime) 
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	output.SignatureValidBool = sigValidBool
+	if !sigValidBool {
+		return output, nil
+	}
+
+	//------------------
+	
+	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
+	addressStr        := pInput.AddressStr
+	IDstr             := glry_db.AuthUserCreateID(addressStr, creationTimeUNIXf)
+	// nameStr := pInput.NameStr
+
+	user := &glry_db.GLRYuser{
+		VersionInt:    0,
+		IDstr:         IDstr,
+		CreationTimeF: creationTimeUNIXf,
+		AddressesLst:  []glry_db.GLRYuserAddress{addressStr, },
+		// NameStr:       nameStr,
+		// NonceInt:      nonceInt,
+	}
+
+	// DB
+	gErr = glry_db.AuthUserCreate(user, pCtx, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+	
+	//------------------
+
+	
+	// JWT_GENERATION - signature is valid, so generate JWT key
+	jwtTokenStr, gErr := AuthJWTgeneratePipeline(pInput.AddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	output.JWTtokenStr = jwtTokenStr
+
+	//------------------
+
+	return output, nil
+}
+
+//-------------------------------------------------------------
+// USER_GET__PIPELINE
+func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
+	pAuthenticatedBool bool,
+	pCtx               context.Context,
+	pRuntime           *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {
+
+	//------------------
+	// VALIDATE
+	gErr := glry_core.Validate(pInput, pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	//------------------
+
+	user, gErr := glry_db.AuthUserGetByAddress(pInput.AddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	var output *GLRYauthUserGetOutput
+	if pAuthenticatedBool {
+		output = &GLRYauthUserGetOutput{
+			UserNameStr:    user.UserNameStr,
+			DescriptionStr: user.DescriptionStr, 
+		}
+	} else {
+
+	}
+
+	return output, nil
+}
+
+//-------------------------------------------------------------
 func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
-	
+	//------------------
+	// VALIDATE
+	gErr := glry_core.Validate(pInput, pRuntime)
+	if gErr != nil {
+		return gErr
+	}
 
-	gErr := glry_db.AuthUserUpdate(pInput.AddressStr,
+	//------------------
+
+	gErr = glry_db.AuthUserUpdate(pInput.AddressStr,
 		pInput.UserNameNewStr,
 		pInput.DescriptionNewStr,
 		pCtx,
@@ -97,40 +232,19 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 	output := &GLRYauthUserLoginOutput{}
 
 	//------------------
-	// CHECK_USER_EXISTS
-	userExistsBool, gErr := glry_db.AuthUserExistsByAddr(pInput.AddressStr,
-		pCtx,
-		pRuntime)
+	// USER_CHECK
+	userExistsBool, nonceValueStr, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
 
 	output.UserExistsBool = userExistsBool
-	if !userExistsBool {
-		return output, nil
-	}
-
-	//------------------
-	// GET_NONCE - get latest nonce for this user_address from the DB
-
-	nonce, gErr := glry_db.AuthNonceGet(pInput.AddressStr,
-		pCtx,
-		pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
-
-	// NONCE_NOT_FOUND - for this particular user
-	if nonce == nil {
-		output.NonceValueStr = ""
-	} else {
-		output.NonceValueStr = nonce.ValueStr
-	}
+	output.NonceValueStr  = nonceValueStr
 
 	//------------------
 	// VERIFY_SIGNATURE
 
-	dataStr := nonce.ValueStr
+	dataStr := nonceValueStr
 	sigValidBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
@@ -403,71 +517,6 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 }
 
 //-------------------------------------------------------------
-// USER_GET__PIPELINE
-func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
-	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {
-
-
-
-	user, gErr := glry_db.AuthUserGetByAddress(pInput.AddressStr,
-		pCtx,
-		pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
-
-
-	output := &GLRYauthUserGetOutput{
-		UserNameStr:    user.UserNameStr,
-		DescriptionStr: user.DescriptionStr, 
-	}
-
-	return output, nil
-}
-
-//-------------------------------------------------------------
-// USER_CREATE__PIPELINE
-func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
-	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*glry_db.GLRYuser, *gf_core.Gf_error) {
-
-	//------------------
-	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
-
-	//------------------
-
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	// nameStr           := pInput.NameStr
-	addressStr        := pInput.AddressStr
-	IDstr := glry_db.AuthUserCreateID(addressStr,
-		creationTimeUNIXf)
-
-	
-
-	user := &glry_db.GLRYuser{
-		VersionInt:    0,
-		IDstr:         IDstr,
-		CreationTimeF: creationTimeUNIXf,
-		// NameStr:       nameStr,
-		AddressesLst:  []glry_db.GLRYuserAddress{addressStr, },
-		// NonceInt:      nonceInt,
-	}
-
-	// DB
-	gErr = glry_db.AuthUserCreate(user, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
-
-	return user, nil
-}
-
-//-------------------------------------------------------------
 // USER_DELETE__PIPELINE
 func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
 	pCtx     context.Context,
@@ -480,4 +529,40 @@ func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
 	}
 
 	return nil
+}
+
+//-------------------------------------------------------------
+func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (bool, string, *gf_core.Gf_error) {
+
+	//------------------
+	// CHECK_USER_EXISTS
+	userExistsBool, gErr := glry_db.AuthUserExistsByAddr(pAddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return false, "", gErr
+	}
+
+	//------------------
+	// GET_NONCE - get latest nonce for this user_address from the DB
+
+	nonce, gErr := glry_db.AuthNonceGet(pAddressStr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return false, "", gErr
+	}
+
+	// NONCE_NOT_FOUND - for this particular user
+	var nonceValueStr string
+	if nonce == nil {
+		nonceValueStr = ""
+	} else {
+		nonceValueStr = nonce.ValueStr
+	}
+
+	//------------------
+	return userExistsBool, nonceValueStr, nil
 }

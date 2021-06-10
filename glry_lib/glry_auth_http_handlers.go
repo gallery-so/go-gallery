@@ -3,6 +3,7 @@ package glry_lib
 import (
 	"net/http"
 	"context"
+	"github.com/mitchellh/mapstructure"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -19,13 +20,14 @@ type GLRYauthUserUpdateInput struct {
 
 // INPUT - USER_GET
 type GLRYauthUserGetInput struct {
-	AddressStr   glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr   glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET
 type GLRYauthUserGetOutput struct {
-	UserNameStr    string 
-	DescriptionStr string
+	UserNameStr    string   `mapstructure:"username"`
+	DescriptionStr string   `mapstructure:"description"`
+	AddressesLst   []string `mapstructure:"addresses`
 }
 
 // INPUT - USER_LOGIN
@@ -59,19 +61,20 @@ type GLRYauthUserGetPriflightOutput struct {
 //         and the system recognize that their user already exists.
 //         the users entering details on the user as they onboard are all user-update operations.
 type GLRYauthUserCreateInput struct {
-	// NameStr    string                  `json:"name"    validate:"required,min=2,max=20"`
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr string                  `json:"signature" validate:"required,min=4,max=50"`
-	AddressStr   glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	SignatureStr  string                  `json:"signature" validate:"required,min=4,max=50"`
+	AddressStr    glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	NonceValueStr string                  `json:"nonce"     validate:"required,len=50"`
 }
 
 // OUTPUT - USER_CREATE
 type GLRYauthUserCreateOutput struct {
-
-	// JWT token is sent back to user to use to continue onboarding
-	JWTtokenStr string
+	UserExistsBool     bool
+	NonceValueStr      string
+	SignatureValidBool bool
+	JWTtokenStr        string // JWT token is sent back to user to use to continue onboarding
 }
 
 //-------------------------------------------------------------
@@ -244,7 +247,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 
 	//-------------------------------------------------------------
 	// USER_GET
-	// AUTHENTICATED
+	// AUTHENTICATED/UN-AUTHENTICATED
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/users/get",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
@@ -272,60 +275,62 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// USER_GET
 
+			var output *GLRYauthUserGetOutput
 
+			// AUTHENTICATED
 			if validJWTbool {
-				// return one set of results for user authenticated
+				output, gErr = AuthUserGetPipeline(input,
+					true, // pAuthenticatedBool
+					pCtx, pRuntime)
+				if gErr != nil {
+					return nil, gErr
+				}
+
+
+			// UN_AUTHENTICATED - different set of results for user not-authenticated
 			} else {
-				// different set of results for user not-authenticated
+				output, gErr = AuthUserGetPipeline(input,
+					false, // pAuthenticatedBool
+					pCtx, pRuntime)
+				if gErr != nil {
+					return nil, gErr
+				}
+
 			}
 
-			output, gErr := AuthUserGetPipeline(input, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
+
+			
+
 
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{
-				"username":    output.UserNameStr,
-				"description": output.DescriptionStr,
+
+			var dataMap map[string]interface{}
+			err := mapstructure.Decode(output, &dataMap)
+			if err != nil {
+				gf_err := gf_core.Error__create("failed to load user_get pipeline output into a map",
+					"mapstruct__decode",
+					map[string]interface{}{},
+					err, "glry_lib", pRuntime.RuntimeSys)
+				return nil, gf_err
 			}
+
+			// dataMap := map[string]interface{}{
+			// 	"username":    output.UserNameStr,
+			// 	"description": output.DescriptionStr,
+			// }
 
 			//------------------
 
 			return dataMap, nil
 		},
 		pRuntime.RuntimeSys)
-	
+
 	//-------------------------------------------------------------
-	// AUTH_SIGNUP
+	// USER_CREATE
 	// UN-AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/auth/signup",
-	func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
-
-		//------------------
-		// INPUT
-
-
-		//------------------
-		
-		//------------------
-		// OUTPUT
-		dataMap := map[string]interface{}{
-			
-		}
-
-		//------------------
-
-		return dataMap, nil
-	},
-	pRuntime.RuntimeSys)
-
-	//-------------------------------------------------------------
-	// AUTH_SIGNUP
-
-	gf_rpc_lib.Create_handler__http("/glry/v1/auth/signup",
+	gf_rpc_lib.Create_handler__http("/glry/v1/users/create",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 			
 			if pReq.Method == "POST" {
@@ -339,17 +344,20 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 				}
 
 				//------------------
-				// GET_PUBLIC_INFO
-				user, gErr := AuthUserCreatePipeline(inputParsed.(*GLRYauthUserCreateInput), pCtx, pRuntime)
+				// USER_CREATE
+				output, gErr := AuthUserCreatePipeline(inputParsed.(*GLRYauthUserCreateInput), pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
 				}
 
 				//------------------
 				// OUTPUT
+
 				dataMap := map[string]interface{}{
-					"id": user.IDstr,
-					// "nonce": user.NonceInt,
+					"user_exists": output.UserExistsBool,
+					"nonce":       output.NonceValueStr,
+					"sig_valid":   output.SignatureValidBool,
+					"jwt_token":   output.JWTtokenStr,
 				}
 
 				//------------------
@@ -360,4 +368,6 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			return nil, nil
 		},
 		pRuntime.RuntimeSys)
+
+	//-------------------------------------------------------------
 }
