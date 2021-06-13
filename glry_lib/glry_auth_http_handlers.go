@@ -1,26 +1,29 @@
 package glry_lib
 
 import (
+	// "fmt"
 	"net/http"
 	"context"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type GLRYauthUserUpdateInput struct {
-	AddressStr        glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	UserNameNewStr    string
-	DescriptionNewStr string
+	AddressStr        glry_db.GLRYuserAddress `mapstructure:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	UserNameNewStr    string                  `mapstructure:"username"`
+	DescriptionNewStr string                  `mapstructure:"description"`
 }
 
 // INPUT - USER_GET
 type GLRYauthUserGetInput struct {
-	AddressStr   glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr glry_db.GLRYuserAddress `validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET
@@ -32,26 +35,24 @@ type GLRYauthUserGetOutput struct {
 
 // INPUT - USER_LOGIN
 type GLRYauthUserLoginInput struct {
-	SignatureStr string                  `json:"signature" validate:"required,min=4,max=50"`
-	UsernameStr  string                  `json:"username"  validate:"required,min=2,max=20"`
-	AddressStr   glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	SignatureStr string                  `mapstructure:"signature" validate:"required,min=4,max=50"`
+	AddressStr   glry_db.GLRYuserAddress `mapstructure:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_LOGIN
 type GLRYauthUserLoginOutput struct {
-	UserExistsBool     bool
 	SignatureValidBool bool
 	JWTtokenStr        string
-	NonceValueStr      string
+	UserIDstr          glry_db.GLRYuserID
 }
 
 // INPUT - USER_GET_PREFLIGHT
 type GLRYauthUserGetPreflightInput struct {
-	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr glry_db.GLRYuserAddress `mapstructure:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET_PREFLIGHT
-type GLRYauthUserGetPriflightOutput struct {
+type GLRYauthUserGetPreflightOutput struct {
 	NonceStr       string
 	UserExistsBool bool
 }
@@ -64,17 +65,16 @@ type GLRYauthUserCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr  string                  `json:"signature" validate:"required,min=4,max=50"`
-	AddressStr    glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	NonceValueStr string                  `json:"nonce"     validate:"required,len=50"`
+	SignatureStr  string                  `mapstructure:"signature" validate:"required,min=80,max=200"`
+	AddressStr    glry_db.GLRYuserAddress `mapstructure:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	NonceValueStr string                  `mapstructure:"nonce"     validate:"required,min=10,max=150"`
 }
 
 // OUTPUT - USER_CREATE
 type GLRYauthUserCreateOutput struct {
-	UserExistsBool     bool
-	NonceValueStr      string
 	SignatureValidBool bool
 	JWTtokenStr        string // JWT token is sent back to user to use to continue onboarding
+	UserIDstr          glry_db.GLRYuserID
 }
 
 //-------------------------------------------------------------
@@ -89,6 +89,8 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	// [GET] /glry/v1/auth/get_preflight?addr=:walletAddress
 	gf_rpc_lib.Create_handler__http("/glry/v1/auth/get_preflight",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			log.WithFields(log.Fields{}).Debug("/glry/v1/auth/get_preflight")
 
 			//------------------
 			// INPUT
@@ -125,22 +127,31 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	// AUTH_USER_LOGIN
 	// UN-AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/auth/login",
+	gf_rpc_lib.Create_handler__http("/glry/v1/users/login",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
 			//------------------
 			// INPUT
 
-			var input GLRYauthUserLoginInput
-			inputParsed, gErr := gf_rpc_lib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
+			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
+			}
+
+			var input GLRYauthUserLoginInput
+			err := mapstructure.Decode(inputMap, &input)
+			if err != nil {
+				gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserLoginInput struct",
+					"mapstruct__decode",
+					map[string]interface{}{},
+					err, "glry_lib", pRuntime.RuntimeSys)
+				return nil, gf_err
 			}
 
 			//------------------
 			
 			// USER_LOGIN__PIPELINE
-			output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(inputParsed.(*GLRYauthUserLoginInput),
+			output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(&input,
 				pReq,
 				pCtx,
 				pRuntime)
@@ -148,26 +159,10 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 				return nil, gErr
 			}
 
-			// FAILED - NO_USER
-			if !output.UserExistsBool {
-				dataMap := map[string]interface{}{
-					"user_exists": false,
-				}
-				return dataMap, nil
-			}
-
 			// FAILED - INVALID_SIGNATURE
 			if !output.SignatureValidBool {
 				dataMap := map[string]interface{}{
 					"sig_valid": false,
-				}
-				return dataMap, nil
-			}
-
-			// FAILED - NO_NONCE_FOUND
-			if output.NonceValueStr == "" {
-				dataMap := map[string]interface{}{
-					"nonce_found": false,
 				}
 				return dataMap, nil
 			}
@@ -186,6 +181,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			// OUTPUT
 			dataMap := map[string]interface{}{
 				"jwt_token": output.JWTtokenStr,
+				"user_id":   output.UserIDstr,
 			}
 
 			//------------------
@@ -206,11 +202,21 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			qMap        := pReq.URL.Query()
 			userAddrStr := qMap["addr"][0]
 
-			var input GLRYauthUserUpdateInput
-			_, gErr := gf_rpc_lib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
+			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}
+
+			var input GLRYauthUserUpdateInput
+			err := mapstructure.Decode(inputMap, &input)
+			if err != nil {
+				gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserUpdateInput struct",
+					"mapstruct__decode",
+					map[string]interface{}{},
+					err, "glry_lib", pRuntime.RuntimeSys)
+				return nil, gf_err
+			}
+
 			input.AddressStr = glry_db.GLRYuserAddress(userAddrStr)
 
 			//------------------
@@ -298,10 +304,6 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 
 			}
 
-
-			
-
-
 			//------------------
 			// OUTPUT
 
@@ -334,18 +336,30 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 			
 			if pReq.Method == "POST" {
+
+				log.WithFields(log.Fields{}).Debug("/glry/v1/users/create")
+
 				//------------------
 				// INPUT
 
-				var input GLRYauthUserCreateInput
-				inputParsed, gErr := gf_rpc_lib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
+				inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
 				if gErr != nil {
 					return nil, gErr
 				}
 
+				var input GLRYauthUserCreateInput
+				err := mapstructure.Decode(inputMap, &input)
+				if err != nil {
+					gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserCreateInput struct",
+						"mapstruct__decode",
+						map[string]interface{}{},
+						err, "glry_lib", pRuntime.RuntimeSys)
+					return nil, gf_err
+				}
+
 				//------------------
 				// USER_CREATE
-				output, gErr := AuthUserCreatePipeline(inputParsed.(*GLRYauthUserCreateInput), pCtx, pRuntime)
+				output, gErr := AuthUserCreatePipeline(&input, pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
 				}
@@ -354,10 +368,9 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 				// OUTPUT
 
 				dataMap := map[string]interface{}{
-					"user_exists": output.UserExistsBool,
-					"nonce":       output.NonceValueStr,
-					"sig_valid":   output.SignatureValidBool,
-					"jwt_token":   output.JWTtokenStr,
+					"sig_valid": output.SignatureValidBool,
+					"jwt_token": output.JWTtokenStr,
+					"user_id":   output.UserIDstr,
 				}
 
 				//------------------

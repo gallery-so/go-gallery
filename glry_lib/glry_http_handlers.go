@@ -5,7 +5,8 @@ import (
 	// "time"
 	"net/http"
 	"context"
-	log "github.com/sirupsen/logrus"
+	// log "github.com/sirupsen/logrus"
+	"github.com/mitchellh/mapstructure"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -16,16 +17,9 @@ import (
 //-------------------------------------------------------------
 func HandlersInit(pRuntime *glry_core.Runtime) {
 
-
-
-	// log.WithFields(log.Fields{}).Debug("initializing HTTP handlers")
-
-
 	// AUTH_HANDLERS
 	AuthHandlersInit(pRuntime)
 
-	
-	
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
 
@@ -35,8 +29,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			var input GLRYcollCreateInput
-			inputParsed, gErr := gf_rpc_lib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
+			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -44,10 +37,19 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			// FINISH!! - get user_id mechanism
 			userIDstr := ""
 
+			var input GLRYcollCreateInput
+			err := mapstructure.Decode(inputMap, &input)
+			if err != nil {
+				gf_err := gf_core.Error__create("failed to load input map into GLRYcollCreateInput struct",
+					"mapstruct__decode",
+					map[string]interface{}{},
+					err, "glry_lib", pRuntime.RuntimeSys)
+				return nil, gf_err
+			}
+
 			//------------------
-
-
-			coll, gErr := CollCreatePipeline(inputParsed.(*GLRYcollCreateInput), userIDstr, pCtx, pRuntime)
+			// CREATE
+			coll, gErr := CollCreatePipeline(&input, userIDstr, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -72,15 +74,24 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			var input GLRYcollDeleteInput
-			inputParsed, gErr := gf_rpc_lib.Get_http_input_to_struct(input, pResp, pReq, pRuntime.RuntimeSys)
+			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
 			if gErr != nil {
 				return nil, gErr
 			}
 
+			var input GLRYcollDeleteInput
+			err := mapstructure.Decode(inputMap, &input)
+			if err != nil {
+				gf_err := gf_core.Error__create("failed to load input map into GLRYcollDeleteInput struct",
+					"mapstruct__decode",
+					map[string]interface{}{},
+					err, "glry_lib", pRuntime.RuntimeSys)
+				return nil, gf_err
+			}
+
 			//------------------
 
-			_, gErr = CollDeletePipeline(inputParsed.(*GLRYcollDeleteInput), pCtx, pRuntime)
+			_, gErr = CollDeletePipeline(&input, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
@@ -166,7 +177,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	gf_rpc_lib.Create_handler__http("/glry/v1/health",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
-			log.WithFields(log.Fields{}).Debug("/health")
+			// log.WithFields(log.Fields{}).Debug("/health")
 
 			//------------------
 			// OUTPUT

@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"github.com/go-playground/validator"
 	"github.com/gloflow/gloflow/go/gf_core"
-	"github.com/davecgh/go-spew/spew"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -60,6 +60,7 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 
 	//------------------
 	// ERRORS_SEND_TO_SENTRY
+
 	if pConfig.SentryEndpointStr != "" {
 		runtimeSys.Errors_send_to_sentry_bool = true
 	}
@@ -67,10 +68,11 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 	//------------------
 	// DB
 
-	var mongoURLstr           string
+	var mongoURLstr string
 	// var mongoSslCAfilePathStr string
 	// var mongoUserStr string
 	// var mongoPassStr string
+
 
 	if pConfig.AWSsecretsBool {
 		
@@ -86,21 +88,13 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 		// MONGO_URL
 		mongoURLstr = secretsMap["glry_mongo_url"]["main"].(string)
 
-
-
-		fmt.Println("==============")
-		spew.Dump(secretsMap)
+		// spew.Dump(secretsMap)
 
 
 		/*//------------------
 		// MONGO_SSL_CA_FILE
 		mongoSslCAfilePathStr = "./glry_mongo_ssl_ca_file.pem"
 		mongoSslCAbase64str := secretsMap["glry_mongo_ssl_ca_file"]["main"].(string)
-
-
-
-		
-
 
 		err = ioutil.WriteFile(mongoSslCAfilePathStr, []byte(mongoSslCAstr), 0644)
 		if err != nil {
@@ -110,7 +104,7 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 		//------------------*/
 
 	} else {
-		mongoURLstr           = pConfig.MongoURLstr
+		mongoURLstr = pConfig.MongoURLstr
 		// mongoSslCAfilePathStr = pConfig.MongoSslCAfilePathStr
 	}
 
@@ -135,7 +129,7 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 	// RUNTIME
 	runtime := &Runtime{
 		Config:     pConfig,
-		// DB:         db,
+		DB:         db,
 		Validator:  validator,
 		RuntimeSys: runtimeSys,
 	}
@@ -171,25 +165,33 @@ func DBinit(pMongoURLstr string,
 		// wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 
 
-		fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-		fmt.Println(pConfig.MongoSslCAfilePathStr)
-		cmd := exec.Command("wget", "https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stdout
 
-		err := cmd.Run()
-		if err != nil {
-			panic(err)
+		var TLSconfig *tls.Config
+		var gErr      *gf_core.Gf_error
+
+		if pConfig.AWSsecretsBool {
+			fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+			fmt.Println(pConfig.MongoSslCAfilePathStr)
+			cmd := exec.Command("wget", "https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stdout
+
+			err := cmd.Run()
+			if err != nil {
+				panic(err)
+			}
+
+
+			CAfilePathStr := "rds-combined-ca-bundle.pem"
+
+			// TLS_CONFIG
+			TLSconfig, gErr = DBgetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
+			if gErr != nil {
+				return nil, nil, gErr
+			}
 		}
 
 
-		CAfilePathStr := "rds-combined-ca-bundle.pem"
-
-		// TLS_CONFIG
-		TLSconfig, gErr := DBgetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
-		if gErr != nil {
-			return nil, nil, gErr
-		}
 
 		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(pMongoURLstr,
 			pMongoDBNamestr,
@@ -248,8 +250,8 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 	
 
 
-	fmt.Println("###########################################")
-	spew.Dump(tlsConfig)
+	// fmt.Println("###########################################")
+	// spew.Dump(tlsConfig)
 
 
 	return tlsConfig, nil

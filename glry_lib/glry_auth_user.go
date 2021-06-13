@@ -11,6 +11,7 @@ import (
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -31,21 +32,9 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 
 	//------------------
 	// USER_CHECK
-	userExistsBool, nonceValueStr, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
+	_, nonceValueStr, _, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
 	if gErr != nil {
 		return nil, gErr
-	}
-
-	// user already exists
-	if userExistsBool {
-		output.UserExistsBool = userExistsBool
-		return output, nil
-	}
-
-	// no nonce found for this user
-	if nonceValueStr == "" {
-		output.NonceValueStr = nonceValueStr
-		return output, nil
 	}
 
 	//------------------
@@ -87,9 +76,10 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 		return nil, gErr
 	}
 	
+	output.UserIDstr = IDstr
+
 	//------------------
 
-	
 	// JWT_GENERATION - signature is valid, so generate JWT key
 	jwtTokenStr, gErr := AuthJWTgeneratePipeline(pInput.AddressStr,
 		pCtx,
@@ -186,7 +176,7 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 	//------------------
 	// LOGIN_ATTEMPT
 	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	IDstr             := glry_db.AuthUserLoginAttemptCreateID(pInput.UsernameStr, pInput.AddressStr, pInput.SignatureStr, creationTimeUNIXf)
+	IDstr             := glry_db.AuthUserLoginAttemptCreateID(pInput.AddressStr, pInput.SignatureStr, creationTimeUNIXf)
 	
 	loginAttempt := &glry_db.GLRYuserLoginAttempt {
 		VersionInt:    0,
@@ -195,9 +185,6 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 
 		AddressStr:         pInput.AddressStr,
 		SignatureStr:       pInput.SignatureStr,
-		NonceValueStr:      output.NonceValueStr,
-		UsernameStr:        pInput.UsernameStr,
-		UserExistsBool:     output.UserExistsBool,
 		SignatureValidBool: output.SignatureValidBool,
 
 		ReqHostAddrStr: pReq.RemoteAddr,
@@ -233,13 +220,12 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 
 	//------------------
 	// USER_CHECK
-	userExistsBool, nonceValueStr, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
+	_, nonceValueStr, userIDstr, gErr := AuthUserCheck(pInput.AddressStr, pCtx, pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
 
-	output.UserExistsBool = userExistsBool
-	output.NonceValueStr  = nonceValueStr
+	output.UserIDstr = userIDstr
 
 	//------------------
 	// VERIFY_SIGNATURE
@@ -441,7 +427,7 @@ func AuthVerifySignature(pSignatureStr string,
 // USER_GET_PREFLIGHT__PIPELINE
 func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPriflightOutput, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPreflightOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -452,8 +438,9 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 
 	//------------------
 
-	var nonce *glry_db.GLRYuserNonce
+	var nonce          *glry_db.GLRYuserNonce
 	var userExistsBool bool
+
 	//-------------------------------------------------------------
 	dbTXfun := func() *gf_core.Gf_error {
 
@@ -491,7 +478,6 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 
 	//-------------------------------------------------------------
 
-
 	// TX_RUN
 	txSession, gErr := gf_core.MongoTXrun(dbTXfun,
 		map[string]interface{}{
@@ -501,15 +487,14 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 		pRuntime.DB.MongoClient,
 		pCtx,
 		pRuntime.RuntimeSys)
+
 	if gErr != nil {
 		return nil, gErr
 	}
 	defer txSession.EndSession(pCtx)
 	
 
-	
-	
-	output := &GLRYauthUserGetPriflightOutput{
+	output := &GLRYauthUserGetPreflightOutput{
 		NonceStr:       nonce.ValueStr,
 		UserExistsBool: userExistsBool,
 	}
@@ -534,7 +519,7 @@ func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
 //-------------------------------------------------------------
 func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (bool, string, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (bool, string, glry_db.GLRYuserID, *gf_core.Gf_error) {
 
 	//------------------
 	// CHECK_USER_EXISTS
@@ -542,7 +527,7 @@ func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
 		pCtx,
 		pRuntime)
 	if gErr != nil {
-		return false, "", gErr
+		return false, "", "", gErr
 	}
 
 	//------------------
@@ -552,7 +537,7 @@ func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
 		pCtx,
 		pRuntime)
 	if gErr != nil {
-		return false, "", gErr
+		return false, "", "", gErr
 	}
 
 	// NONCE_NOT_FOUND - for this particular user
@@ -564,5 +549,20 @@ func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
 	}
 
 	//------------------
-	return userExistsBool, nonceValueStr, nil
+	// GET_ID
+
+	var userIDstr glry_db.GLRYuserID
+	if userExistsBool {
+
+		user, gErr := glry_db.AuthUserGetByAddress(pAddressStr, pCtx, pRuntime)
+		if gErr != nil {
+			return false, "", "", gErr
+		}
+
+		userIDstr = user.IDstr
+	}
+
+	//------------------
+
+	return userExistsBool, nonceValueStr, userIDstr, nil
 }

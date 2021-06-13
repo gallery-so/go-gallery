@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/gloflow/gloflow/go/gf_aws"
 	"github.com/gloflow/gloflow/go/gf_core"
-	"github.com/davecgh/go-spew/spew"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
@@ -48,12 +48,12 @@ func ConfigLoad() *GLRYconfig {
 
 	//------------------
 	// DEFAULTS
-	viper.SetDefault(env, "local")
+	viper.SetDefault(env,     "local")
 	viper.SetDefault(baseURL, "http://localhost:4000")
 	viper.SetDefault(port, 4000)
 	viper.SetDefault(portMetrics, 4000)
 
-	viper.SetDefault(mongoURL, "mongodb://localhost:27017")
+	viper.SetDefault(mongoURL,    "mongodb://localhost:27017")
 	viper.SetDefault(mongoDBname, "glry")
 	viper.SetDefault(mongoSslCAfilePathStr, "")
 
@@ -95,7 +95,7 @@ func ConfigLoad() *GLRYconfig {
 
 
 	fmt.Println("CONFIG----------------------------------")
-	spew.Dump(config)
+	// spew.Dump(config)
 
 
 	return config

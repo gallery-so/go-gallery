@@ -46,7 +46,11 @@ $ sudo docker run -it mikeybitcoin/gallery bash
 $ sudo docker run --net=host mikeybitcoin/gallery
 ```
 
+Local testing
+```bash
 
+$ GLRY_AWS_SECRETS=0 AWS_REGION=us-east-1 GLRY_SENTRY_ENDPOINT=... ./main
+```
 
 ### Healthcheck
 

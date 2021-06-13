@@ -71,7 +71,6 @@ type GLRYuserLoginAttempt struct {
 	AddressStr    GLRYuserAddress `bson:"address"`
 	SignatureStr  string          `bson:"signature"`
 	NonceValueStr string          `bson:"nonce_value"`
-	UsernameStr        string     `bson:"username"`
 	UserExistsBool     bool       `bson:"user_exists"`
 	SignatureValidBool bool       `bson:"signature_valid"`
 
@@ -170,7 +169,6 @@ func AuthUserLoginAttemptCreate(pLoginAttempt *GLRYuserLoginAttempt,
 		collNameStr,
 		map[string]interface{}{
 			"address":        pLoginAttempt.AddressStr,
-			"username":       pLoginAttempt.UsernameStr,
 			"caller_err_msg": "failed to insert a new GLRYuserLoginAttempt into the DB",
 		},
 		pCtx,
@@ -223,6 +221,7 @@ func AuthUserUpdate(pAddressStr GLRYuserAddress,
 }
 
 //-------------------------------------------------------------
+// EXISTS_BY_ADDRESS
 func AuthUserExistsByAddr(pAddressStr GLRYuserAddress,
 	pCtx     context.Context,
 	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
@@ -316,6 +315,7 @@ func AuthUserGetByAddress(pAddressStr GLRYuserAddress,
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
+	
 	if err != nil {
 		gErr := gf_core.Mongo__handle_error("failed to get user GLRYuser by Address",
 			"mongodb_find_error",
@@ -416,14 +416,12 @@ func AuthUserCreateID(pAddressStr GLRYuserAddress,
 
 //-------------------------------------------------------------
 // CREATE_LOGIN_ATTEMPT_ID
-func AuthUserLoginAttemptCreateID(pUsernameStr string,
-	pAddressStr        GLRYuserAddress,
+func AuthUserLoginAttemptCreateID(pAddressStr GLRYuserAddress,
 	pSignatureStr      string,
 	pCreationTimeUNIXf float64) GLRYloginAttemptID {
 	
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
-	h.Write([]byte(pUsernameStr))
 	h.Write([]byte(string(pAddressStr)))
 	h.Write([]byte(string(pSignatureStr)))
 	sum    := h.Sum(nil)

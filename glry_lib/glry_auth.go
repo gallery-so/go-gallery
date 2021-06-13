@@ -23,7 +23,7 @@ func AuthNonceCreatePipeline(pUserIDstr glry_db.GLRYuserID,
 	pRuntime        *glry_core.Runtime) (*glry_db.GLRYuserNonce, *gf_core.Gf_error) {
 	
 	// NONCE
-	nonceStr := AuthGenerateRandom()
+	nonceStr := fmt.Sprintf("Signature request on Gallery: %s", AuthGenerateRandom())
 
 	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
 	nonce := &glry_db.GLRYuserNonce{
@@ -54,4 +54,3 @@ func AuthGenerateRandom() string {
 	nonceStr   := fmt.Sprintf("%d", nonceInt)
 	return nonceStr	  
 }
-
