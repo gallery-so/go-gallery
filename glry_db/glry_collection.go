@@ -6,7 +6,8 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"go.mongodb.org/mongo-driver/bson"
-	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 )
 
@@ -30,10 +31,10 @@ type GLRYcollection struct {
 //-------------------------------------------------------------
 func CollCreate(pColl *GLRYcollection,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	collNameStr := "glry_collections"
-	gErr := gfcore.Mongo__insert(pColl,
+	gErr := gf_core.Mongo__insert(pColl,
 		collNameStr,
 		map[string]interface{}{
 			"coll_name":       pColl.NameStr,
@@ -49,9 +50,47 @@ func CollCreate(pColl *GLRYcollection,
 }
 
 //-------------------------------------------------------------
+func CollGetByUserID(pUserIDstr GLRYuserID,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) ([]*GLRYcollection, *gf_core.Gf_error) {
+
+
+	find_opts := options.Find()
+	c, gErr := gf_core.MongoFind(bson.M{
+			"owner_user_id": pUserIDstr,
+			"deleted":       false,
+		},
+		find_opts,
+		map[string]interface{}{
+			"user_id":            pUserIDstr,
+			"caller_err_msg_str": "failed to get collections from DB by user_id",
+		},
+		pRuntime.RuntimeSys.Mongo_db.Collection("glry_collections"),
+		pCtx,
+		pRuntime.RuntimeSys)
+
+	if gErr != nil {
+		return nil, gErr
+	}
+
+	var collsLst []*GLRYcollection
+	err := c.All(pCtx, collsLst)
+	if err != nil {
+		gf_err := gf_core.Mongo__handle_error("failed to decode mongodb result of query to get Miners",
+			"mongodb_cursor_decode",
+			map[string]interface{}{},
+			err, "gf_eth_monitor_core", pRuntime.RuntimeSys)
+			
+		return nil, gf_err
+	}
+
+	return collsLst, nil
+}
+
+//-------------------------------------------------------------
 func CollGetByID(pIDstr string,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYcollection, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYcollection, *gf_core.Gf_error) {
 
 	var coll *GLRYcollection
 	err := pRuntime.RuntimeSys.Mongo_db.Collection("glry_collections").FindOne(pCtx, bson.M{
@@ -60,7 +99,7 @@ func CollGetByID(pIDstr string,
 		}).Decode(&coll)
 	
 	if err != nil {
-		gf_err := gfcore.Mongo__handle_error("failed to query GLRYcollection by ID",
+		gf_err := gf_core.Mongo__handle_error("failed to query GLRYcollection by ID",
 			"mongodb_find_error",
 			map[string]interface{}{"id": pIDstr,},
 			err, "glry_db", pRuntime.RuntimeSys)

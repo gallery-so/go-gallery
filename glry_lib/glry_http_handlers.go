@@ -1,7 +1,7 @@
 package glry_lib
 
 import (
-	// "fmt"
+	"fmt"
 	// "time"
 	"net/http"
 	"context"
@@ -20,6 +20,43 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	// AUTH_HANDLERS
 	AuthHandlersInit(pRuntime)
 
+	//-------------------------------------------------------------
+	// COLLECTION
+	//-------------------------------------------------------------
+	// COLLECTION_GET
+
+	gf_rpc_lib.Create_handler__http("/glry/v1/collections/get",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			//------------------
+			// INPUT
+
+			qMap      := pReq.URL.Query()
+			userIDstr := qMap["userid"][0]
+
+			input := &GLRYcollGetInput{
+				UserIDstr: glry_db.GLRYuserID(userIDstr),
+			}
+
+			//------------------
+			// CREATE
+			output, gErr := CollGetPipeline(input, pCtx, pRuntime)
+			if gErr != nil {
+				return nil, gErr
+			}
+			
+			//------------------
+			// OUTPUT
+			dataMap := map[string]interface{}{
+				"colls": output.CollsOutputsLst,
+			}
+
+			//------------------
+
+			return dataMap, nil
+		},
+		pRuntime.RuntimeSys)
+	
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
 
@@ -49,15 +86,17 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 			// CREATE
-			coll, gErr := CollCreatePipeline(&input, userIDstr, pCtx, pRuntime)
+			output, gErr := CollCreatePipeline(&input, userIDstr, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
 			
+			fmt.Println(output)
+
 			//------------------
 			// OUTPUT
 			dataMap := map[string]interface{}{
-				"coll_id": coll.IDstr,
+				
 			}
 
 			//------------------
@@ -107,9 +146,12 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			return dataMap, nil
 		},
 		pRuntime.RuntimeSys)
-		
+	
+
 	//-------------------------------------------------------------
-	// NFTS_FOR_USER__GET
+	// NFTS
+	//-------------------------------------------------------------
+	// USER_GET
 	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/user_get",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
@@ -133,7 +175,6 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				}
 
 				//------------------
-
 				return dataMap, nil
 			}
 
@@ -142,7 +183,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
-	// NFTS_FROM_OPENSEA__GET
+	// OPENSEA_GET
 	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/opensea_get",
 		func(pCtx context.Context, pResp http.ResponseWriter,
 			pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
@@ -162,7 +203,9 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// OUTPUT
 			dataMap := map[string]interface{}{
-	
+				
+
+
 			}
 
 			//------------------
@@ -171,6 +214,8 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		},
 		pRuntime.RuntimeSys)
 
+	//-------------------------------------------------------------
+	// VAR
 	//-------------------------------------------------------------
 	// HEALTH
 

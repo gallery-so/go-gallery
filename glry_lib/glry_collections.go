@@ -3,12 +3,22 @@ package glry_lib
 import (
 	"time"
 	"context"
-	gfcore "github.com/gloflow/gloflow/go/gf_core"
+	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 )
 
 //-------------------------------------------------------------
+// INPUT
+type GLRYcollGetInput struct {
+	UserIDstr glry_db.GLRYuserID `validate:"required,min=4,max=50"`
+}
+
+// OUTPUT
+type GLRYcollGetOutput struct {
+	CollsOutputsLst []map[string]interface{}
+}
+
 // INPUT
 type GLRYcollCreateInput struct {
 	NameStr        string `json:"name"        validate:"required,min=4,max=50"`
@@ -34,11 +44,61 @@ type GLRYcollDeleteOutput struct {
 }
 
 //-------------------------------------------------------------
+func CollGetPipeline(pInput *GLRYcollGetInput,
+	pCtx     context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYcollGetOutput, *gf_core.Gf_error) {
+
+
+
+	
+	collsLst, gErr := glry_db.CollGetByUserID(pInput.UserIDstr,
+		pCtx,
+		pRuntime)
+	if gErr != nil {
+		return nil, gErr
+	}
+
+
+
+	collsOutputsLst := []map[string]interface{}{}
+	for _, coll := range collsLst {
+
+		/*
+		COLL_OUTPUT:
+		{
+			id: 1,
+			isHidden: true,
+			name: 'Cool Collection',
+			description: 'my favorites',
+			// ! note: we want the CREATOR opensea username, not OWNER username
+			nfts: [ { id: 1, name: 'cool nft', creator_username_opensea: 'ColorGlyphs' }, {}, {}, ...] 
+		},
+		*/
+		collOutputMap := map[string]interface{}{
+			"id":          coll.IDstr,
+			"hidden":      coll.HiddeBool,
+			"name":        coll.NameStr,
+			"description": coll.DescriptionStr,
+			"nfts": []map[string]interface{}{},
+		}
+
+		collsOutputsLst = append(collsOutputsLst, collOutputMap)
+	}
+
+	output := &GLRYcollGetOutput{
+		CollsOutputsLst: collsOutputsLst,
+	}
+
+
+	return output, nil
+}
+
+//-------------------------------------------------------------
 // CREATE
 func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
 	pCtx       context.Context,
-	pRuntime   *glry_core.Runtime) (*GLRYcollCreateOutput, *gfcore.Gf_error) {
+	pRuntime   *glry_core.Runtime) (*GLRYcollCreateOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -85,7 +145,7 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 // DELETE
 func CollDeletePipeline(pInput *GLRYcollDeleteInput,
 	pCtx     context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, *gf_core.Gf_error) {
 	
 	//------------------
 	// VALIDATE
