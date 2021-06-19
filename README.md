@@ -21,9 +21,9 @@ $ go run .
 ```
 
 ```bash
-$ go build -o ./bin/main ./cmd/server/glry_main.go
+$ GOOS=linux GOARCH=amd64 go build -o ./bin/main ./cmd/server/glry_main.go
 
-$ sudo docker build -f Dockerfile --tag mikeybitcoin/gallery .
+$ sudo docker build --platform linux/amd64 -f Dockerfile --tag mikeybitcoin/gallery .
 ```
 
 start a MongoDB container to use as a local dev DB.
