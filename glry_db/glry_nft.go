@@ -151,8 +151,11 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 	}
 	result := []*GLRYnft{}
 
-	// TODO error should be handled here but do not know how to convert type error into *gfcore.Gf_error
-	_ = cur.All(pCtx, &result)
+	if err := cur.All(pCtx, &result); err != nil {
+		return nil, gfcore.Error__create("nft id not found in query values",
+			"mongodb_cursor_all",
+			map[string]interface{}{}, err, "glry_core", pRuntime.RuntimeSys)
+	}
 
 	return result, nil
 
