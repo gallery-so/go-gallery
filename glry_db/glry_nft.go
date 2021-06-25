@@ -139,7 +139,8 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 		opts.MaxTime = &dur
 	}
 
-	col := pRuntime.RuntimeSys.Mongo_db.Client().Database(pRuntime.RuntimeSys.Mongo_db.Name()).Collection("glry_nfts")
+	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
+
 	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr},
 		opts,
 		map[string]interface{}{},

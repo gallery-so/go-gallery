@@ -22,6 +22,7 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
+	conf := glry_core.GLRYconfig{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000"}
 	runtime, gErr := glry_core.RuntimeGet("127.0.0.1:27017", "glry_test")
 	if gErr != nil {
 		pTest.Fail()
