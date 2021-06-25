@@ -1,11 +1,11 @@
 package glry_lib
 
 import (
+	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"time"
-	"context"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	// log "github.com/sirupsen/logrus"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -19,13 +19,13 @@ import (
 // NONCE_CREATE__PIPELINE
 func AuthNonceCreatePipeline(pUserIDstr glry_db.GLRYuserID,
 	pUserAddressStr glry_db.GLRYuserAddress,
-	pCtx            context.Context,
-	pRuntime        *glry_core.Runtime) (*glry_db.GLRYuserNonce, *gf_core.Gf_error) {
-	
+	pCtx context.Context,
+	pRuntime *glry_core.Runtime) (*glry_db.GLRYuserNonce, *gf_core.Gf_error) {
+
 	// NONCE
 	nonceStr := fmt.Sprintf("Signature request on Gallery: %s", AuthGenerateRandom())
 
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
+	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
 	nonce := &glry_db.GLRYuserNonce{
 		VersionInt:    0,
 		ID:            primitive.NewObjectID(),
@@ -50,7 +50,7 @@ func AuthNonceCreatePipeline(pUserIDstr glry_db.GLRYuserID,
 // NONCE_GENERATE
 func AuthGenerateRandom() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	nonceInt   := seededRand.Int()
-	nonceStr   := fmt.Sprintf("%d", nonceInt)
-	return nonceStr	  
+	nonceInt := seededRand.Int()
+	nonceStr := fmt.Sprintf("%d", nonceInt)
+	return nonceStr
 }

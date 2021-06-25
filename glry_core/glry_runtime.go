@@ -1,16 +1,16 @@
 package glry_core
 
 import (
-	"os"
-	"fmt"
-	"os/exec"
-	"io/ioutil"
-	"crypto/x509"
 	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"github.com/gloflow/gloflow/go/gf_core"
+	"github.com/go-playground/validator"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"github.com/go-playground/validator"
-	"github.com/gloflow/gloflow/go/gf_core"
+	"io/ioutil"
+	"os"
+	"os/exec"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -29,12 +29,6 @@ type DB struct {
 
 //-------------------------------------------------------------
 func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
-	
-
-
-
-	
-
 
 	//------------------
 	// LOGS
@@ -52,11 +46,7 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 		Errors_send_to_mongodb_bool: true,
 	}
 
-
-
 	// DBgetCustomTLSConfig(pConfig.MongoSslCAfilePathStr, runtimeSys)
-
-
 
 	//------------------
 	// ERRORS_SEND_TO_SENTRY
@@ -73,9 +63,8 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 	// var mongoUserStr string
 	// var mongoPassStr string
 
-
 	if pConfig.AWSsecretsBool {
-		
+
 		log.WithFields(log.Fields{
 			"env": pConfig.EnvStr,
 		}).Info("Loading Mongo params from AWS Secrets Manager")
@@ -89,7 +78,6 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 		mongoURLstr = secretsMap["glry_mongo_url"]["main"].(string)
 
 		// spew.Dump(secretsMap)
-
 
 		/*//------------------
 		// MONGO_SSL_CA_FILE
@@ -134,18 +122,14 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 		RuntimeSys: runtimeSys,
 	}
 
-
-
-	
 	return runtime, nil
 }
 
 //-------------------------------------------------------------
 func DBinit(pMongoURLstr string,
 	pMongoDBNamestr string,
-	pConfig         *GLRYconfig,
-	pRuntimeSys     *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
-
+	pConfig *GLRYconfig,
+	pRuntimeSys *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
 
 	// AWS CONN STRING
 	// mongodb://gallerydevmain:<insertYourPassword>@host:27017?
@@ -154,20 +138,17 @@ func DBinit(pMongoURLstr string,
 	// 		replicaSet=rs0
 	//		readPreference=secondaryPreferred
 	// 		retryWrites=false
-	
+
 	log.WithFields(log.Fields{}).Info("mongo connecting...")
 
 	//-------------------------------------------------------------
 	// GF_GET_DB
 	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gf_core.Gf_error) {
 
-
 		// wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 
-
-
 		var TLSconfig *tls.Config
-		var gErr      *gf_core.Gf_error
+		var gErr *gf_core.Gf_error
 
 		if pConfig.AWSsecretsBool {
 			fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
@@ -181,7 +162,6 @@ func DBinit(pMongoURLstr string,
 				panic(err)
 			}
 
-
 			CAfilePathStr := "rds-combined-ca-bundle.pem"
 
 			// TLS_CONFIG
@@ -191,8 +171,6 @@ func DBinit(pMongoURLstr string,
 			}
 		}
 
-
-
 		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(pMongoURLstr,
 			pMongoDBNamestr,
 			TLSconfig,
@@ -201,7 +179,7 @@ func DBinit(pMongoURLstr string,
 			return nil, nil, gErr
 		}
 		log.Info("mongo connected...")
-		
+
 		return mongoDB, mongoClient, nil
 	}
 
@@ -223,7 +201,6 @@ func DBinit(pMongoURLstr string,
 func DBgetCustomTLSConfig(pCAfilePathStr string,
 	pRuntimeSys *gf_core.Runtime_sys) (*tls.Config, *gf_core.Gf_error) {
 
-	
 	certs, err := ioutil.ReadFile(pCAfilePathStr)
 
 	if err != nil {
@@ -235,7 +212,7 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 		return nil, gErr
 	}
 
-	tlsConfig        := new(tls.Config)
+	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 
 	ok := tlsConfig.RootCAs.AppendCertsFromPEM(certs)
@@ -247,13 +224,9 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 			}, nil, "glry_core", pRuntimeSys)
 		return nil, gErr
 	}
-	
-
 
 	// fmt.Println("###########################################")
 	// spew.Dump(tlsConfig)
 
-
 	return tlsConfig, nil
 }
-

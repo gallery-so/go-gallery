@@ -2,20 +2,20 @@ package glry_lib
 
 import (
 	// "fmt"
-	"net/http"
 	"context"
-	"github.com/mitchellh/mapstructure"
-	log "github.com/sirupsen/logrus"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
+	"net/http"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
 func AuthHandlersInit(pRuntime *glry_core.Runtime) {
-	
+
 	//-------------------------------------------------------------
 	// AUTH_GET_PREFLIGHT
 	// UN-AUTHENTICATED
@@ -31,7 +31,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			qMap        := pReq.URL.Query()
+			qMap := pReq.URL.Query()
 			userAddrStr := qMap["addr"][0]
 
 			input := &GLRYauthUserGetPreflightInput{
@@ -39,7 +39,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			}
 
 			//------------------
-			
+
 			// GET_PUBLIC_INFO
 			output, gErr := AuthUserGetPreflightPipeline(input, pCtx, pRuntime)
 			if gErr != nil {
@@ -85,7 +85,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			}
 
 			//------------------
-			
+
 			// USER_LOGIN__PIPELINE
 			output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(&input,
 				pReq,
@@ -104,14 +104,14 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			}
 
 			/*
-			// ADD!! - going forward we should follow this approach, after v1
-			// SET_JWT_COOKIE
-			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
-			http.SetCookie(pResp, &http.Cookie{
-				Name:    "glry_token",
-				Value:   userJWTtokenStr,
-				Expires: expirationTime,
-			})*/
+				// ADD!! - going forward we should follow this approach, after v1
+				// SET_JWT_COOKIE
+				expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
+				http.SetCookie(pResp, &http.Cookie{
+					Name:    "glry_token",
+					Value:   userJWTtokenStr,
+					Expires: expirationTime,
+				})*/
 
 			//------------------
 			// OUTPUT
@@ -135,7 +135,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 			// INPUT
-			qMap        := pReq.URL.Query()
+			qMap := pReq.URL.Query()
 			userAddrStr := qMap["addr"][0]
 
 			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
@@ -167,19 +167,17 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			if !validJWTbool {
 				return dataJWTmap, nil
 			}
-			
+
 			//------------------
 			// UPDATE
 			gErr = AuthUserUpdatePipeline(&input, pCtx, pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
-			
+
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{
-				
-			}
+			dataMap := map[string]interface{}{}
 
 			//------------------
 
@@ -197,7 +195,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			qMap        := pReq.URL.Query()
+			qMap := pReq.URL.Query()
 			userAddrStr := qMap["addr"][0]
 
 			input := &GLRYauthUserGetInput{
@@ -228,8 +226,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 					return nil, gErr
 				}
 
-
-			// UN_AUTHENTICATED - different set of results for user not-authenticated
+				// UN_AUTHENTICATED - different set of results for user not-authenticated
 			} else {
 				output, gErr = AuthUserGetPipeline(input,
 					false, // pAuthenticatedBool
@@ -270,7 +267,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/users/create",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
-			
+
 			if pReq.Method == "POST" {
 
 				log.WithFields(log.Fields{}).Debug("/glry/v1/users/create")

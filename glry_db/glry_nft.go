@@ -1,30 +1,34 @@
 package glry_db
 
 import (
-	"fmt"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
+	"time"
+
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
 type GLRYnftID string
 type GLRYnft struct {
-	VersionInt         int64     `bson:"version"              json:"version"` // schema version for this model
-	IDstr              GLRYnftID `bson:"_id"                  json:"id"`
-	CreationTimeF      float64   `bson:"creation_time"        json:"creation_time"`
-	DeletedBool        bool      `bson:"deleted"`
+	VersionInt    int64     `bson:"version"              json:"version"` // schema version for this model
+	IDstr         GLRYnftID `bson:"_id"                  json:"id"`
+	CreationTimeF float64   `bson:"creation_time"        json:"creation_time"`
+	DeletedBool   bool      `bson:"deleted"`
 
-	NameStr            string    `bson:"name"                 json:"name"`
-	DescriptionStr     string    `bson:"description"          json:"description"`
-	CollectionNamesLst []string  `bson:"collection_names"     json:"collection_names"`
-	
-	ExternalURLstr     string    `bson:"external_url"         json:"external_url"`
-	CreatorAddressStr  string    `bson:"creator_address"      json:"creator_address"`
-	ContractAddressStr string    `bson:"contract_address"     json:"contract_address"`
+	NameStr            string   `bson:"name"                 json:"name"`
+	DescriptionStr     string   `bson:"description"          json:"description"`
+	CollectionNamesLst []string `bson:"collection_names"     json:"collection_names"`
+
+	ExternalURLstr     string `bson:"external_url"         json:"external_url"`
+	CreatorAddressStr  string `bson:"creator_address"      json:"creator_address"`
+	ContractAddressStr string `bson:"contract_address"     json:"contract_address"`
 
 	// OPEN_SEA_TOKEN_ID
 	OpenSeaIDstr      string `bson:"opensea_id"       json:"opensea_id"`
@@ -35,7 +39,7 @@ type GLRYnft struct {
 	ImageThumbnailURLstr string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURLstr   string `bson:"image_preview_url"   json:"image_preview_url"`
 
-	HiddenBool  bool  `bson:"hidden"   json:"hidden"`
+	HiddenBool bool `bson:"hidden"   json:"hidden"`
 }
 
 /*// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
@@ -54,7 +58,7 @@ type GLRYnftLegacy struct {
 	DescriptionStr    string `bson:"description"         json:"description"`
 	NameStr           string `bson:"name"                json:"name"`
 	CollectionNameStr string `bson:"collection_name"     json:"collection_name"`
-	
+
 	ExternalURLstr       string    `bson:"external_url"        json:"external_url"`
 	CreatedDateF         float64   `bson:"created_date"        json:"created_date"`
 	CreatorAddressStr    string    `bson:"creator_address"     json:"creator_address"`
@@ -69,17 +73,15 @@ type GLRYnftLegacy struct {
 
 //-------------------------------------------------------------
 func NFTcreateBulk(pNFTlst []*GLRYnft,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
-
-	IDsLst     := []string{}
+	IDsLst := []string{}
 	recordsLst := []interface{}{}
 	for _, n := range pNFTlst {
-		IDsLst     = append(IDsLst, string(n.IDstr))
+		IDsLst = append(IDsLst, string(n.IDstr))
 		recordsLst = append(recordsLst, interface{}(n))
 	}
-
 
 	collNameStr := "glry_nfts"
 	gErr := gfcore.Mongo__insert_bulk(IDsLst, recordsLst,
@@ -94,16 +96,13 @@ func NFTcreateBulk(pNFTlst []*GLRYnft,
 		return gErr
 	}
 
-
 	return nil
 }
 
 //-------------------------------------------------------------
 func NFTcreate(pNFT *GLRYnft,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
-
-
 
 	collNameStr := "glry_nfts"
 	gErr := gfcore.Mongo__insert(pNFT,
@@ -119,34 +118,57 @@ func NFTcreate(pNFT *GLRYnft,
 		return gErr
 	}
 
-
-
 	return nil
 }
 
 //-------------------------------------------------------------
 func NFTgetByUserID(pUserIDstr string,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) ([]*GLRYnft, *gfcore.Gf_error) {
 
-
-
-
-
 	return nil, nil
+}
+
+//-------------------------------------------------------------
+
+func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime) ([]*GLRYnft, *gfcore.Gf_error) {
+
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
+	col := pRuntime.RuntimeSys.Mongo_db.Client().Database(pRuntime.RuntimeSys.Mongo_db.Name()).Collection("glry_nfts")
+	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr},
+		opts,
+		map[string]interface{}{},
+		col,
+		pCtx,
+		pRuntime.RuntimeSys)
+	if gErr != nil {
+		return nil, gErr
+	}
+	result := []*GLRYnft{}
+
+	// TODO error should be handled here but do not know how to convert type error into *gfcore.Gf_error
+	_ = cur.All(pCtx, &result)
+
+	return result, nil
+
 }
 
 //-------------------------------------------------------------
 func NFTcreateID(pNameStr string,
 	pCreatorAddressStr string,
 	pCreationTimeUNIXf float64) GLRYnftID {
-	
+
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
 	h.Write([]byte(pNameStr))
 	h.Write([]byte(pCreatorAddressStr))
-	sum    := h.Sum(nil)
+	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
-	ID     := GLRYnftID(hexStr)
+	ID := GLRYnftID(hexStr)
 	return ID
 }

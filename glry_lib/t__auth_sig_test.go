@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 	// "context"
-	log "github.com/sirupsen/logrus"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -16,7 +16,7 @@ import (
 //---------------------------------------------------
 func TestAuthSignatures(pTest *testing.T) {
 
-	cyan   := color.New(color.FgCyan).SprintFunc()
+	cyan := color.New(color.FgCyan).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 
 	log.Info(fmt.Sprint(cyan("TEST__AUTH_SIGNATURES"), yellow(" ==============================================")))
@@ -26,7 +26,7 @@ func TestAuthSignatures(pTest *testing.T) {
 
 		//--------------------
 		// METAMASK
-		
+
 		// personal.sign() - "Ethereum Signed Message:" header
 		map[string]string{
 			"name":           "metamask_00",
@@ -35,7 +35,7 @@ func TestAuthSignatures(pTest *testing.T) {
 			"signature":      "0xe3c30211b94bdd49980cf3c8a59e49ca00e8a577a08389f0399cfe7fa16ab03359266cccced3459b30a27e3840892b2032783fe33a52fef9ecc008b38366ff7e1c",
 			"signature_type": "personal_sign",
 		},
-		
+
 		// personal.sign() - "Ethereum Signed Message:" header
 		map[string]string{
 			"name":           "metamask_0",
@@ -53,7 +53,7 @@ func TestAuthSignatures(pTest *testing.T) {
 			"signature":      "0xc3e229612b88f9e1bf91e865c57136f1aec5866abbd1135ba8d3cfc0ec8e640d06c678ff9f494937de95a4c0612280a3bf1c19fe1b1fbfb77626e72d03d1ac021c",
 			"signature_type": "personal_sign",
 		},
-		
+
 		// personal.sign() - "Ethereum Signed Message:" header
 		map[string]string{
 			"name":           "metamask_2",
@@ -71,7 +71,7 @@ func TestAuthSignatures(pTest *testing.T) {
 			"signature":      "0xcf2060cdd95fce605a7b249924aa5e5e76800bbd4a2d2324d54d038b8fe19b901386605a096f8c05c3788041d464d14b4441931702460d402963099af72d63421b",
 			"signature_type": "personal_sign",
 		},
-		
+
 		//--------------------
 		// WALLET_CONNECT
 
@@ -110,9 +110,9 @@ func TestAuthSignatures(pTest *testing.T) {
 
 	//--------------------
 	// RUNTIME_SYS
-	mongoURLstr    := "mongodb://127.0.0.1:27017"
+	mongoURLstr := "mongodb://127.0.0.1:27017"
 	mongoDBnameStr := "glry_test"
-	config := &glry_core.GLRYconfig {
+	config := &glry_core.GLRYconfig{
 		// Env            string
 		// BaseURL        string
 		// WebBaseURL     string
@@ -125,16 +125,16 @@ func TestAuthSignatures(pTest *testing.T) {
 	if gErr != nil {
 		pTest.Fail()
 	}
-	
+
 	//--------------------
-	
+
 	// ADD!! - test negative cases as well, where incorrect signatures are passed it
 	//         and a failure is expected.
 	for _, v := range walletSignaturesLst {
 
-		testSignatureStr     := v["signature"]
+		testSignatureStr := v["signature"]
 		testWalletAddressStr := v["wallet_address"]
-		testMsgStr           := v["msg"]
+		testMsgStr := v["msg"]
 
 		fmt.Println("============================")
 		fmt.Println(v["name"])
@@ -149,7 +149,7 @@ func TestAuthSignatures(pTest *testing.T) {
 			pTest.Fail()
 		}
 
-		log.WithFields(log.Fields{"valid": validBool,}).Info("signature validity")
+		log.WithFields(log.Fields{"valid": validBool}).Info("signature validity")
 
 		assert.True(pTest, validBool, "test signature is not valid")
 	}

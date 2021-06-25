@@ -1,15 +1,15 @@
 package glry_lib
 
 import (
-	"time"
 	"context"
-	"net/http"
-	log "github.com/sirupsen/logrus"
-	gf_core "github.com/gloflow/gloflow/go/gf_core"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
+	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
-	"github.com/davecgh/go-spew/spew"
+	log "github.com/sirupsen/logrus"
+	"net/http"
+	"time"
 )
 
 //-------------------------------------------------------------
@@ -21,8 +21,8 @@ type GLRYjwtClaims struct {
 
 //-------------------------------------------------------------
 func AuthJWTverifyHTTP(pUserAddressStr glry_db.GLRYuserAddress,
-	pReq     *http.Request,
-	pCtx     context.Context,
+	pReq *http.Request,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (bool, map[string]interface{}, *gf_core.Gf_error) {
 
 	// JWT_HEADER
@@ -37,14 +37,14 @@ func AuthJWTverifyHTTP(pUserAddressStr glry_db.GLRYuserAddress,
 	}
 
 	if !tokenValidBool {
-		
+
 		//------------------
 		// OUTPUT
 		dataMap := map[string]interface{}{
 			"token_valid": false,
 		}
 		return false, dataMap, nil
-		
+
 		//------------------
 	}
 
@@ -55,8 +55,8 @@ func AuthJWTverifyHTTP(pUserAddressStr glry_db.GLRYuserAddress,
 // VERIFY_PIPELINE
 func AuthJWTverifyPipeline(pJWTtokenStr string,
 	pUserAddressStr glry_db.GLRYuserAddress,
-	pCtx            context.Context,
-	pRuntime        *glry_core.Runtime) (bool, *gf_core.Gf_error) {
+	pCtx context.Context,
+	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
 
 	//------------------
 	// DB_GET_KEY
@@ -74,15 +74,15 @@ func AuthJWTverifyPipeline(pJWTtokenStr string,
 	if gErr != nil {
 		return false, gErr
 	}
-	
+
 	//------------------
-	
+
 	claimedAddressStr := JWTkey.AddressStr
 
 	if pUserAddressStr != claimedAddressStr {
 		return false, nil
 	}
-	
+
 	return tokenValidBool, nil
 }
 
@@ -90,8 +90,7 @@ func AuthJWTverifyPipeline(pJWTtokenStr string,
 // VERIFY
 func AuthJWTverify(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
-	pRuntime         *glry_core.Runtime) (bool, *gf_core.Gf_error) {
-
+	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
 
 	claims := jwt.MapClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
@@ -101,20 +100,17 @@ func AuthJWTverify(pJWTtokenStr string,
 		})
 
 	if err != nil {
-		gErr := gf_core.Error__create("failed to verify JWT token for a user", 
+		gErr := gf_core.Error__create("failed to verify JWT token for a user",
 			"crypto_jwt_verify_token_error",
 			map[string]interface{}{},
 			err, "glry_lib", pRuntime.RuntimeSys)
 		return false, gErr
 	}
 
-
 	tokenValidBool := JWTtoken.Valid
-
 
 	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
 	spew.Dump(claims)
-
 
 	return tokenValidBool, nil
 }
@@ -125,12 +121,11 @@ func AuthJWTverify(pJWTtokenStr string,
 // ADD!! - mark all other JWT's for this address as deleted to exclude them from future use.
 
 func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (string, *gf_core.Gf_error) {
 
-
 	JWTkeyStr := AuthGenerateRandom()
-	
+
 	JWTissuerStr := "gallery" // string(pAddressStr)
 	JWTtokenStr, gErr := AuthJWTgenerate(JWTkeyStr,
 		JWTissuerStr,
@@ -142,18 +137,18 @@ func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 
 	//------------------
 	// DB
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
+	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
 
 	IDstr := glry_db.AuthUserJWTkeyCreateID(pAddressStr,
 		JWTkeyStr,
 		creationTimeUNIXf)
 
-	jwtKey := &glry_db.GLRYuserJWTkey {
+	jwtKey := &glry_db.GLRYuserJWTkey{
 		VersionInt:    0,
 		ID:            IDstr,
 		CreationTimeF: creationTimeUNIXf,
 		DeletedBool:   false,
-	
+
 		ValueStr:   JWTkeyStr,
 		AddressStr: pAddressStr,
 	}
@@ -173,18 +168,18 @@ func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 // ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
 
 func AuthJWTgenerate(pSigningKeyStr string,
-	pIssuerStr  string,
+	pIssuerStr string,
 	pAddressStr glry_db.GLRYuserAddress,
-	pRuntime    *glry_core.Runtime) (string, *gf_core.Gf_error) {
-	
+	pRuntime *glry_core.Runtime) (string, *gf_core.Gf_error) {
+
 	signingKeyBytesLst := []byte(pSigningKeyStr)
 
 	//------------------
 	// CLAIMS
 
 	// Create the Claims
-	creationTimeUNIXint := time.Now().UnixNano()/1000000000
-	expiresAtUNIXint    := creationTimeUNIXint + pRuntime.Config.JWTtokenTTLsecInt //60*60*24*2 // expire N number of secs from now
+	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
+	expiresAtUNIXint := creationTimeUNIXint + pRuntime.Config.JWTtokenTTLsecInt //60*60*24*2 // expire N number of secs from now
 	JWTclaims := GLRYjwtClaims{
 		pAddressStr,
 		jwt.StandardClaims{
@@ -202,12 +197,12 @@ func AuthJWTgenerate(pSigningKeyStr string,
 	JWTtokenStr, err := token.SignedString(signingKeyBytesLst)
 	if err != nil {
 
-		gErr := gf_core.Error__create("failed to sign an Auth JWT token for a user", 
+		gErr := gf_core.Error__create("failed to sign an Auth JWT token for a user",
 			"crypto_jwt_sign_token_error",
 			map[string]interface{}{},
 			err, "glry_lib", pRuntime.RuntimeSys)
 		return "", gErr
 	}
-	
+
 	return JWTtokenStr, nil
 }

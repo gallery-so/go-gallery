@@ -1,11 +1,11 @@
 package glry_lib
 
 import (
-	"time"
 	"context"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	"time"
 )
 
 //-------------------------------------------------------------
@@ -32,7 +32,7 @@ type GLRYcollCreateOutput struct {
 }
 
 // INPUT
-// FIX!! - currently coll IDs are mongodb ID's, 
+// FIX!! - currently coll IDs are mongodb ID's,
 //         have some mongodb agnostic ID format.
 type GLRYcollDeleteInput struct {
 	IDstr string `json:"id" validate:"required,len=24"`
@@ -40,17 +40,13 @@ type GLRYcollDeleteInput struct {
 
 // OUTPUT
 type GLRYcollDeleteOutput struct {
-
 }
 
 //-------------------------------------------------------------
 func CollGetPipeline(pInput *GLRYcollGetInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYcollGetOutput, *gf_core.Gf_error) {
 
-
-
-	
 	collsLst, gErr := glry_db.CollGetByUserID(pInput.UserIDstr,
 		pCtx,
 		pRuntime)
@@ -58,28 +54,26 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 		return nil, gErr
 	}
 
-
-
 	collsOutputsLst := []map[string]interface{}{}
 	for _, coll := range collsLst {
 
 		/*
-		COLL_OUTPUT:
-		{
-			id: 1,
-			isHidden: true,
-			name: 'Cool Collection',
-			description: 'my favorites',
-			// ! note: we want the CREATOR opensea username, not OWNER username
-			nfts: [ { id: 1, name: 'cool nft', creator_username_opensea: 'ColorGlyphs' }, {}, {}, ...] 
-		},
+			COLL_OUTPUT:
+			{
+				id: 1,
+				isHidden: true,
+				name: 'Cool Collection',
+				description: 'my favorites',
+				// ! note: we want the CREATOR opensea username, not OWNER username
+				nfts: [ { id: 1, name: 'cool nft', creator_username_opensea: 'ColorGlyphs' }, {}, {}, ...]
+			},
 		*/
 		collOutputMap := map[string]interface{}{
 			"id":          coll.IDstr,
 			"hidden":      coll.HiddeBool,
 			"name":        coll.NameStr,
 			"description": coll.DescriptionStr,
-			"nfts": []map[string]interface{}{},
+			"nfts":        []map[string]interface{}{},
 		}
 
 		collsOutputsLst = append(collsOutputsLst, collOutputMap)
@@ -89,7 +83,6 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 		CollsOutputsLst: collsOutputsLst,
 	}
 
-
 	return output, nil
 }
 
@@ -97,8 +90,8 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 // CREATE
 func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
-	pCtx       context.Context,
-	pRuntime   *glry_core.Runtime) (*GLRYcollCreateOutput, *gf_core.Gf_error) {
+	pCtx context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYcollCreateOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -109,23 +102,22 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 
 	//------------------
 
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	nameStr        := pInput.NameStr
+	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
+	nameStr := pInput.NameStr
 	ownerUserIDstr := pUserIDstr
-	IDstr          := glry_db.CollCreateID(nameStr, ownerUserIDstr, creationTimeUNIXf)
+	IDstr := glry_db.CollCreateID(nameStr, ownerUserIDstr, creationTimeUNIXf)
 
-	coll := &glry_db.GLRYcollection {
+	coll := &glry_db.GLRYcollection{
 		VersionInt:    0,
 		IDstr:         IDstr,
 		CreationTimeF: creationTimeUNIXf,
-		
+
 		NameStr:        nameStr,
 		DescriptionStr: pInput.DescriptionStr,
 		OwnerUserIDstr: ownerUserIDstr,
 		DeletedBool:    false,
 		NFTsLst:        []string{},
 	}
-
 
 	// DB
 	gErr = glry_db.CollCreate(coll, pCtx, pRuntime)
@@ -144,9 +136,9 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 //-------------------------------------------------------------
 // DELETE
 func CollDeletePipeline(pInput *GLRYcollDeleteInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, *gf_core.Gf_error) {
-	
+
 	//------------------
 	// VALIDATE
 	gErr := glry_core.Validate(pInput, pRuntime)

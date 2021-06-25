@@ -15,14 +15,8 @@ func Init(pPortInt int,
 
 	// HANDLERS
 	glry_lib.HandlersInit(pRuntime)
-	
-
-
 
 	// SERVER_INIT
 	gf_rpc_lib.Server__init(pPortInt)
-	
-	
-
 
 }
