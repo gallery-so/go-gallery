@@ -12,7 +12,6 @@ import (
 
 //-------------------------------------------------------------
 func main() {
-	
 
 	config := glry_core.ConfigLoad()
 	portStr := config.Port
@@ -31,9 +30,7 @@ func main() {
 		// FINISH!! - create a complete list of handlers that we want to be traced.
 		//            find a way to get this dynamically listed after the handlers are initialized,
 		//            so that a list of handler paths doesnt have to get maintained in multiple places.
-		sentryTransactionToTrace_map := map[string]bool{
-			
-		}
+		sentryTransactionToTrace_map := map[string]bool{}
 
 		err := gf_core.Error__init_sentry(runtime.Config.SentryEndpointStr,
 			sentryTransactionToTrace_map,

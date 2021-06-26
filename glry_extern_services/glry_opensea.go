@@ -1,17 +1,18 @@
 package glry_extern_services
 
 import (
-	"fmt"
 	"context"
-	"time"
 	"encoding/json"
+	"fmt"
 	"strings"
-	log "github.com/sirupsen/logrus"
-	"github.com/parnurzeal/gorequest"
-	"github.com/mitchellh/mapstructure"
+	"time"
+
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	"github.com/mitchellh/mapstructure"
+	"github.com/parnurzeal/gorequest"
+	log "github.com/sirupsen/logrus"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -21,9 +22,8 @@ import (
 // ADD!! - persist OpenSea fetched assets as well.
 
 func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
-
 
 	//--------------------
 	// OPENSEA_FETCH
@@ -36,43 +36,38 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 
 	//--------------------
 
-
-
 	// DB_PERSIST
 	nftsLst := []*glry_db.GLRYnft{}
 	for _, openSeaAsset := range openSeaAssetsForAccLst {
 
-		creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-		nameStr           := openSeaAsset.NameStr
+		creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
+		nameStr := openSeaAsset.NameStr
 		creatorAddressStr := openSeaAsset.Creator.AddressStr
-		IDstr             := glry_db.NFTcreateID(nameStr, creatorAddressStr, creationTimeUNIXf)
+		IDstr := glry_db.NFTcreateID(nameStr, creatorAddressStr, creationTimeUNIXf)
 
 		nft := &glry_db.GLRYnft{
-			VersionInt:         0,
-			
+			VersionInt: 0,
+
 			IDstr:              IDstr,
 			CreationTimeF:      creationTimeUNIXf,
 			NameStr:            nameStr,
 			DescriptionStr:     openSeaAsset.DescriptionStr,
-			CollectionNamesLst: []string{openSeaAsset.Collection.NameStr, },
+			CollectionNamesLst: []string{openSeaAsset.Collection.NameStr},
 
 			ExternalURLstr:     openSeaAsset.ExternLinkStr,
 			CreatorAddressStr:  creatorAddressStr,
 			ContractAddressStr: openSeaAsset.AssetContract.AddressStr,
 
-			OpenSeaTokenIDstr: openSeaAsset.TokenIDstr,       
+			OpenSeaTokenIDstr: openSeaAsset.TokenIDstr,
 
 			ImageURLstr:          openSeaAsset.ImageURLstr,
 			ImageThumbnailURLstr: openSeaAsset.ImageThumbURLstr,
 			ImagePreviewURLstr:   openSeaAsset.ImagePreviewURLstr,
 
-			
-			HiddenBool:  false,
+			HiddenBool: false,
 		}
 		nftsLst = append(nftsLst, nft)
 	}
-
-
 
 	// CREATE_BULK
 	gErr = glry_db.NFTcreateBulk(nftsLst, pCtx, pRuntime)
@@ -80,13 +75,12 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 		return nil, gErr
 	}
 
-
 	return openSeaAssetsForAccLst, nil
 }
 
 //-------------------------------------------------------------
 func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx        context.Context,
+	pCtx context.Context,
 	pRuntimeSys *gfcore.Runtime_sys) ([]*glry_db.GLRYopenSeaAsset, *gfcore.Gf_error) {
 
 	/*{
@@ -187,8 +181,8 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		"transfer_fee_payment_token": null,
 		"transfer_fee": null
 	}
-	
-	
+
+
 	LAST_SALE:
 	map[
 		asset:map[
@@ -223,24 +217,23 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 				user: map[
 	*				username:mikeybitcoin
 				]
-			] 
-	*		id:         9.1561879e+07 
-	*		timestamp:  2021-03-18T17:22:37 
+			]
+	*		id:         9.1561879e+07
+	*		timestamp:  2021-03-18T17:22:37
 	*		to_account: map[
 	*			address: 0x7be8076f4ea4a4ad08075c2508e481d6c946d12b
 				config:  verified
-				discord_id: 
+				discord_id:
 	*			profile_img_url: https://storage.googleapis.com/opensea-static/opensea-profile/22.png
 				user: map[
 	*				username:OpenSea-Orders
 				]
 			]
-	*		transaction_hash:  0xb49f436bf95b22c6ddd35494e393d41eae728045045cf4cefbb2df599933adbd 
+	*		transaction_hash:  0xb49f436bf95b22c6ddd35494e393d41eae728045045cf4cefbb2df599933adbd
 	*		transaction_index: 68
 		]
 	]
 	*/
-
 
 	offsetInt := 0
 	limitInt := 50
@@ -251,9 +244,6 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		"limit":           fmt.Sprintf("%d", limitInt),
 	}
 
-
-
-
 	qsLst := []string{}
 	for k, v := range qsArgsMap {
 		qsLst = append(qsLst, fmt.Sprintf("%s=%s", k, v))
@@ -261,32 +251,27 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	qsStr := strings.Join(qsLst, "&")
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?%s", qsStr)
 
-
-
 	log.WithFields(log.Fields{
-			"url":                  urlStr,
-			"owner_wallet_address": pOwnerWalletAddressStr,
-		}).Info("making HTTP request to OpenSea API")
+		"url":                  urlStr,
+		"owner_wallet_address": pOwnerWalletAddressStr,
+	}).Info("making HTTP request to OpenSea API")
 	_, respBytes, errs := gorequest.New().Get(urlStr).EndBytes()
 	if len(errs) > 0 {
-		
+
 		// FIX!! - add error capture here!!!
 	}
 
 	var response map[string]interface{}
 	err := json.Unmarshal(respBytes, &response)
 	if err != nil {
-		gErr := gfcore.Error__create(fmt.Sprintf("failed to parse json response from OpenSea API"), 
+		gErr := gfcore.Error__create(fmt.Sprintf("failed to parse json response from OpenSea API"),
 			"json_decode_error",
-			map[string]interface{}{"url": urlStr,},
+			map[string]interface{}{"url": urlStr},
 			err, "glry_extern_services", pRuntimeSys)
 		return nil, gErr
 	}
 
-
-
-
-	assetsLst       := response["assets"].([]interface{})
+	assetsLst := response["assets"].([]interface{})
 	assetsForAccLst := []*glry_db.GLRYopenSeaAsset{}
 
 	for _, aMap := range assetsLst {
@@ -294,7 +279,7 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		var asset glry_db.GLRYopenSeaAsset
 		err := mapstructure.Decode(aMap, &asset)
 		if err != nil {
-			
+
 			gErr := gfcore.Error__create("failed to load OpenSea asset map into a GLRYopenSeaAsset struct",
 				"mapstruct__decode",
 				map[string]interface{}{
@@ -302,12 +287,9 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 					"owner_wallet_address": pOwnerWalletAddressStr,
 				},
 				err, "glry_extern_services", pRuntimeSys)
-			
+
 			return nil, gErr
 		}
-
-
-
 
 		// LAST_SALE - for some assets this is null, for others its specified.
 		//             this loading of token_id is done manually here to avoid another nested struct "asset"
@@ -318,12 +300,9 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 			asset.LastSale.TokenIDstr = aMap.(map[string]interface{})["last_sale"].(map[string]interface{})["asset"].(map[string]interface{})["token_id"].(string)
 		}
 
-
-
-
 		assetsForAccLst = append(assetsForAccLst, &asset)
 	}
-	
+
 	// spew.Dump(assetsForAccLst)
 
 	return assetsForAccLst, nil

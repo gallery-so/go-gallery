@@ -3,15 +3,16 @@ package glry_lib
 import (
 	"fmt"
 	// "time"
-	"net/http"
 	"context"
+	"net/http"
+
 	// log "github.com/sirupsen/logrus"
-	"github.com/mitchellh/mapstructure"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	"github.com/mikeydub/go-gallery/glry_extern_services"
+	"github.com/mitchellh/mapstructure"
 )
 
 //-------------------------------------------------------------
@@ -31,7 +32,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 			// INPUT
 
-			qMap      := pReq.URL.Query()
+			qMap := pReq.URL.Query()
 			userIDstr := qMap["userid"][0]
 
 			input := &GLRYcollGetInput{
@@ -44,7 +45,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			if gErr != nil {
 				return nil, gErr
 			}
-			
+
 			//------------------
 			// OUTPUT
 			dataMap := map[string]interface{}{
@@ -56,7 +57,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			return dataMap, nil
 		},
 		pRuntime.RuntimeSys)
-	
+
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
 
@@ -90,14 +91,12 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 			if gErr != nil {
 				return nil, gErr
 			}
-			
+
 			fmt.Println(output)
 
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{
-				
-			}
+			dataMap := map[string]interface{}{}
 
 			//------------------
 
@@ -137,20 +136,60 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{
-		
-			}
+			dataMap := map[string]interface{}{}
 
 			//------------------
 
 			return dataMap, nil
 		},
 		pRuntime.RuntimeSys)
-	
 
 	//-------------------------------------------------------------
 	// NFTS
 	//-------------------------------------------------------------
+	// SINGLE GET
+	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/get",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			if pReq.Method == "GET" {
+
+				//------------------
+				// INPUT
+
+				//------------------
+
+				qMap := pReq.URL.Query()
+
+				nftIDstr := qMap.Get("id")
+
+				if nftIDstr == "" {
+					// is this the right way to create an error for gf_core?
+					return nil, gf_core.Error__create("nft id not found in query values",
+						"http_client_req_error",
+						map[string]interface{}{
+							"uri": "/glry/v1/nfts/get",
+						}, nil, "glry_core", pRuntime.RuntimeSys)
+				}
+
+				nfts, gErr := glry_db.NFTgetByID(nftIDstr, pCtx, pRuntime)
+				if gErr != nil {
+					return nil, gErr
+				}
+
+				//------------------
+				// OUTPUT
+				dataMap := map[string]interface{}{
+					"nfts": nfts,
+				}
+
+				//------------------
+				return dataMap, nil
+			}
+
+			return nil, nil
+		},
+		pRuntime.RuntimeSys)
+
 	// USER_GET
 	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/user_get",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
@@ -199,14 +238,9 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				return nil, gErr
 			}
 
-
 			//------------------
 			// OUTPUT
-			dataMap := map[string]interface{}{
-				
-
-
-			}
+			dataMap := map[string]interface{}{}
 
 			//------------------
 

@@ -1,16 +1,16 @@
 package glry_lib
 
 import (
-	"fmt"
-	"net/http"
 	"context"
-	"time"
-	"github.com/ethereum/go-ethereum/crypto"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	log "github.com/sirupsen/logrus"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
+	log "github.com/sirupsen/logrus"
+	"net/http"
+	"time"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -81,7 +81,7 @@ type GLRYauthUserCreateOutput struct {
 //-------------------------------------------------------------
 // USER_CREATE__PIPELINE
 func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserCreateOutput, *gf_core.Gf_error) {
 
 	//------------------
@@ -108,7 +108,7 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 	sigValidBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
-		pRuntime) 
+		pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
@@ -119,17 +119,17 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 	}
 
 	//------------------
-	
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	addressStr        := pInput.AddressStr
-	IDstr             := glry_db.AuthUserCreateID(addressStr, creationTimeUNIXf)
+
+	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
+	addressStr := pInput.AddressStr
+	IDstr := glry_db.AuthUserCreateID(addressStr, creationTimeUNIXf)
 	// nameStr := pInput.NameStr
 
 	user := &glry_db.GLRYuser{
 		VersionInt:    0,
 		IDstr:         IDstr,
 		CreationTimeF: creationTimeUNIXf,
-		AddressesLst:  []glry_db.GLRYuserAddress{addressStr, },
+		AddressesLst:  []glry_db.GLRYuserAddress{addressStr},
 		// NameStr:       nameStr,
 		// NonceInt:      nonceInt,
 	}
@@ -139,7 +139,7 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 	if gErr != nil {
 		return nil, gErr
 	}
-	
+
 	output.UserIDstr = IDstr
 
 	//------------------
@@ -163,8 +163,8 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 // USER_GET__PIPELINE
 func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 	pAuthenticatedBool bool,
-	pCtx               context.Context,
-	pRuntime           *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {
+	pCtx context.Context,
+	pRuntime *glry_core.Runtime) (*GLRYauthUserGetOutput, *gf_core.Gf_error) {
 
 	//------------------
 	// VALIDATE
@@ -186,7 +186,7 @@ func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 	if pAuthenticatedBool {
 		output = &GLRYauthUserGetOutput{
 			UserNameStr:    user.UserNameStr,
-			DescriptionStr: user.DescriptionStr, 
+			DescriptionStr: user.DescriptionStr,
 		}
 	} else {
 
@@ -197,7 +197,7 @@ func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 
 //-------------------------------------------------------------
 func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	//------------------
@@ -218,16 +218,14 @@ func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
 		return gErr
 	}
 
-
-
 	return nil
 }
 
 //-------------------------------------------------------------
 // LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
-	pReq     *http.Request,
-	pCtx     context.Context,
+	pReq *http.Request,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserLoginOutput, *gf_core.Gf_error) {
 
 	//------------------
@@ -239,10 +237,10 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 
 	//------------------
 	// LOGIN_ATTEMPT
-	creationTimeUNIXf := float64(time.Now().UnixNano())/1000000000.0
-	IDstr             := glry_db.AuthUserLoginAttemptCreateID(pInput.AddressStr, pInput.SignatureStr, creationTimeUNIXf)
-	
-	loginAttempt := &glry_db.GLRYuserLoginAttempt {
+	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
+	IDstr := glry_db.AuthUserLoginAttemptCreateID(pInput.AddressStr, pInput.SignatureStr, creationTimeUNIXf)
+
+	loginAttempt := &glry_db.GLRYuserLoginAttempt{
 		VersionInt:    0,
 		ID:            IDstr,
 		CreationTimeF: creationTimeUNIXf,
@@ -268,7 +266,7 @@ func AuthUserLoginAndMemorizeAttemptPipeline(pInput *GLRYauthUserLoginInput,
 //-------------------------------------------------------------
 // USER_LOGIN__PIPELINE
 func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserLoginOutput, *gf_core.Gf_error) {
 
 	//------------------
@@ -298,7 +296,7 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 	sigValidBool, gErr := AuthVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
-		pRuntime) 
+		pRuntime)
 	if gErr != nil {
 		return nil, gErr
 	}
@@ -328,9 +326,9 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 // VERIFY_SIGNATURE_ALL_METHODS
 
 func AuthVerifySignatureAllMethods(pSignatureStr string,
-	pDataStr    string,
+	pDataStr string,
 	pAddressStr glry_db.GLRYuserAddress,
-	pRuntime    *glry_core.Runtime) (bool, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
 
 	// DATA_HEADER - TRUE
 	validBool, gErr := AuthVerifySignature(pSignatureStr,
@@ -354,7 +352,7 @@ func AuthVerifySignatureAllMethods(pSignatureStr string,
 		}
 	}
 
-	return validBool, nil	
+	return validBool, nil
 }
 
 //-------------------------------------------------------------
@@ -364,32 +362,32 @@ func AuthVerifySignatureAllMethods(pSignatureStr string,
 //            for persistance in the LoginAttempt.
 
 func AuthVerifySignature(pSignatureStr string,
-	pDataStr           string,
-	pAddressStr        glry_db.GLRYuserAddress,
+	pDataStr string,
+	pAddressStr glry_db.GLRYuserAddress,
 	pUseDataHeaderBool bool,
-	pRuntime           *glry_core.Runtime) (bool, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
 
 	// eth_sign:
 	// - https://goethereumbook.org/signature-verify/
 	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
 	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
-	
+
 	// DATA
-	
+
 	var dataStr string
 	if pUseDataHeaderBool {
 		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(fmt.Sprintf(pDataStr)), pDataStr)
 	} else {
 		dataStr = pDataStr
-	} 
+	}
 
 	dataBytesLst := []byte(dataStr)
-	dataHash     := crypto.Keccak256Hash(dataBytesLst)
+	dataHash := crypto.Keccak256Hash(dataBytesLst)
 
 	// SIGNATURE
-	log.WithFields(log.Fields{"signature": pSignatureStr,}).Debug("signature to verify")
-	log.WithFields(log.Fields{"header":    pUseDataHeaderBool,}).Debug("use 'Ethereum Signed Message' header in verifying")
-	log.WithFields(log.Fields{"data":      pDataStr,}).Debug("data that was signed")
+	log.WithFields(log.Fields{"signature": pSignatureStr}).Debug("signature to verify")
+	log.WithFields(log.Fields{"header": pUseDataHeaderBool}).Debug("use 'Ethereum Signed Message' header in verifying")
+	log.WithFields(log.Fields{"data": pDataStr}).Debug("data that was signed")
 
 	signature, err := hexutil.Decode(pSignatureStr)
 	if err != nil {
@@ -410,7 +408,7 @@ func AuthVerifySignature(pSignatureStr string,
 	//                    its important because with eliptic curves multiple points on the curve
 	//                    can be calculated from "r" and "s" alone. this would result in 2 different pubkeys.
 	//                    "v" indicates which of those 2 points to use.
-	// 
+	//
 	// https://github.com/ethereum/go-ethereum/issues/19751
 	// @karalabe commented on Jun 24, 2019:
 	// Originally Ethereum used 27 / 28 (which internally is just 0 / 1, just some weird bitcoin legacy to add 27).
@@ -423,7 +421,7 @@ func AuthVerifySignature(pSignatureStr string,
 	// Use the high level signers, don't use the secp256k1 library directly. If you use the low level crypto library directly,
 	// you need to be aware of how generic ECC relates to Ethereum signatures.
 
-	log.WithFields(log.Fields{"id": signature[len(signature)-1],}).Debug("signature last byte (recovery ID)")
+	log.WithFields(log.Fields{"id": signature[len(signature)-1]}).Debug("signature last byte (recovery ID)")
 	if signature[64] == 27 || signature[64] == 28 {
 		signature[64] -= 27
 	}
@@ -435,7 +433,7 @@ func AuthVerifySignature(pSignatureStr string,
 
 	// EC_RECOVER - returns the address for the account that was used to create the signature.
 	//              compatible with eth_sign and personal_sign.
-	// 
+	//
 	// It is important to know that the ECDSA signature scheme allows the public key to be
 	// recovered from the signed message together with the signature.
 	// The recovery process is based on some mathematical computations
@@ -443,10 +441,10 @@ func AuthVerifySignature(pSignatureStr string,
 	// The public key recovery from the ECDSA signature is very useful in bandwidth
 	// constrained or storage constrained environments (such as blockchain systems),
 	// when transmission or storage of the public keys cannot be afforded.
-	// 
-	
+	//
+
 	publicKey, err := crypto.SigToPub(dataHash.Bytes(), signature)
-	
+
 	// publicKey, err := crypto.Ecrecover(dataHash.Bytes(), signature)
 	if err != nil {
 		gErr := gf_core.Error__create("failed to recover PublicKey from ECDSA public key",
@@ -470,8 +468,8 @@ func AuthVerifySignature(pSignatureStr string,
 	//                     correlating to the private key used to generate the signature.
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*publicKey).Hex()
 
-	log.WithFields(log.Fields{"address": pubkeyAddressHexStr,}).Debug("derived address from sig pubkey")
-	log.WithFields(log.Fields{"address": pAddressStr,}).Debug("registered address with the msg/nonce")
+	log.WithFields(log.Fields{"address": pubkeyAddressHexStr}).Debug("derived address from sig pubkey")
+	log.WithFields(log.Fields{"address": pAddressStr}).Debug("registered address with the msg/nonce")
 
 	if pubkeyAddressHexStr != string(pAddressStr) {
 		validBool = false
@@ -490,7 +488,7 @@ func AuthVerifySignature(pSignatureStr string,
 //-------------------------------------------------------------
 // USER_GET_PREFLIGHT__PIPELINE
 func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYauthUserGetPreflightOutput, *gf_core.Gf_error) {
 
 	//------------------
@@ -502,7 +500,7 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 
 	//------------------
 
-	var nonce          *glry_db.GLRYuserNonce
+	var nonce *glry_db.GLRYuserNonce
 	var userExistsBool bool
 
 	//-------------------------------------------------------------
@@ -518,7 +516,6 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 		//                 to the front-end. subsequently the client has to create a new user.
 		if user == nil {
 
-			
 			// NONCE_CREATE
 			nonce, gErr = AuthNonceCreatePipeline(glry_db.GLRYuserID(""), pInput.AddressStr, pCtx, pRuntime)
 			if gErr != nil {
@@ -556,7 +553,6 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 		return nil, gErr
 	}
 	defer txSession.EndSession(pCtx)
-	
 
 	output := &GLRYauthUserGetPreflightOutput{
 		NonceStr:       nonce.ValueStr,
@@ -568,7 +564,7 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 //-------------------------------------------------------------
 // USER_DELETE__PIPELINE
 func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
 
 	// DELETE
@@ -582,7 +578,7 @@ func AuthUserDeletePipeline(pUserIDstr glry_db.GLRYuserID,
 
 //-------------------------------------------------------------
 func AuthUserCheck(pAddressStr glry_db.GLRYuserAddress,
-	pCtx     context.Context,
+	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (bool, string, glry_db.GLRYuserID, *gf_core.Gf_error) {
 
 	//------------------
