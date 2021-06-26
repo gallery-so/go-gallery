@@ -168,12 +168,20 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 						"http_client_req_error",
 						map[string]interface{}{
 							"uri": "/glry/v1/nfts/get",
-						}, nil, "glry_core", pRuntime.RuntimeSys)
+						}, nil, "glry_lib", pRuntime.RuntimeSys)
 				}
 
 				nfts, gErr := glry_db.NFTgetByID(nftIDstr, pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
+				}
+
+				if len(nfts) == 0 {
+					return nil, gf_core.Error__create(fmt.Sprintf("no nfts found with id: %s", nftIDstr),
+						"http_client_req_error",
+						map[string]interface{}{
+							"uri": "/glry/v1/nfts/get",
+						}, nil, "glry_lib", pRuntime.RuntimeSys)
 				}
 
 				//------------------
