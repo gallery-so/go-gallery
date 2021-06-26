@@ -151,7 +151,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/get",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
-			if pReq.Method == "GET" {
+			if pReq.Method == http.MethodGet {
 
 				//------------------
 				// INPUT
@@ -189,6 +189,67 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 				dataMap := map[string]interface{}{
 					"nfts": nfts,
 				}
+
+				//------------------
+				return dataMap, nil
+			}
+
+			return nil, nil
+		},
+		pRuntime.RuntimeSys)
+
+	// SINGLE UPDATE
+	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/update",
+		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			if pReq.Method == http.MethodPatch {
+
+				//------------------
+				// INPUT
+
+				//------------------
+
+				pReq.ParseForm()
+
+				nftIDstr := pReq.FormValue("id")
+
+				// TODO any other values that could be potentially changed here
+
+				nftCollectorsNote := pReq.FormValue("collectors_note")
+
+				if nftIDstr == "" {
+					// is this the right way to create an error for gf_core?
+					return nil, gf_core.Error__create("no id found in form values",
+						"http_client_req_error",
+						map[string]interface{}{
+							"uri": "/glry/v1/nfts/get",
+						}, nil, "glry_lib", pRuntime.RuntimeSys)
+				}
+
+				nfts, gErr := glry_db.NFTgetByID(nftIDstr, pCtx, pRuntime)
+				if gErr != nil {
+					return nil, gErr
+				}
+
+				if len(nfts) == 0 {
+					return nil, gf_core.Error__create(fmt.Sprintf("no nfts found with id: %s", nftIDstr),
+						"http_client_req_error",
+						map[string]interface{}{
+							"uri": "/glry/v1/nfts/get",
+						}, nil, "glry_lib", pRuntime.RuntimeSys)
+				}
+
+				for _, nft := range nfts {
+					nft.DescriptionStr = nftCollectorsNote
+					gErr := glry_db.NFTupdateById(nftIDstr, nft, pCtx, pRuntime)
+					if gErr != nil {
+						return nil, gErr
+					}
+				}
+
+				//------------------
+				// OUTPUT
+				dataMap := map[string]interface{}{}
 
 				//------------------
 				return dataMap, nil
