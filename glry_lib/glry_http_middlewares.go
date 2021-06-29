@@ -20,7 +20,7 @@ type authContextValue struct {
 
 // jwt middleware
 // parameter hell because gf_core http_handler is private :(
-// both funcs (param and return funcs) are of type gf_core.http_handler implicitly
+// both funcs (parameter and return funcs) are of type gf_core.http_handler implicitly
 func precheckJwt(midd func(pCtx context.Context, pResp http.ResponseWriter,
 	pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error), pRuntime *glry_core.Runtime) func(context.Context, http.ResponseWriter,
 	*http.Request) (map[string]interface{}, *gf_core.Gf_error) {
