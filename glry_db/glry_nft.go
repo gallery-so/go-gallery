@@ -141,7 +141,7 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 
 	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
 
-	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr},
+	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr, "deleted": false},
 		opts,
 		map[string]interface{}{},
 		col,

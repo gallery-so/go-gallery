@@ -1,10 +1,7 @@
 package glry_lib
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 
 	// "time"
 	"context"
@@ -225,29 +222,14 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 						}, nil, "glry_lib", pRuntime.RuntimeSys)
 				}
 
-				buf := &bytes.Buffer{}
-
-				_, err := io.Copy(buf, pReq.Body)
-				if err != nil {
-					return nil, gf_core.Error__create("unable to read bytes of body",
-						"io_reader_error",
-						map[string]interface{}{
-							"uri": "/glry/v1/nfts/update",
-						}, err, "glry_lib", pRuntime.RuntimeSys)
-				}
-
 				nft := &glry_db.GLRYnft{}
 
-				err = json.Unmarshal(buf.Bytes(), nft)
-				if err != nil {
-					return nil, gf_core.Error__create("unable to unmarshal body; expecting nft",
-						"io_reader_error",
-						map[string]interface{}{
-							"uri": "/glry/v1/nfts/update",
-						}, err, "glry_lib", pRuntime.RuntimeSys)
+				gErr := glry_core.UnmarshalBody(nft, pReq.Body, pRuntime)
+				if gErr != nil {
+					return nil, gErr
 				}
 
-				gErr := glry_db.NFTupdateById(nftIDstr, nft, pCtx, pRuntime)
+				gErr = glry_db.NFTupdateById(nftIDstr, nft, pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
 				}
