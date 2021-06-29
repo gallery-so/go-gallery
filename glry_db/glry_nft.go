@@ -167,10 +167,11 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 // NOTE: there is no gfcore mongo func for update... using default mongo lib for now
 func NFTupdateById(pIDstr string, updatedNft *GLRYnft, pCtx context.Context, pRuntime *glry_core.Runtime) *gfcore.Gf_error {
 
-	opts := &options.FindOptions{}
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+	//------------------
+	// VALIDATE
+	gErr := glry_core.Validate(updatedNft, pRuntime)
+	if gErr != nil {
+		return gErr
 	}
 
 	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
