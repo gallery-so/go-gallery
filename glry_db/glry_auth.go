@@ -28,13 +28,9 @@ type GLRYuser struct {
 	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool       `bson:"deleted"`
 
-	UserNameStr    string            `bson:"name"         json:"name"`      // mutable
-	AddressesLst   []GLRYuserAddress `bson:"addresses     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	DescriptionStr string            `bson:"description"  json:"description"`
-
-	// LAST_SEEN - last time user logged or out? or some other metric?
-	// FINISH!!  - nothing is setting this yet.
-	LastSeenTimeF float64
+	UserNameStr  string            `bson:"name"         json:"name"`       // mutable
+	AddressesLst []GLRYuserAddress `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	BioStr       string            `bson:"bio"  json:"bio"`
 }
 
 // USER_NONCE
