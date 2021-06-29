@@ -3,16 +3,19 @@ package glry_lib
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"testing"
+
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	// "github.com/davecgh/go-spew/spew"
 )
 
+// TODO change tests to reflect changes to jwt
 //---------------------------------------------------
 func TestAuthJWT(pTest *testing.T) {
 

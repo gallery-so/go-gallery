@@ -332,6 +332,14 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	//-------------------------------------------------------------
 }
 
+// information to be added to context with middlewares
+type contextKey string
+
+type authContextValue struct {
+	AuthenticatedBool bool
+	UserAddressStr    string
+}
+
 // jwt middleware
 // parameter hell because gf_core http_handler is private :(
 // both funcs (param and return funcs) are of type gf_core.http_handler implicitly
@@ -343,24 +351,29 @@ func precheckJwt(midd func(pCtx context.Context, pResp http.ResponseWriter,
 
 		authHeaders := strings.Split(pReq.Header.Get("Authorization"), " ")
 		if len(authHeaders) > 0 {
+			// get string after "Bearer"
 			jwt := authHeaders[1]
-			valid, gErr := AuthJWTverify(jwt, os.Getenv("JWT_SECRET"), pRuntime)
+			// use an env variable as jwt secret as upposed to using a stateful secret stored in
+			// database that is unique to every user and session
+			valid, userAddr, gErr := AuthJWTverify(jwt, os.Getenv("JWT_SECRET"), pRuntime)
 			if gErr != nil {
 				return nil, gErr
 			}
-			if !valid {
-				return nil, gf_core.Error__create("invalid jwt",
-					"http_client_req_error",
-					map[string]interface{}{
-						"jwt": jwt,
-					}, nil, "glry_lib", pRuntime.RuntimeSys)
-			}
-		} else {
-			return nil, gf_core.Error__create("expecting jwt in headers",
-				"http_client_req_error",
-				map[string]interface{}{}, nil,
-				"glry_lib", pRuntime.RuntimeSys)
+
+			// using a struct for storing values with a kard
+			pCtx = context.WithValue(pCtx, contextKey("auth"), authContextValue{
+				AuthenticatedBool: valid,
+				UserAddressStr:    userAddr,
+			})
 		}
 		return midd(pCtx, pResp, pReq)
+	}
+}
+
+func getAuthFromCtx(pCtx context.Context) bool {
+	if value, ok := pCtx.Value("auth").(authContextValue); ok {
+		return value.AuthenticatedBool
+	} else {
+		return false
 	}
 }
