@@ -2,6 +2,8 @@ package glry_lib
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	// "time"
 	"context"
@@ -328,4 +330,37 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
+}
+
+// jwt middleware
+// parameter hell because gf_core http_handler is private :(
+// both funcs (param and return funcs) are of type gf_core.http_handler implicitly
+func precheckJwt(midd func(pCtx context.Context, pResp http.ResponseWriter,
+	pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error), pRuntime *glry_core.Runtime) func(context.Context, http.ResponseWriter,
+	*http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	return func(pCtx context.Context, pResp http.ResponseWriter,
+		pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+		authHeaders := strings.Split(pReq.Header.Get("Authorization"), " ")
+		if len(authHeaders) > 0 {
+			jwt := authHeaders[1]
+			valid, gErr := AuthJWTverify(jwt, os.Getenv("JWT_SECRET"), pRuntime)
+			if gErr != nil {
+				return nil, gErr
+			}
+			if !valid {
+				return nil, gf_core.Error__create("invalid jwt",
+					"http_client_req_error",
+					map[string]interface{}{
+						"jwt": jwt,
+					}, nil, "glry_lib", pRuntime.RuntimeSys)
+			}
+		} else {
+			return nil, gf_core.Error__create("expecting jwt in headers",
+				"http_client_req_error",
+				map[string]interface{}{}, nil,
+				"glry_lib", pRuntime.RuntimeSys)
+		}
+		return midd(pCtx, pResp, pReq)
+	}
 }
