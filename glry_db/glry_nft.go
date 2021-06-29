@@ -141,7 +141,7 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 
 	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
 
-	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr},
+	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr, "deleted": false},
 		opts,
 		map[string]interface{}{},
 		col,
@@ -155,10 +155,36 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 	if err := cur.All(pCtx, &result); err != nil {
 		return nil, gfcore.Error__create("nft id not found in query values",
 			"mongodb_cursor_all",
-			map[string]interface{}{}, err, "glry_core", pRuntime.RuntimeSys)
+			map[string]interface{}{}, err, "glry_db", pRuntime.RuntimeSys)
 	}
 
 	return result, nil
+
+}
+
+//-------------------------------------------------------------
+
+// NOTE: there is no gfcore mongo func for update... using default mongo lib for now
+func NFTupdateById(pIDstr string, updatedNft *GLRYnft, pCtx context.Context, pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+
+	//------------------
+	// VALIDATE
+	gErr := glry_core.Validate(updatedNft, pRuntime)
+	if gErr != nil {
+		return gErr
+	}
+
+	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
+
+	updateResult, err := col.UpdateOne(pCtx, bson.D{{"_id", pIDstr}}, bson.D{{"$set", updatedNft}})
+
+	if err != nil || updateResult.ModifiedCount == 0 {
+		return gfcore.Error__create("unable to update nft",
+			"mongodb_update_error",
+			map[string]interface{}{}, err, "glry_db", pRuntime.RuntimeSys)
+	}
+
+	return nil
 
 }
 
