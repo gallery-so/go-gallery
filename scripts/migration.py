@@ -34,9 +34,10 @@ with open('glry-users.csv') as usersfile:
         print(row['username'])
         creation_time_unix = datetime.datetime.strptime(
             row['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
+        user_id = create_user_id(row['wallet_address'])
         user_document = {
             "version": 0,
-            "_id": create_user_id(row['wallet_address']),
+            "_id": user_id,
             "creation_time": creation_time_unix,
             "deleted": False,
             "name": row['username'],
@@ -44,6 +45,18 @@ with open('glry-users.csv') as usersfile:
             "description": None,
             "last_seen": None
         }
+
+        #TODO create 2 collections, default and hidden
+
+        gallery_document = {
+            'version': 0,
+            '_id': # TODO create id the same way as done on backend
+            'creation_time': creation_time_unix,
+            'deleted': false,
+            'owner_user_id': user_id,
+            'collections': []
+        }
+
         user2.insert_one(user_document)
 
 
@@ -88,5 +101,8 @@ with open('glry-nfts.csv') as nftsFile:
         # TODO: Create 2 collections for each user. Default and Hidden. Use row['position'] to populate default collection, and row['hidden'] to determine which collection to put it in
         # 
 
+
+# migration strategy
+# for each existing user, create user and gallery docuemnts.
 
 # version=0
