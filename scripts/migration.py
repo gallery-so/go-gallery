@@ -103,6 +103,12 @@ with open('glry-nfts.csv') as nftsFile:
 
 
 # migration strategy
-# for each existing user, create user and gallery docuemnts.
+# for each existing user:
+#   - create user and gallery documents.
+#   - create 2 collection documents - default and hidden
+# for each nft:
+#   - create nft document
+#   - populate user's collections, default or hidden, in the correct order
+# save all documents in mongo
 
 # version=0
