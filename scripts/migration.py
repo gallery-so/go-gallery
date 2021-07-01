@@ -53,4 +53,40 @@ with open('glry-users.csv') as usersfile:
 # NFT
 # version, id, creation_time, deleted, name, description, collection_names, external_url, creator_address, contract_address, opensea_id, opensea_token_id, image_url, image_thumbnail_url, image_preview_url, animation_url
 
+with open('glry-nfts.csv') as nftsFile:
+    reader = csv.DictReader(nftsFile)
+    for row in reader:
+        creation_time_unix = datetime.datetime.strptime(
+            row['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
+        contract_document = {
+            contract_address: row['contract_address']
+        }
+        nft_document = {
+            'version': 0,
+            '_id': #TODO generate id same way as backend,
+            'creation_time': creation_time_unix,
+            'deleted': false,
+            'name': row['name'],
+            'description': row['description'],
+            'collectors_note': null,
+            'external_url': row['external_url'],
+            'token_metadata_url': null, # Need to get from OpenSea
+            'creator_address': row['creator_address'],
+            'creator_name': null, # Need to get from OpenSea
+            'owner_address': null, # TODO do we need this field? Should we have owner_id (GLRY user id instead?)
+            'contract': contract_document, #TODO should this be a reference to the document instead?
+            'opensea_id': null, # Need to get from OpenSea. but do we need? We only need contract address and token_id to query in OpenSea
+            'opensea_token_id': row['token_id'],
+            'image_url': null, # Need to get from OpenSea
+            'image_thumbnail_url': row['image_thumbnail_url'],
+            'image_preview_url': row['image_preview_url'],
+            'image_original_url': null, # Need to get from OpenSea
+            'animation_url': null, # Need to get from OpenSea
+            'animation_original_url': null, # Need to get from OpenSea
+            'acquisition_date': null, # Need to get from OpenSea
+        }
+        # TODO: Create 2 collections for each user. Default and Hidden. Use row['position'] to populate default collection, and row['hidden'] to determine which collection to put it in
+        # 
+
+
 # version=0
