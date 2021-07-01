@@ -35,6 +35,7 @@ with open('glry-users.csv') as usersfile:
         creation_time_unix = datetime.datetime.strptime(
             row['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
         user_id = create_user_id(row['wallet_address'])
+
         user_document = {
             "version": 0,
             "_id": user_id,
@@ -44,6 +45,32 @@ with open('glry-users.csv') as usersfile:
             "addresses": [row['wallet_address']],
             "description": None,
             "last_seen": None
+        }
+
+        # Since there is no concept of collections on the alpha, we will put all of a user's displayed NFTs in a default unnamed collection for v1.
+        default_collection_document = {
+            'version':
+            '_id':
+            'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
+            'deleted': false,
+            'name': null, # Default gallery will not have a name
+            'collectors_note': null, # Default gallery will not have a collectors note
+            'owner_user_id': user_id,
+            'nfts': [],
+            'hidden': false
+        }
+
+        # NFTs marked as hidden in the alpha will be put in the "hidden" collection representing unassigned NFTs.
+        hidden_collection_document = {
+            'version':
+            '_id':
+            'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
+            'deleted': false,
+            'name': null, # Default gallery will not have a name
+            'collectors_note': null, # Default gallery will not have a collectors note
+            'owner_user_id': user_id,
+            'nfts': [],
+            'hidden': false
         }
 
         #TODO create 2 collections, default and hidden
