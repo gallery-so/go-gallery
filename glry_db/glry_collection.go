@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,13 +20,13 @@ type GLRYcollection struct {
 	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool       `bson:"deleted"`
 
-	NameStr        string   `bson:"name"          json:"name"`
-	DescriptionStr string   `bson:"description"   json:"description"`
-	OwnerUserIDstr string   `bson:"owner_user_id" json:"owner_user_id"`
-	NFTsLst        []string `bson:"nfts"          json:"nfts"`
+	NameStr           string   `bson:"name"          json:"name"`
+	CollectorsNoteStr string   `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserIDstr    string   `bson:"owner_user_id" json:"owner_user_id"`
+	NFTsLst           []string `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	HiddeBool bool `bson:"hidden"`
+	HiddenBool bool `bson:"hidden" json:"hidden"`
 }
 
 //-------------------------------------------------------------
