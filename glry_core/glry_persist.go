@@ -132,6 +132,7 @@ func (m GLRYmongoPersister) Find(ctx context.Context, filter interface{}, opts i
 	if err != nil {
 		return err
 	}
+	defer cur.Close(ctx)
 	return cur.All(ctx, result)
 }
 
