@@ -2,10 +2,11 @@ package glry_lib
 
 import (
 	"context"
+	"time"
+
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
-	"time"
 )
 
 //-------------------------------------------------------------
@@ -21,8 +22,8 @@ type GLRYcollGetOutput struct {
 
 // INPUT
 type GLRYcollCreateInput struct {
-	NameStr        string `json:"name"        validate:"required,min=4,max=50"`
-	DescriptionStr string `json:"description" validate:"required,min=0,max=500"`
+	NameStr           string `json:"name"        validate:"required,min=4,max=50"`
+	CollectorsNoteStr string `json:"collectors_note" validate:"required,min=0,max=500"`
 }
 
 // OUTPUT
@@ -69,11 +70,11 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 			},
 		*/
 		collOutputMap := map[string]interface{}{
-			"id":          coll.IDstr,
-			"hidden":      coll.HiddeBool,
-			"name":        coll.NameStr,
-			"description": coll.DescriptionStr,
-			"nfts":        []map[string]interface{}{},
+			"id":              coll.IDstr,
+			"hidden":          coll.HiddenBool,
+			"name":            coll.NameStr,
+			"collectors_note": coll.CollectorsNoteStr,
+			"nfts":            []map[string]interface{}{},
 		}
 
 		collsOutputsLst = append(collsOutputsLst, collOutputMap)
@@ -112,11 +113,11 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 		IDstr:         IDstr,
 		CreationTimeF: creationTimeUNIXf,
 
-		NameStr:        nameStr,
-		DescriptionStr: pInput.DescriptionStr,
-		OwnerUserIDstr: ownerUserIDstr,
-		DeletedBool:    false,
-		NFTsLst:        []string{},
+		NameStr:           nameStr,
+		CollectorsNoteStr: pInput.CollectorsNoteStr,
+		OwnerUserIDstr:    ownerUserIDstr,
+		DeletedBool:       false,
+		NFTsLst:           []string{},
 	}
 
 	// DB
