@@ -22,24 +22,42 @@ type GLRYnft struct {
 	CreationTimeF float64   `bson:"creation_time"        json:"creation_time"`
 	DeletedBool   bool      `bson:"deleted"`
 
-	NameStr            string   `bson:"name"                 json:"name"`
-	DescriptionStr     string   `bson:"description"          json:"description"`
-	CollectionNamesLst []string `bson:"collection_names"     json:"collection_names"`
+	NameStr           string `bson:"name,omitempty"                 json:"name"`
+	DescriptionStr    string `bson:"description,omitempty"          json:"description"`
+	CollectorsNoteStr string `bson:"collectors_note,omitempty" json:"collectors_note"`
 
-	ExternalURLstr     string `bson:"external_url"         json:"external_url"`
-	CreatorAddressStr  string `bson:"creator_address"      json:"creator_address"`
-	ContractAddressStr string `bson:"contract_address"     json:"contract_address"`
+	ExternalURLstr      string       `bson:"external_url,omitempty"         json:"external_url"`
+	TokenMetadataUrlStr string       `bson:"token_metadata_url,omitempty" json:"token_metadata_url"`
+	CreatorAddressStr   string       `bson:"creator_address,omitempty"      json:"creator_address"`
+	CreatorNameStr      string       `bson:"creator_name,omitempty" json:"creator_name"`
+	OwnerAddressStr     string       `bson:"owner_address,omitempty" json:"owner_address"`
+	Contract            GLRYcontract `bson:"contract,omitempty"     json:"contract"`
 
 	// OPEN_SEA_TOKEN_ID
-	OpenSeaIDstr      string `bson:"opensea_id"       json:"opensea_id"`
-	OpenSeaTokenIDstr string `bson:"opensea_token_id" json:"opensea_token_id"` // add a comment describing what this is
+	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
+	// (/asset/:contract_address/:token_id)
+	OpenSeaIDstr   string `bson:"opensea_id,omitempty"       json:"opensea_id"`
+	OpenSeaTokenID string `bson:"opensea_token_id,omitempty" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
-	ImageURLstr          string `bson:"image_url"           json:"image_url"`
-	ImageThumbnailURLstr string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
-	ImagePreviewURLstr   string `bson:"image_preview_url"   json:"image_preview_url"`
+	ImageURLstr             string `bson:"image_url,omitempty"           json:"image_url"`
+	ImageThumbnailURLstr    string `bson:"image_thumbnail_url,omitempty" json:"image_thumbnail_url"`
+	ImagePreviewURLstr      string `bson:"image_preview_url,omitempty"   json:"image_preview_url"`
+	ImageOriginalUrlStr     string `bson:"image_original_url,omitempty" json:"image_original_url"`
+	AnimationUrlStr         string `bson:"animation_url,omitempty" json:"animation_url"`
+	AnimationOriginalUrlStr string `bson:"animation_original_url,omitempty" json:"animation_original_url"`
 
-	HiddenBool bool `bson:"hidden"   json:"hidden"`
+	AcquisitionDateStr string `bson:"acquisition_date,omitempty" json:"acquisition_date"`
+}
+
+type GLRYcontract struct {
+	ContractAddressStr      string `bson:"contract_address,omitempty"     json:"contract_address"`
+	ContractNameStr         string `bson:"contract_name,omitempty" json:"contract_name"`
+	ContractDescription     string `bson:"contract_description,omitempty" json:"contract_description"`
+	ContractExternalLinkStr string `bson:"contract_external_link,omitempty" json:"contract_external_link"`
+	ContractSchemaNameStr   string `bson:"contract_schema_name,omitempty" json:"contract_schema_name"`
+	ContractSymbolStr       string `bson:"contract_symbol,omitempty" json:"contract_symbol"`
+	ContractTotalSupplyInt  int    `bson:"contract_total_supply,omitempty" json:"contract_total_supply"`
 }
 
 /*// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
