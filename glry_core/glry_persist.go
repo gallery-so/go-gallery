@@ -4,99 +4,77 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/gloflow/gloflow/go/gf_core"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type GLRYdbId string
 
-type GLRYpersister interface {
+type GLRYmongoPersister interface {
 	// TODO insert many, update many
-	Insert(context.Context, interface{}, interface{}) error
-	Update(context.Context, string, interface{}, interface{}) error
-	Find(context.Context, interface{}, interface{}, []interface{}) error
+	Insert(context.Context, interface{}, map[string]interface{}) *gf_core.Gf_error
+	Update(context.Context, bson.M, interface{}, map[string]interface{}) *gf_core.Gf_error
+	Find(context.Context, bson.M, []interface{}, *options.FindOptions, map[string]interface{}) *gf_core.Gf_error
 }
 
-type GLRYmongoPersister struct {
-	Version    int64
-	Collection *mongo.Collection
+type GLRYmongoPersisterImpl struct {
+	Version int64
+	// Collection  *mongo.Collection
+	CollNameStr string
+	Runtime     Runtime
 }
 
-func NewMongoPersister(version int64, collName string, runtime Runtime) GLRYpersister {
-	collection := runtime.DB.MongoDB.Collection(collName)
-	return GLRYmongoPersister{Version: version, Collection: collection}
+func NewMongoPersister(version int64, collName string, runtime Runtime) GLRYmongoPersister {
+
+	return GLRYmongoPersisterImpl{Version: version, CollNameStr: collName, Runtime: runtime}
 }
 
 // i must be a pointer to a struct
-func (m GLRYmongoPersister) Insert(ctx context.Context, insert interface{}, opts interface{}) error {
+func (m GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, meta map[string]interface{}) *gf_core.Gf_error {
 
-	insertOpts, ok := opts.(*options.InsertOneOptions)
-
-	if !ok {
-		return errors.New("opts must be of type *options.InsertOneOptions")
-	}
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
+	now := float64(time.Now().UnixNano()) / 1000000000.0
 	if _, ok := elem.FieldByName("IDstr"); ok {
-		fieldsForId := []interface{}{}
 		idField := val.FieldByName("IDstr")
 		if !idField.CanSet() {
-			return errors.New("must be able to set id field")
+			// panic because this literally cannot happen in prod
+			panic("unable to set id field on struct")
 		}
-		for i := 0; i < elem.NumField(); i++ {
-			f := elem.Field(i)
-			t := f.Tag
-			if v, ok := t.Lookup("fill"); ok {
-				switch v {
-				case "creation_time":
-					now := float64(time.Now().UnixNano()) / 1000000000.0
-					if val.Field(i).CanSet() {
-						val.Field(i).SetFloat(now)
-					}
-					fieldsForId = append(fieldsForId, now)
-				case "version":
-					if val.Field(i).CanSet() {
-						val.Field(i).SetInt(m.Version)
-					}
-					fieldsForId = append(fieldsForId, m.Version)
-				default:
-					add := val.Field(i)
-					fieldsForId = append(fieldsForId, add)
-				}
-			}
+		if _, ok = elem.FieldByName("CreationTimeF"); ok {
+			val.FieldByName("CreationTimeF").SetFloat(now)
+		} else {
+			// panic because this literally cannot happen in prod
+			panic("creation time field required for id-able structs")
 		}
-		idField.Set(reflect.ValueOf(CreateId(fieldsForId...)))
+		idField.Set(reflect.ValueOf(generateId(now)))
 	}
 
 	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
 		f := val.FieldByName("LastUpdatedF")
 		if f.CanSet() {
-			now := float64(time.Now().UnixNano()) / 1000000000.0
 			f.SetFloat(now)
 		}
 	}
 
-	_, err := m.Collection.InsertOne(ctx, insert, insertOpts)
-	if err != nil {
-		return err
-	}
+	return gf_core.Mongo__insert(insert, m.CollNameStr, meta, ctx, m.Runtime.RuntimeSys)
 
-	return nil
+	// _, err := m.Collection.InsertOne(ctx, insert, opts...)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// return nil
 }
 
-// i must be a pointer to a struct
-func (m GLRYmongoPersister) Update(ctx context.Context, id string, update interface{}, opts interface{}) error {
-	updateOpts, ok := opts.(*options.UpdateOptions)
+// update must be a pointer to a struct
+func (m GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, update interface{}, meta map[string]interface{}) *gf_core.Gf_error {
 
-	if !ok {
-		return errors.New("opts must be of type *options.UpdateOptions")
-	}
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
 	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
@@ -107,41 +85,40 @@ func (m GLRYmongoPersister) Update(ctx context.Context, id string, update interf
 		}
 	}
 
-	result, err := m.Collection.UpdateByID(ctx, id, update, updateOpts)
-	if err != nil {
-		return err
-	}
-	if result.ModifiedCount == 0 || result.MatchedCount == 0 {
-		return errors.New("could not find document to update")
-	}
+	return gf_core.Mongo__upsert(query, update, meta, m.Runtime.DB.MongoDB.Collection(m.CollNameStr), ctx, m.Runtime.RuntimeSys)
+	// result, err := m.Collection.UpdateByID(ctx, id, bson.D{{"$set", update}}, opts...)
+	// if err != nil {
+	// 	return err
+	// }
+	// if result.ModifiedCount == 0 || result.MatchedCount == 0 {
+	// 	return errors.New("could not find document to update")
+	// }
 
-	return nil
+	// return nil
 }
 
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
-func (m GLRYmongoPersister) Find(ctx context.Context, filter interface{}, opts interface{}, result []interface{}) error {
-	fil, ok := filter.(bson.M)
-	if !ok {
-		return errors.New("filter must be of type bson.M")
-	}
-	findOpts, ok := opts.(*options.FindOptions)
-	if !ok {
-		return errors.New("opts must be of type *options.FindOptions")
-	}
-	cur, err := m.Collection.Find(ctx, fil, findOpts)
-	if err != nil {
-		return err
+func (m GLRYmongoPersisterImpl) Find(ctx context.Context, filter bson.M, result []interface{}, opts *options.FindOptions, meta map[string]interface{}) *gf_core.Gf_error {
+
+	filter["deleted"] = false
+
+	cur, gErr := gf_core.Mongo__find(filter, opts, meta, m.Runtime.DB.MongoDB.Collection(m.CollNameStr), ctx, m.Runtime.RuntimeSys)
+	if gErr != nil {
+		return gErr
 	}
 	defer cur.Close(ctx)
-	return cur.All(ctx, result)
+	if err := cur.All(ctx, result); err != nil {
+		return gf_core.Error__create("nft id not found in query values",
+			"mongodb_cursor_all",
+			map[string]interface{}{}, err, "glry_db", m.Runtime.RuntimeSys)
+	}
+	return nil
 }
 
 // CREATE_ID
-func CreateId(fields ...interface{}) GLRYdbId {
+func generateId(creationTime float64) GLRYdbId {
 	h := md5.New()
-	for _, field := range fields {
-		h.Write([]byte(fmt.Sprint(field)))
-	}
+	h.Write([]byte(fmt.Sprint(creationTime)))
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	return GLRYdbId(hexStr)
