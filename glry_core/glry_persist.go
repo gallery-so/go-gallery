@@ -34,7 +34,7 @@ func NewMongoPersister(version int64, collName string, runtime Runtime) GLRYmong
 	return GLRYmongoPersisterImpl{Version: version, CollNameStr: collName, Runtime: runtime}
 }
 
-// i must be a pointer to a struct
+// insert must be a pointer to a struct
 func (m GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, meta map[string]interface{}) *gf_core.Gf_error {
 
 	elem := reflect.TypeOf(insert).Elem()
