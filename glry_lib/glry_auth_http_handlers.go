@@ -3,13 +3,14 @@ package glry_lib
 import (
 	// "fmt"
 	"context"
+	"net/http"
+
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
-	"net/http"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -131,8 +132,14 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	// AUTHENTICATED
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/users/update",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+		precheckJwt(func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
+			if !getAuthFromCtx(pCtx) {
+				return nil, gf_core.Error__create("jwt authentication required",
+					"http_client_req_error",
+					map[string]interface{}{}, nil,
+					"glry_lib", pRuntime.RuntimeSys)
+			}
 			//------------------
 			// INPUT
 			qMap := pReq.URL.Query()
@@ -156,19 +163,6 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			input.AddressStr = glry_db.GLRYuserAddress(userAddrStr)
 
 			//------------------
-			// JWT_VERIFY
-			validJWTbool, dataJWTmap, gErr := AuthJWTverifyHTTP(input.AddressStr,
-				pReq,
-				pCtx,
-				pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-			if !validJWTbool {
-				return dataJWTmap, nil
-			}
-
-			//------------------
 			// UPDATE
 			gErr = AuthUserUpdatePipeline(&input, pCtx, pRuntime)
 			if gErr != nil {
@@ -182,7 +176,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 
 			return dataMap, nil
-		},
+		}, pRuntime),
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------
@@ -190,7 +184,9 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	// AUTHENTICATED/UN-AUTHENTICATED
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/users/get",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+		precheckJwt(func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+
+			authenticated := getAuthFromCtx(pCtx)
 
 			//------------------
 			// INPUT
@@ -203,37 +199,28 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			}
 
 			//------------------
-			// JWT_VERIFY
-			validJWTbool, _, gErr := AuthJWTverifyHTTP(input.AddressStr,
-				pReq,
-				pCtx,
-				pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			//------------------
 			// USER_GET
 
 			var output *GLRYauthUserGetOutput
 
 			// AUTHENTICATED
-			if validJWTbool {
-				output, gErr = AuthUserGetPipeline(input,
-					true, // pAuthenticatedBool
+			if authenticated {
+				o, gErr := AuthUserGetPipeline(input,
+					authenticated,
 					pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
 				}
-
-				// UN_AUTHENTICATED - different set of results for user not-authenticated
+				output = o
 			} else {
-				output, gErr = AuthUserGetPipeline(input,
-					false, // pAuthenticatedBool
+				// UN_AUTHENTICATED - different set of results for user not-authenticated
+				o, gErr := AuthUserGetPipeline(input,
+					authenticated, // pAuthenticatedBool
 					pCtx, pRuntime)
 				if gErr != nil {
 					return nil, gErr
 				}
+				output = o
 
 			}
 
@@ -258,7 +245,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 			//------------------
 
 			return dataMap, nil
-		},
+		}, pRuntime),
 		pRuntime.RuntimeSys)
 
 	//-------------------------------------------------------------

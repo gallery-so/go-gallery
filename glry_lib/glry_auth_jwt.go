@@ -2,15 +2,27 @@ package glry_lib
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	log "github.com/sirupsen/logrus"
-	"net/http"
-	"time"
 )
+
+// USER_JWT_KEY - is unique per user, and stored in the DB for now.
+// type GLRYuserJWTkey struct {
+// 	VersionInt    int64            `bson:"version"       mapstructure:"version"`
+// 	ID            GLRYuserJWTkeyID `bson:"_id"           mapstructure:"_id"`
+// 	CreationTimeF float64          `bson:"creation_time" mapstructure:"creation_time"`
+// 	BlackListed   bool             `bson:"blacklisted"       mapstructure:"blacklisted"`
+
+// 	ValueStr   string          `bson:"value"   mapstructure:"value"`
+// 	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
+// }
 
 //-------------------------------------------------------------
 // JWT_CLAIMS
@@ -20,79 +32,12 @@ type GLRYjwtClaims struct {
 }
 
 //-------------------------------------------------------------
-func AuthJWTverifyHTTP(pUserAddressStr glry_db.GLRYuserAddress,
-	pReq *http.Request,
-	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (bool, map[string]interface{}, *gf_core.Gf_error) {
-
-	// JWT_HEADER
-	JTWtokenStr := pReq.Header.Get("glry-jwt")
-
-	tokenValidBool, gErr := AuthJWTverifyPipeline(JTWtokenStr,
-		pUserAddressStr,
-		pCtx,
-		pRuntime)
-	if gErr != nil {
-		return false, nil, gErr
-	}
-
-	if !tokenValidBool {
-
-		//------------------
-		// OUTPUT
-		dataMap := map[string]interface{}{
-			"token_valid": false,
-		}
-		return false, dataMap, nil
-
-		//------------------
-	}
-
-	return true, nil, nil
-}
-
-//-------------------------------------------------------------
-// VERIFY_PIPELINE
-func AuthJWTverifyPipeline(pJWTtokenStr string,
-	pUserAddressStr glry_db.GLRYuserAddress,
-	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
-
-	//------------------
-	// DB_GET_KEY
-	JWTkey, gErr := glry_db.AuthUserJWTkeyGet(pUserAddressStr, pCtx, pRuntime)
-	if gErr != nil {
-		return false, gErr
-	}
-
-	//------------------
-	// VERIFY
-	JWTkeyValueStr := JWTkey.ValueStr
-	tokenValidBool, gErr := AuthJWTverify(pJWTtokenStr,
-		JWTkeyValueStr,
-		pRuntime)
-	if gErr != nil {
-		return false, gErr
-	}
-
-	//------------------
-
-	claimedAddressStr := JWTkey.AddressStr
-
-	if pUserAddressStr != claimedAddressStr {
-		return false, nil
-	}
-
-	return tokenValidBool, nil
-}
-
-//-------------------------------------------------------------
 // VERIFY
 func AuthJWTverify(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
-	pRuntime *glry_core.Runtime) (bool, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (bool, string, *gf_core.Gf_error) {
 
-	claims := jwt.MapClaims{}
+	claims := GLRYjwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
 		&claims,
 		func(pJWTtoken *jwt.Token) (interface{}, error) {
@@ -104,15 +49,21 @@ func AuthJWTverify(pJWTtokenStr string,
 			"crypto_jwt_verify_token_error",
 			map[string]interface{}{},
 			err, "glry_lib", pRuntime.RuntimeSys)
-		return false, gErr
+		return false, "", gErr
 	}
-
-	tokenValidBool := JWTtoken.Valid
 
 	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
 	spew.Dump(claims)
 
-	return tokenValidBool, nil
+	if claims, ok := JWTtoken.Claims.(GLRYjwtClaims); ok && JWTtoken.Valid {
+		return JWTtoken.Valid, string(claims.AddressStr), nil
+	} else {
+		gErr := gf_core.Error__create("failed to verify JWT token for a user",
+			"crypto_jwt_verify_token_error",
+			map[string]interface{}{},
+			err, "glry_lib", pRuntime.RuntimeSys)
+		return false, "", gErr
+	}
 }
 
 //-------------------------------------------------------------
@@ -124,36 +75,15 @@ func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
 	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (string, *gf_core.Gf_error) {
 
-	JWTkeyStr := AuthGenerateRandom()
-
+	// previously we would generate a random string and use that as jwt secret and store
+	// the string in the db with the jwt for verifcation. with stateless auth, we might
+	// use an environment variable like so as the secret. worth considering other options
+	// to increase security
 	JWTissuerStr := "gallery" // string(pAddressStr)
-	JWTtokenStr, gErr := AuthJWTgenerate(JWTkeyStr,
+	JWTtokenStr, gErr := AuthJWTgenerate(os.Getenv("JWT_SECRET"),
 		JWTissuerStr,
 		pAddressStr,
 		pRuntime)
-	if gErr != nil {
-		return "", gErr
-	}
-
-	//------------------
-	// DB
-	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
-
-	IDstr := glry_db.AuthUserJWTkeyCreateID(pAddressStr,
-		JWTkeyStr,
-		creationTimeUNIXf)
-
-	jwtKey := &glry_db.GLRYuserJWTkey{
-		VersionInt:    0,
-		ID:            IDstr,
-		CreationTimeF: creationTimeUNIXf,
-		DeletedBool:   false,
-
-		ValueStr:   JWTkeyStr,
-		AddressStr: pAddressStr,
-	}
-
-	gErr = glry_db.AuthUserJWTkeyCreate(jwtKey, pCtx, pRuntime)
 	if gErr != nil {
 		return "", gErr
 	}
