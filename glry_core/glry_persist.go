@@ -4,38 +4,36 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/gloflow/gloflow/go/gf_core"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type GLRYdbId string
 
 type GLRYmongoPersister interface {
-	// TODO insert many, update many
-	Insert(context.Context, interface{}, map[string]interface{}) *gf_core.Gf_error
-	Update(context.Context, bson.M, interface{}, map[string]interface{}) *gf_core.Gf_error
-	Find(context.Context, bson.M, []interface{}, *options.FindOptions, map[string]interface{}) *gf_core.Gf_error
+	Insert(context.Context, interface{}, ...*options.InsertOneOptions) error
+	Update(context.Context, bson.M, interface{}, ...*options.UpdateOptions) error
+	Find(context.Context, bson.M, interface{}, ...*options.FindOptions) error
 }
 
 type GLRYmongoPersisterImpl struct {
-	Version int64
-	// Collection  *mongo.Collection
-	CollNameStr string
-	Runtime     Runtime
+	Version    int64
+	Collection *mongo.Collection
 }
 
-func NewMongoPersister(version int64, collName string, runtime Runtime) GLRYmongoPersister {
-
-	return GLRYmongoPersisterImpl{Version: version, CollNameStr: collName, Runtime: runtime}
+func NewMongoPersister(version int64, collName string, runtime *Runtime) GLRYmongoPersister {
+	coll := runtime.DB.MongoDB.Collection(collName)
+	return &GLRYmongoPersisterImpl{Version: version, Collection: coll}
 }
 
 // insert must be a pointer to a struct
-func (m GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, meta map[string]interface{}) *gf_core.Gf_error {
+func (m *GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) error {
 
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
@@ -62,18 +60,16 @@ func (m GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, 
 		}
 	}
 
-	return gf_core.Mongo__insert(insert, m.CollNameStr, meta, ctx, m.Runtime.RuntimeSys)
+	_, err := m.Collection.InsertOne(ctx, insert, opts...)
+	if err != nil {
+		return err
+	}
 
-	// _, err := m.Collection.InsertOne(ctx, insert, opts...)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// return nil
+	return nil
 }
 
 // update must be a pointer to a struct
-func (m GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, update interface{}, meta map[string]interface{}) *gf_core.Gf_error {
+func (m *GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
@@ -84,33 +80,29 @@ func (m GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, update
 			f.SetFloat(now)
 		}
 	}
+	result, err := m.Collection.UpdateOne(ctx, query, bson.D{{"$set", update}}, opts...)
+	if err != nil {
+		return err
+	}
+	if result.ModifiedCount == 0 || result.MatchedCount == 0 {
+		return errors.New("could not find document to update")
+	}
 
-	return gf_core.Mongo__upsert(query, update, meta, m.Runtime.DB.MongoDB.Collection(m.CollNameStr), ctx, m.Runtime.RuntimeSys)
-	// result, err := m.Collection.UpdateByID(ctx, id, bson.D{{"$set", update}}, opts...)
-	// if err != nil {
-	// 	return err
-	// }
-	// if result.ModifiedCount == 0 || result.MatchedCount == 0 {
-	// 	return errors.New("could not find document to update")
-	// }
-
-	// return nil
+	return nil
 }
 
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
-func (m GLRYmongoPersisterImpl) Find(ctx context.Context, filter bson.M, result []interface{}, opts *options.FindOptions, meta map[string]interface{}) *gf_core.Gf_error {
+func (m *GLRYmongoPersisterImpl) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
 	filter["deleted"] = false
 
-	cur, gErr := gf_core.Mongo__find(filter, opts, meta, m.Runtime.DB.MongoDB.Collection(m.CollNameStr), ctx, m.Runtime.RuntimeSys)
-	if gErr != nil {
-		return gErr
+	cur, err := m.Collection.Find(ctx, filter, opts...)
+	if err != nil {
+		return err
 	}
 	defer cur.Close(ctx)
 	if err := cur.All(ctx, result); err != nil {
-		return gf_core.Error__create("nft id not found in query values",
-			"mongodb_cursor_all",
-			map[string]interface{}{}, err, "glry_db", m.Runtime.RuntimeSys)
+		return errors.New("could not decode cursor")
 	}
 	return nil
 }
