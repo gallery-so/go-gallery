@@ -21,14 +21,24 @@ type authContextValue struct {
 // jwt middleware
 // parameter hell because gf_core http_handler is private :(
 // both funcs (parameter and return funcs) are of type gf_core.http_handler implicitly
-func precheckJwt(midd func(pCtx context.Context, pResp http.ResponseWriter,
-	pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error), pRuntime *glry_core.Runtime) func(context.Context, http.ResponseWriter,
+func precheckJwt(midd func(pCtx context.Context,
+	pResp http.ResponseWriter,
+	pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error),
+	pRuntime *glry_core.Runtime) func(context.Context,
+	http.ResponseWriter,
 	*http.Request) (map[string]interface{}, *gf_core.Gf_error) {
-	return func(pCtx context.Context, pResp http.ResponseWriter,
+	return func(pCtx context.Context,
+		pResp http.ResponseWriter,
 		pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
 		authHeaders := strings.Split(pReq.Header.Get("Authorization"), " ")
-		if len(authHeaders) > 0 {
+		if len(authHeaders) > 0 && len(authHeaders) < 2 {
+			if authHeaders[0] != "Bearer" {
+				return nil, gf_core.Error__create("incorrect authorization header format",
+					"http_client_req_error",
+					map[string]interface{}{},
+					nil, "glry_lib", pRuntime.RuntimeSys)
+			}
 			// get string after "Bearer"
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
