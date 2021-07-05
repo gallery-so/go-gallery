@@ -20,8 +20,8 @@ type GLRYgallery struct {
 	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool       `bson:"deleted"`
 
-	OwnerUserIDstr string   `bson:"owner_user_id" json:"owner_user_id"`
-	CollectionsLst []string `bson:"collections"          json:"collections"`
+	OwnerUserIDstr string   `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	CollectionsLst []string `bson:"collections,omitempty"          json:"collections"`
 }
 
 //-------------------------------------------------------------
