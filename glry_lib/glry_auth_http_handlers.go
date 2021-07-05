@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -130,6 +131,15 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	//-------------------------------------------------------------
 	// USER_UPDATE
 	// AUTHENTICATED
+
+	pRuntime.Router.POST("/glry/v1/users/update", jwtMiddleware(), func(c *gin.Context) {
+
+		if !getAuthFromGinCtx(c) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
+			return
+		}
+		// blah blah more code
+	})
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/users/update",
 		precheckJwt(func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {

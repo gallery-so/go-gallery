@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	// log "github.com/sirupsen/logrus"
+	"github.com/gin-gonic/gin"
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -26,6 +27,30 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	// COLLECTION
 	//-------------------------------------------------------------
 	// COLLECTION_GET
+
+	pRuntime.Router.GET("/glry/v1/collections/get", func(c *gin.Context) {
+		//------------------
+		// INPUT
+
+		userIDstr := c.Query("userid")
+
+		input := &GLRYcollGetInput{
+			UserIDstr: glry_db.GLRYuserID(userIDstr),
+		}
+
+		//------------------
+		// CREATE
+		output, gErr := CollGetPipeline(input, context.TODO(), pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+
+		//------------------
+		// OUTPUT
+
+		c.JSON(http.StatusOK, gin.H{"colls": output.CollsOutputsLst})
+	})
 
 	gf_rpc_lib.Create_handler__http("/glry/v1/collections/get",
 		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
