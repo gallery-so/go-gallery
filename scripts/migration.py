@@ -68,8 +68,8 @@ with open('glry-users.csv') as usersfile:
 
         # Since there is no concept of collections on the alpha, we will put all of a user's displayed NFTs in a default unnamed collection for v1.
         default_collection_document = {
-            'version':
-            '_id':
+            'version': 0,
+            '_id': 0, # TODO change
             'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
             'deleted': false,
             'name': null, # Default gallery will not have a name
@@ -81,11 +81,11 @@ with open('glry-users.csv') as usersfile:
 
         # NFTs marked as hidden in the alpha will be put in the "hidden" collection representing unassigned NFTs.
         hidden_collection_document = {
-            'version':
-            '_id':
+            'version': 0,
+            '_id': 0, # TODO change
             'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
             'deleted': false,
-            'name': null, # TODO change name to reserved name
+            'name': 'GLRY__RESERVED__UNASSIGNED', # TODO change name to reserved name
             'collectors_note': null, # Hidden collection doesnt need collectors note
             'owner_user_id': user_id,
             'nfts': [],
@@ -94,7 +94,7 @@ with open('glry-users.csv') as usersfile:
 
         gallery_document = {
             'version': 0,
-            '_id': # TODO create id the same way as done on backend
+            '_id':  0, # TODO create id the same way as done on backend
             'creation_time': creation_time_unix,
             'deleted': false,
             'owner_user_id': user_id,
@@ -130,7 +130,7 @@ with open('glry-nfts.csv') as nftsFile:
         }
         nft_document = {
             'version': 0,
-            '_id': #TODO generate id same way as backend,
+            '_id':  0, #TODO generate id same way as backend,
             'creation_time': creation_time_unix,
             'deleted': false,
             'name': row['name'],
@@ -171,21 +171,21 @@ with open('glry-nfts.csv') as nftsFile:
 # SAVE TO DB #
 ##############
 
-client = MongoClient(
-    "mongodb+srv://mike:<w6jhy5oivdMCVqzC>@cluster0.p9jwh.mongodb.net/test?retryWrites=true&w=majority")
-testDb = client.test
+# client = MongoClient(
+#     "mongodb+srv://mike:<w6jhy5oivdMCVqzC>@cluster0.p9jwh.mongodb.net/test?retryWrites=true&w=majority")
+# testDb = client.test
 
-# Select database collections (equivalent to tables)
-userCollection = testDb.user2 # Why is this named user2?
-galleryCollection = testDb.gallery
-collectionCollection = testDb.collection
-nftCollection = testDb.nft
+# # Select database collections (equivalent to tables)
+# userCollection = testDb.user2 # Why is this named user2?
+# galleryCollection = testDb.gallery
+# collectionCollection = testDb.collection
+# nftCollection = testDb.nft
 
-# Bulk insert into database
-userCollection.bulk_write(user_documents)
-galleryCollection.bulk_write(gallery_documents)
-collectionCollection.bulk_write(collection_documents)
-nftCollection.bulk_write(nft_documents)
+# # Bulk insert into database
+# userCollection.bulk_write(user_documents)
+# galleryCollection.bulk_write(gallery_documents)
+# collectionCollection.bulk_write(collection_documents)
+# nftCollection.bulk_write(nft_documents)
 
 
 # migration strategy
