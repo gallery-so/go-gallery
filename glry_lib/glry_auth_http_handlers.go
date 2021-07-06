@@ -38,10 +38,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 		//------------------
 		// OUTPUT
-		c.JSON(http.StatusOK, gin.H{
-			"nonce":       output.NonceStr,
-			"user_exists": output.UserExistsBool,
-		})
+		c.JSON(http.StatusOK, output)
 	})
 
 	//-------------------------------------------------------------
@@ -67,14 +64,6 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 			return
 		}
 
-		// FAILED - INVALID_SIGNATURE
-		if !output.SignatureValidBool {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"sig_valid": false,
-			})
-			return
-		}
-
 		/*
 			// ADD!! - going forward we should follow this approach, after v1
 			// SET_JWT_COOKIE
@@ -87,10 +76,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 		//------------------
 		// OUTPUT
-		c.JSON(http.StatusOK, gin.H{
-			"jwt_token": output.JWTtokenStr,
-			"user_id":   output.UserIDstr,
-		})
+		c.JSON(http.StatusOK, output)
 	})
 
 	//-------------------------------------------------------------
@@ -175,11 +161,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 		//------------------
 		// OUTPUT
 
-		c.JSON(http.StatusOK, gin.H{
-			"sig_valid": output.SignatureValidBool,
-			"jwt_token": output.JWTtokenStr,
-			"user_id":   output.UserIDstr,
-		})
+		c.JSON(http.StatusOK, output)
 
 	})
 
