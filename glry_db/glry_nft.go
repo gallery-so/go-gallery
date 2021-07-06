@@ -36,8 +36,8 @@ type GLRYnft struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaIDstr   string `bson:"opensea_id,omitempty"       json:"opensea_id"`
-	OpenSeaTokenID string `bson:"opensea_token_id,omitempty" json:"opensea_token_id"`
+	OpenSeaIDstr      string `bson:"opensea_id,omitempty"       json:"opensea_id"`
+	OpenSeaTokenIDstr string `bson:"opensea_token_id,omitempty" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURLstr             string `bson:"image_url,omitempty"           json:"image_url"`
