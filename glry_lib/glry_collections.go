@@ -22,6 +22,7 @@ type GLRYcollGetOutput struct {
 
 // INPUT
 type GLRYcollCreateInput struct {
+	OwnerUserIdStr    string `json:"user_id" validate:"required"`
 	NameStr           string `json:"name"        validate:"required,min=4,max=50"`
 	CollectorsNoteStr string `json:"collectors_note" validate:"required,min=0,max=500"`
 }
