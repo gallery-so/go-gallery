@@ -161,6 +161,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 		if err := c.BindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 
 		//------------------
