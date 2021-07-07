@@ -56,7 +56,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 	apiGroupV1.POST("/collections/create", func(c *gin.Context) {
 		input := &GLRYcollCreateInput{}
-		if err := c.BindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -79,7 +79,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 	apiGroupV1.POST("/collections/delete", func(c *gin.Context) {
 		input := &GLRYcollDeleteInput{}
-		if err := c.BindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -129,7 +129,7 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 	// must specify nft id in json input
 	apiGroupV1.POST("/nfts/update", func(c *gin.Context) {
 		nft := &glry_db.GLRYnft{}
-		if err := c.BindJSON(nft); err != nil {
+		if err := c.ShouldBindJSON(nft); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

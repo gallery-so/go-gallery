@@ -47,7 +47,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 	usersGroup.POST("/login", func(c *gin.Context) {
 		input := &GLRYauthUserLoginInput{}
-		if err := c.BindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -85,14 +85,14 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 	usersGroup.POST("/update", func(c *gin.Context) {
 
-		if auth, ok := getAuthFromCtx(c); !ok || !auth.AuthenticatedBool {
+		if auth := c.GetBool("authenticated"); !auth {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
 			return
 		}
 
 		up := &GLRYauthUserUpdateInput{}
 
-		if err := c.BindJSON(up); err != nil {
+		if err := c.ShouldBindJSON(up); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -115,7 +115,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 	usersGroup.GET("/get", func(c *gin.Context) {
 
-		auth, _ := getAuthFromCtx(c)
+		auth := c.GetBool("authenticated")
 
 		userAddrStr := c.Query("addr")
 		input := &GLRYauthUserGetInput{
@@ -123,7 +123,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 		}
 
 		output, gErr := AuthUserGetPipeline(input,
-			auth.AuthenticatedBool,
+			auth,
 			c, pRuntime)
 		if gErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
@@ -145,7 +145,7 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
 
 		input := &GLRYauthUserCreateInput{}
 
-		if err := c.BindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

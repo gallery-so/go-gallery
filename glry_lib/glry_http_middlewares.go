@@ -9,24 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/glry_core"
 )
 
-type authContextValue struct {
-	AuthenticatedBool bool
-	UserAddressStr    string
-}
-
-func getAuthFromCtx(c *gin.Context) (authContextValue, bool) {
-	auth, ok := c.Get("auth")
-	if !ok {
-		return authContextValue{}, false
-	}
-	if authStruct, ok := auth.(authContextValue); ok {
-		return authStruct, true
-	} else {
-		return authContextValue{}, false
-	}
-
-}
-
 func jwtMiddleware(runtime *glry_core.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeaders := strings.Split(c.GetHeader("Authorization"), " ")
@@ -45,10 +27,8 @@ func jwtMiddleware(runtime *glry_core.Runtime) gin.HandlerFunc {
 				return
 			}
 
-			c.Set("auth", authContextValue{
-				AuthenticatedBool: valid,
-				UserAddressStr:    userAddr,
-			})
+			c.Set("authenticated", valid)
+			c.Set("user_addr", userAddr)
 		}
 		c.Next()
 	}
