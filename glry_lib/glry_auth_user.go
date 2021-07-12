@@ -3,59 +3,60 @@ package glry_lib
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	log "github.com/sirupsen/logrus"
-	"net/http"
-	"time"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type GLRYauthUserUpdateInput struct {
-	AddressStr        glry_db.GLRYuserAddress `mapstructure:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	UserNameNewStr    string                  `mapstructure:"username"`
-	DescriptionNewStr string                  `mapstructure:"description"`
+	AddressStr        glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	UserNameNewStr    string                  `json:"username"`
+	DescriptionNewStr string                  `json:"description"`
 }
 
 // INPUT - USER_GET
 type GLRYauthUserGetInput struct {
-	AddressStr glry_db.GLRYuserAddress `validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET
 type GLRYauthUserGetOutput struct {
-	UserNameStr    string   `mapstructure:"username"`
-	DescriptionStr string   `mapstructure:"description"`
-	AddressesLst   []string `mapstructure:"addresses`
+	UserNameStr  string   ` json:"username"`
+	BioStr       string   ` json:"bio"`
+	AddressesLst []string ` json:"addresses"`
 }
 
 // INPUT - USER_LOGIN
 type GLRYauthUserLoginInput struct {
-	SignatureStr string                  `mapstructure:"signature" validate:"required,min=4,max=50"`
-	AddressStr   glry_db.GLRYuserAddress `mapstructure:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	SignatureStr string                  `json:"signature" validate:"required,min=4,max=50"`
+	AddressStr   glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_LOGIN
 type GLRYauthUserLoginOutput struct {
-	SignatureValidBool bool
-	JWTtokenStr        string
-	UserIDstr          glry_db.GLRYuserID
+	SignatureValidBool bool               `json:"signature_valid"`
+	JWTtokenStr        string             `json:"jwt_token"`
+	UserIDstr          glry_db.GLRYuserID `json:"user_id"`
 }
 
 // INPUT - USER_GET_PREFLIGHT
 type GLRYauthUserGetPreflightInput struct {
-	AddressStr glry_db.GLRYuserAddress `mapstructure:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr glry_db.GLRYuserAddress `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET_PREFLIGHT
 type GLRYauthUserGetPreflightOutput struct {
-	NonceStr       string
-	UserExistsBool bool
+	NonceStr       string `json:"nonce"`
+	UserExistsBool bool   `json:"user_exists"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -66,16 +67,16 @@ type GLRYauthUserCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr  string                  `mapstructure:"signature" validate:"required,min=80,max=200"`
-	AddressStr    glry_db.GLRYuserAddress `mapstructure:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	NonceValueStr string                  `mapstructure:"nonce"     validate:"required,min=10,max=150"`
+	SignatureStr  string                  `json:"signature" validate:"required,min=80,max=200"`
+	AddressStr    glry_db.GLRYuserAddress `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	NonceValueStr string                  `json:"nonce"     validate:"required,min=10,max=150"`
 }
 
 // OUTPUT - USER_CREATE
 type GLRYauthUserCreateOutput struct {
-	SignatureValidBool bool
-	JWTtokenStr        string // JWT token is sent back to user to use to continue onboarding
-	UserIDstr          glry_db.GLRYuserID
+	SignatureValidBool bool               `json:"signature_valid"`
+	JWTtokenStr        string             `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
+	UserIDstr          glry_db.GLRYuserID `json:"user_id"`
 }
 
 //-------------------------------------------------------------
@@ -185,8 +186,8 @@ func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 	var output *GLRYauthUserGetOutput
 	if pAuthenticatedBool {
 		output = &GLRYauthUserGetOutput{
-			UserNameStr:    user.UserNameStr,
-			DescriptionStr: user.DescriptionStr,
+			UserNameStr: user.UserNameStr,
+			BioStr:      user.BioStr,
 		}
 	} else {
 
