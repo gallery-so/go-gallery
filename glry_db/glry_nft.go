@@ -2,12 +2,8 @@ package glry_db
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"fmt"
 	"time"
 
-	gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -15,6 +11,9 @@ import (
 )
 
 //-------------------------------------------------------------
+
+const nftColName = "glry_nfts"
+
 type GLRYnftID string
 type GLRYnft struct {
 	VersionInt    int64     `bson:"version"              json:"version"` // schema version for this model
@@ -92,64 +91,46 @@ type GLRYnftLegacy struct {
 //-------------------------------------------------------------
 func NFTcreateBulk(pNFTlst []*GLRYnft,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) error {
 
-	IDsLst := []string{}
-	recordsLst := []interface{}{}
-	for _, n := range pNFTlst {
-		IDsLst = append(IDsLst, string(n.IDstr))
-		recordsLst = append(recordsLst, interface{}(n))
-	}
+	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
 
-	collNameStr := "glry_nfts"
-	gErr := gfcore.Mongo__insert_bulk(IDsLst, recordsLst,
-		collNameStr,
-		map[string]interface{}{
-			"nft_ids":            IDsLst,
-			"caller_err_msg_str": "failed to bulk insert NFTs (GLRYnft) into DB",
-		},
-		pCtx,
-		pRuntime.RuntimeSys)
-	if gErr != nil {
-		return gErr
-	}
-
-	return nil
+	return mp.InsertMany(pCtx, pNFTlst)
 }
 
 //-------------------------------------------------------------
 func NFTcreate(pNFT *GLRYnft,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+	pRuntime *glry_core.Runtime) error {
 
-	collNameStr := "glry_nfts"
-	gErr := gfcore.Mongo__insert(pNFT,
-		collNameStr,
-		map[string]interface{}{
-			"nft_name":       pNFT.NameStr,
-			"nft_image_url":  pNFT.ImageURLstr,
-			"caller_err_msg": "failed to insert a new NFT into the DB",
-		},
-		pCtx,
-		pRuntime.RuntimeSys)
-	if gErr != nil {
-		return gErr
-	}
+	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
 
-	return nil
+	return mp.Insert(pCtx, pNFT)
+
 }
 
 //-------------------------------------------------------------
 func NFTgetByUserID(pUserIDstr string,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) ([]*GLRYnft, *gfcore.Gf_error) {
+	pRuntime *glry_core.Runtime) ([]*GLRYnft, error) {
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
+	result := []*GLRYnft{}
+
+	if err := mp.Find(pCtx, bson.M{"user_id": pUserIDstr}, result, opts); err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
 
 //-------------------------------------------------------------
 
-func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime) ([]*GLRYnft, *gfcore.Gf_error) {
+func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime) ([]*GLRYnft, error) {
 
 	opts := &options.FindOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -157,23 +138,11 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 		opts.MaxTime = &dur
 	}
 
-	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
-
-	cur, gErr := gfcore.Mongo__find(bson.M{"_id": pIDstr, "deleted": false},
-		opts,
-		map[string]interface{}{},
-		col,
-		pCtx,
-		pRuntime.RuntimeSys)
-	if gErr != nil {
-		return nil, gErr
-	}
+	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
 	result := []*GLRYnft{}
 
-	if err := cur.All(pCtx, &result); err != nil {
-		return nil, gfcore.Error__create("nft id not found in query values",
-			"mongodb_cursor_all",
-			map[string]interface{}{}, err, "glry_db", pRuntime.RuntimeSys)
+	if err := mp.Find(pCtx, bson.M{"_id": pIDstr}, result, opts); err != nil {
+		return nil, err
 	}
 
 	return result, nil
@@ -183,40 +152,16 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 //-------------------------------------------------------------
 
 // NOTE: there is no gfcore mongo func for update... using default mongo lib for now
-func NFTupdateById(pIDstr string, updatedNft *GLRYnft, pCtx context.Context, pRuntime *glry_core.Runtime) *gfcore.Gf_error {
+func NFTupdateById(pIDstr string, updatedNft *GLRYnft, pCtx context.Context, pRuntime *glry_core.Runtime) error {
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(updatedNft, pRuntime)
-	if gErr != nil {
-		return gErr
+	if err := glry_core.Validate(updatedNft, pRuntime); err != nil {
+		return err
 	}
 
-	col := pRuntime.RuntimeSys.Mongo_db.Collection("glry_nfts")
+	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
 
-	updateResult, err := col.UpdateOne(pCtx, bson.D{{"_id", pIDstr}}, bson.D{{"$set", updatedNft}})
+	return mp.Update(pCtx, bson.M{"_id": pIDstr}, updatedNft)
 
-	if err != nil || updateResult.ModifiedCount == 0 {
-		return gfcore.Error__create("unable to update nft",
-			"mongodb_update_error",
-			map[string]interface{}{}, err, "glry_db", pRuntime.RuntimeSys)
-	}
-
-	return nil
-
-}
-
-//-------------------------------------------------------------
-func NFTcreateID(pNameStr string,
-	pCreatorAddressStr string,
-	pCreationTimeUNIXf float64) GLRYnftID {
-
-	h := md5.New()
-	h.Write([]byte(fmt.Sprint(pCreationTimeUNIXf)))
-	h.Write([]byte(pNameStr))
-	h.Write([]byte(pCreatorAddressStr))
-	sum := h.Sum(nil)
-	hexStr := hex.EncodeToString(sum)
-	ID := GLRYnftID(hexStr)
-	return ID
 }

@@ -17,13 +17,13 @@ import (
 type GLRYdbId string
 
 type GLRYmongoPersistence struct {
-	Version    int64
-	Collection *mongo.Collection
+	version    int64
+	collection *mongo.Collection
 }
 
 func NewMongoPersister(version int64, collName string, runtime *Runtime) *GLRYmongoPersistence {
 	coll := runtime.DB.MongoDB.Collection(collName)
-	return &GLRYmongoPersistence{Version: version, Collection: coll}
+	return &GLRYmongoPersistence{version: version, collection: coll}
 }
 
 // insert must be a pointer to a struct
@@ -54,7 +54,49 @@ func (m *GLRYmongoPersistence) Insert(ctx context.Context, insert interface{}, o
 		}
 	}
 
-	_, err := m.Collection.InsertOne(ctx, insert, opts...)
+	_, err := m.collection.InsertOne(ctx, insert, opts...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// insert must be a slice of pointers to a struct
+func (m *GLRYmongoPersistence) InsertMany(ctx context.Context, insert interface{}, opts ...*options.InsertManyOptions) error {
+
+	inserts, ok := insert.([]interface{})
+	if !ok {
+		return errors.New("invalid input, must be slice of pointers to structs")
+	}
+	for _, k := range inserts {
+		elem := reflect.TypeOf(k).Elem()
+		val := reflect.ValueOf(k).Elem()
+		now := float64(time.Now().UnixNano()) / 1000000000.0
+		if _, ok := elem.FieldByName("IDstr"); ok {
+			idField := val.FieldByName("IDstr")
+			if !idField.CanSet() {
+				// panic because this literally cannot happen in prod
+				panic("unable to set id field on struct")
+			}
+			if _, ok = elem.FieldByName("CreationTimeF"); ok {
+				val.FieldByName("CreationTimeF").SetFloat(now)
+			} else {
+				// panic because this literally cannot happen in prod
+				panic("creation time field required for id-able structs")
+			}
+			idField.Set(reflect.ValueOf(generateId(now)))
+		}
+
+		if _, ok := elem.FieldByName("LastUpdatedF"); ok {
+			f := val.FieldByName("LastUpdatedF")
+			if f.CanSet() {
+				f.SetFloat(now)
+			}
+		}
+	}
+
+	_, err := m.collection.InsertMany(ctx, inserts, opts...)
 	if err != nil {
 		return err
 	}
@@ -74,7 +116,7 @@ func (m *GLRYmongoPersistence) Update(ctx context.Context, query bson.M, update 
 			f.SetFloat(now)
 		}
 	}
-	result, err := m.Collection.UpdateOne(ctx, query, bson.D{{"$set", update}}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{"$set", update}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -90,7 +132,7 @@ func (m *GLRYmongoPersistence) Find(ctx context.Context, filter bson.M, result i
 
 	filter["deleted"] = false
 
-	cur, err := m.Collection.Find(ctx, filter, opts...)
+	cur, err := m.collection.Find(ctx, filter, opts...)
 	if err != nil {
 		return err
 	}
@@ -109,7 +151,7 @@ func (m *GLRYmongoPersistence) FindWithOuterJoin(ctx context.Context, id, from, 
 		{{"$unwind", fmt.Sprintf("$%s", as)}},
 	}
 
-	cur, err := m.Collection.Aggregate(ctx, pipeline, opts...)
+	cur, err := m.collection.Aggregate(ctx, pipeline, opts...)
 	if err != nil {
 		return nil, err
 	}
