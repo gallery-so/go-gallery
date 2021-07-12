@@ -5,7 +5,7 @@ go 1.16
 // replace github.com/gloflow/gloflow => ./../gloflow
 
 require (
-	github.com/aws/aws-sdk-go v1.38.64 // indirect
+	github.com/aws/aws-sdk-go v1.39.3 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -25,7 +25,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/parnurzeal/gorequest v0.2.16
 	github.com/sirupsen/logrus v1.8.1
-	github.com/spf13/viper v1.8.0
+	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.6 // indirect
 	go.mongodb.org/mongo-driver v1.5.3
