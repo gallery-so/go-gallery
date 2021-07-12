@@ -31,13 +31,13 @@ type GLRYnft struct {
 	CreatorAddressStr   string       `bson:"creator_address,omitempty"      json:"creator_address"`
 	CreatorNameStr      string       `bson:"creator_name,omitempty" json:"creator_name"`
 	OwnerAddressStr     string       `bson:"owner_address,omitempty" json:"owner_address"`
-	Contract            GLRYcontract `bson:"contract,omitempty"     json:"contract"`
+	Contract            GLRYcontract `bson:"contract,omitempty"     json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaIDstr   string `bson:"opensea_id,omitempty"       json:"opensea_id"`
-	OpenSeaTokenID string `bson:"opensea_token_id,omitempty" json:"opensea_token_id"`
+	OpenSeaIDstr      string `bson:"opensea_id,omitempty"       json:"opensea_id"`
+	OpenSeaTokenIDstr string `bson:"opensea_token_id,omitempty" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURLstr             string `bson:"image_url,omitempty"           json:"image_url"`
@@ -51,13 +51,13 @@ type GLRYnft struct {
 }
 
 type GLRYcontract struct {
-	ContractAddressStr      string `bson:"contract_address,omitempty"     json:"contract_address"`
-	ContractNameStr         string `bson:"contract_name,omitempty" json:"contract_name"`
-	ContractDescription     string `bson:"contract_description,omitempty" json:"contract_description"`
-	ContractExternalLinkStr string `bson:"contract_external_link,omitempty" json:"contract_external_link"`
-	ContractSchemaNameStr   string `bson:"contract_schema_name,omitempty" json:"contract_schema_name"`
-	ContractSymbolStr       string `bson:"contract_symbol,omitempty" json:"contract_symbol"`
-	ContractTotalSupplyInt  int    `bson:"contract_total_supply,omitempty" json:"contract_total_supply"`
+	ContractAddressStr      string `bson:"contract_address,omitempty"     json:"address"`
+	ContractNameStr         string `bson:"contract_name,omitempty" json:"name"`
+	ContractDescription     string `bson:"contract_description,omitempty" json:"description"`
+	ContractExternalLinkStr string `bson:"contract_external_link,omitempty" json:"external_link"`
+	ContractSchemaNameStr   string `bson:"contract_schema_name,omitempty" json:"schema_name"`
+	ContractSymbolStr       string `bson:"contract_symbol,omitempty" json:"symbol"`
+	ContractTotalSupplyInt  int    `bson:"contract_total_supply,omitempty" json:"total_supply"`
 }
 
 /*// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
