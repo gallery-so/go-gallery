@@ -2,7 +2,6 @@ package glry_core
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,10 +15,26 @@ type testDoc struct {
 	Deleted       bool     `bson:"deleted"`
 }
 
+type testParent struct {
+	IDstr         GLRYdbId `bson:"_id,omitempty"`
+	CreationTimeF float64  `bson:"creation_time"`
+	ImportantData string   `bson:"data"`
+	Deleted       bool     `bson:"deleted"`
+	SubDocs       []string `bson:"sub_docs"`
+}
+
+type testGrandparent struct {
+	IDstr         GLRYdbId `bson:"_id,omitempty"`
+	CreationTimeF float64  `bson:"creation_time"`
+	ImportantData string   `bson:"data"`
+	Deleted       bool     `bson:"deleted"`
+	SubDocs       []string `bson:"sub_docs"`
+}
+
 //---------------------------------------------------
 func TestPersist(pTest *testing.T) {
 
-	fmt.Println("TEST__PERSIST ==============================================")
+	pTest.Log("TEST__PERSIST ==============================================")
 
 	ctx := context.Background()
 	if deadline, ok := pTest.Deadline(); ok {
@@ -44,14 +59,14 @@ func TestPersist(pTest *testing.T) {
 
 	err := m.Insert(ctx, &sub, &options.InsertOneOptions{})
 	if err != nil {
-		fmt.Println(err)
+		pTest.Log(err)
 		pTest.Fail()
 	}
 
 	up := testDoc{ImportantData: "potty"}
 	err = m.Update(ctx, bson.M{"data": "hype"}, &up, &options.UpdateOptions{})
 	if err != nil {
-		fmt.Println(err)
+		pTest.Log(err)
 		pTest.Fail()
 	}
 
@@ -59,7 +74,7 @@ func TestPersist(pTest *testing.T) {
 
 	err = m.Find(ctx, bson.M{}, &resSub, &options.FindOptions{})
 	if err != nil {
-		fmt.Println(err)
+		pTest.Log(err)
 		pTest.Fail()
 	}
 
@@ -67,6 +82,41 @@ func TestPersist(pTest *testing.T) {
 		pTest.Fail()
 	}
 
-	fmt.Println(resSub)
+	pTest.Log(resSub)
+
+	// PARENT
+
+	p := NewMongoPersister(1, "parent", runtime)
+
+	parent := testParent{ImportantData: "ima parent", SubDocs: []string{string(resSub[0].IDstr)}}
+
+	err = p.Insert(ctx, &parent, &options.InsertOneOptions{})
+	if err != nil {
+		pTest.Log(err)
+		pTest.Fail()
+	}
+
+	resParent := []testParent{}
+	if err := p.Find(ctx, bson.M{}, &resParent); err != nil {
+		pTest.Log(err)
+		pTest.Fail()
+	}
+	if len(resParent) == 0 {
+		pTest.Fail()
+	}
+
+	pTest.Log(resParent)
+
+	docs, err := p.FindWithOuterJoin(ctx, string(resParent[0].IDstr), "sub", "sub_docs", "_id", "sub_docs", &options.AggregateOptions{})
+	if err != nil {
+		pTest.Log(err)
+		pTest.Fail()
+	}
+
+	if len(docs) == 0 {
+		pTest.Fail()
+	}
+
+	pTest.Log(docs)
 
 }

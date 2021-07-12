@@ -16,24 +16,18 @@ import (
 
 type GLRYdbId string
 
-type GLRYmongoPersister interface {
-	Insert(context.Context, interface{}, ...*options.InsertOneOptions) error
-	Update(context.Context, bson.M, interface{}, ...*options.UpdateOptions) error
-	Find(context.Context, bson.M, interface{}, ...*options.FindOptions) error
-}
-
-type GLRYmongoPersisterImpl struct {
+type GLRYmongoPersistence struct {
 	Version    int64
 	Collection *mongo.Collection
 }
 
-func NewMongoPersister(version int64, collName string, runtime *Runtime) GLRYmongoPersister {
+func NewMongoPersister(version int64, collName string, runtime *Runtime) *GLRYmongoPersistence {
 	coll := runtime.DB.MongoDB.Collection(collName)
-	return &GLRYmongoPersisterImpl{Version: version, Collection: coll}
+	return &GLRYmongoPersistence{Version: version, Collection: coll}
 }
 
 // insert must be a pointer to a struct
-func (m *GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) error {
+func (m *GLRYmongoPersistence) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) error {
 
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
@@ -69,7 +63,7 @@ func (m *GLRYmongoPersisterImpl) Insert(ctx context.Context, insert interface{},
 }
 
 // update must be a pointer to a struct
-func (m *GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
+func (m *GLRYmongoPersistence) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
@@ -92,7 +86,7 @@ func (m *GLRYmongoPersisterImpl) Update(ctx context.Context, query bson.M, updat
 }
 
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
-func (m *GLRYmongoPersisterImpl) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
+func (m *GLRYmongoPersistence) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
 	filter["deleted"] = false
 
@@ -105,6 +99,26 @@ func (m *GLRYmongoPersisterImpl) Find(ctx context.Context, filter bson.M, result
 		return errors.New("could not decode cursor")
 	}
 	return nil
+}
+
+func (m *GLRYmongoPersistence) FindWithOuterJoin(ctx context.Context, id, from, localField, foreignField, as string, opts ...*options.AggregateOptions) ([]bson.D, error) {
+
+	pipeline := mongo.Pipeline{
+		{{"$match", bson.M{"_id": id}}},
+		{{"$lookup", bson.M{"from": from, "localField": localField, "foreignField": foreignField, "as": as}}},
+		{{"$unwind", fmt.Sprintf("$%s", as)}},
+	}
+
+	cur, err := m.Collection.Aggregate(ctx, pipeline, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []bson.D{}
+	if err := cur.All(ctx, &res); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // CREATE_ID
