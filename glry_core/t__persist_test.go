@@ -5,22 +5,23 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type testDoc struct {
+type testGrandchild struct {
 	IDstr         GLRYdbId `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
 }
 
-type testParent struct {
+type testChild struct {
 	IDstr         GLRYdbId `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
-	SubDocs       []string `bson:"sub_docs"`
+	Children      []string `bson:"children"`
 }
 
 type testGrandparent struct {
@@ -28,7 +29,7 @@ type testGrandparent struct {
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
-	SubDocs       []string `bson:"sub_docs"`
+	Children      []string `bson:"children"`
 }
 
 //---------------------------------------------------
@@ -53,9 +54,9 @@ func TestPersist(pTest *testing.T) {
 
 	//--------------------
 
-	m := NewMongoPersister(1, "sub", runtime)
+	m := NewMongoPersister(1, "grand_children_collection", runtime)
 
-	sub := testDoc{ImportantData: "hype"}
+	sub := testGrandchild{ImportantData: "hype"}
 
 	err := m.Insert(ctx, &sub, &options.InsertOneOptions{})
 	if err != nil {
@@ -63,14 +64,14 @@ func TestPersist(pTest *testing.T) {
 		pTest.Fail()
 	}
 
-	up := testDoc{ImportantData: "potty"}
-	err = m.Update(ctx, bson.M{"data": "hype"}, &up, &options.UpdateOptions{})
+	up := testGrandchild{ImportantData: "potty"}
+	err = m.Update(ctx, bson.M{"data": "ima childs child"}, &up, &options.UpdateOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
 
-	resSub := []testDoc{}
+	resSub := []testGrandchild{}
 
 	err = m.Find(ctx, bson.M{}, &resSub, &options.FindOptions{})
 	if err != nil {
@@ -86,9 +87,9 @@ func TestPersist(pTest *testing.T) {
 
 	// PARENT
 
-	p := NewMongoPersister(1, "parent", runtime)
+	p := NewMongoPersister(1, "children_collection", runtime)
 
-	parent := testParent{ImportantData: "ima parent", SubDocs: []string{string(resSub[0].IDstr)}}
+	parent := testChild{ImportantData: "ima child", Children: []string{string(resSub[0].IDstr)}}
 
 	err = p.Insert(ctx, &parent, &options.InsertOneOptions{})
 	if err != nil {
@@ -96,7 +97,7 @@ func TestPersist(pTest *testing.T) {
 		pTest.Fail()
 	}
 
-	resParent := []testParent{}
+	resParent := []testChild{}
 	if err := p.Find(ctx, bson.M{}, &resParent); err != nil {
 		pTest.Log(err)
 		pTest.Fail()
@@ -107,16 +108,59 @@ func TestPersist(pTest *testing.T) {
 
 	pTest.Log(resParent)
 
-	docs, err := p.FindWithOuterJoin(ctx, string(resParent[0].IDstr), "sub", "sub_docs", "_id", "sub_docs", &options.AggregateOptions{})
+	// GRANDPARENT
+
+	gp := NewMongoPersister(1, "grand_parents_collection", runtime)
+
+	gparent := testGrandparent{ImportantData: "ima gparent", Children: []string{string(resParent[0].IDstr)}}
+
+	err = gp.Insert(ctx, &gparent, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
 
-	if len(docs) == 0 {
+	resGParent := []testGrandparent{}
+	if err := gp.Find(ctx, bson.M{}, &resGParent); err != nil {
+		pTest.Log(err)
+		pTest.Fail()
+	}
+	if len(resGParent) == 0 {
 		pTest.Fail()
 	}
 
-	pTest.Log(docs)
+	pTest.Log(resGParent)
 
+	pipeline := mongo.Pipeline{
+		{{"$match", bson.M{"_id": resGParent[0].IDstr}}},
+		{{"$lookup", bson.M{
+			"from": "children_collection",
+			"let":  bson.M{"childArray": "$children"},
+			"pipeline": mongo.Pipeline{
+				{{"$match", bson.M{"$expr": bson.M{"$in": []string{"$_id", "$$childArray"}}}}},
+				{{"$lookup", bson.M{
+					"from":         "grand_children_collection",
+					"foreignField": "_id",
+					"localField":   "children",
+					"as":           "children",
+				}}},
+				{{"$unwind", "$children"}},
+			},
+			"as": "children",
+		}}},
+		{{"$unwind", "$children"}},
+	}
+
+	res := []bson.D{}
+
+	if err := gp.Aggregate(ctx, pipeline, &res); err != nil {
+		pTest.Log(err)
+		pTest.Fail()
+	}
+
+	pTest.Log(res)
+
+	if len(res) == 0 {
+		pTest.Fail()
+	}
 }

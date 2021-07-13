@@ -143,24 +143,37 @@ func (m *GLRYmongoPersistence) Find(ctx context.Context, filter bson.M, result i
 	return nil
 }
 
-func (m *GLRYmongoPersistence) FindWithOuterJoin(ctx context.Context, id, from, localField, foreignField, as string, opts ...*options.AggregateOptions) ([]bson.D, error) {
+// This func is a predefined aggregation and is probably not needed if we have an aggregation func instead
+// func (m *GLRYmongoPersistence) FindWithOuterJoin(ctx context.Context, id, from, localField, foreignField, as string, opts ...*options.AggregateOptions) ([]bson.D, error) {
 
-	pipeline := mongo.Pipeline{
-		{{"$match", bson.M{"_id": id}}},
-		{{"$lookup", bson.M{"from": from, "localField": localField, "foreignField": foreignField, "as": as}}},
-		{{"$unwind", fmt.Sprintf("$%s", as)}},
-	}
+// 	pipeline := mongo.Pipeline{
+// 		{{"$match", bson.M{"_id": id}}},
+// 		{{"$lookup", bson.M{"from": from, "localField": localField, "foreignField": foreignField, "as": as}}},
+// 		{{"$unwind", fmt.Sprintf("$%s", as)}},
+// 	}
 
-	cur, err := m.collection.Aggregate(ctx, pipeline, opts...)
+// 	cur, err := m.collection.Aggregate(ctx, pipeline, opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	res := []bson.D{}
+// 	if err := cur.All(ctx, &res); err != nil {
+// 		return nil, err
+// 	}
+// 	return res, nil
+// }
+
+// result must be a pointer to a slice of structs or bson structures
+func (m *GLRYmongoPersistence) Aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
+
+	cur, err := m.collection.Aggregate(ctx, agg, opts...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	res := []bson.D{}
-	if err := cur.All(ctx, &res); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return cur.All(ctx, result)
+
 }
 
 // CREATE_ID
