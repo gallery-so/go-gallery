@@ -143,7 +143,7 @@ func DBinit(pMongoURLstr string,
 	//		readPreference=secondaryPreferred
 	// 		retryWrites=false
 
-	log.WithFields(log.Fields{}).Info("mongo connecting...")
+	log.WithFields(log.Fields{}).Info("connecting to mongo...")
 
 	//-------------------------------------------------------------
 	// GF_GET_DB
@@ -182,7 +182,7 @@ func DBinit(pMongoURLstr string,
 		if gErr != nil {
 			return nil, nil, gErr
 		}
-		log.Info("mongo connected...")
+		log.Info("mongo connected! ✅")
 
 		return mongoDB, mongoClient, nil
 	}
