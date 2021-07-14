@@ -21,5 +21,5 @@ func TestHealthcheck(t *testing.T) {
 	glry_core.UnmarshalBody(&body, resp.Body, runtime)
 
 	assert.Equal(body.Message, "gallery operational")
-	assert.Equal(body.Env, "glry_test")
+	assert.Equal(body.Env, "local")
 }

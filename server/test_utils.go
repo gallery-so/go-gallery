@@ -24,15 +24,7 @@ func setup(t *testing.T) (*assert.Assertions,
 	assert := assert.New(t)
 
 	// Initialize runtime
-	runtime, err := glry_core.RuntimeGet(
-		&glry_core.GLRYconfig{
-			// TODO: get these from ENV
-			MongoURLstr: "mongodb://127.0.0.1:27017",
-			MongoDBnameStr: "gallery",
-			Port: 4000,
-			BaseURL: "http://localhost:4000",
-			EnvStr: "glry_test",
-		})
+	runtime, err := glry_core.RuntimeGet(glry_core.ConfigLoad())
 	assert.Nil(err)
 
 	// Initialize test server
