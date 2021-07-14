@@ -42,6 +42,7 @@ func GalleryCreate(pGallery *GLRYgalleryStorage,
 	mp := glry_core.NewMongoPersister(0, collectionColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
+
 }
 
 //-------------------------------------------------------------

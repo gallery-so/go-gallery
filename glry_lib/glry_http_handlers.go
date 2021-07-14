@@ -8,324 +8,193 @@ import (
 	"net/http"
 
 	// log "github.com/sirupsen/logrus"
-	gf_core "github.com/gloflow/gloflow/go/gf_core"
-	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
+	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 	"github.com/mikeydub/go-gallery/glry_extern_services"
-	"github.com/mitchellh/mapstructure"
 )
 
 //-------------------------------------------------------------
 func HandlersInit(pRuntime *glry_core.Runtime) {
 
+	apiGroupV1 := pRuntime.Router.Group("/glry/v1")
+
 	// AUTH_HANDLERS
-	AuthHandlersInit(pRuntime)
+	AuthHandlersInit(pRuntime, apiGroupV1)
 
 	//-------------------------------------------------------------
 	// COLLECTION
 	//-------------------------------------------------------------
 	// COLLECTION_GET
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/collections/get",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	apiGroupV1.GET("/collections/get", func(c *gin.Context) {
+		//------------------
+		// INPUT
 
-			//------------------
-			// INPUT
+		userIDstr := c.Query("userid")
 
-			qMap := pReq.URL.Query()
-			userIDstr := qMap["userid"][0]
+		input := &GLRYcollGetInput{
+			UserIDstr: glry_db.GLRYuserID(userIDstr),
+		}
 
-			input := &GLRYcollGetInput{
-				UserIDstr: glry_db.GLRYuserID(userIDstr),
-			}
+		//------------------
+		// CREATE
+		output, gErr := CollGetPipeline(input, context.TODO(), pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			//------------------
-			// CREATE
-			output, gErr := CollGetPipeline(input, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
+		//------------------
+		// OUTPUT
 
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{
-				"colls": output.CollsOutputsLst,
-			}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		c.JSON(http.StatusOK, gin.H{"colls": output.CollsOutputsLst})
+	})
 
 	//-------------------------------------------------------------
 	// COLLECTION_CREATE
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/collections/create",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	apiGroupV1.POST("/collections/create", func(c *gin.Context) {
+		input := &GLRYcollCreateInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-			//------------------
-			// INPUT
+		//------------------
+		// CREATE
+		output, gErr := CollCreatePipeline(input, input.OwnerUserIdStr, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			// FINISH!! - get user_id mechanism
-			userIDstr := ""
-
-			var input GLRYcollCreateInput
-			err := mapstructure.Decode(inputMap, &input)
-			if err != nil {
-				gf_err := gf_core.Error__create("failed to load input map into GLRYcollCreateInput struct",
-					"mapstruct__decode",
-					map[string]interface{}{},
-					err, "glry_lib", pRuntime.RuntimeSys)
-				return nil, gf_err
-			}
-
-			//------------------
-			// CREATE
-			output, gErr := CollCreatePipeline(&input, userIDstr, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			fmt.Println(output)
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	})
 
 	//-------------------------------------------------------------
 	// COLLECTION_DELETE
-	gf_rpc_lib.Create_handler__http("/glry/v1/collections/delete",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
-			//------------------
-			// INPUT
+	apiGroupV1.POST("/collections/delete", func(c *gin.Context) {
+		input := &GLRYcollDeleteInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
-			if gErr != nil {
-				return nil, gErr
-			}
+		output, gErr := CollDeletePipeline(input, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			var input GLRYcollDeleteInput
-			err := mapstructure.Decode(inputMap, &input)
-			if err != nil {
-				gf_err := gf_core.Error__create("failed to load input map into GLRYcollDeleteInput struct",
-					"mapstruct__decode",
-					map[string]interface{}{},
-					err, "glry_lib", pRuntime.RuntimeSys)
-				return nil, gf_err
-			}
-
-			//------------------
-
-			_, gErr = CollDeletePipeline(&input, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	})
 
 	//-------------------------------------------------------------
 	// NFTS
 	//-------------------------------------------------------------
 	// SINGLE GET
-	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/get",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
-			if pReq.Method == http.MethodGet {
+	apiGroupV1.GET("/nfts/get", func(c *gin.Context) {
+		nftIDstr := c.Query("id")
+		if nftIDstr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nft id not found in query values"})
+			return
+		}
+		nfts, gErr := glry_db.NFTgetByID(nftIDstr, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-				//------------------
-				// INPUT
+		if len(nfts) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("no nfts found with id: %s", nftIDstr)})
+			return
+		}
 
-				//------------------
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, gin.H{
+			"nfts": nfts,
+		})
 
-				qMap := pReq.URL.Query()
-
-				nftIDstr := qMap.Get("id")
-
-				if nftIDstr == "" {
-					// is this the right way to create an error for gf_core?
-					return nil, gf_core.Error__create("nft id not found in query values",
-						"http_client_req_error",
-						map[string]interface{}{
-							"uri": "/glry/v1/nfts/get",
-						}, nil, "glry_lib", pRuntime.RuntimeSys)
-				}
-
-				nfts, gErr := glry_db.NFTgetByID(nftIDstr, pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-				if len(nfts) == 0 {
-					return nil, gf_core.Error__create(fmt.Sprintf("no nfts found with id: %s", nftIDstr),
-						"http_client_req_error",
-						map[string]interface{}{
-							"uri": "/glry/v1/nfts/get",
-						}, nil, "glry_lib", pRuntime.RuntimeSys)
-				}
-
-				//------------------
-				// OUTPUT
-				dataMap := map[string]interface{}{
-					"nfts": nfts,
-				}
-
-				//------------------
-				return dataMap, nil
-			}
-
-			return nil, nil
-		},
-		pRuntime.RuntimeSys)
+	})
 
 	// SINGLE UPDATE
-	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/update",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	// must specify nft id in json input
+	apiGroupV1.POST("/nfts/update", func(c *gin.Context) {
+		nft := &glry_db.GLRYnft{}
+		if err := c.ShouldBindJSON(nft); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-			if pReq.Method == http.MethodPut {
+		gErr := glry_db.NFTupdateById(string(nft.IDstr), nft, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-				//------------------
-				// INPUT
-
-				//------------------
-
-				pReq.ParseForm()
-
-				nftIDstr := pReq.FormValue("id")
-
-				if nftIDstr == "" {
-					return nil, gf_core.Error__create("no id found in form values",
-						"http_client_req_error",
-						map[string]interface{}{
-							"uri": "/glry/v1/nfts/update",
-						}, nil, "glry_lib", pRuntime.RuntimeSys)
-				}
-
-				nft := &glry_db.GLRYnft{}
-
-				gErr := glry_core.UnmarshalBody(nft, pReq.Body, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-				gErr = glry_db.NFTupdateById(nftIDstr, nft, pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-				//------------------
-				// OUTPUT
-				dataMap := map[string]interface{}{}
-
-				//------------------
-				return dataMap, nil
-			}
-
-			return nil, nil
-		},
-		pRuntime.RuntimeSys)
+		c.Status(http.StatusOK)
+	})
 
 	// USER_GET
-	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/user_get",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	apiGroupV1.GET("/nfts/user_get", func(c *gin.Context) {
+		userId := c.Query("user_id")
+		if userId == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user id not found in query values"})
+			return
+		}
+		nfts, gErr := glry_db.NFTgetByUserID(userId, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			if pReq.Method == "GET" {
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, gin.H{"nfts": nfts})
 
-				//------------------
-				// INPUT
-
-				//------------------
-
-				userIDstr := "7bfaafcc-722e-4dce-986f-fe0d9bee2047"
-				nfts, gErr := glry_db.NFTgetByUserID(userIDstr, pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-				//------------------
-				// OUTPUT
-				dataMap := map[string]interface{}{
-					"nfts": nfts,
-				}
-
-				//------------------
-				return dataMap, nil
-			}
-
-			return nil, nil
-		},
-		pRuntime.RuntimeSys)
+	})
 
 	//-------------------------------------------------------------
 	// OPENSEA_GET
-	gf_rpc_lib.Create_handler__http("/glry/v1/nfts/opensea_get",
-		func(pCtx context.Context, pResp http.ResponseWriter,
-			pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
 
-			//------------------
-			// INPUT
+	// USER_GET
+	apiGroupV1.GET("/nfts/opensea_get", func(c *gin.Context) {
+		ownerWalletAddr := c.Query("user_id")
+		if ownerWalletAddr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "owner wallet address not found in query values"})
+			return
+		}
+		_, gErr := glry_extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddr, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			//------------------
+		//------------------
+		// OUTPUT
+		c.Status(http.StatusOK)
 
-			ownerWalletAddressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
-			_, gErr := glry_extern_services.OpenSeaPipelineAssetsForAcc(ownerWalletAddressStr, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+	})
 
 	//-------------------------------------------------------------
 	// VAR
 	//-------------------------------------------------------------
 	// HEALTH
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/health",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
-
-			// log.WithFields(log.Fields{}).Debug("/health")
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{
-				"msg": "gallery operational",
-				"env": pRuntime.Config.EnvStr,
-			}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+	apiGroupV1.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "gallery operational",
+			"env": pRuntime.Config.EnvStr,
+		})
+	})
 
 	//-------------------------------------------------------------
 }

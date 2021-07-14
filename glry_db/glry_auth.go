@@ -48,17 +48,6 @@ type GLRYuserNonce struct {
 	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
 }
 
-// USER_JWT_KEY - is unique per user, and stored in the DB for now.
-type GLRYuserJWTkey struct {
-	VersionInt    int64            `bson:"version"       mapstructure:"version"`
-	ID            GLRYuserJWTkeyID `bson:"_id"           mapstructure:"_id"`
-	CreationTimeF float64          `bson:"creation_time" mapstructure:"creation_time"`
-	DeletedBool   bool             `bson:"deleted"       mapstructure:"deleted"`
-
-	ValueStr   string          `bson:"value"   mapstructure:"value"`
-	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
-}
-
 // USER_LOGIN_ATTEMPT
 type GLRYuserLoginAttempt struct {
 	VersionInt    int64              `bson:"version"`
@@ -81,70 +70,6 @@ type GLRYuserLoginAttempt struct {
 type GLRYuserUpdate struct {
 	CreationTimeF float64 `bson:"creation_time"`
 	NameNewStr    string  `bson:"name_new"`
-}
-
-//-------------------------------------------------------------
-// JWT
-//-------------------------------------------------------------
-// GET
-func AuthUserJWTkeyGet(pUserAddressStr GLRYuserAddress,
-	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYuserJWTkey, *gf_core.Gf_error) {
-
-	record, gErr := gf_core.MongoFindLatest(bson.M{
-		"address": pUserAddressStr,
-		"deleted": false,
-	},
-		"creation_time", // p_time_field_name_str
-		map[string]interface{}{
-			"address":            pUserAddressStr,
-			"caller_err_msg_str": "failed to get JWT key from DB",
-		},
-		pRuntime.DB.MongoDB.Collection("glry_users_jwt_keys"),
-		pCtx,
-		pRuntime.RuntimeSys)
-	if gErr != nil {
-		return nil, gErr
-	}
-
-	var JWTkey GLRYuserJWTkey
-	err := mapstructure.Decode(record, &JWTkey)
-	if err != nil {
-		gErr := gf_core.Error__create("failed to load DB result of GLRYuserJWTkey into its struct",
-			"mapstruct__decode",
-			map[string]interface{}{
-				"address": pUserAddressStr,
-			},
-			err, "glry_db", pRuntime.RuntimeSys)
-		return nil, gErr
-	}
-
-	// spew.Dump(JWTkey)
-
-	return &JWTkey, nil
-}
-
-//-------------------------------------------------------------
-// CREATE
-
-func AuthUserJWTkeyCreate(pJWTkey *GLRYuserJWTkey,
-	pCtx context.Context,
-	pRuntime *glry_core.Runtime) *gf_core.Gf_error {
-
-	collNameStr := "glry_users_jwt_keys"
-	gErr := gf_core.Mongo__insert(pJWTkey,
-		collNameStr,
-		map[string]interface{}{
-			"address":        pJWTkey.AddressStr,
-			"caller_err_msg": "failed to insert a new GLRYuserJWTkey into the DB",
-		},
-		pCtx,
-		pRuntime.RuntimeSys)
-	if gErr != nil {
-		return gErr
-	}
-
-	return nil
 }
 
 //-------------------------------------------------------------

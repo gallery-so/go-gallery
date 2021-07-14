@@ -2,19 +2,20 @@ package glry_lib
 
 import (
 	// "fmt"
-	"context"
-	gf_core "github.com/gloflow/gloflow/go/gf_core"
-	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
+
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
-	"github.com/mitchellh/mapstructure"
-	log "github.com/sirupsen/logrus"
-	"net/http"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 //-------------------------------------------------------------
-func AuthHandlersInit(pRuntime *glry_core.Runtime) {
+func AuthHandlersInit(pRuntime *glry_core.Runtime, parent *gin.RouterGroup) {
+
+	usersGroup := parent.Group("/users")
+	usersGroup.Use(jwtMiddleware(pRuntime))
 
 	//-------------------------------------------------------------
 	// AUTH_GET_PREFLIGHT
@@ -23,297 +24,145 @@ func AuthHandlersInit(pRuntime *glry_core.Runtime) {
 	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
 
 	// [GET] /glry/v1/auth/get_preflight?addr=:walletAddress
-	gf_rpc_lib.Create_handler__http("/glry/v1/auth/get_preflight",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	usersGroup.GET("/auth/get_preflight", func(c *gin.Context) {
+		userAddrStr := c.Query("addr")
+		input := &GLRYauthUserGetPreflightInput{
+			AddressStr: glry_db.GLRYuserAddress(userAddrStr),
+		}
+		// GET_PUBLIC_INFO
+		output, gErr := AuthUserGetPreflightPipeline(input, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			log.WithFields(log.Fields{}).Debug("/glry/v1/auth/get_preflight")
-
-			//------------------
-			// INPUT
-
-			qMap := pReq.URL.Query()
-			userAddrStr := qMap["addr"][0]
-
-			input := &GLRYauthUserGetPreflightInput{
-				AddressStr: glry_db.GLRYuserAddress(userAddrStr),
-			}
-
-			//------------------
-
-			// GET_PUBLIC_INFO
-			output, gErr := AuthUserGetPreflightPipeline(input, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{
-				"nonce":       output.NonceStr,
-				"user_exists": output.UserExistsBool,
-			}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	})
 
 	//-------------------------------------------------------------
 	// AUTH_USER_LOGIN
 	// UN-AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/users/login",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	usersGroup.POST("/login", func(c *gin.Context) {
+		input := &GLRYauthUserLoginInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-			//------------------
-			// INPUT
+		//------------------
 
-			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
-			if gErr != nil {
-				return nil, gErr
-			}
+		// USER_LOGIN__PIPELINE
+		output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(input,
+			c.Request,
+			c,
+			pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			var input GLRYauthUserLoginInput
-			err := mapstructure.Decode(inputMap, &input)
-			if err != nil {
-				gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserLoginInput struct",
-					"mapstruct__decode",
-					map[string]interface{}{},
-					err, "glry_lib", pRuntime.RuntimeSys)
-				return nil, gf_err
-			}
+		/*
+			// ADD!! - going forward we should follow this approach, after v1
+			// SET_JWT_COOKIE
+			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
+			http.SetCookie(pResp, &http.Cookie{
+				Name:    "glry_token",
+				Value:   userJWTtokenStr,
+				Expires: expirationTime,
+			})*/
 
-			//------------------
-
-			// USER_LOGIN__PIPELINE
-			output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(&input,
-				pReq,
-				pCtx,
-				pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			// FAILED - INVALID_SIGNATURE
-			if !output.SignatureValidBool {
-				dataMap := map[string]interface{}{
-					"sig_valid": false,
-				}
-				return dataMap, nil
-			}
-
-			/*
-				// ADD!! - going forward we should follow this approach, after v1
-				// SET_JWT_COOKIE
-				expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
-				http.SetCookie(pResp, &http.Cookie{
-					Name:    "glry_token",
-					Value:   userJWTtokenStr,
-					Expires: expirationTime,
-				})*/
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{
-				"jwt_token": output.JWTtokenStr,
-				"user_id":   output.UserIDstr,
-			}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	})
 
 	//-------------------------------------------------------------
 	// USER_UPDATE
 	// AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/users/update",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	usersGroup.POST("/update", func(c *gin.Context) {
 
-			//------------------
-			// INPUT
-			qMap := pReq.URL.Query()
-			userAddrStr := qMap["addr"][0]
+		if auth := c.GetBool("authenticated"); !auth {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
+			return
+		}
 
-			inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
-			if gErr != nil {
-				return nil, gErr
-			}
+		up := &GLRYauthUserUpdateInput{}
 
-			var input GLRYauthUserUpdateInput
-			err := mapstructure.Decode(inputMap, &input)
-			if err != nil {
-				gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserUpdateInput struct",
-					"mapstruct__decode",
-					map[string]interface{}{},
-					err, "glry_lib", pRuntime.RuntimeSys)
-				return nil, gf_err
-			}
+		if err := c.ShouldBindJSON(up); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-			input.AddressStr = glry_db.GLRYuserAddress(userAddrStr)
-
-			//------------------
-			// JWT_VERIFY
-			validJWTbool, dataJWTmap, gErr := AuthJWTverifyHTTP(input.AddressStr,
-				pReq,
-				pCtx,
-				pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-			if !validJWTbool {
-				return dataJWTmap, nil
-			}
-
-			//------------------
-			// UPDATE
-			gErr = AuthUserUpdatePipeline(&input, pCtx, pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
-
-			//------------------
-			// OUTPUT
-			dataMap := map[string]interface{}{}
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+		//------------------
+		// UPDATE
+		gErr := AuthUserUpdatePipeline(up, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+		//------------------
+		// OUTPUT
+		c.Status(http.StatusOK)
+	})
 
 	//-------------------------------------------------------------
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/users/get",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	usersGroup.GET("/get", func(c *gin.Context) {
 
-			//------------------
-			// INPUT
+		auth := c.GetBool("authenticated")
 
-			qMap := pReq.URL.Query()
-			userAddrStr := qMap["addr"][0]
+		userAddrStr := c.Query("addr")
+		input := &GLRYauthUserGetInput{
+			AddressStr: glry_db.GLRYuserAddress(userAddrStr),
+		}
 
-			input := &GLRYauthUserGetInput{
-				AddressStr: glry_db.GLRYuserAddress(userAddrStr),
-			}
+		output, gErr := AuthUserGetPipeline(input,
+			auth,
+			c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-			//------------------
-			// JWT_VERIFY
-			validJWTbool, _, gErr := AuthJWTverifyHTTP(input.AddressStr,
-				pReq,
-				pCtx,
-				pRuntime)
-			if gErr != nil {
-				return nil, gErr
-			}
+		//------------------
+		// OUTPUT
 
-			//------------------
-			// USER_GET
+		c.JSON(http.StatusOK, output)
 
-			var output *GLRYauthUserGetOutput
-
-			// AUTHENTICATED
-			if validJWTbool {
-				output, gErr = AuthUserGetPipeline(input,
-					true, // pAuthenticatedBool
-					pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-				// UN_AUTHENTICATED - different set of results for user not-authenticated
-			} else {
-				output, gErr = AuthUserGetPipeline(input,
-					false, // pAuthenticatedBool
-					pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
-
-			}
-
-			//------------------
-			// OUTPUT
-
-			var dataMap map[string]interface{}
-			err := mapstructure.Decode(output, &dataMap)
-			if err != nil {
-				gf_err := gf_core.Error__create("failed to load user_get pipeline output into a map",
-					"mapstruct__decode",
-					map[string]interface{}{},
-					err, "glry_lib", pRuntime.RuntimeSys)
-				return nil, gf_err
-			}
-
-			// dataMap := map[string]interface{}{
-			// 	"username":    output.UserNameStr,
-			// 	"description": output.DescriptionStr,
-			// }
-
-			//------------------
-
-			return dataMap, nil
-		},
-		pRuntime.RuntimeSys)
+	})
 
 	//-------------------------------------------------------------
 	// USER_CREATE
 	// UN-AUTHENTICATED
 
-	gf_rpc_lib.Create_handler__http("/glry/v1/users/create",
-		func(pCtx context.Context, pResp http.ResponseWriter, pReq *http.Request) (map[string]interface{}, *gf_core.Gf_error) {
+	usersGroup.POST("/create", func(c *gin.Context) {
 
-			if pReq.Method == "POST" {
+		input := &GLRYauthUserCreateInput{}
 
-				log.WithFields(log.Fields{}).Debug("/glry/v1/users/create")
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-				//------------------
-				// INPUT
+		//------------------
+		// USER_CREATE
+		output, gErr := AuthUserCreatePipeline(input, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
 
-				inputMap, gErr := gf_rpc_lib.Get_http_input(pResp, pReq, pRuntime.RuntimeSys)
-				if gErr != nil {
-					return nil, gErr
-				}
+		//------------------
+		// OUTPUT
 
-				var input GLRYauthUserCreateInput
-				err := mapstructure.Decode(inputMap, &input)
-				if err != nil {
-					gf_err := gf_core.Error__create("failed to load input map into GLRYauthUserCreateInput struct",
-						"mapstruct__decode",
-						map[string]interface{}{},
-						err, "glry_lib", pRuntime.RuntimeSys)
-					return nil, gf_err
-				}
+		c.JSON(http.StatusOK, output)
 
-				//------------------
-				// USER_CREATE
-				output, gErr := AuthUserCreatePipeline(&input, pCtx, pRuntime)
-				if gErr != nil {
-					return nil, gErr
-				}
+	})
 
-				//------------------
-				// OUTPUT
-
-				dataMap := map[string]interface{}{
-					"sig_valid": output.SignatureValidBool,
-					"jwt_token": output.JWTtokenStr,
-					"user_id":   output.UserIDstr,
-				}
-
-				//------------------
-
-				return dataMap, nil
-			}
-
-			return nil, nil
-		},
-		pRuntime.RuntimeSys)
-
-	//-------------------------------------------------------------
 }

@@ -4,7 +4,9 @@ import (
 	// "fmt"
 	// log "github.com/sirupsen/logrus"
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
-	gf_rpc_lib "github.com/gloflow/gloflow/go/gf_rpc_lib"
+	"fmt"
+
+	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_lib"
 )
@@ -13,10 +15,13 @@ import (
 func Init(pPortInt int,
 	pRuntime *glry_core.Runtime) {
 
+	pRuntime.Router = gin.Default()
+
 	// HANDLERS
 	glry_lib.HandlersInit(pRuntime)
 
-	// SERVER_INIT
-	gf_rpc_lib.Server__init(pPortInt)
+	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
+		panic(err)
+	}
 
 }

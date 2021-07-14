@@ -4,14 +4,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/go-playground/validator"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"io/ioutil"
-	"os"
-	"os/exec"
+
 	// "github.com/davecgh/go-spew/spew"
+	"github.com/gin-gonic/gin"
 )
 
 //-------------------------------------------------------------
@@ -20,6 +23,7 @@ type Runtime struct {
 	DB         *DB
 	Validator  *validator.Validate
 	RuntimeSys *gf_core.Runtime_sys
+	Router     *gin.Engine
 }
 
 type DB struct {
