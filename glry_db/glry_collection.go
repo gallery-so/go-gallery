@@ -6,6 +6,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/glry_core"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -13,7 +14,7 @@ const collectionColName = "glry_collections"
 
 //-------------------------------------------------------------
 type GLRYcollID string
-type GLRYcollection struct {
+type GLRYcollectionStorage struct {
 	VersionInt    int64      `bson:"version"       json:"version"` // schema version for this model
 	IDstr         GLRYcollID `bson:"_id"           json:"id"`
 	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
@@ -28,8 +29,23 @@ type GLRYcollection struct {
 	HiddenBool bool `bson:"hidden,omitempty" json:"hidden"`
 }
 
+type GLRYcollection struct {
+	VersionInt    int64      `bson:"version"       json:"version"` // schema version for this model
+	IDstr         GLRYcollID `bson:"_id"           json:"id"`
+	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool       `bson:"deleted"`
+
+	NameStr           string    `bson:"name,omitempty"          json:"name"`
+	CollectorsNoteStr string    `bson:"collectors_note,omitempty"   json:"collectors_note"`
+	OwnerUserIDstr    string    `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	NFTsLst           []GLRYnft `bson:"nfts,omitempty"          json:"nfts"`
+
+	// collections can be hidden from public-viewing
+	HiddenBool bool `bson:"hidden,omitempty" json:"hidden"`
+}
+
 //-------------------------------------------------------------
-func CollCreate(pColl *GLRYcollection,
+func CollCreate(pColl *GLRYcollectionStorage,
 	pCtx context.Context,
 	pRuntime *glry_core.Runtime) error {
 
@@ -44,7 +60,7 @@ func CollGetByUserID(pUserIDstr GLRYuserID,
 	pCtx context.Context,
 	pRuntime *glry_core.Runtime) ([]*GLRYcollection, error) {
 
-	opts := &options.FindOptions{}
+	opts := &options.AggregateOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.MaxTime = &dur
@@ -54,7 +70,7 @@ func CollGetByUserID(pUserIDstr GLRYuserID,
 
 	result := []*GLRYcollection{}
 
-	if err := mp.Find(pCtx, bson.M{"user_id": pUserIDstr}, result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"owner_user_id": pUserIDstr}), result, opts); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +82,7 @@ func CollGetByID(pIDstr string,
 	pCtx context.Context,
 	pRuntime *glry_core.Runtime) ([]*GLRYcollection, error) {
 
-	opts := &options.FindOptions{}
+	opts := &options.AggregateOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.MaxTime = &dur
@@ -76,9 +92,22 @@ func CollGetByID(pIDstr string,
 
 	result := []*GLRYcollection{}
 
-	if err := mp.Find(pCtx, bson.M{"_id": pIDstr}, result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"_id": pIDstr}), result, opts); err != nil {
 		return nil, err
 	}
 
 	return result, nil
+}
+
+func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
+	return mongo.Pipeline{
+		{{Key: "$match", Value: matchFilter}},
+		{{Key: "$lookup", Value: bson.M{
+			"from":         "glry_nfts",
+			"foreignField": "_id",
+			"localField":   "nfts",
+			"as":           "nfts",
+		}}},
+		{{Key: "$unwind", Value: "$nfts"}},
+	}
 }
