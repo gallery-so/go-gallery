@@ -1,7 +1,6 @@
 package glry_lib
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -24,9 +23,9 @@ func getAllCollectionsForUser(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 
 		//------------------
 		// CREATE
-		output, gErr := CollGetPipeline(input, context.TODO(), pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := CollGetPipeline(input, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -44,9 +43,9 @@ func createCollection(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 
 		//------------------
 		// CREATE
-		output, gErr := CollCreatePipeline(input, input.OwnerUserIdStr, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := CollCreatePipeline(input, input.OwnerUserIdStr, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 			return
 		}
 
@@ -62,9 +61,9 @@ func deleteCollection(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		output, gErr := CollDeletePipeline(input, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := CollDeletePipeline(input, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -79,9 +78,9 @@ func getNftById(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "nft id not found in query values"})
 			return
 		}
-		nfts, gErr := glry_db.NFTgetByID(nftIDstr, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		nfts, err := glry_db.NFTgetByID(nftIDstr, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -106,9 +105,9 @@ func updateNftById(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		gErr := glry_db.NFTupdateById(string(nft.IDstr), nft, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		err := glry_db.NFTupdateById(string(nft.IDstr), nft, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -127,9 +126,9 @@ func getNftsForUser(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "user id not found in query values"})
 			return
 		}
-		nfts, gErr := glry_db.NFTgetByUserID(userId, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		nfts, err := glry_db.NFTgetByUserID(userId, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -156,14 +155,149 @@ func getNftsFromOpensea(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 
 type HealthcheckResponse struct {
 	Message string `json:"msg"`
-	Env 	string `json:"env"`
+	Env     string `json:"env"`
 }
 
 func healthcheck(pRuntime *glry_core.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, HealthcheckResponse{
 			Message: "gallery operational",
-			Env: pRuntime.Config.EnvStr,
+			Env:     pRuntime.Config.EnvStr,
 		})
+	}
+}
+
+func getAuthPreflight(pRuntime *glry_core.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userAddrStr := c.Query("addr")
+		input := &GLRYauthUserGetPreflightInput{
+			AddressStr: glry_db.GLRYuserAddress(userAddrStr),
+		}
+		// GET_PUBLIC_INFO
+		output, gErr := AuthUserGetPreflightPipeline(input, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	}
+}
+
+func login(pRuntime *glry_core.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &GLRYauthUserLoginInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		//------------------
+
+		// USER_LOGIN__PIPELINE
+		output, gErr := AuthUserLoginAndMemorizeAttemptPipeline(input,
+			c.Request,
+			c,
+			pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+
+		/*
+			// ADD!! - going forward we should follow this approach, after v1
+			// SET_JWT_COOKIE
+			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
+			http.SetCookie(pResp, &http.Cookie{
+				Name:    "glry_token",
+				Value:   userJWTtokenStr,
+				Expires: expirationTime,
+			})*/
+
+		//------------------
+		// OUTPUT
+		c.JSON(http.StatusOK, output)
+	}
+}
+
+func updateUserAuth(pRuntime *glry_core.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		if auth := c.GetBool("authenticated"); !auth {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
+			return
+		}
+
+		up := &GLRYauthUserUpdateInput{}
+
+		if err := c.ShouldBindJSON(up); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		//------------------
+		// UPDATE
+		gErr := AuthUserUpdatePipeline(up, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+		//------------------
+		// OUTPUT
+		c.Status(http.StatusOK)
+	}
+}
+
+func getUserAuth(pRuntime *glry_core.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		auth := c.GetBool("authenticated")
+
+		userAddrStr := c.Query("addr")
+		input := &GLRYauthUserGetInput{
+			AddressStr: glry_db.GLRYuserAddress(userAddrStr),
+		}
+
+		output, gErr := AuthUserGetPipeline(input,
+			auth,
+			c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+
+		//------------------
+		// OUTPUT
+
+		c.JSON(http.StatusOK, output)
+
+	}
+}
+
+func createUser(pRuntime *glry_core.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := &GLRYauthUserCreateInput{}
+
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		//------------------
+		// USER_CREATE
+		output, gErr := AuthUserCreatePipeline(input, c, pRuntime)
+		if gErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+			return
+		}
+
+		//------------------
+		// OUTPUT
+
+		c.JSON(http.StatusOK, output)
+
 	}
 }
