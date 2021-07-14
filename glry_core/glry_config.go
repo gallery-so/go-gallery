@@ -2,6 +2,7 @@ package glry_core
 
 import (
 	"fmt"
+
 	"github.com/gloflow/gloflow/go/gf_aws"
 	"github.com/gloflow/gloflow/go/gf_core"
 	log "github.com/sirupsen/logrus"
@@ -64,7 +65,7 @@ func ConfigLoad() *GLRYconfig {
 	viper.Set("true", true)
 	viper.Set("false", false)
 
-	viper.SetConfigFile("./.env")
+	viper.SetConfigFile(fmt.Sprintf("%s/.env", ProjectRootPath))
 
 	// Enable VIPER to read Environment Variables
 	viper.AutomaticEnv()
