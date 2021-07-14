@@ -1,13 +1,10 @@
 package glry_lib
 
 import (
-	"fmt"
-
-	// "time"
 	"context"
+	"fmt"
 	"net/http"
 
-	// log "github.com/sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
@@ -15,7 +12,7 @@ import (
 )
 
 //-------------------------------------------------------------
-func HandlersInit(pRuntime *glry_core.Runtime) {
+func HandlersInit(pRuntime *glry_core.Runtime) *gin.Engine {
 
 	apiGroupV1 := pRuntime.Router.Group("/glry/v1")
 
@@ -184,17 +181,10 @@ func HandlersInit(pRuntime *glry_core.Runtime) {
 
 	})
 
-	//-------------------------------------------------------------
-	// VAR
-	//-------------------------------------------------------------
 	// HEALTH
-
-	apiGroupV1.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"msg": "gallery operational",
-			"env": pRuntime.Config.EnvStr,
-		})
-	})
+	apiGroupV1.GET("/health", healthcheck(pRuntime))
 
 	//-------------------------------------------------------------
+
+	return pRuntime.Router
 }
