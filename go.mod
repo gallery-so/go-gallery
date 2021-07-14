@@ -13,7 +13,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.4
 	github.com/fatih/color v1.12.0
 	github.com/fortytw2/leaktest v1.3.0 // indirect
-	github.com/getsentry/sentry-go v0.11.0
+	github.com/getsentry/sentry-go v0.11.0 // indirect
 	github.com/gin-gonic/gin v1.7.2
 	github.com/gloflow/gloflow v0.0.0-20210713035011-41b59fd5db66
 	github.com/go-playground/validator v9.31.0+incompatible
@@ -21,7 +21,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.13.1 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
-	github.com/mitchellh/mapstructure v1.4.1
 	github.com/parnurzeal/gorequest v0.2.16
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.8.1

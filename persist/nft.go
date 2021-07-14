@@ -1,10 +1,10 @@
-package glry_db
+package persist
 
 import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
@@ -14,23 +14,22 @@ import (
 
 const nftColName = "glry_nfts"
 
-type GLRYnftID string
-type GLRYnft struct {
-	VersionInt    int64     `bson:"version"              json:"version"` // schema version for this model
-	IDstr         GLRYnftID `bson:"_id"                  json:"id"`
-	CreationTimeF float64   `bson:"creation_time"        json:"creation_time"`
-	DeletedBool   bool      `bson:"deleted"`
+type Nft struct {
+	VersionInt    int64   `bson:"version"              json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id"                  json:"id"`
+	CreationTimeF float64 `bson:"creation_time"        json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"`
 
 	NameStr           string `bson:"name,omitempty"                 json:"name"`
 	DescriptionStr    string `bson:"description,omitempty"          json:"description"`
 	CollectorsNoteStr string `bson:"collectors_note,omitempty" json:"collectors_note"`
 
-	ExternalURLstr      string       `bson:"external_url,omitempty"         json:"external_url"`
-	TokenMetadataUrlStr string       `bson:"token_metadata_url,omitempty" json:"token_metadata_url"`
-	CreatorAddressStr   string       `bson:"creator_address,omitempty"      json:"creator_address"`
-	CreatorNameStr      string       `bson:"creator_name,omitempty" json:"creator_name"`
-	OwnerAddressStr     string       `bson:"owner_address,omitempty" json:"owner_address"`
-	Contract            GLRYcontract `bson:"contract,omitempty"     json:"asset_contract"`
+	ExternalURLstr      string   `bson:"external_url,omitempty"         json:"external_url"`
+	TokenMetadataUrlStr string   `bson:"token_metadata_url,omitempty" json:"token_metadata_url"`
+	CreatorAddressStr   string   `bson:"creator_address,omitempty"      json:"creator_address"`
+	CreatorNameStr      string   `bson:"creator_name,omitempty" json:"creator_name"`
+	OwnerAddressStr     string   `bson:"owner_address,omitempty" json:"owner_address"`
+	Contract            Contract `bson:"contract,omitempty"     json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
@@ -49,7 +48,7 @@ type GLRYnft struct {
 	AcquisitionDateStr string `bson:"acquisition_date,omitempty" json:"acquisition_date"`
 }
 
-type GLRYcontract struct {
+type Contract struct {
 	ContractAddressStr      string `bson:"contract_address,omitempty"     json:"address"`
 	ContractNameStr         string `bson:"contract_name,omitempty" json:"name"`
 	ContractDescription     string `bson:"contract_description,omitempty" json:"description"`
@@ -89,37 +88,37 @@ type GLRYnftLegacy struct {
 }*/
 
 //-------------------------------------------------------------
-func NFTcreateBulk(pNFTlst []*GLRYnft,
+func NftCreateBulk(pNFTlst []*Nft,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) error {
+	pRuntime *runtime.Runtime) error {
 
-	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
+	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.InsertMany(pCtx, pNFTlst)
 }
 
 //-------------------------------------------------------------
-func NFTcreate(pNFT *GLRYnft,
+func NftCreate(pNFT *Nft,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) error {
+	pRuntime *runtime.Runtime) (DbId, error) {
 
-	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
+	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.Insert(pCtx, pNFT)
 
 }
 
 //-------------------------------------------------------------
-func NFTgetByUserID(pUserIDstr string,
+func NftGetByUserId(pUserIDstr DbId,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) ([]*GLRYnft, error) {
+	pRuntime *runtime.Runtime) ([]*Nft, error) {
 	opts := &options.FindOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.MaxTime = &dur
 	}
-	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
-	result := []*GLRYnft{}
+	mp := NewMongoStorage(0, nftColName, pRuntime)
+	result := []*Nft{}
 
 	if err := mp.Find(pCtx, bson.M{"user_id": pUserIDstr}, result, opts); err != nil {
 		return nil, err
@@ -130,7 +129,7 @@ func NFTgetByUserID(pUserIDstr string,
 
 //-------------------------------------------------------------
 
-func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime) ([]*GLRYnft, error) {
+func NeftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	opts := &options.FindOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -138,8 +137,8 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 		opts.MaxTime = &dur
 	}
 
-	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
-	result := []*GLRYnft{}
+	mp := NewMongoStorage(0, nftColName, pRuntime)
+	result := []*Nft{}
 
 	if err := mp.Find(pCtx, bson.M{"_id": pIDstr}, result, opts); err != nil {
 		return nil, err
@@ -151,16 +150,15 @@ func NFTgetByID(pIDstr string, pCtx context.Context, pRuntime *glry_core.Runtime
 
 //-------------------------------------------------------------
 
-// NOTE: there is no gfcore mongo func for update... using default mongo lib for now
-func NFTupdateById(pIDstr string, updatedNft *GLRYnft, pCtx context.Context, pRuntime *glry_core.Runtime) error {
+func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
 	//------------------
 	// VALIDATE
-	if err := glry_core.Validate(updatedNft, pRuntime); err != nil {
+	if err := runtime.Validate(updatedNft, pRuntime); err != nil {
 		return err
 	}
 
-	mp := glry_core.NewMongoPersister(0, nftColName, pRuntime)
+	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.Update(pCtx, bson.M{"_id": pIDstr}, updatedNft)
 

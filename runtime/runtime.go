@@ -1,4 +1,4 @@
-package glry_core
+package runtime
 
 import (
 	"crypto/tls"
@@ -19,7 +19,7 @@ import (
 
 //-------------------------------------------------------------
 type Runtime struct {
-	Config     *GLRYconfig
+	Config     *Config
 	DB         *DB
 	Validator  *validator.Validate
 	RuntimeSys *gf_core.Runtime_sys
@@ -32,7 +32,7 @@ type DB struct {
 }
 
 //-------------------------------------------------------------
-func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
+func RuntimeGet(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 
 	//------------------
 	// LOGS
@@ -132,7 +132,7 @@ func RuntimeGet(pConfig *GLRYconfig) (*Runtime, *gf_core.Gf_error) {
 //-------------------------------------------------------------
 func DBinit(pMongoURLstr string,
 	pMongoDBNamestr string,
-	pConfig *GLRYconfig,
+	pConfig *Config,
 	pRuntimeSys *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
 
 	// AWS CONN STRING
@@ -212,7 +212,7 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 			"file_read_error",
 			map[string]interface{}{
 				"ca_file_path": pCAfilePathStr,
-			}, err, "glry_core", pRuntimeSys)
+			}, err, "runtime", pRuntimeSys)
 		return nil, gErr
 	}
 
@@ -225,7 +225,7 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 			"crypto_cert_ca_parse",
 			map[string]interface{}{
 				"ca_file_path": pCAfilePathStr,
-			}, nil, "glry_core", pRuntimeSys)
+			}, nil, "runtime", pRuntimeSys)
 		return nil, gErr
 	}
 

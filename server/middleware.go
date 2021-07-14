@@ -1,4 +1,4 @@
-package glry_lib
+package server
 
 import (
 	"net/http"
@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/mikeydub/go-gallery/runtime"
 )
 
-func jwtMiddleware(runtime *glry_core.Runtime) gin.HandlerFunc {
+func jwtMiddleware(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeaders := strings.Split(c.GetHeader("Authorization"), " ")
 		if len(authHeaders) > 0 && len(authHeaders) < 2 {
@@ -21,7 +21,7 @@ func jwtMiddleware(runtime *glry_core.Runtime) gin.HandlerFunc {
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
 			// database that is unique to every user and session
-			valid, userAddr, gErr := AuthJWTverify(jwt, os.Getenv("JWT_SECRET"), runtime)
+			valid, userAddr, gErr := authJwtVerify(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if gErr != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": gErr})
 				return

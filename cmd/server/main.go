@@ -2,23 +2,21 @@ package main
 
 import (
 	"time"
-	// log "github.com/sirupsen/logrus"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/gloflow/gloflow/go/gf_core"
-	"github.com/mikeydub/go-gallery/glry_core"
-
-	// "github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/server"
 )
 
 //-------------------------------------------------------------
 func main() {
 
-	config := glry_core.ConfigLoad()
+	config := runtime.ConfigLoad()
 	portStr := config.Port
 
 	// RUNTIME
-	runtime, gErr := glry_core.RuntimeGet(config)
+	runtime, gErr := runtime.RuntimeGet(config)
 	if gErr != nil {
 		panic(gErr.Error)
 	}

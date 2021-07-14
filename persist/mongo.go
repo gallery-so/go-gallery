@@ -1,4 +1,4 @@
-package glry_core
+package persist
 
 import (
 	"context"
@@ -9,25 +9,26 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type GLRYdbId string
+type DbId string
 
-type GLRYmongoPersistence struct {
+type MongoStorage struct {
 	version    int64
 	collection *mongo.Collection
 }
 
-func NewMongoPersister(version int64, collName string, runtime *Runtime) *GLRYmongoPersistence {
+func NewMongoStorage(version int64, collName string, runtime *runtime.Runtime) *MongoStorage {
 	coll := runtime.DB.MongoDB.Collection(collName)
-	return &GLRYmongoPersistence{version: version, collection: coll}
+	return &MongoStorage{version: version, collection: coll}
 }
 
 // insert must be a pointer to a struct
-func (m *GLRYmongoPersistence) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) error {
+func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DbId, error) {
 
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
@@ -54,16 +55,16 @@ func (m *GLRYmongoPersistence) Insert(ctx context.Context, insert interface{}, o
 		}
 	}
 
-	_, err := m.collection.InsertOne(ctx, insert, opts...)
+	res, err := m.collection.InsertOne(ctx, insert, opts...)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return res.InsertedID.(DbId), nil
 }
 
 // insert must be a slice of pointers to a struct
-func (m *GLRYmongoPersistence) InsertMany(ctx context.Context, insert interface{}, opts ...*options.InsertManyOptions) error {
+func (m *MongoStorage) InsertMany(ctx context.Context, insert interface{}, opts ...*options.InsertManyOptions) error {
 
 	inserts, ok := insert.([]interface{})
 	if !ok {
@@ -105,7 +106,7 @@ func (m *GLRYmongoPersistence) InsertMany(ctx context.Context, insert interface{
 }
 
 // update must be a pointer to a struct
-func (m *GLRYmongoPersistence) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
+func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
@@ -116,7 +117,7 @@ func (m *GLRYmongoPersistence) Update(ctx context.Context, query bson.M, update 
 			f.SetFloat(now)
 		}
 	}
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{"$set", update}}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -128,7 +129,7 @@ func (m *GLRYmongoPersistence) Update(ctx context.Context, query bson.M, update 
 }
 
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
-func (m *GLRYmongoPersistence) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
+func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
 	filter["deleted"] = false
 
@@ -144,7 +145,7 @@ func (m *GLRYmongoPersistence) Find(ctx context.Context, filter bson.M, result i
 }
 
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
-func (m *GLRYmongoPersistence) Aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
+func (m *MongoStorage) Aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
 
 	cur, err := m.collection.Aggregate(ctx, agg, opts...)
 	if err != nil {
@@ -155,11 +156,16 @@ func (m *GLRYmongoPersistence) Aggregate(ctx context.Context, agg mongo.Pipeline
 
 }
 
+// result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
+func (m *MongoStorage) Count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+	return m.collection.CountDocuments(ctx, filter, opts...)
+}
+
 // CREATE_ID
-func generateId(creationTime float64) GLRYdbId {
+func generateId(creationTime float64) DbId {
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(creationTime)))
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
-	return GLRYdbId(hexStr)
+	return DbId(hexStr)
 }

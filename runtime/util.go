@@ -1,4 +1,4 @@
-package glry_core
+package runtime
 
 import (
 	"bytes"

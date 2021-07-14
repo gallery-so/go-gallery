@@ -1,4 +1,4 @@
-package glry_db
+package persist
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func TestCreateAndGetNFT(pTest *testing.T) {
 	// //--------------------
 	// // RUNTIME_SYS
 
-	// runtime, gErr := glry_core.RuntimeGet(&glry_core.GLRYconfig{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	// runtime, gErr := runtime.RuntimeGet(&runtime.GLRYconfig{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	// if gErr != nil {
 	// 	pTest.Fail()
 	// }

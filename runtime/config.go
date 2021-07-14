@@ -1,4 +1,4 @@
-package glry_core
+package runtime
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ const (
 	awsSecrets        = "GLRY_AWS_SECRETS"
 )
 
-type GLRYconfig struct {
+type Config struct {
 	EnvStr      string
 	BaseURL     string
 	Port        int
@@ -43,7 +43,7 @@ type GLRYconfig struct {
 }
 
 //-------------------------------------------------------------
-func ConfigLoad() *GLRYconfig {
+func ConfigLoad() *Config {
 
 	//------------------
 	// DEFAULTS
@@ -75,7 +75,7 @@ func ConfigLoad() *GLRYconfig {
 		panic(-1)
 	}
 
-	config := &GLRYconfig{
+	config := &Config{
 		EnvStr:      viper.GetString(env),
 		BaseURL:     viper.GetString(baseURL),
 		Port:        viper.GetInt(port),

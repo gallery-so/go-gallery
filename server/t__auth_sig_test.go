@@ -1,15 +1,16 @@
-package glry_lib
+package server
 
 import (
 	"fmt"
 	"testing"
+
 	// "context"
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
 	// gfcore "github.com/gloflow/gloflow/go/gf_core"
-	"github.com/mikeydub/go-gallery/glry_core"
-	"github.com/mikeydub/go-gallery/glry_db"
+	"github.com/mikeydub/go-gallery/runtime"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -112,7 +113,7 @@ func TestAuthSignatures(pTest *testing.T) {
 	// RUNTIME_SYS
 	mongoURLstr := "mongodb://127.0.0.1:27017"
 	mongoDBnameStr := "glry_test"
-	config := &glry_core.GLRYconfig{
+	config := &runtime.Config{
 		// Env            string
 		// BaseURL        string
 		// WebBaseURL     string
@@ -121,7 +122,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		MongoDBnameStr:    mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
-	runtime, gErr := glry_core.RuntimeGet(config)
+	runtime, gErr := runtime.RuntimeGet(config)
 	if gErr != nil {
 		pTest.Fail()
 	}
@@ -141,9 +142,9 @@ func TestAuthSignatures(pTest *testing.T) {
 		fmt.Println(testSignatureStr)
 
 		// VERIFY
-		validBool, gErr := AuthVerifySignatureAllMethods(testSignatureStr,
+		validBool, gErr := authVerifySignatureAllMethods(testSignatureStr,
 			testMsgStr,
-			glry_db.GLRYuserAddress(testWalletAddressStr),
+			testWalletAddressStr,
 			runtime)
 		if gErr != nil {
 			pTest.Fail()

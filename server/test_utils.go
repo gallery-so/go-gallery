@@ -7,8 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/glry_core"
-	"github.com/mikeydub/go-gallery/glry_lib"
+	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,18 +18,18 @@ type serverUrl = string
 func setup(t *testing.T) (*assert.Assertions,
 	*httptest.Server,
 	serverUrl,
-	*glry_core.Runtime) {
+	*runtime.Runtime) {
 	// Initialize assertion handler to be used in actual test downstream
 	assert := assert.New(t)
 
 	// Initialize runtime
-	runtime, err := glry_core.RuntimeGet(glry_core.ConfigLoad())
+	runtime, err := runtime.RuntimeGet(runtime.ConfigLoad())
 	assert.Nil(err)
 
 	// Initialize test server
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	runtime.Router = gin.Default()
-	ts := httptest.NewServer(glry_lib.HandlersInit(runtime))
+	ts := httptest.NewServer(HandlersInit(runtime))
 
 	return assert, ts, fmt.Sprintf("%s/glry/v1", ts.URL), runtime
 }

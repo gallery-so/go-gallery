@@ -1,4 +1,4 @@
-package glry_extern_services
+package server
 
 import (
 	"context"
@@ -7,17 +7,17 @@ import (
 	"strings"
 
 	gfcore "github.com/gloflow/gloflow/go/gf_core"
-	"github.com/mikeydub/go-gallery/glry_core"
-	"github.com/mikeydub/go-gallery/glry_db"
+	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/parnurzeal/gorequest"
 	log "github.com/sirupsen/logrus"
 	// "github.com/davecgh/go-spew/spew"
 )
 
-// glry_db.GLRYnft struct tags reflect the json data of an open sea response and therefore
+// persist.GLRYnft struct tags reflect the json data of an open sea response and therefore
 // can be unmarshalled from the api response
 type openSeaApiResponse struct {
-	Assets []*glry_db.GLRYnft `json:"assets"`
+	Assets []*persist.Nft `json:"assets"`
 }
 
 //-------------------------------------------------------------
@@ -27,7 +27,7 @@ type openSeaApiResponse struct {
 
 func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) ([]*glry_db.GLRYnft, *gfcore.Gf_error) {
+	pRuntime *runtime.Runtime) ([]*persist.Nft, *gfcore.Gf_error) {
 
 	//--------------------
 	// OPENSEA_FETCH
@@ -42,7 +42,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 
 	// DB_PERSIST
 	// CREATE_BULK
-	err := glry_db.NFTcreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
+	err := persist.NftCreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
 	if err != nil {
 		return nil, &gfcore.Gf_error{Error: err}
 	}
@@ -53,7 +53,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 //-------------------------------------------------------------
 func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) ([]*glry_db.GLRYnft, *gfcore.Gf_error) {
+	pRuntimeSys *gfcore.Runtime_sys) ([]*persist.Nft, *gfcore.Gf_error) {
 
 	/*{
 	*	"id": 21976544,

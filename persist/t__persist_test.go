@@ -1,23 +1,24 @@
-package glry_core
+package persist
 
 import (
 	"context"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type testGrandchild struct {
-	IDstr         GLRYdbId `bson:"_id,omitempty"`
-	CreationTimeF float64  `bson:"creation_time"`
-	ImportantData string   `bson:"data"`
-	Deleted       bool     `bson:"deleted"`
+	IDstr         DbId    `bson:"_id,omitempty"`
+	CreationTimeF float64 `bson:"creation_time"`
+	ImportantData string  `bson:"data"`
+	Deleted       bool    `bson:"deleted"`
 }
 
 type testChild struct {
-	IDstr         GLRYdbId `bson:"_id,omitempty"`
+	IDstr         DbId     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
@@ -25,7 +26,7 @@ type testChild struct {
 }
 
 type testGrandparent struct {
-	IDstr         GLRYdbId `bson:"_id,omitempty"`
+	IDstr         DbId     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
@@ -47,18 +48,18 @@ func TestPersist(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	runtime, gErr := RuntimeGet(&GLRYconfig{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	runtime, gErr := runtime.RuntimeGet(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	if gErr != nil {
 		pTest.Fail()
 	}
 
 	//--------------------
 
-	m := NewMongoPersister(1, "grand_children_collection", runtime)
+	m := NewMongoStorage(1, "grand_children_collection", runtime)
 
 	sub := testGrandchild{ImportantData: "hype"}
 
-	err := m.Insert(ctx, &sub, &options.InsertOneOptions{})
+	_, err := m.Insert(ctx, &sub, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
@@ -87,11 +88,11 @@ func TestPersist(pTest *testing.T) {
 
 	// PARENT
 
-	p := NewMongoPersister(1, "children_collection", runtime)
+	p := NewMongoStorage(1, "children_collection", runtime)
 
 	parent := testChild{ImportantData: "ima child", Children: []string{string(resSub[0].IDstr)}}
 
-	err = p.Insert(ctx, &parent, &options.InsertOneOptions{})
+	_, err = p.Insert(ctx, &parent, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
@@ -110,11 +111,11 @@ func TestPersist(pTest *testing.T) {
 
 	// GRANDPARENT
 
-	gp := NewMongoPersister(1, "grand_parents_collection", runtime)
+	gp := NewMongoStorage(1, "grand_parents_collection", runtime)
 
 	gparent := testGrandparent{ImportantData: "ima gparent", Children: []string{string(resParent[0].IDstr)}}
 
-	err = gp.Insert(ctx, &gparent, &options.InsertOneOptions{})
+	_, err = gp.Insert(ctx, &gparent, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
