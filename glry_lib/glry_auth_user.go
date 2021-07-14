@@ -87,9 +87,9 @@ func AuthUserCreatePipeline(pInput *GLRYauthUserCreateInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------
@@ -169,9 +169,9 @@ func AuthUserGetPipeline(pInput *GLRYauthUserGetInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------
@@ -203,14 +203,14 @@ func AuthUserUpdatePipeline(pInput *GLRYauthUserUpdateInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------
 
-	gErr = glry_db.AuthUserUpdate(pInput.AddressStr,
+	gErr := glry_db.AuthUserUpdate(pInput.AddressStr,
 		pInput.UserNameNewStr,
 		pInput.DescriptionNewStr,
 		pCtx,
@@ -272,9 +272,9 @@ func AuthUserLoginPipeline(pInput *GLRYauthUserLoginInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------
@@ -494,9 +494,9 @@ func AuthUserGetPreflightPipeline(pInput *GLRYauthUserGetPreflightInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------

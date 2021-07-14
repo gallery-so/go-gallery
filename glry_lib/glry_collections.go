@@ -2,7 +2,6 @@ package glry_lib
 
 import (
 	"context"
-	"time"
 
 	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
@@ -49,11 +48,11 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 	pCtx context.Context,
 	pRuntime *glry_core.Runtime) (*GLRYcollGetOutput, *gf_core.Gf_error) {
 
-	collsLst, gErr := glry_db.CollGetByUserID(pInput.UserIDstr,
+	collsLst, err := glry_db.CollGetByUserID(pInput.UserIDstr,
 		pCtx,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	collsOutputsLst := []map[string]interface{}{}
@@ -90,6 +89,7 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 
 //-------------------------------------------------------------
 // CREATE
+// TODO: fix this handler!
 func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
 	pCtx context.Context,
@@ -97,39 +97,44 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
+	// err := glry_core.Validate(pInput, pRuntime)
+	// if err != nil {
+	// 	return nil, &gf_core.Gf_error{Error: err}
+	// }
 
-	//------------------
+	// //------------------
 
-	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
-	nameStr := pInput.NameStr
-	ownerUserIDstr := pUserIDstr
-	IDstr := glry_db.CollCreateID(nameStr, ownerUserIDstr, creationTimeUNIXf)
+	// creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
+	// nameStr := pInput.NameStr
+	// ownerUserIDstr := pUserIDstr
+	// IDstr := glry_db.CollCreateID(nameStr, ownerUserIDstr, creationTimeUNIXf)
 
-	coll := &glry_db.GLRYcollection{
-		VersionInt:    0,
-		IDstr:         IDstr,
-		CreationTimeF: creationTimeUNIXf,
+	// coll := &glry_db.GLRYcollection{
+	// 	VersionInt:    0,
+	// 	IDstr:         IDstr,
+	// 	CreationTimeF: creationTimeUNIXf,
 
-		NameStr:           nameStr,
-		CollectorsNoteStr: pInput.CollectorsNoteStr,
-		OwnerUserIDstr:    ownerUserIDstr,
-		DeletedBool:       false,
-		NFTsLst:           []string{},
-	}
+	// 	NameStr:           nameStr,
+	// 	CollectorsNoteStr: pInput.CollectorsNoteStr,
+	// 	OwnerUserIDstr:    ownerUserIDstr,
+	// 	DeletedBool:       false,
+	// 	NFTsLst:           []string{},
+	// }
 
-	// DB
-	gErr = glry_db.CollCreate(coll, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
-	}
+	// // DB
+	// err = glry_db.CollCreate(coll, pCtx, pRuntime)
+	// if err != nil {
+	// 	return nil, &gf_core.Gf_error{Error: err}
+	// }
+
+	// output := &GLRYcollCreateOutput{
+	// 	IDstr:   coll.IDstr,
+	// 	NameStr: coll.NameStr,
+	// }
 
 	output := &GLRYcollCreateOutput{
-		IDstr:   coll.IDstr,
-		NameStr: coll.NameStr,
+		IDstr:   "",
+		NameStr: "",
 	}
 
 	return output, nil
@@ -143,9 +148,9 @@ func CollDeletePipeline(pInput *GLRYcollDeleteInput,
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, &gf_core.Gf_error{Error: err}
 	}
 
 	//------------------
