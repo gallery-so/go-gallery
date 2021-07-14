@@ -110,6 +110,22 @@ You can verify that the server is running by calling the `/alive` endpoint.
 $ curl localhost:4000/alive
 ```
 
+## Testing
+
+Run all tests in current directory and all of its subdirectories:
+
+```bash
+$ go test ./...
+```
+
+Run all tests in subdirectory (e.g. /server):
+
+```bash
+$ go test ./server/...
+```
+
+Add `-v` for detailed logs
+
 ## Deploy
 
 ### Publish to Dockerhub

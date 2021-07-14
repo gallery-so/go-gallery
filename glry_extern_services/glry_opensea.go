@@ -42,9 +42,9 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 
 	// DB_PERSIST
 	// CREATE_BULK
-	gErr = glry_db.NFTcreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_db.NFTcreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
+	if err != nil {
+		return nil, &gfcore.Gf_error{Error: err}
 	}
 
 	return openSeaAssetsForAccLst, nil

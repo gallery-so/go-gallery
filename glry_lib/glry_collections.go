@@ -2,9 +2,7 @@ package glry_lib
 
 import (
 	"context"
-	"time"
 
-	gf_core "github.com/gloflow/gloflow/go/gf_core"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_db"
 )
@@ -47,13 +45,13 @@ type GLRYcollDeleteOutput struct {
 //-------------------------------------------------------------
 func CollGetPipeline(pInput *GLRYcollGetInput,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYcollGetOutput, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYcollGetOutput, error) {
 
-	collsLst, gErr := glry_db.CollGetByUserID(pInput.UserIDstr,
+	collsLst, err := glry_db.CollGetByUserID(pInput.UserIDstr,
 		pCtx,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, err
 	}
 
 	collsOutputsLst := []map[string]interface{}{}
@@ -93,27 +91,19 @@ func CollGetPipeline(pInput *GLRYcollGetInput,
 func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	pUserIDstr string,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYcollCreateOutput, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYcollCreateOutput, error) {
 
-	//------------------
-	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
 	//------------------
 
-	creationTimeUNIXf := float64(time.Now().UnixNano()) / 1000000000.0
 	nameStr := pInput.NameStr
 	ownerUserIDstr := pUserIDstr
-	IDstr := glry_db.CollCreateID(nameStr, ownerUserIDstr, creationTimeUNIXf)
 
-	coll := &glry_db.GLRYcollection{
-		VersionInt:    0,
-		IDstr:         IDstr,
-		CreationTimeF: creationTimeUNIXf,
-
+	coll := &glry_db.GLRYcollectionStorage{
 		NameStr:           nameStr,
 		CollectorsNoteStr: pInput.CollectorsNoteStr,
 		OwnerUserIDstr:    ownerUserIDstr,
@@ -122,9 +112,9 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 	}
 
 	// DB
-	gErr = glry_db.CollCreate(coll, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err = glry_db.CollCreate(coll, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
 	output := &GLRYcollCreateOutput{
@@ -139,13 +129,13 @@ func CollCreatePipeline(pInput *GLRYcollCreateInput,
 // DELETE
 func CollDeletePipeline(pInput *GLRYcollDeleteInput,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, *gf_core.Gf_error) {
+	pRuntime *glry_core.Runtime) (*GLRYcollDeleteOutput, error) {
 
 	//------------------
 	// VALIDATE
-	gErr := glry_core.Validate(pInput, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	err := glry_core.Validate(pInput, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
 	//------------------

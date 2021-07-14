@@ -1,19 +1,19 @@
 package server
 
 import (
-	// "fmt"
-	// log "github.com/sirupsen/logrus"
-	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/glry_core"
 	"github.com/mikeydub/go-gallery/glry_lib"
+	log "github.com/sirupsen/logrus"
 )
 
 //-------------------------------------------------------------
 func Init(pPortInt int,
 	pRuntime *glry_core.Runtime) {
+
+	log.Info("initializing server...")
 
 	pRuntime.Router = gin.Default()
 
@@ -23,5 +23,4 @@ func Init(pPortInt int,
 	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
 		panic(err)
 	}
-
 }
