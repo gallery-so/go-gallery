@@ -28,7 +28,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			AddressStr: addrStr,
 		}
 		// GET_PUBLIC_INFO
-		output, gErr := authUserGetPreflightPipeline(input, c, pRuntime)
+		output, gErr := authUserGetPreflightDb(input, c, pRuntime)
 		if gErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
 			return
@@ -51,7 +51,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 
 		// USER_LOGIN__PIPELINE
-		output, gErr := authUserLoginAndMemorizeAttemptPipeline(input,
+		output, gErr := authUserLoginAndMemorizeAttemptDb(input,
 			c.Request,
 			c,
 			pRuntime)
@@ -178,7 +178,7 @@ func authGenerateRandomString() string {
 
 //-------------------------------------------------------------
 // LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
-func authUserLoginAndMemorizeAttemptPipeline(pInput *authUserLoginInput,
+func authUserLoginAndMemorizeAttemptDb(pInput *authUserLoginInput,
 	pReq *http.Request,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
@@ -426,7 +426,7 @@ func authVerifySignature(pSignatureStr string,
 
 //-------------------------------------------------------------
 // USER_GET_PREFLIGHT__PIPELINE
-func authUserGetPreflightPipeline(pInput *authUserGetPreflightInput,
+func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
