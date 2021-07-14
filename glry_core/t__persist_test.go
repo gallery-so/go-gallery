@@ -131,27 +131,39 @@ func TestPersist(pTest *testing.T) {
 
 	pTest.Log(resGParent)
 
+	// perfect example of mongo pipeling filling in sub documents
 	pipeline := mongo.Pipeline{
-		{{"$match", bson.M{"_id": resGParent[0].IDstr}}},
-		{{"$lookup", bson.M{
+		{{Key: "$match", Value: bson.M{"_id": resGParent[0].IDstr}}},
+		{{Key: "$lookup", Value: bson.M{
 			"from": "children_collection",
 			"let":  bson.M{"childArray": "$children"},
 			"pipeline": mongo.Pipeline{
-				{{"$match", bson.M{"$expr": bson.M{"$in": []string{"$_id", "$$childArray"}}}}},
-				{{"$lookup", bson.M{
+				{{Key: "$match", Value: bson.M{
+					"$expr": bson.M{
+						"$in": []string{"$_id", "$$childArray"},
+					},
+				}}},
+				{{Key: "$lookup", Value: bson.M{
 					"from":         "grand_children_collection",
 					"foreignField": "_id",
 					"localField":   "children",
 					"as":           "children",
 				}}},
-				{{"$unwind", "$children"}},
+				{{Key: "$unwind", Value: "$children"}},
 			},
 			"as": "children",
 		}}},
-		{{"$unwind", "$children"}},
+		{{Key: "$unwind", Value: "$children"}},
 	}
 
-	res := []bson.D{}
+	// pipeline for a single outer join (e.g. one array of children documents)
+	// 	pipeline := mongo.Pipeline{
+	// 		{{"$match", bson.M{"_id": id}}},
+	// 		{{"$lookup", bson.M{"from": from, "localField": localField, "foreignField": foreignField, "as": as}}},
+	// 		{{"$unwind", fmt.Sprintf("$%s", as)}},
+	// 	}
+
+	res := []map[string]interface{}{}
 
 	if err := gp.Aggregate(ctx, pipeline, &res); err != nil {
 		pTest.Log(err)
