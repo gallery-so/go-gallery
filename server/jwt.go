@@ -1,15 +1,15 @@
-package glry_lib
+package server
 
 import (
 	"context"
+	"errors"
 	"os"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
-	gf_core "github.com/gloflow/gloflow/go/gf_core"
-	"github.com/mikeydub/go-gallery/glry_core"
-	"github.com/mikeydub/go-gallery/glry_db"
+	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,18 +26,18 @@ import (
 
 //-------------------------------------------------------------
 // JWT_CLAIMS
-type GLRYjwtClaims struct {
-	AddressStr glry_db.GLRYuserAddress `json:"address"`
+type jwtClaims struct {
+	UserId persist.DbId `json:"address"`
 	jwt.StandardClaims
 }
 
 //-------------------------------------------------------------
 // VERIFY
-func AuthJWTverify(pJWTtokenStr string,
+func authJwtVerify(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
-	pRuntime *glry_core.Runtime) (bool, string, *gf_core.Gf_error) {
+	pRuntime *runtime.Runtime) (bool, string, error) {
 
-	claims := GLRYjwtClaims{}
+	claims := jwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
 		&claims,
 		func(pJWTtoken *jwt.Token) (interface{}, error) {
@@ -45,24 +45,16 @@ func AuthJWTverify(pJWTtokenStr string,
 		})
 
 	if err != nil {
-		gErr := gf_core.Error__create("failed to verify JWT token for a user",
-			"crypto_jwt_verify_token_error",
-			map[string]interface{}{},
-			err, "glry_lib", pRuntime.RuntimeSys)
-		return false, "", gErr
+		return false, "", err
 	}
 
 	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
 	spew.Dump(claims)
 
-	if claims, ok := JWTtoken.Claims.(GLRYjwtClaims); ok && JWTtoken.Valid {
-		return JWTtoken.Valid, string(claims.AddressStr), nil
+	if claims, ok := JWTtoken.Claims.(jwtClaims); ok && JWTtoken.Valid {
+		return JWTtoken.Valid, string(claims.UserId), nil
 	} else {
-		gErr := gf_core.Error__create("failed to verify JWT token for a user",
-			"crypto_jwt_verify_token_error",
-			map[string]interface{}{},
-			err, "glry_lib", pRuntime.RuntimeSys)
-		return false, "", gErr
+		return false, "", errors.New("failed to verify JWT token for a user")
 	}
 }
 
@@ -71,36 +63,36 @@ func AuthJWTverify(pJWTtokenStr string,
 
 // ADD!! - mark all other JWT's for this address as deleted to exclude them from future use.
 
-func AuthJWTgeneratePipeline(pAddressStr glry_db.GLRYuserAddress,
+func jwtGeneratePipeline(pUserId persist.DbId,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) (string, *gf_core.Gf_error) {
+	pRuntime *runtime.Runtime) (string, error) {
 
 	// previously we would generate a random string and use that as jwt secret and store
 	// the string in the db with the jwt for verifcation. with stateless auth, we might
 	// use an environment variable like so as the secret. worth considering other options
 	// to increase security
-	JWTissuerStr := "gallery" // string(pAddressStr)
-	JWTtokenStr, gErr := AuthJWTgenerate(os.Getenv("JWT_SECRET"),
-		JWTissuerStr,
-		pAddressStr,
+	issuer := "gallery" // string(pAddressStr)
+	jwtTokenStr, err := jwtGenerate(os.Getenv("JWT_SECRET"),
+		issuer,
+		pUserId,
 		pRuntime)
-	if gErr != nil {
-		return "", gErr
+	if err != nil {
+		return "", err
 	}
 
 	//------------------
 
-	return JWTtokenStr, nil
+	return jwtTokenStr, nil
 }
 
 //-------------------------------------------------------------
 // GENERATE
 // ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
 
-func AuthJWTgenerate(pSigningKeyStr string,
+func jwtGenerate(pSigningKeyStr string,
 	pIssuerStr string,
-	pAddressStr glry_db.GLRYuserAddress,
-	pRuntime *glry_core.Runtime) (string, *gf_core.Gf_error) {
+	pUserId persist.DbId,
+	pRuntime *runtime.Runtime) (string, error) {
 
 	signingKeyBytesLst := []byte(pSigningKeyStr)
 
@@ -110,8 +102,8 @@ func AuthJWTgenerate(pSigningKeyStr string,
 	// Create the Claims
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
 	expiresAtUNIXint := creationTimeUNIXint + pRuntime.Config.JWTtokenTTLsecInt //60*60*24*2 // expire N number of secs from now
-	JWTclaims := GLRYjwtClaims{
-		pAddressStr,
+	claims := jwtClaims{
+		pUserId,
 		jwt.StandardClaims{
 			ExpiresAt: expiresAtUNIXint,
 			Issuer:    pIssuerStr,
@@ -121,18 +113,14 @@ func AuthJWTgenerate(pSigningKeyStr string,
 	//------------------
 
 	// SYMETRIC_SIGNING - same secret is used to both sign and validate tokens
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, JWTclaims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// SIGN
-	JWTtokenStr, err := token.SignedString(signingKeyBytesLst)
+	jwtTokenStr, err := token.SignedString(signingKeyBytesLst)
 	if err != nil {
 
-		gErr := gf_core.Error__create("failed to sign an Auth JWT token for a user",
-			"crypto_jwt_sign_token_error",
-			map[string]interface{}{},
-			err, "glry_lib", pRuntime.RuntimeSys)
-		return "", gErr
+		return "", err
 	}
 
-	return JWTtokenStr, nil
+	return jwtTokenStr, nil
 }

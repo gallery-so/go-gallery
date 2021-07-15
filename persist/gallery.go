@@ -1,54 +1,53 @@
-package glry_db
+package persist
 
 import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/glry_core"
+	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const galleryColName = "glry_galleries"
+const galleryColName = "galleries"
 
 //-------------------------------------------------------------
-type GLRYgalleryID string
-type GLRYgalleryStorage struct {
-	VersionInt    int64      `bson:"version"       json:"version"` // schema version for this model
-	IDstr         GLRYcollID `bson:"_id"           json:"id"`
-	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool       `bson:"deleted"`
+type GalleryDb struct {
+	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string   `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	CollectionsLst []string `bson:"collections,omitempty"          json:"collections"`
+	OwnerUserIDstr string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	CollectionsLst []DbId `bson:"collections,omitempty"          json:"collections"`
 }
 
-type GLRYgallery struct {
-	VersionInt    int64      `bson:"version"       json:"version"` // schema version for this model
-	IDstr         GLRYcollID `bson:"_id"           json:"id"`
-	CreationTimeF float64    `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool       `bson:"deleted"`
+type Gallery struct {
+	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string           `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	CollectionsLst []GLRYcollection `bson:"collections,omitempty"          json:"collections"`
+	OwnerUserIDstr string       `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	CollectionsLst []Collection `bson:"collections,omitempty"          json:"collections"`
 }
 
 //-------------------------------------------------------------
-func GalleryCreate(pGallery *GLRYgalleryStorage,
+func GalleryCreate(pGallery *GalleryDb,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) error {
+	pRuntime *runtime.Runtime) (DbId, error) {
 
-	mp := glry_core.NewMongoPersister(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
 
 }
 
 //-------------------------------------------------------------
-func GalleryGetByUserID(pUserIDstr GLRYuserID,
+func GalleryGetByUserID(pUserIDstr DbId,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) ([]*GLRYgallery, error) {
+	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 
 	opts := &options.AggregateOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -56,9 +55,9 @@ func GalleryGetByUserID(pUserIDstr GLRYuserID,
 		opts.MaxTime = &dur
 	}
 
-	mp := glry_core.NewMongoPersister(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	result := []*GLRYgallery{}
+	result := []*Gallery{}
 
 	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr}), result, opts); err != nil {
 		return nil, err
@@ -68,18 +67,18 @@ func GalleryGetByUserID(pUserIDstr GLRYuserID,
 }
 
 //-------------------------------------------------------------
-func GalleryGetByID(pIDstr string,
+func GalleryGetByID(pIDstr DbId,
 	pCtx context.Context,
-	pRuntime *glry_core.Runtime) ([]*GLRYgallery, error) {
+	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 	opts := &options.AggregateOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.MaxTime = &dur
 	}
 
-	mp := glry_core.NewMongoPersister(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	result := []*GLRYgallery{}
+	result := []*Gallery{}
 
 	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr}), result, opts); err != nil {
 		return nil, err

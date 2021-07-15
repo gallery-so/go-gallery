@@ -33,7 +33,7 @@ $ docker kill <CONTAINER ID>
 ### Exec
 
 ```bash
-$ go build -o ./bin/main ./cmd/server/glry_main.go
+$ go build -o ./bin/main ./cmd/server/main.go
 ```
 
 This will generate a binary within `./bin/main`. To run the binary, simply:
@@ -50,7 +50,7 @@ To generate a docker image of your binary, run:
 
 ```bash
 # build the binary
-$ go build -o ./bin/main ./cmd/server/glry_main.go
+$ go build -o ./bin/main ./cmd/server/main.go
 # build the docker image
 $ docker build --platform linux/amd64 -f Dockerfile --tag mikeybitcoin/gallery .
 # [OPTIONAL] run the image
@@ -78,7 +78,7 @@ $ GLRY_AWS_SECRETS=0 AWS_REGION=us-east-1 GLRY_SENTRY_ENDPOINT=... ./main
 ### Exec
 
 ```bash
-$ go build -o ./bin/main_mac ./cmd/server/glry_main.go
+$ go build -o ./bin/main_mac ./cmd/server/main.go
 ```
 
 This will generate a binary within `./bin/main_mac`. To run the binary, simply:
@@ -95,7 +95,7 @@ To generate a docker image of your binary, you'll need to build for linux, since
 
 ```bash
 # build the binary
-$ GOOS=linux GOARCH=amd64 go build -o ./bin/main ./cmd/server/glry_main.go
+$ GOOS=linux GOARCH=amd64 go build -o ./bin/main ./cmd/server/main.go
 # build the docker image
 $ docker build --platform linux/amd64 -f Dockerfile --tag mikeybitcoin/gallery .
 ```
