@@ -18,6 +18,31 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
+// INPUT - USER_LOGIN
+type authUserLoginInput struct {
+	SignatureStr string `json:"signature" validate:"required,min=4,max=50"`
+	Address      string `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+}
+
+// OUTPUT - USER_LOGIN
+type authUserLoginOutput struct {
+	SignatureValidBool bool         `json:"signature_valid"`
+	JWTtokenStr        string       `json:"jwt_token"`
+	UserIDstr          persist.DbId `json:"user_id"`
+	AddressStr         string       `json:"address"`
+}
+
+// INPUT - USER_GET_PREFLIGHT
+type authUserGetPreflightInput struct {
+	AddressStr string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+}
+
+// OUTPUT - USER_GET_PREFLIGHT
+type authUserGetPreflightOutput struct {
+	NonceStr       string `json:"nonce"`
+	UserExistsBool bool   `json:"user_exists"`
+}
+
 //-------------------------------------------------------------
 // HANDLERS
 

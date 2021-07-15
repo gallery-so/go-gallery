@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,39 +21,16 @@ type userUpdateInput struct {
 
 // INPUT - USER_GET
 type userGetInput struct {
-	UserId persist.DbId `json:"user_id" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	UserId   persist.DbId `json:"user_id" form:"user_id"`
+	Address  string       `json:"address" form:"addr" validate:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Username string       `json:"username" form:"username"`
 }
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
-	UserNameStr string ` json:"username"`
-	BioStr      string ` json:"bio"`
-	Address     string ` json:"address"`
-}
-
-// INPUT - USER_LOGIN
-type authUserLoginInput struct {
-	SignatureStr string `json:"signature" validate:"required,min=4,max=50"`
-	Address      string `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-}
-
-// OUTPUT - USER_LOGIN
-type authUserLoginOutput struct {
-	SignatureValidBool bool         `json:"signature_valid"`
-	JWTtokenStr        string       `json:"jwt_token"`
-	UserIDstr          persist.DbId `json:"user_id"`
-	AddressStr         string       `json:"address"`
-}
-
-// INPUT - USER_GET_PREFLIGHT
-type authUserGetPreflightInput struct {
-	AddressStr string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-}
-
-// OUTPUT - USER_GET_PREFLIGHT
-type authUserGetPreflightOutput struct {
-	NonceStr       string `json:"nonce"`
-	UserExistsBool bool   `json:"user_exists"`
+	UserNameStr string   ` json:"username"`
+	BioStr      string   ` json:"bio"`
+	Addresses   []string ` json:"addresses"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -111,16 +89,18 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		auth := c.GetBool("authenticated")
 
-		userIdStr := c.Query("user_id")
-		input := &userGetInput{
-			UserId: persist.DbId(userIdStr),
+		input := &userGetInput{}
+
+		if err := c.ShouldBindQuery(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 
-		output, gErr := userGetDb(input,
+		output, err := userGetDb(input,
 			auth,
 			c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -245,9 +225,30 @@ func userGetDb(pInput *userGetInput,
 
 	//------------------
 
-	user, err := persist.UserGetById(pInput.UserId, pCtx, pRuntime)
-	if err != nil {
-		return nil, err
+	var user *persist.User
+	switch {
+	case pInput.UserId != "":
+		user, err = persist.UserGetById(pInput.UserId, pCtx, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		break
+	case pInput.Username != "":
+		user, err = persist.UserGetByUsername(pInput.Username, pCtx, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		break
+	case pInput.Address != "":
+		user, err = persist.UserGetByAddress(pInput.Address, pCtx, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	if user == nil {
+		return nil, errors.New("no user found")
 	}
 
 	output := &userGetOutput{}
@@ -255,6 +256,7 @@ func userGetDb(pInput *userGetInput,
 		output = &userGetOutput{
 			UserNameStr: user.UserNameStr,
 			BioStr:      user.BioStr,
+			Addresses:   user.AddressesLst,
 		}
 	} else {
 		// TODO
