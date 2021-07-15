@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const usersCollName = "glry_users"
+const usersCollName = "users"
 
 type User struct {
 	VersionInt    int64   `bson:"version"` // schema version for this model

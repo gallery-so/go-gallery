@@ -12,7 +12,7 @@ import (
 
 //-------------------------------------------------------------
 
-const nftColName = "glry_nfts"
+const nftColName = "nfts"
 
 type Nft struct {
 	VersionInt    int64   `bson:"version"              json:"version"` // schema version for this model

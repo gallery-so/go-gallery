@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const galleryColName = "glry_galleries"
+const galleryColName = "galleries"
 
 //-------------------------------------------------------------
 type GalleryDb struct {

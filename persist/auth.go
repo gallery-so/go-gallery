@@ -6,14 +6,13 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 const (
-	loginAttemptCollName = "glry_users_login_attempts"
-	noncesCollName       = "glry_nonces"
+	loginAttemptCollName = "user_login_attempts"
+	noncesCollName       = "nonces"
 )
 
 //-------------------------------------------------------------
@@ -24,12 +23,12 @@ type UserNonce struct {
 
 	// nonces are shortlived, and not something to be persisted across DB's
 	// other than mongo. so use mongo-native ID generation
-	ID            primitive.ObjectID `bson:"_id"           mapstructure:"_id"`
-	CreationTimeF float64            `bson:"creation_time" mapstructure:"creation_time"`
-	DeletedBool   bool               `bson:"deleted"       mapstructure:"deleted"`
+	ID            DbId    `bson:"_id"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"       json:"deleted"`
 
-	ValueStr   string `bson:"value"   mapstructure:"value"`
-	UserIDstr  DbId   `bson:"user_id" mapstructure:"user_id"`
+	ValueStr   string `bson:"value"   json:"value"`
+	UserIDstr  DbId   `bson:"user_id" json:"user_id"`
 	AddressStr string `bson:"address"     json:"address"`
 }
 

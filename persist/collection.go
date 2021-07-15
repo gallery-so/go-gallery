@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const collectionColName = "glry_collections"
+const collectionColName = "collections"
 
 //-------------------------------------------------------------
 type CollectionDb struct {
