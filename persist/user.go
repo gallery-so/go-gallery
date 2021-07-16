@@ -3,9 +3,11 @@ package persist
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const usersCollName = "users"
@@ -87,17 +89,26 @@ func UserGetById(userId DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*User, error) {
 
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"_id": userId}, result)
+	err := mp.Find(pCtx, bson.M{"_id": userId}, result, opts)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(result) == 0 || len(result) > 1 {
-		return nil, fmt.Errorf("invalid amount of returned users: %d", len(result))
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
 	}
 
 	return result[0], nil
@@ -109,17 +120,57 @@ func UserGetByAddress(pAddress string,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*User, error) {
 
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, result)
+	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, result, opts)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(result) == 0 || len(result) > 1 {
-		return nil, fmt.Errorf("invalid amount of returned users: %d", len(result))
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
+	}
+
+	return result[0], nil
+}
+
+//-------------------------------------------------------------
+// GET BY USERNAME
+func UserGetByUsername(pUsername string,
+	pCtx context.Context,
+	pRuntime *runtime.Runtime) (*User, error) {
+
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
+	mp := NewMongoStorage(0, usersCollName, pRuntime)
+
+	result := []*User{}
+	err := mp.Find(pCtx, bson.M{"username": pUsername}, result, opts)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
 	}
 
 	return result[0], nil
