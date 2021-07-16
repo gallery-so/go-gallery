@@ -47,7 +47,6 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 
 	usersGroup := parent.Group("/users")
-	usersGroup.Use(jwtRequired(pRuntime))
 
 	authGroup := parent.Group("/auth")
 
@@ -70,13 +69,13 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// USER_UPDATE
 	// AUTHENTICATED
 
-	usersGroup.POST("/update", updateUserAuth(pRuntime))
+	usersGroup.POST("/update", jwtRequired(pRuntime), updateUserAuth(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED
 
-	usersGroup.GET("/get", getUserAuth(pRuntime))
+	usersGroup.GET("/get", jwtOptional(pRuntime), getUserAuth(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_CREATE
