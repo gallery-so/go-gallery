@@ -163,3 +163,20 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 	return mp.Update(pCtx, bson.M{"_id": pIDstr}, updatedNft)
 
 }
+
+//-------------------------------------------------------------
+
+// nfts with an id field will update by external id
+func NftCreateOrUpdateByExternalId(pOpenSeaId string, nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
+
+	mp := NewMongoStorage(0, nftColName, pRuntime)
+
+	genericNfts := make([]interface{}, len(nfts))
+
+	for i, v := range nfts {
+		genericNfts[i] = v
+	}
+
+	return mp.UpsertMany(pCtx, bson.M{"opensea_id": pOpenSeaId}, genericNfts)
+
+}
