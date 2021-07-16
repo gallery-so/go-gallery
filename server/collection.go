@@ -11,9 +11,12 @@ import (
 )
 
 type collectionCreateInput struct {
-	OwnerUserIdStr    string `json:"user_id" validate:"required"`
-	NameStr           string `json:"name"        validate:"required,min=4,max=50"`
-	CollectorsNoteStr string `json:"collectors_note" validate:"required,min=0,max=500"`
+	NameStr           string         `json:"name"        binding:"required,short_string"`
+	CollectorsNoteStr string         `json:"collectors_note" binding:"required,medium_string"`
+	Nfts              []persist.DbId `json:"nfts" binding:"required"`
+}
+type collectionCreateOutput struct {
+	Id persist.DbId `json:"collection_id"`
 }
 
 type collectionDeleteInput struct {
@@ -28,7 +31,7 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// INPUT
 
-		userIDstr := c.Query("userid")
+		userIDstr := c.Query("user_id")
 
 		//------------------
 		// CREATE
@@ -54,16 +57,18 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		ownerId := c.GetString("user_id")
+
 		//------------------
 		// CREATE
 
-		_, err := collectionCreateDb(input, input.OwnerUserIdStr, c, pRuntime)
+		id, err := collectionCreateDb(input, ownerId, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, collectionCreateOutput{Id: id})
 	}
 }
 
@@ -88,22 +93,11 @@ func collectionCreateDb(pInput *collectionCreateInput,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return "", err
-	}
-
-	//------------------
-
-	nameStr := pInput.NameStr
-	ownerUserIDstr := pUserIDstr
-
 	coll := &persist.CollectionDb{
-		NameStr:           nameStr,
+		NameStr:           pInput.NameStr,
 		CollectorsNoteStr: pInput.CollectorsNoteStr,
-		OwnerUserIDstr:    ownerUserIDstr,
-		DeletedBool:       false,
-		NFTsLst:           []persist.DbId{},
+		OwnerUserIDstr:    pUserIDstr,
+		NFTsLst:           pInput.Nfts,
 	}
 
 	return persist.CollCreate(coll, pCtx, pRuntime)
