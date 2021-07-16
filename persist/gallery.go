@@ -14,10 +14,10 @@ const galleryColName = "galleries"
 
 //-------------------------------------------------------------
 type GalleryDb struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"           json:"id"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	VersionInt    int64   `bson:"version,omitempty"       json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id,omitempty"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted,omitempty"`
 
 	OwnerUserIDstr string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
 	CollectionsLst []DbId `bson:"collections,omitempty"          json:"collections"`
@@ -29,8 +29,8 @@ type Gallery struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string       `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	CollectionsLst []Collection `bson:"collections,omitempty"          json:"collections"`
+	OwnerUserIDstr string        `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	CollectionsLst []*Collection `bson:"collections,omitempty"          json:"collections"`
 }
 
 //-------------------------------------------------------------
@@ -59,7 +59,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr}), result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func GalleryGetByID(pIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr}), result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -91,7 +91,7 @@ func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "glry_collections",
+			"from": "collections",
 			"let":  bson.M{"childArray": "$collections"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
@@ -100,15 +100,13 @@ func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
 					},
 				}}},
 				{{Key: "$lookup", Value: bson.M{
-					"from":         "glry_nfts",
+					"from":         "nfts",
 					"foreignField": "_id",
 					"localField":   "nfts",
 					"as":           "nfts",
 				}}},
-				{{Key: "$unwind", Value: "$nfts"}},
 			},
 			"as": "children",
 		}}},
-		{{Key: "$unwind", Value: "$collections"}},
 	}
 }
