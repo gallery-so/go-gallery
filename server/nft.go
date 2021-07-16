@@ -74,6 +74,23 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
+func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userId := c.Query("user_id")
+		if userId == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user id not found in query values"})
+			return
+		}
+		coll, err := persist.CollGetUnassigned(persist.DbId(userId), c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, GetNftsForUserResponse{Nfts: coll.NFTsLst})
+	}
+}
+
 func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ownerWalletAddr := c.Query("user_id")
@@ -81,12 +98,12 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "owner wallet address not found in query values"})
 			return
 		}
-		_, gErr := OpenSeaPipelineAssetsForAcc(ownerWalletAddr, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		nfts, err := OpenSeaPipelineAssetsForAcc(ownerWalletAddr, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, gin.H{"nfts": nfts})
 	}
 }

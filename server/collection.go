@@ -20,7 +20,7 @@ type collectionCreateOutput struct {
 }
 
 type collectionDeleteInput struct {
-	IDstr string `json:"id"`
+	IDstr persist.DbId `json:"id"`
 }
 
 //-------------------------------------------------------------
@@ -62,7 +62,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// CREATE
 
-		id, err := collectionCreateDb(input, ownerId, c, pRuntime)
+		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 			return
@@ -89,7 +89,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 //-------------------------------------------------------------
 // CREATE
 func collectionCreateDb(pInput *collectionCreateInput,
-	pUserIDstr string,
+	pUserIDstr persist.DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 
