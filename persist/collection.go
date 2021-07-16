@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -10,18 +11,20 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const collectionColName = "collections"
+const (
+	collectionColName = "collections"
+)
 
 //-------------------------------------------------------------
 type CollectionDb struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"           json:"id"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	VersionInt    int64   `bson:"version,omitempty"       json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id,omitempty"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted,omitempty"`
 
 	NameStr           string `bson:"name,omitempty"          json:"name"`
 	CollectorsNoteStr string `bson:"collectors_note,omitempty"   json:"collectors_note"`
-	OwnerUserIDstr    string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
+	OwnerUserIDstr    DbId   `bson:"owner_user_id,omitempty" json:"owner_user_id"`
 	NFTsLst           []DbId `bson:"nfts,omitempty"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
@@ -37,7 +40,7 @@ type Collection struct {
 	NameStr           string `bson:"name,omitempty"          json:"name"`
 	CollectorsNoteStr string `bson:"collectors_note,omitempty"   json:"collectors_note"`
 	OwnerUserIDstr    string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	NFTsLst           []Nft  `bson:"nfts,omitempty"          json:"nfts"`
+	NFTsLst           []*Nft `bson:"nfts,omitempty"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	HiddenBool bool `bson:"hidden,omitempty" json:"hidden"`
@@ -50,7 +53,20 @@ func CollCreate(pColl *CollectionDb,
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Insert(pCtx, pColl)
+	id, err := mp.Insert(pCtx, pColl)
+	if err != nil {
+		return "", err
+	}
+
+	// RELATIONAL
+	// nmp := NewMongoStorage(0, nftCollectionColName, pRuntime)
+	// for _, v := range pColl.NFTsLst {
+	// 	if err := nmp.Update(pCtx, bson.M{"nft_id": v}, &CollectionNft{CollectionId: id}); err != nil {
+	// 		return "", err
+	// 	}
+	// }
+
+	return id, nil
 
 }
 
@@ -69,7 +85,7 @@ func CollGetByUserID(pUserIDstr DbId,
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"owner_user_id": pUserIDstr}), result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"owner_user_id": pUserIDstr}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -91,22 +107,109 @@ func CollGetByID(pIDstr DbId,
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"_id": pIDstr}), result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"_id": pIDstr}), &result, opts); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
 
+//-------------------------------------------------------------
+func CollUpdateById(pIDstr DbId,
+	pColl *Collection,
+	pCtx context.Context,
+	pRuntime *runtime.Runtime) error {
+
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
+
+	return mp.Update(pCtx, bson.M{"_id": pIDstr}, pColl)
+}
+
+//-------------------------------------------------------------
+
+// returns a collection that is empty except for a list of nfts
+func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Runtime) (*Collection, error) {
+
+	opts := &options.AggregateOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
+
+	result := []*Collection{}
+
+	if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserId), &result, opts); err != nil {
+		return nil, err
+	}
+	if len(result) != 1 {
+		return nil, errors.New("multiple collections of unassigned nfts found")
+	}
+
+	return result[0], nil
+
+	// RELATIONAL
+	// mp := NewMongoStorage(0, nftCollectionColName, pRuntime)
+	// result := []map[string]interface{}{}
+
+	// if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserId), &result, opts); err != nil {
+	// 	return nil, err
+	// }
+
+	// return result, nil
+
+}
+
+func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
+	return mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"owner_user_id": pUserId}}},
+		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},
+		{{Key: "$project", Value: bson.M{
+			"nfts": bson.M{
+				"$reduce": bson.M{
+					"input":        "$nfts",
+					"initialValue": []string{},
+					"in": bson.M{
+						"$setUnion": []string{"$$value", "$$this"},
+					},
+				},
+			},
+		}}},
+		{{Key: "$lookup", Value: bson.M{
+			"from": "nfts",
+			"let":  bson.M{"array": "$nfts"},
+			"pipeline": mongo.Pipeline{
+				{{Key: "$match", Value: bson.M{
+					"$expr": bson.M{
+						"$not": bson.M{"$in": []string{"$_id", "$$array"}},
+					},
+				}}},
+			},
+			"as": "nfts",
+		}}},
+	}
+
+	// RELATIONAL
+	// return mongo.Pipeline{
+	// 	{{Key: "$match", Value: bson.M{"collection_id": bson.M{"$in": []interface{}{nil, false}}}}},
+	// 	{{Key: "$lookup", Value: bson.M{
+	// 		"from":         "nfts",
+	// 		"foreignField": "_id",
+	// 		"localField":   "nft_id",
+	// 		"as":           "nfts",
+	// 	}}},
+	// }
+}
+
 func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from":         "glry_nfts",
+			"from":         "nfts",
 			"foreignField": "_id",
 			"localField":   "nfts",
 			"as":           "nfts",
 		}}},
-		{{Key: "$unwind", Value: "$nfts"}},
 	}
 }

@@ -12,17 +12,21 @@ import (
 
 //-------------------------------------------------------------
 
-const nftColName = "nfts"
+const (
+	nftColName           = "nfts"
+	nftCollectionColName = "nft_collections"
+)
 
 type Nft struct {
-	VersionInt    int64   `bson:"version"              json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"                  json:"id"`
-	CreationTimeF float64 `bson:"creation_time"        json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	VersionInt    int64   `bson:"version,omitempty"              json:"version"` // schema version for this model
+	IDstr         DbId    `bson:"_id,omitempty"                  json:"id"`
+	CreationTimeF float64 `bson:"creation_time,omitempty"        json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted,omitempty"`
 
 	NameStr           string `bson:"name,omitempty"                 json:"name"`
 	DescriptionStr    string `bson:"description,omitempty"          json:"description"`
 	CollectorsNoteStr string `bson:"collectors_note,omitempty" json:"collectors_note"`
+	OwnerUserIdStr    DbId   `bson:"owner_user_id" json:"user_id"`
 
 	ExternalURLstr      string   `bson:"external_url,omitempty"         json:"external_url"`
 	TokenMetadataUrlStr string   `bson:"token_metadata_url,omitempty" json:"token_metadata_url"`
@@ -58,6 +62,18 @@ type Contract struct {
 	ContractTotalSupplyInt  int    `bson:"contract_total_supply,omitempty" json:"total_supply"`
 }
 
+// RELATIONAL
+// type CollectionNft struct {
+// 	VersionInt    int64   `bson:"version"              json:"version"` // schema version for this model
+// 	IDstr         DbId    `bson:"_id,omitempty"                  json:"id"`
+// 	CreationTimeF float64 `bson:"creation_time"        json:"creation_time"`
+// 	DeletedBool   bool    `bson:"deleted"`
+
+// 	CollectionId DbId `bson:"collection_id,omitempty" json:"collection_id"`
+// 	NftId        DbId `bson:"nft_id,omitempty" json:"nft_id"`
+// 	OwnerUserId  DbId `bson:"owner_user_id" json:"owner_user_id"`
+// }
+
 /*// IS THIS REALLY NECESSARY? - why not just import directly from v0 DB into the v1 DB GLRYnft format?
 // DEPRECATED!! - will be removed once we fully migrate to v1 server/db schema.
 //                legacy NFT type, this is the schema in the initial v0 prototype of the system.
@@ -90,11 +106,36 @@ type GLRYnftLegacy struct {
 //-------------------------------------------------------------
 func NftCreateBulk(pNFTlst []*Nft,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) error {
+	pRuntime *runtime.Runtime) ([]DbId, error) {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	return mp.InsertMany(pCtx, pNFTlst)
+	nfts := make([]interface{}, len(pNFTlst))
+
+	for i, v := range pNFTlst {
+		nfts[i] = v
+	}
+
+	ids, err := mp.InsertMany(pCtx, nfts)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// RELATIONAL
+	// nmp := NewMongoStorage(0, nftCollectionColName, pRuntime)
+	// joins := make([]interface{}, len(ids))
+
+	// for i, v := range ids {
+	// 	joins[i] = &CollectionNft{OwnerUserId: pNFTlst[i].OwnerUserIdStr, NftId: v}
+	// }
+
+	// _, err = nmp.InsertMany(pCtx, joins)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return ids, nil
+
 }
 
 //-------------------------------------------------------------
@@ -120,7 +161,7 @@ func NftGetByUserId(pUserIDstr DbId,
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.Find(pCtx, bson.M{"user_id": pUserIDstr}, result, opts); err != nil {
+	if err := mp.Find(pCtx, bson.M{"owner_user_id": pUserIDstr}, result, opts); err != nil {
 		return nil, err
 	}
 

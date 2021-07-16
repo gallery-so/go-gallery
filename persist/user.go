@@ -11,14 +11,14 @@ import (
 const usersCollName = "users"
 
 type User struct {
-	VersionInt    int64   `bson:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"           json:"id"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	VersionInt    int64   `bson:"version,omitempty"` // schema version for this model
+	IDstr         DbId    `bson:"_id,omitempty"           json:"id"`
+	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted,omitempty"`
 
-	UserNameStr  string   `bson:"name"         json:"name"`       // mutable
-	AddressesLst []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	BioStr       string   `bson:"bio"  json:"bio"`
+	UserNameStr  string   `bson:"name,omitempty"         json:"name"`       // mutable
+	AddressesLst []string `bson:"addresses,omitempty"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	BioStr       string   `bson:"bio,omitempty"  json:"bio"`
 }
 
 //-------------------------------------------------------------

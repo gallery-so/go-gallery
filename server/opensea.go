@@ -27,7 +27,7 @@ type openSeaApiResponse struct {
 
 func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) ([]*persist.Nft, *gfcore.Gf_error) {
+	pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 
 	//--------------------
 	// OPENSEA_FETCH
@@ -42,9 +42,9 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 
 	// DB_PERSIST
 	// CREATE_BULK
-	err := persist.NftCreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
+	_, err := persist.NftCreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
 	if err != nil {
-		return nil, &gfcore.Gf_error{Error: err}
+		return nil, err
 	}
 
 	return openSeaAssetsForAccLst, nil
@@ -53,7 +53,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 //-------------------------------------------------------------
 func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	pCtx context.Context,
-	pRuntimeSys *gfcore.Runtime_sys) ([]*persist.Nft, *gfcore.Gf_error) {
+	pRuntimeSys *gfcore.Runtime_sys) ([]*persist.Nft, error) {
 
 	/*{
 	*	"id": 21976544,
@@ -229,21 +229,14 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	}).Info("making HTTP request to OpenSea API")
 	_, respBytes, errs := gorequest.New().Get(urlStr).EndBytes()
 	if len(errs) > 0 {
-		gErr := gfcore.Error__create(fmt.Sprintf("opensea api request failed"),
-			"http_client_req_error",
-			map[string]interface{}{"url": urlStr},
-			errs[0], "glry_extern_services", pRuntimeSys)
-		return nil, gErr
+		return nil, errs[0]
 	}
 
 	response := openSeaApiResponse{}
 	err := json.Unmarshal(respBytes, &response)
 	if err != nil {
-		gErr := gfcore.Error__create(fmt.Sprintf("failed to parse json response from OpenSea API"),
-			"json_decode_error",
-			map[string]interface{}{"url": urlStr},
-			err, "glry_extern_services", pRuntimeSys)
-		return nil, gErr
+
+		return nil, err
 	}
 
 	// spew.Dump(assetsForAccLst)

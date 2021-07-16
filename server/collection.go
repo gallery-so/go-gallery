@@ -11,13 +11,13 @@ import (
 )
 
 type collectionCreateInput struct {
-	OwnerUserIdStr    string `json:"user_id" validate:"required"`
-	NameStr           string `json:"name"        validate:"required,min=4,max=50"`
-	CollectorsNoteStr string `json:"collectors_note" validate:"required,min=0,max=500"`
+	OwnerUserIdStr    persist.DbId `json:"user_id" validate:"required"`
+	NameStr           string       `json:"name"        validate:"required,min=4,max=50"`
+	CollectorsNoteStr string       `json:"collectors_note" validate:"required,min=0,max=500"`
 }
 
 type collectionDeleteInput struct {
-	IDstr string `json:"id"`
+	IDstr persist.DbId `json:"id"`
 }
 
 //-------------------------------------------------------------
@@ -84,7 +84,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 //-------------------------------------------------------------
 // CREATE
 func collectionCreateDb(pInput *collectionCreateInput,
-	pUserIDstr string,
+	pUserIDstr persist.DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 
