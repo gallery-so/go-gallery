@@ -58,14 +58,6 @@ func CollCreate(pColl *CollectionDb,
 		return "", err
 	}
 
-	// RELATIONAL
-	// nmp := NewMongoStorage(0, nftCollectionColName, pRuntime)
-	// for _, v := range pColl.NFTsLst {
-	// 	if err := nmp.Update(pCtx, bson.M{"nft_id": v}, &CollectionNft{CollectionId: id}); err != nil {
-	// 		return "", err
-	// 	}
-	// }
-
 	return id, nil
 
 }
@@ -149,16 +141,6 @@ func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Run
 
 	return result[0], nil
 
-	// RELATIONAL
-	// mp := NewMongoStorage(0, nftCollectionColName, pRuntime)
-	// result := []map[string]interface{}{}
-
-	// if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserId), &result, opts); err != nil {
-	// 	return nil, err
-	// }
-
-	// return result, nil
-
 }
 
 func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
@@ -190,16 +172,6 @@ func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
 		}}},
 	}
 
-	// RELATIONAL
-	// return mongo.Pipeline{
-	// 	{{Key: "$match", Value: bson.M{"collection_id": bson.M{"$in": []interface{}{nil, false}}}}},
-	// 	{{Key: "$lookup", Value: bson.M{
-	// 		"from":         "nfts",
-	// 		"foreignField": "_id",
-	// 		"localField":   "nft_id",
-	// 		"as":           "nfts",
-	// 	}}},
-	// }
 }
 
 func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
