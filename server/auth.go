@@ -20,8 +20,8 @@ import (
 
 // INPUT - USER_LOGIN
 type authUserLoginInput struct {
-	SignatureStr string `json:"signature" validate:"required,min=4,max=50"`
-	Address      string `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	SignatureStr string `json:"signature" binding:"required,short_string"`
+	Address      string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_LOGIN
@@ -34,7 +34,7 @@ type authUserLoginOutput struct {
 
 // INPUT - USER_GET_PREFLIGHT
 type authUserGetPreflightInput struct {
-	AddressStr string `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	AddressStr string `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_GET_PREFLIGHT
@@ -48,14 +48,18 @@ type authUserGetPreflightOutput struct {
 
 func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		addrStr := c.Query("address")
-		input := &authUserGetPreflightInput{
-			AddressStr: addrStr,
+
+		input := &authUserGetPreflightInput{}
+
+		if err := c.ShouldBindQuery(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
+
 		// GET_PUBLIC_INFO
-		output, gErr := authUserGetPreflightDb(input, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := authUserGetPreflightDb(input, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -76,12 +80,12 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 
 		// USER_LOGIN__PIPELINE
-		output, gErr := authUserLoginAndMemorizeAttemptDb(input,
+		output, err := authUserLoginAndMemorizeAttemptDb(input,
 			c.Request,
 			c,
 			pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
