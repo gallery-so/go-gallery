@@ -104,8 +104,11 @@ func UserGetById(userId DbId,
 		return nil, err
 	}
 
-	if len(result) == 0 || len(result) > 1 {
-		return nil, fmt.Errorf("invalid amount of returned users: %d", len(result))
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
 	}
 
 	return result[0], nil
@@ -132,8 +135,11 @@ func UserGetByAddress(pAddress string,
 		return nil, err
 	}
 
-	if len(result) == 0 || len(result) > 1 {
-		return nil, fmt.Errorf("invalid amount of returned users: %d", len(result))
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
 	}
 
 	return result[0], nil
@@ -160,8 +166,11 @@ func UserGetByUsername(pUsername string,
 		return nil, err
 	}
 
-	if len(result) == 0 || len(result) > 1 {
-		return nil, fmt.Errorf("invalid amount of returned users: %d", len(result))
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+	if len(result) > 1 {
+		return nil, fmt.Errorf("more than one user found when expecting a single result")
 	}
 
 	return result[0], nil
