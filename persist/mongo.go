@@ -153,37 +153,6 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	return nil
 }
 
-// upsert must be a map of filter key values to pointers to structs, will not fill reflectively fill insert fields such as id or creation time
-func (m *MongoStorage) UpsertMany(ctx context.Context, filterKey string, upserts map[string]interface{}) error {
-	weWantToUpsertHere := true
-
-	models := make([]mongo.WriteModel, len(upserts))
-
-	for key, upsert := range upserts {
-		elem := reflect.TypeOf(upsert).Elem()
-		val := reflect.ValueOf(upsert).Elem()
-		now := float64(time.Now().UnixNano()) / 1000000000.0
-		if _, ok := elem.FieldByName("LastUpdatedF"); ok {
-			f := val.FieldByName("LastUpdatedF")
-			if f.CanSet() {
-				f.SetFloat(now)
-			}
-		}
-
-		models = append(models, mongo.UpdateOneModel{Upsert: &weWantToUpsertHere, Filter: bson.M{filterKey: key}, Update: bson.M{"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now}, "$set": upsert}})
-	}
-
-	result, err := m.collection.BulkWrite(ctx, models)
-	if err != nil {
-		return err
-	}
-	if result.ModifiedCount == 0 || result.MatchedCount == 0 {
-		return errors.New("could not find document to update")
-	}
-
-	return nil
-}
-
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 

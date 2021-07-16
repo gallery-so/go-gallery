@@ -2,10 +2,12 @@ package persist
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -166,17 +168,80 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 
 //-------------------------------------------------------------
 
-// nfts without an id field will update by external id
-func NftCreateOrUpdateByExternalId(nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
+func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	genericNfts := make(map[string]interface{}, len(nfts))
+	// UPSERT
+	// --------------------------------------------------------
+	weWantToUpsertHere := true
 
-	for _, v := range nfts {
-		genericNfts[v.OpenSeaIDstr] = v
+	upsertModels := make([]mongo.WriteModel, len(nfts))
+
+	for i, v := range nfts {
+
+		if v.OpenSeaIDstr == "" {
+			return errors.New("open sea id required for each nft")
+		}
+
+		now := float64(time.Now().UnixNano()) / 1000000000.0
+
+		// TODO last updated
+
+		upsertModels[i] = mongo.UpdateOneModel{
+			Upsert: &weWantToUpsertHere,
+			Filter: bson.M{"owner_address": walletAddress, "opensea_id": v.OpenSeaIDstr},
+			Update: bson.M{
+				"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now},
+				"$set":         v,
+			},
+		}
 	}
 
-	return mp.UpsertMany(pCtx, "opensea_id", genericNfts)
+	if _, err := mp.collection.BulkWrite(pCtx, upsertModels); err != nil {
+		return err
+	}
 
+	// FIND DIFFERENCE AND DELETE OUTLIERS
+	// -------------------------------------------------------
+	opts := &options.FindOptions{}
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.MaxTime = &dur
+	}
+
+	allNfts := []*Nft{}
+	if err := mp.Find(pCtx, bson.M{"owner_address": walletAddress}, allNfts, opts); err != nil {
+		return err
+	}
+
+	if len(allNfts) > len(nfts) {
+		currOpenseaIds := map[string]bool{}
+		diff := []DbId{}
+
+		for _, v := range nfts {
+			currOpenseaIds[v.OpenSeaIDstr] = true
+		}
+
+		for _, v := range allNfts {
+			if v.OpenSeaIDstr == "" {
+				return errors.New("could not find opensea id on db nft")
+			}
+			if !currOpenseaIds[v.OpenSeaIDstr] {
+				diff = append(diff, v.IDstr)
+			}
+		}
+
+		deleteModels := make([]mongo.WriteModel, len(diff))
+
+		for i, v := range diff {
+			deleteModels[i] = mongo.DeleteOneModel{Filter: bson.M{"_id": v}}
+		}
+
+		if _, err := mp.collection.BulkWrite(pCtx, deleteModels); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
