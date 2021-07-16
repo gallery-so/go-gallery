@@ -128,7 +128,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 	return nil
 }
 
-// upsert must be a pointer to a struct
+// upsert must be a pointer to a struct, will not fill reflectively fill insert fields such as id or creation time
 func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
@@ -142,25 +142,7 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 		}
 	}
 
-	if _, ok := elem.FieldByName("IDstr"); ok {
-		idField := val.FieldByName("IDstr")
-		if idField.String() == "" {
-			if !idField.CanSet() {
-				// panic because this literally cannot happen in prod
-				panic("unable to set id field on struct")
-			}
-			if _, ok = elem.FieldByName("CreationTimeF"); ok {
-				val.FieldByName("CreationTimeF").SetFloat(now)
-			} else {
-				// panic because this literally cannot happen in prod
-				panic("creation time field required for id-able structs")
-			}
-			id := generateId(now)
-			idField.Set(reflect.ValueOf(id))
-		}
-	}
-
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: upsert}}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now}, "$set": upsert}, opts...)
 	if err != nil {
 		return err
 	}
@@ -171,13 +153,13 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	return nil
 }
 
-// upsert must be a pointer to a struct
-func (m *MongoStorage) UpsertMany(ctx context.Context, filter bson.M, upserts []interface{}) error {
+// upsert must be a map of filter key values to pointers to structs, will not fill reflectively fill insert fields such as id or creation time
+func (m *MongoStorage) UpsertMany(ctx context.Context, filterKey string, upserts map[string]interface{}) error {
 	weWantToUpsertHere := true
 
 	models := make([]mongo.WriteModel, len(upserts))
 
-	for _, upsert := range upserts {
+	for key, upsert := range upserts {
 		elem := reflect.TypeOf(upsert).Elem()
 		val := reflect.ValueOf(upsert).Elem()
 		now := float64(time.Now().UnixNano()) / 1000000000.0
@@ -188,27 +170,7 @@ func (m *MongoStorage) UpsertMany(ctx context.Context, filter bson.M, upserts []
 			}
 		}
 
-		if _, ok := elem.FieldByName("IDstr"); ok {
-			idField := val.FieldByName("IDstr")
-			idFieldStr := idField.String()
-			if idFieldStr == "" {
-				if !idField.CanSet() {
-					// panic because this literally cannot happen in prod
-					panic("unable to set id field on struct")
-				}
-				if _, ok = elem.FieldByName("CreationTimeF"); ok {
-					val.FieldByName("CreationTimeF").SetFloat(now)
-				} else {
-					// panic because this literally cannot happen in prod
-					panic("creation time field required for id-able structs")
-				}
-				id := generateId(now)
-				idField.Set(reflect.ValueOf(id))
-				models = append(models, mongo.InsertOneModel{Document: upsert})
-			}
-		} else {
-			models = append(models, mongo.UpdateOneModel{Upsert: &weWantToUpsertHere, Filter: filter, Update: upsert})
-		}
+		models = append(models, mongo.UpdateOneModel{Upsert: &weWantToUpsertHere, Filter: bson.M{filterKey: key}, Update: bson.M{"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now}, "$set": upsert}})
 	}
 
 	result, err := m.collection.BulkWrite(ctx, models)

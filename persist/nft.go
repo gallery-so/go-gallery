@@ -166,17 +166,17 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 
 //-------------------------------------------------------------
 
-// nfts with an id field will update by external id
-func NftCreateOrUpdateByExternalId(pOpenSeaId string, nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
+// nfts without an id field will update by external id
+func NftCreateOrUpdateByExternalId(nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	genericNfts := make([]interface{}, len(nfts))
+	genericNfts := make(map[string]interface{}, len(nfts))
 
-	for i, v := range nfts {
-		genericNfts[i] = v
+	for _, v := range nfts {
+		genericNfts[v.OpenSeaIDstr] = v
 	}
 
-	return mp.UpsertMany(pCtx, bson.M{"opensea_id": pOpenSeaId}, genericNfts)
+	return mp.UpsertMany(pCtx, "opensea_id", genericNfts)
 
 }
