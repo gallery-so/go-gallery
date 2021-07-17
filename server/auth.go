@@ -60,6 +60,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		output, err := authUserGetPreflightDb(input, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
 			return
 		}
 
@@ -73,7 +74,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 

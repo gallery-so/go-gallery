@@ -141,10 +141,8 @@ func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface
 		return err
 	}
 	defer cur.Close(ctx)
-	if err := cur.All(ctx, result); err != nil {
-		return errors.New("could not decode cursor")
-	}
-	return nil
+	return cur.All(ctx, result)
+
 }
 
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
