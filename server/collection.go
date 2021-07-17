@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,13 +12,13 @@ import (
 )
 
 type collectionCreateInput struct {
-	OwnerUserIdStr    string `json:"user_id" validate:"required"`
-	NameStr           string `json:"name"        validate:"required,min=4,max=50"`
-	CollectorsNoteStr string `json:"collectors_note" validate:"required,min=0,max=500"`
+	OwnerUserIdStr    persist.DbId `json:"user_id" validate:"required"`
+	NameStr           string       `json:"name"        validate:"required,min=4,max=50"`
+	CollectorsNoteStr string       `json:"collectors_note" validate:"required,min=0,max=500"`
 }
 
 type collectionDeleteInput struct {
-	IDstr string `json:"id"`
+	IDstr persist.DbId `json:"id"`
 }
 
 //-------------------------------------------------------------
@@ -30,13 +31,14 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userIDstr := c.Query("userid")
 
-		//------------------
-		// CREATE
-
 		colls, err := persist.CollGetByUserID(persist.DbId(userIDstr), c, pRuntime)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no collections found with user_id: %s", userIDstr)})
+			return
+		}
+		if len(colls) == 0 {
+			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no collections found with user_id: %s", userIDstr)})
 			return
 		}
 
@@ -50,7 +52,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// TODO sanatize input
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -59,7 +61,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		_, err := collectionCreateDb(input, input.OwnerUserIdStr, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -71,7 +73,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -84,7 +86,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 //-------------------------------------------------------------
 // CREATE
 func collectionCreateDb(pInput *collectionCreateInput,
-	pUserIDstr string,
+	pUserIDstr persist.DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 

@@ -14,7 +14,7 @@ func jwtMiddleware(runtime *runtime.Runtime) gin.HandlerFunc {
 		authHeaders := strings.Split(c.GetHeader("Authorization"), " ")
 		if len(authHeaders) > 0 && len(authHeaders) < 2 {
 			if authHeaders[0] != "Bearer" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+				c.JSON(http.StatusOK, gin.H{"error": "invalid authorization header format"})
 				return
 			}
 			// get string after "Bearer"
