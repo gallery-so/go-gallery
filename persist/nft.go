@@ -111,7 +111,7 @@ func NftGetByUserId(pUserIDstr DbId,
 		return nil, err
 	}
 
-	return nil, nil
+	return result, nil
 }
 
 //-------------------------------------------------------------
