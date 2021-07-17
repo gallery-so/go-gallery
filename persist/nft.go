@@ -235,7 +235,7 @@ func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Conte
 		deleteModels := make([]mongo.WriteModel, len(diff))
 
 		for i, v := range diff {
-			deleteModels[i] = mongo.DeleteOneModel{Filter: bson.M{"_id": v}}
+			deleteModels[i] = mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"deleted": true}}}
 		}
 
 		if _, err := mp.collection.BulkWrite(pCtx, deleteModels); err != nil {
