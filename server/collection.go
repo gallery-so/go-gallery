@@ -45,7 +45,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// TODO sanatize input
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -54,7 +54,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		_, err := collectionCreateDb(input, input.OwnerUserIdStr, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -66,7 +66,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 

@@ -59,23 +59,18 @@ type userCreateOutput struct {
 func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		if auth := c.GetBool("authenticated"); !auth {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
-			return
-		}
-
 		up := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(up); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		//------------------
 		// UPDATE
-		gErr := userUpdateDb(up, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusOK, gin.H{"error": gErr})
+		err := userUpdateDb(up, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		//------------------
@@ -92,7 +87,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -100,7 +95,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			auth,
 			c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNoContent, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -118,7 +113,7 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userCreateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -126,7 +121,7 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// USER_CREATE
 		output, gErr := userCreateDb(input, c, pRuntime)
 		if gErr != nil {
-			c.JSON(http.StatusOK, gin.H{"error": gErr})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
 			return
 		}
 
@@ -143,13 +138,6 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 func userCreateDb(pInput *userCreateInput,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
-
-	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
 
 	//------------------
 	output := &userCreateOutput{}
@@ -217,15 +205,9 @@ func userGetDb(pInput *userGetInput,
 	pRuntime *runtime.Runtime) (*userGetOutput, error) {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//------------------
 
 	var user *persist.User
+	var err error
 	switch {
 	case pInput.UserId != "":
 		user, err = persist.UserGetById(pInput.UserId, pCtx, pRuntime)
