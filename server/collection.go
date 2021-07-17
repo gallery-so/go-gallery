@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -32,14 +31,8 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		userIDstr := c.Query("userid")
 
 		colls, err := persist.CollGetByUserID(persist.DbId(userIDstr), c, pRuntime)
-
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no collections found with user_id: %s", userIDstr)})
-			return
-		}
-		if len(colls) == 0 {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no collections found with user_id: %s", userIDstr)})
-			return
+		if len(colls) == 0 || err != nil {
+			colls = []*persist.Collection{}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"collections": colls})

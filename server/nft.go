@@ -65,13 +65,8 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 		nfts, err := persist.NftGetByUserId(persist.DbId(userId), c, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
-			return
-		}
-		if len(nfts) == 0 {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
-			return
+		if len(nfts) == 0 || err != nil {
+			nfts = []*persist.Nft{}
 		}
 
 		c.JSON(http.StatusOK, GetNftsForUserResponse{Nfts: nfts})
@@ -86,13 +81,8 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 		coll, err := persist.CollGetUnassigned(persist.DbId(userId), c, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
-			return
-		}
-		if len(coll.NFTsLst) == 0 {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
-			return
+		if coll == nil || err != nil {
+			coll = &persist.Collection{NFTsLst: []*persist.Nft{}}
 		}
 
 		c.JSON(http.StatusOK, GetNftsForUserResponse{Nfts: coll.NFTsLst})
@@ -107,13 +97,8 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 		nfts, err := OpenSeaPipelineAssetsForAcc(ownerWalletAddr, c, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with wallet: %s", ownerWalletAddr)})
-			return
-		}
-		if len(nfts) == 0 {
-			c.JSON(http.StatusOK, gin.H{"error": fmt.Sprintf("no nfts found with wallet: %s", ownerWalletAddr)})
-			return
+		if len(nfts) == 0 || err != nil {
+			nfts = []*persist.Nft{}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"nfts": nfts})
