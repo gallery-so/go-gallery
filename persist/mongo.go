@@ -60,17 +60,13 @@ func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*
 		return "", err
 	}
 
-	return res.InsertedID.(DbId), nil
+	return DbId(res.InsertedID.(string)), nil
 }
 
 // insert must be a slice of pointers to a struct
-func (m *MongoStorage) InsertMany(ctx context.Context, insert interface{}, opts ...*options.InsertManyOptions) error {
+func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DbId, error) {
 
-	inserts, ok := insert.([]interface{})
-	if !ok {
-		return errors.New("invalid input, must be slice of pointers to structs")
-	}
-	for _, k := range inserts {
+	for _, k := range insert {
 		elem := reflect.TypeOf(k).Elem()
 		val := reflect.ValueOf(k).Elem()
 		now := float64(time.Now().UnixNano()) / 1000000000.0
@@ -97,12 +93,19 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert interface{}, opts 
 		}
 	}
 
-	_, err := m.collection.InsertMany(ctx, inserts, opts...)
+	res, err := m.collection.InsertMany(ctx, insert, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	ids := make([]DbId, len(res.InsertedIDs))
+
+	for i, v := range res.InsertedIDs {
+		if id, ok := v.(string); ok {
+			ids[i] = DbId(id)
+		}
+	}
+	return ids, nil
 }
 
 // update must be a pointer to a struct
@@ -163,10 +166,8 @@ func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface
 		return err
 	}
 	defer cur.Close(ctx)
-	if err := cur.All(ctx, result); err != nil {
-		return errors.New("could not decode cursor")
-	}
-	return nil
+	return cur.All(ctx, result)
+
 }
 
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
