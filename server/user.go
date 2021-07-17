@@ -14,9 +14,10 @@ import (
 //-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
-	UserId      persist.DbId `json:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"description"`
+	Addresses   []string     `json:"addresses" `
 }
 
 // INPUT - USER_GET

@@ -25,7 +25,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	//-------------------------------------------------------------
 	// NFTS
 	//-------------------------------------------------------------
-	apiGroupV1.GET("/nfts/get", getNftsById(pRuntime))
+	apiGroupV1.GET("/nfts/get", getNftById(pRuntime))
 	apiGroupV1.GET("/nfts/user_get", getNftsForUser(pRuntime))
 	apiGroupV1.GET("/nfts/opensea_get", getNftsFromOpensea(pRuntime))
 	apiGroupV1.POST("/nfts/update", updateNftById(pRuntime))

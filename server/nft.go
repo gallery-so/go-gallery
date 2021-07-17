@@ -10,18 +10,18 @@ import (
 )
 
 type getNftsByIdInput struct {
-	NftId persist.DbId `json:"nft_id" binding:"required"`
+	NftId persist.DbId `json:"id" form:"id" binding:"required"`
 }
 
 type getNftsByUserIdInput struct {
-	UserId persist.DbId `json:"user_id" binding:"required"`
+	UserId persist.DbId `json:"user_id" form:"user_id" binding:"required"`
 }
 
 type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
 }
 
-func getNftsById(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIdInput{}
 
@@ -32,7 +32,7 @@ func getNftsById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		nfts, err := persist.NeftGetById(input.NftId, c, pRuntime)
 		if len(nfts) == 0 || err != nil {
-			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with id: %s", nftIDstr)})
+			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with id: %s", input.NftId)})
 			return
 		}
 
@@ -72,7 +72,7 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		nfts, err := persist.NftGetByUserId(input.UserId, c, pRuntime)
 		if len(nfts) == 0 || err != nil {
-			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
+			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", input.UserId)})
 			return
 		}
 
@@ -89,7 +89,7 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		coll, err := persist.CollGetUnassigned(input.UserId, c, pRuntime)
 		if len(coll.NFTsLst) == 0 || err != nil {
-			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", userId)})
+			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with user_id: %s", input.UserId)})
 			return
 		}
 
