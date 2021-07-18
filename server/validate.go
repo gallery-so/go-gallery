@@ -20,3 +20,13 @@ var nonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 	sig := fl.Field().String()
 	return len(sig) >= 10 && len(sig) <= 150
 }
+
+var shortStringValidator validator.Func = func(fl validator.FieldLevel) bool {
+	s := fl.Field().String()
+	return len(s) > 4 && len(s) < 50
+}
+
+var mediumStringValidator validator.Func = func(fl validator.FieldLevel) bool {
+	s := fl.Field().String()
+	return len(s) < 500
+}

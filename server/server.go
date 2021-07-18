@@ -10,16 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var shortStringValidator validator.Func = func(fl validator.FieldLevel) bool {
-	s := fl.Field().String()
-	return len(s) > 4 && len(s) < 50
-}
-
-var mediumStringValidator validator.Func = func(fl validator.FieldLevel) bool {
-	s := fl.Field().String()
-	return len(s) < 500
-}
-
 //-------------------------------------------------------------
 func Init(pPortInt int,
 	pRuntime *runtime.Runtime) {
@@ -31,6 +21,9 @@ func Init(pPortInt int,
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("short_string", shortStringValidator)
 		v.RegisterValidation("medium_string", mediumStringValidator)
+		v.RegisterValidation("eth_addr", ethValidator)
+		v.RegisterValidation("nonce", nonceValidator)
+		v.RegisterValidation("signature", signatureValidator)
 	}
 
 	// HANDLERS
