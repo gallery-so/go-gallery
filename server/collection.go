@@ -10,10 +10,16 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+type collectionGetByIdInput struct {
+	Id persist.DbId `json:"id" binding:"required"       `
+}
+
+type collectionGetByUserIdInput struct {
+	UserId persist.DbId `json:"user_id" binding:"required"       `
+}
+
 type collectionCreateInput struct {
-	NameStr           string         `json:"name"        binding:"required,short_string"`
-	CollectorsNoteStr string         `json:"collectors_note" binding:"required,medium_string"`
-	Nfts              []persist.DbId `json:"nfts" binding:"required"`
+	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
 type collectionCreateOutput struct {
 	Id persist.DbId `json:"collection_id"`
@@ -31,9 +37,13 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// INPUT
 
-		userIDstr := c.Query("user_id")
+		input := &collectionGetByUserIdInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-		colls, err := persist.CollGetByUserID(persist.DbId(userIDstr), c, pRuntime)
+		colls, err := persist.CollGetByUserID(input.UserId, c, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
@@ -45,14 +55,13 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// TODO sanatize input
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		ownerId := c.GetString("user_id")
+		ownerId := c.GetString(userIdContextKey)
 
 		//------------------
 		// CREATE
@@ -89,10 +98,8 @@ func collectionCreateDb(pInput *collectionCreateInput,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 
 	coll := &persist.CollectionDb{
-		NameStr:           pInput.NameStr,
-		CollectorsNoteStr: pInput.CollectorsNoteStr,
-		OwnerUserIDstr:    pUserIDstr,
-		NFTsLst:           pInput.Nfts,
+		OwnerUserIDstr: pUserIDstr,
+		NFTsLst:        pInput.Nfts,
 	}
 
 	return persist.CollCreate(coll, pCtx, pRuntime)

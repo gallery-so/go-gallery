@@ -9,6 +9,11 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+const (
+	userIdContextKey = "user_id"
+	authContextKey   = "authenticated"
+)
+
 func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -37,7 +42,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 				return
 			}
 
-			c.Set("user_id", userId)
+			c.Set(userIdContextKey, userId)
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
 			return
@@ -55,8 +60,8 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 				// get string after "Bearer"
 				jwt := authHeaders[1]
 				valid, userId, _ := authJwtVerify(jwt, os.Getenv("JWT_SECRET"), runtime)
-				c.Set("authenticated", valid)
-				c.Set("user_id", userId)
+				c.Set(authContextKey, valid)
+				c.Set(userIdContextKey, userId)
 			}
 		}
 		c.Next()
