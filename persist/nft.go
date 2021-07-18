@@ -232,10 +232,7 @@ func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DbId, error) {
 	}
 
 	for _, v := range dbNfts {
-		if v.OpenSeaIDstr == "" {
-			return nil, nil
-		}
-		if !currOpenseaIds[v.OpenSeaIDstr] {
+		if !currOpenseaIds[v.OpenSeaIDstr] || v.OpenSeaIDstr == "" {
 			diff = append(diff, v.IDstr)
 		}
 	}
