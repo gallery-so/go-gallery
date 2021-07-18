@@ -41,8 +41,8 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 	//--------------------
 
 	// DB_PERSIST
-	// CREATE_BULK
-	_, err := persist.NftCreateBulk(openSeaAssetsForAccLst, pCtx, pRuntime)
+	// CREATE_OR_UPDATE_BULK
+	err := persist.NftBulkUpsertOrRemove(pOwnerWalletAddressStr, openSeaAssetsForAccLst, pCtx, pRuntime)
 	if err != nil {
 		return nil, err
 	}
