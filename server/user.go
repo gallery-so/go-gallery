@@ -14,15 +14,16 @@ import (
 //-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
-	UserId      persist.DbId `json:"address" validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"description"`
+	Addresses   []string     `json:"addresses" `
 }
 
 // INPUT - USER_GET
 type userGetInput struct {
 	UserId   persist.DbId `json:"user_id" form:"user_id"`
-	Address  string       `json:"address" form:"addr" validate:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Address  string       `json:"address" form:"addr" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	Username string       `json:"username" form:"username"`
 }
 
@@ -41,9 +42,9 @@ type userCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr  string `json:"signature" validate:"required,min=80,max=200"`
-	AddressStr    string `json:"address"   validate:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	NonceValueStr string `json:"nonce"     validate:"required,min=10,max=150"`
+	SignatureStr  string `json:"signature" binding:"required,signature"`
+	AddressStr    string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	NonceValueStr string `json:"nonce"     binding:"required,nonce"`
 }
 
 // OUTPUT - USER_CREATE

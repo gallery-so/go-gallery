@@ -21,7 +21,7 @@ const (
 
 type Nft struct {
 	VersionInt    int64   `bson:"version,omitempty"              json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"                  json:"id"`
+	IDstr         DbId    `bson:"_id,omitempty"                  json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time,omitempty"        json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted,omitempty"`
 
@@ -118,7 +118,7 @@ func NftGetByUserId(pUserIDstr DbId,
 
 //-------------------------------------------------------------
 
-func NeftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
+func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	opts := &options.FindOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {

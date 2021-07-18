@@ -18,7 +18,7 @@ const (
 //-------------------------------------------------------------
 type CollectionDb struct {
 	VersionInt    int64   `bson:"version,omitempty"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id"`
+	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted,omitempty"`
 
@@ -33,7 +33,7 @@ type CollectionDb struct {
 
 type Collection struct {
 	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"           json:"id"`
+	IDstr         DbId    `bson:"_id"           json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
