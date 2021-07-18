@@ -116,7 +116,7 @@ func NftGetByUserId(pUserIDstr DbId,
 
 //-------------------------------------------------------------
 
-func NeftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
+func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	opts := &options.FindOptions{}
 	if deadline, ok := pCtx.Deadline(); ok {

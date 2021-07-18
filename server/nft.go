@@ -30,15 +30,15 @@ func getNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := persist.NeftGetById(input.NftId, c, pRuntime)
+		nfts, err := persist.NftGetById(input.NftId, c, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with id: %s", input.NftId)})
 			return
 		}
 
 		if len(nfts) > 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("too many nfts found with id: %s", input.NftId)})
-			return
+			nfts = nfts[:1]
+			// TODO log that this should not be happening
 		}
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
