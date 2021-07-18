@@ -86,7 +86,7 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		coll, err := persist.CollGetUnassigned(persist.DbId(userId), c, pRuntime)
+		coll, err := persist.CollGetUnassigned(input.UserId, c, pRuntime)
 		if coll == nil || err != nil {
 			coll = &persist.Collection{NFTsLst: []*persist.Nft{}}
 		}
