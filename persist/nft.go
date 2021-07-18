@@ -203,7 +203,7 @@ func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Conte
 	}
 
 	if len(allNfts) > len(nfts) {
-		currOpenseaIds := map[string]bool{}
+		currOpenSeaIds := map[string]bool{}
 		diff := []DbId{}
 
 		for _, v := range nfts {
