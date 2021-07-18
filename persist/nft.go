@@ -155,7 +155,7 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 
 //-------------------------------------------------------------
 
-func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
+func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
@@ -163,9 +163,9 @@ func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Conte
 	// --------------------------------------------------------
 	weWantToUpsertHere := true
 
-	upsertModels := make([]mongo.WriteModel, len(nfts))
+	upsertModels := make([]mongo.WriteModel, len(pNfts))
 
-	for i, v := range nfts {
+	for i, v := range pNfts {
 
 		if v.OpenSeaIDstr == "" {
 			return errors.New("open sea id required for each nft")
@@ -197,26 +197,15 @@ func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Conte
 		opts.MaxTime = &dur
 	}
 
-	allNfts := []*Nft{}
-	if err := mp.Find(pCtx, bson.M{"owner_address": walletAddress}, allNfts, opts); err != nil {
+	dbNfts := []*Nft{}
+	if err := mp.Find(pCtx, bson.M{"owner_address": walletAddress}, dbNfts, opts); err != nil {
 		return err
 	}
 
-	if len(allNfts) > len(nfts) {
-		currOpenseaIds := map[string]bool{}
-		diff := []DbId{}
-
-		for _, v := range nfts {
-			currOpenseaIds[v.OpenSeaIDstr] = true
-		}
-
-		for _, v := range allNfts {
-			if v.OpenSeaIDstr == "" {
-				return errors.New("could not find opensea id on db nft")
-			}
-			if !currOpenseaIds[v.OpenSeaIDstr] {
-				diff = append(diff, v.IDstr)
-			}
+	if len(dbNfts) > len(pNfts) {
+		diff, err := findDifference(pNfts, dbNfts)
+		if err != nil {
+			return err
 		}
 
 		deleteModels := make([]mongo.WriteModel, len(diff))
@@ -231,4 +220,25 @@ func NftBulkUpsertOrRemove(walletAddress string, nfts []*Nft, pCtx context.Conte
 	}
 
 	return nil
+}
+
+func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DbId, error) {
+
+	currOpenseaIds := map[string]bool{}
+	diff := []DbId{}
+
+	for _, v := range nfts {
+		currOpenseaIds[v.OpenSeaIDstr] = true
+	}
+
+	for _, v := range dbNfts {
+		if v.OpenSeaIDstr == "" {
+			return nil, nil
+		}
+		if !currOpenseaIds[v.OpenSeaIDstr] {
+			diff = append(diff, v.IDstr)
+		}
+	}
+
+	return diff, nil
 }
