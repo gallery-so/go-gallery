@@ -33,14 +33,9 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userIDstr := c.Query("user_id")
 
-		//------------------
-		// CREATE
-
 		colls, err := persist.CollGetByUserID(persist.DbId(userIDstr), c, pRuntime)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		if len(colls) == 0 || err != nil {
+			colls = []*persist.Collection{}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"collections": colls})
@@ -64,7 +59,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 

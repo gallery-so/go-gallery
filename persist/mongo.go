@@ -131,6 +131,31 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 	return nil
 }
 
+// upsert must be a pointer to a struct, will not fill reflectively fill insert fields such as id or creation time
+func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
+	weWantToUpsertHere := true
+	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
+	elem := reflect.TypeOf(upsert).Elem()
+	val := reflect.ValueOf(upsert).Elem()
+	now := float64(time.Now().UnixNano()) / 1000000000.0
+	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
+		f := val.FieldByName("LastUpdatedF")
+		if f.CanSet() {
+			f.SetFloat(now)
+		}
+	}
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now}, "$set": upsert}, opts...)
+	if err != nil {
+		return err
+	}
+	if result.ModifiedCount == 0 || result.MatchedCount == 0 {
+		return errors.New("could not find document to update")
+	}
+
+	return nil
+}
+
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
@@ -141,10 +166,8 @@ func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface
 		return err
 	}
 	defer cur.Close(ctx)
-	if err := cur.All(ctx, result); err != nil {
-		return errors.New("could not decode cursor")
-	}
-	return nil
+	return cur.All(ctx, result)
+
 }
 
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
