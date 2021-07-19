@@ -44,9 +44,9 @@ func TestUnassignedWithAggregation(t *testing.T) {
 	assert.Len(t, nftsInColOne, 10)
 	assert.Len(t, nftsInColTwo, 3)
 
-	_, err = CollCreate(&CollectionDb{NameStr: "Poop", NFTsLst: nftsInColOne, OwnerUserIDstr: userId}, context.Background(), runtime)
+	_, err = CollCreate(&CollectionDb{NameStr: "Poop", NftsLst: nftsInColOne, OwnerUserIDstr: userId}, context.Background(), runtime)
 	assert.Nil(t, err)
-	_, err = CollCreate(&CollectionDb{NameStr: "Baby", NFTsLst: nftsInColTwo, OwnerUserIDstr: userId}, context.Background(), runtime)
+	_, err = CollCreate(&CollectionDb{NameStr: "Baby", NftsLst: nftsInColTwo, OwnerUserIDstr: userId}, context.Background(), runtime)
 	assert.Nil(t, err)
 
 	unassignedCollection, err := CollGetUnassigned(user.IDstr, context.Background(), runtime)
@@ -54,7 +54,7 @@ func TestUnassignedWithAggregation(t *testing.T) {
 
 	unassignedIds := []DbId{}
 
-	for _, k := range unassignedCollection.NFTsLst {
+	for _, k := range unassignedCollection.NftsLst {
 		unassignedIds = append(unassignedIds, k.IDstr)
 	}
 

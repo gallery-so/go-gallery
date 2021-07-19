@@ -11,8 +11,6 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	apiGroupV1 := pRuntime.Router.Group("/glry/v1")
 
 	// AUTH_HANDLERS
-	// TODO: bring these handlers out to this file and format
-	// like the routes below
 	authHandlersInit(pRuntime, apiGroupV1)
 
 	//-------------------------------------------------------------
@@ -24,7 +22,9 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	collectionsGroup.GET("/get", jwtOptional(pRuntime), getAllCollectionsForUser(pRuntime))
 	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
 	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
-	collectionsGroup.POST("/update", jwtRequired(pRuntime), updateCollection(pRuntime))
+	collectionsGroup.POST("/update/name", jwtRequired(pRuntime), updateCollectionName(pRuntime))
+	collectionsGroup.POST("/update/hidden", jwtRequired(pRuntime), updateCollectionHidden(pRuntime))
+	collectionsGroup.POST("/update/nfts", jwtRequired(pRuntime), updateCollectionNfts(pRuntime))
 
 	//-------------------------------------------------------------
 	// NFTS
@@ -36,7 +36,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	nftsGroup.GET("/user_get", jwtOptional(pRuntime), getNftsForUser(pRuntime))
 	nftsGroup.GET("/opensea_get", jwtOptional(pRuntime), getNftsFromOpensea(pRuntime))
 	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftById(pRuntime))
-	apiGroupV1.GET("/nfts/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
+	apiGroupV1.GET("/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
 
 	// HEALTH
 	apiGroupV1.GET("/health", healthcheck(pRuntime))

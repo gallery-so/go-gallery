@@ -33,7 +33,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 			// database that is unique to every user and session
 			valid, userId, err := authJwtVerify(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+				c.JSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
 				return
 			}
 
