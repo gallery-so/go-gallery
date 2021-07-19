@@ -39,7 +39,7 @@ func TestCreateAndGetNFT(pTest *testing.T) {
 	nfts, err := NftGetById(id, ctx, runtime)
 	assert.Nil(pTest, err)
 
-	assert.Equal(pTest, nfts[0].DescriptionStr, "extremely cool nft")
+	assert.Equal(pTest, "extremely cool nft", nfts[0].DescriptionStr)
 
 	//--------------------
 }
