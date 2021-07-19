@@ -9,10 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	// "github.com/davecgh/go-spew/spew"
 )
-
-//-------------------------------------------------------------
 
 const (
 	nftColName           = "nfts"
@@ -64,7 +61,6 @@ type Contract struct {
 	ContractTotalSupplyInt  int    `bson:"contract_total_supply" json:"total_supply"`
 }
 
-//-------------------------------------------------------------
 func NftCreateBulk(pNFTlst []*Nft,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]DbId, error) {
@@ -83,10 +79,8 @@ func NftCreateBulk(pNFTlst []*Nft,
 		return nil, err
 	}
 	return ids, nil
-
 }
 
-//-------------------------------------------------------------
 func NftCreate(pNFT *Nft,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (DbId, error) {
@@ -94,10 +88,8 @@ func NftCreate(pNFT *Nft,
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.Insert(pCtx, pNFT)
-
 }
 
-//-------------------------------------------------------------
 func NftGetByUserId(pUserIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Nft, error) {
@@ -109,14 +101,12 @@ func NftGetByUserId(pUserIDstr DbId,
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.Find(pCtx, bson.M{"owner_user_id": pUserIDstr}, result, opts); err != nil {
+	if err := mp.Find(pCtx, bson.M{"owner_user_id": pUserIDstr}, &result, opts); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
-
-//-------------------------------------------------------------
 
 func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
@@ -129,15 +119,12 @@ func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.Find(pCtx, bson.M{"_id": pIDstr}, result, opts); err != nil {
+	if err := mp.Find(pCtx, bson.M{"_id": pIDstr}, &result, opts); err != nil {
 		return nil, err
 	}
 
 	return result, nil
-
 }
-
-//-------------------------------------------------------------
 
 func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
@@ -150,10 +137,7 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.Update(pCtx, bson.M{"_id": pIDstr}, updatedNft)
-
 }
-
-//-------------------------------------------------------------
 
 func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
@@ -175,7 +159,7 @@ func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Cont
 
 		// TODO last updated
 
-		upsertModels[i] = mongo.UpdateOneModel{
+		upsertModels[i] = &mongo.UpdateOneModel{
 			Upsert: &weWantToUpsertHere,
 			Filter: bson.M{"owner_address": walletAddress, "opensea_id": v.OpenSeaIDstr},
 			Update: bson.M{
@@ -198,7 +182,7 @@ func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Cont
 	}
 
 	dbNfts := []*Nft{}
-	if err := mp.Find(pCtx, bson.M{"owner_address": walletAddress}, dbNfts, opts); err != nil {
+	if err := mp.Find(pCtx, bson.M{"owner_address": walletAddress}, &dbNfts, opts); err != nil {
 		return err
 	}
 
@@ -211,7 +195,7 @@ func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Cont
 		deleteModels := make([]mongo.WriteModel, len(diff))
 
 		for i, v := range diff {
-			deleteModels[i] = mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"deleted": true}}}
+			deleteModels[i] = &mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"deleted": true}}}
 		}
 
 		if _, err := mp.collection.BulkWrite(pCtx, deleteModels); err != nil {
@@ -223,7 +207,6 @@ func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Cont
 }
 
 func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DbId, error) {
-
 	currOpenseaIds := map[string]bool{}
 	diff := []DbId{}
 

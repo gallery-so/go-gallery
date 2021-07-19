@@ -98,7 +98,7 @@ func UserGetById(userId DbId,
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"_id": userId}, result, opts)
+	err := mp.Find(pCtx, bson.M{"_id": userId}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func UserGetByAddress(pAddress string,
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, result, opts)
+	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func UserGetByUsername(pUsername string,
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"username": pUsername}, result, opts)
+	err := mp.Find(pCtx, bson.M{"username": pUsername}, &result, opts)
 
 	if err != nil {
 		return nil, err

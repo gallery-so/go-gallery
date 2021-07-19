@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHealthcheck(t *testing.T) {
-	assert, testServer, serverUrl, r := setup(t)
-	defer teardown(testServer)
+	assert := assert.New(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/health", serverUrl))
 	assert.Nil(err)
@@ -18,7 +18,6 @@ func TestHealthcheck(t *testing.T) {
 
 	body := HealthcheckResponse{}
 	runtime.UnmarshalBody(&body, resp.Body, r)
-
-	assert.Equal(body.Message, "gallery operational")
-	assert.Equal(body.Env, "local")
+	assert.Equal("gallery operational", body.Message)
+	assert.Equal("local", body.Env)
 }
