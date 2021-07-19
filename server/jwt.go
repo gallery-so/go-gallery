@@ -27,7 +27,7 @@ import (
 //-------------------------------------------------------------
 // JWT_CLAIMS
 type jwtClaims struct {
-	UserId persist.DbId `json:"address"`
+	UserId persist.DbId `json:"user_id"`
 	jwt.StandardClaims
 }
 
@@ -35,7 +35,7 @@ type jwtClaims struct {
 // VERIFY
 func authJwtVerify(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
-	pRuntime *runtime.Runtime) (bool, string, error) {
+	pRuntime *runtime.Runtime) (bool, persist.DbId, error) {
 
 	claims := jwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
@@ -52,7 +52,7 @@ func authJwtVerify(pJWTtokenStr string,
 	spew.Dump(claims)
 
 	if claims, ok := JWTtoken.Claims.(jwtClaims); ok && JWTtoken.Valid {
-		return JWTtoken.Valid, string(claims.UserId), nil
+		return JWTtoken.Valid, claims.UserId, nil
 	} else {
 		return false, "", errors.New("failed to verify JWT token for a user")
 	}

@@ -10,10 +10,19 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+type collectionGetByIdInput struct {
+	Id persist.DbId `json:"id" binding:"required"       `
+}
+
+type collectionGetByUserIdInput struct {
+	UserId persist.DbId `json:"user_id" binding:"required"       `
+}
+
 type collectionCreateInput struct {
-	OwnerUserIdStr    persist.DbId `json:"user_id" validate:"required"`
-	NameStr           string       `json:"name"        validate:"required,min=4,max=50"`
-	CollectorsNoteStr string       `json:"collectors_note" validate:"required,min=0,max=500"`
+	Nfts []persist.DbId `json:"nfts" binding:"required"`
+}
+type collectionCreateOutput struct {
+	Id persist.DbId `json:"collection_id"`
 }
 
 type collectionDeleteInput struct {
@@ -28,9 +37,13 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// INPUT
 
-		userIDstr := c.Query("userid")
+		input := &collectionGetByUserIdInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-		colls, err := persist.CollGetByUserID(persist.DbId(userIDstr), c, pRuntime)
+		colls, err := persist.CollGetByUserID(input.UserId, c, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
@@ -42,23 +55,24 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// TODO sanatize input
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
+		ownerId := c.GetString(userIdContextKey)
+
 		//------------------
 		// CREATE
 
-		_, err := collectionCreateDb(input, input.OwnerUserIdStr, c, pRuntime)
+		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, collectionCreateOutput{Id: id})
 	}
 }
 
@@ -83,22 +97,9 @@ func collectionCreateDb(pInput *collectionCreateInput,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (persist.DbId, error) {
 
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return "", err
-	}
-
-	//------------------
-
-	nameStr := pInput.NameStr
-	ownerUserIDstr := pUserIDstr
-
 	coll := &persist.CollectionDb{
-		NameStr:           nameStr,
-		CollectorsNoteStr: pInput.CollectorsNoteStr,
-		OwnerUserIDstr:    ownerUserIDstr,
-		DeletedBool:       false,
-		NFTsLst:           []persist.DbId{},
+		OwnerUserIDstr: pUserIDstr,
+		NFTsLst:        pInput.Nfts,
 	}
 
 	return persist.CollCreate(coll, pCtx, pRuntime)

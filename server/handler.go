@@ -18,18 +18,24 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	//-------------------------------------------------------------
 	// COLLECTIONS
 	//-------------------------------------------------------------
-	apiGroupV1.GET("/collections/get", getAllCollectionsForUser(pRuntime))
-	apiGroupV1.POST("/collections/create", createCollection(pRuntime))
-	apiGroupV1.POST("/collections/delete", deleteCollection(pRuntime))
+
+	collectionsGroup := apiGroupV1.Group("/collections")
+
+	collectionsGroup.GET("/get", jwtOptional(pRuntime), getAllCollectionsForUser(pRuntime))
+	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
+	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
 
 	//-------------------------------------------------------------
 	// NFTS
 	//-------------------------------------------------------------
-	apiGroupV1.GET("/nfts/get", getNftById(pRuntime))
-	apiGroupV1.GET("/nfts/user_get", getNftsForUser(pRuntime))
-	apiGroupV1.GET("/nfts/opensea_get", getNftsFromOpensea(pRuntime))
-	apiGroupV1.POST("/nfts/update", updateNftById(pRuntime))
-	apiGroupV1.GET("/nfts/get_unassigned", getUnassignedNftsForUser(pRuntime))
+
+	nftsGroup := apiGroupV1.Group("/nfts")
+
+	nftsGroup.GET("/get", jwtOptional(pRuntime), getNftById(pRuntime))
+	nftsGroup.GET("/user_get", jwtOptional(pRuntime), getNftsForUser(pRuntime))
+	nftsGroup.GET("/opensea_get", jwtOptional(pRuntime), getNftsFromOpensea(pRuntime))
+	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftById(pRuntime))
+	apiGroupV1.GET("/nfts/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
 
 	// HEALTH
 	apiGroupV1.GET("/health", healthcheck(pRuntime))
@@ -42,7 +48,8 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 
 	usersGroup := parent.Group("/users")
-	usersGroup.Use(jwtMiddleware(pRuntime))
+
+	authGroup := parent.Group("/auth")
 
 	//-------------------------------------------------------------
 	// AUTH_GET_PREFLIGHT
@@ -51,7 +58,7 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
 
 	// [GET] /glry/v1/auth/get_preflight?addr=:walletAddress
-	usersGroup.GET("/auth/get_preflight", getAuthPreflight(pRuntime))
+	authGroup.GET("/get_preflight", jwtOptional(pRuntime), getAuthPreflight(pRuntime))
 
 	//-------------------------------------------------------------
 	// AUTH_USER_LOGIN
@@ -63,13 +70,13 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// USER_UPDATE
 	// AUTHENTICATED
 
-	usersGroup.POST("/update", updateUserAuth(pRuntime))
+	usersGroup.POST("/update", jwtRequired(pRuntime), updateUserAuth(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED
 
-	usersGroup.GET("/get", getUserAuth(pRuntime))
+	usersGroup.GET("/get", jwtOptional(pRuntime), getUserAuth(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_CREATE
