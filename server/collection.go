@@ -21,6 +21,13 @@ type collectionGetByUserIdInput struct {
 type collectionCreateInput struct {
 	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
+
+type collectionUpdateByIdInput struct {
+	Id     persist.DbId   `json:"id" binding:"required"`
+	Name   string         `json:"name"`
+	Nfts   []*persist.Nft `json:"nfts"`
+	Hidden bool           `json:"hidden"`
+}
 type collectionCreateOutput struct {
 	Id persist.DbId `json:"collection_id"`
 }
@@ -73,6 +80,30 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, collectionCreateOutput{Id: id})
+	}
+}
+
+func updateCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &collectionUpdateByIdInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		userId := c.GetString(userIdContextKey)
+
+		err := persist.CollUpdate(input.Id, persist.DbId(userId), &persist.Collection{
+			NameStr:    input.Name,
+			HiddenBool: input.Hidden,
+			NFTsLst:    input.Nfts,
+		}, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.Status(http.StatusOK)
 	}
 }
 
