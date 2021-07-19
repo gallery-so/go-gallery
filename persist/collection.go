@@ -115,7 +115,18 @@ func CollUpdate(pIDstr DbId,
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, bson.M{"$set": pColl})
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, pColl)
+}
+
+//-------------------------------------------------------------
+func CollDelete(pIDstr DbId,
+	pUserId DbId,
+	pCtx context.Context,
+	pRuntime *runtime.Runtime) error {
+
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
+
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, bson.M{"$set": bson.M{"deleted": true}})
 }
 
 //-------------------------------------------------------------

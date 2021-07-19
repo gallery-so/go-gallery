@@ -11,16 +11,20 @@ import (
 )
 
 type collectionGetByIdInput struct {
-	Id persist.DbId `json:"id" binding:"required"       `
+	Id persist.DbId `json:"id" binding:"required"`
 }
 
 type collectionGetByUserIdInput struct {
-	UserId persist.DbId `json:"user_id" binding:"required"       `
+	UserId persist.DbId `json:"user_id" binding:"required"`
+}
+type collectionGetOutput struct {
+	Collections []*persist.Collection `json:"nfts"`
 }
 
 type collectionCreateInput struct {
 	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
+
 
 type collectionUpdateByIdInput struct {
 	Id     persist.DbId   `json:"id" binding:"required"`
@@ -28,12 +32,13 @@ type collectionUpdateByIdInput struct {
 	Nfts   []*persist.Nft `json:"nfts,omitempty"`
 	Hidden bool           `json:"hidden,omitempty"`
 }
+
 type collectionCreateOutput struct {
 	Id persist.DbId `json:"collection_id"`
 }
 
 type collectionDeleteInput struct {
-	IDstr persist.DbId `json:"id"`
+	Id persist.DbId `json:"id" binding:"required"`
 }
 
 //-------------------------------------------------------------
@@ -46,7 +51,9 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &collectionGetByUserIdInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: err.Error(),
+			})
 			return
 		}
 
@@ -55,7 +62,7 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			colls = []*persist.Collection{}
 		}
 
-		c.JSON(http.StatusOK, gin.H{"collections": colls})
+		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
 	}
 }
 
@@ -64,7 +71,9 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: err.Error(),
+			})
 			return
 		}
 
@@ -75,7 +84,9 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error: err.Error(),
+			})
 			return
 		}
 
@@ -114,13 +125,23 @@ func updateCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := collectionCreateInput{}
+		input := collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: err.Error(),
+			})
 			return
 		}
 
-		// TODO make a db func for delete
+		userId := c.GetString(userIdContextKey)
+
+		err := persist.CollDelete(input.Id, persist.DbId(userId), c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error: err.Error(),
+			})
+			return
+		}
 
 		c.Status(http.StatusOK)
 	}
