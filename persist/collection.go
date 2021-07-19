@@ -64,6 +64,7 @@ func CollCreate(pColl *CollectionDb,
 
 //-------------------------------------------------------------
 func CollGetByUserID(pUserIDstr DbId,
+	pNoHidden bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -77,7 +78,11 @@ func CollGetByUserID(pUserIDstr DbId,
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"owner_user_id": pUserIDstr}), &result, opts); err != nil {
+	fil := bson.M{"owner_user_id": pUserIDstr}
+	if pNoHidden {
+		fil["hidden"] = false
+	}
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -86,6 +91,7 @@ func CollGetByUserID(pUserIDstr DbId,
 
 //-------------------------------------------------------------
 func CollGetByID(pIDstr DbId,
+	pNoHidden bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -99,7 +105,12 @@ func CollGetByID(pIDstr DbId,
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(bson.M{"_id": pIDstr}), &result, opts); err != nil {
+	fil := bson.M{"_id": pIDstr}
+	if pNoHidden {
+		fil["hidden"] = false
+	}
+
+	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
