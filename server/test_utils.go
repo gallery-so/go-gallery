@@ -41,8 +41,15 @@ func teardown(ts *httptest.Server) {
 }
 
 func assertValidJSONResponse(assert *assert.Assertions, resp *http.Response) {
-	assert.Equal(resp.StatusCode, http.StatusOK, "Status should be 200")
+	assert.Equal(http.StatusOK, resp.StatusCode, "Status should be 200")
 	val, ok := resp.Header["Content-Type"]
 	assert.True(ok, "Content-Type header should be set")
-	assert.Equal(val[0], "application/json; charset=utf-8", "Response should be in JSON")
+	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
+}
+
+func assertGalleryErrorResponse(assert *assert.Assertions, resp *http.Response) {
+	assert.NotEqual(http.StatusOK, resp.StatusCode, "Status should not be 200")
+	val, ok := resp.Header["Content-Type"]
+	assert.True(ok, "Content-Type header should be set")
+	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
