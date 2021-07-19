@@ -83,14 +83,14 @@ func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		auth := c.GetBool("authenticated")
-
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		auth := c.GetBool(authContextKey)
 
 		output, err := userGetDb(input,
 			auth,
@@ -234,15 +234,13 @@ func userGetDb(pInput *userGetInput,
 		return nil, errors.New("no user found")
 	}
 
-	output := &userGetOutput{}
+	output := &userGetOutput{
+		UserNameStr: user.UserNameStr,
+		BioStr:      user.BioStr,
+	}
+
 	if pAuthenticatedBool {
-		output = &userGetOutput{
-			UserNameStr: user.UserNameStr,
-			BioStr:      user.BioStr,
-			Addresses:   user.AddressesLst,
-		}
-	} else {
-		// TODO
+		output.Addresses = user.AddressesLst
 	}
 
 	return output, nil

@@ -25,7 +25,6 @@ type collectionCreateInput struct {
 	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
 
-
 type collectionUpdateByIdInput struct {
 	Id     persist.DbId   `json:"id" binding:"required"`
 	Name   string         `json:"name,omitempty"`
@@ -57,7 +56,9 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		colls, err := persist.CollGetByUserID(input.UserId, c, pRuntime)
+		auth := c.GetBool(authContextKey)
+
+		colls, err := persist.CollGetByUserID(input.UserId, !auth, c, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
