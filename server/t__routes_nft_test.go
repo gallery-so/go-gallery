@@ -8,11 +8,11 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetNftById_Success(t *testing.T) {
-	assert, testServer, serverUrl, r := setup(t)
-	defer teardown(testServer)
+	assert := assert.New(t)
 
 	// seed DB with nft
 	name := "very cool nft"
@@ -31,8 +31,7 @@ func TestGetNftById_Success(t *testing.T) {
 }
 
 func TestGetNftById_NoParamError(t *testing.T) {
-	assert, testServer, serverUrl, r := setup(t)
-	defer teardown(testServer)
+	assert := assert.New(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", serverUrl))
 	assert.Nil(err)
@@ -44,8 +43,7 @@ func TestGetNftById_NoParamError(t *testing.T) {
 }
 
 func TestGetNftById_NotFoundError(t *testing.T) {
-	assert, testServer, serverUrl, r := setup(t)
-	defer teardown(testServer)
+	assert := assert.New(t)
 
 	nonexistentNftId := "12345"
 

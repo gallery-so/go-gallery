@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHealthcheck(t *testing.T) {
-	assert, testServer, serverUrl, r := setup(t)
-	defer teardown(testServer)
+	assert := assert.New(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/health", serverUrl))
 	assert.Nil(err)
