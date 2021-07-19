@@ -77,7 +77,7 @@ func AuthNonceGet(pAddress string,
 	opts.SetLimit(1)
 
 	result := []*UserNonce{}
-	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, result, opts)
+	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
