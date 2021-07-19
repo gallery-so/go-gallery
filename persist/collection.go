@@ -17,18 +17,18 @@ const (
 
 //-------------------------------------------------------------
 type CollectionDb struct {
-	VersionInt    int64   `bson:"version,omitempty"       json:"version"` // schema version for this model
+	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
 	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted,omitempty"`
+	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"`
 
-	NameStr           string `bson:"name,omitempty"          json:"name"`
-	CollectorsNoteStr string `bson:"collectors_note,omitempty"   json:"collectors_note"`
-	OwnerUserIDstr    DbId   `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	NFTsLst           []DbId `bson:"nfts,omitempty"          json:"nfts"`
+	NameStr           string `bson:"name"          json:"name"`
+	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserIDstr    DbId   `bson:"owner_user_id" json:"owner_user_id"`
+	NFTsLst           []DbId `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	HiddenBool bool `bson:"hidden,omitempty" json:"hidden"`
+	HiddenBool bool `bson:"hidden" json:"hidden"`
 }
 
 type Collection struct {
@@ -37,13 +37,13 @@ type Collection struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	NameStr           string `bson:"name,omitempty"          json:"name"`
-	CollectorsNoteStr string `bson:"collectors_note,omitempty"   json:"collectors_note"`
-	OwnerUserIDstr    string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	NFTsLst           []*Nft `bson:"nfts,omitempty"          json:"nfts"`
+	NameStr           string `bson:"name"          json:"name"`
+	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserIDstr    string `bson:"owner_user_id" json:"owner_user_id"`
+	NFTsLst           []*Nft `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	HiddenBool bool `bson:"hidden,omitempty" json:"hidden"`
+	HiddenBool bool `bson:"hidden" json:"hidden"`
 }
 
 //-------------------------------------------------------------
