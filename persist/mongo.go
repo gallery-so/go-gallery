@@ -120,6 +120,12 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 			f.SetFloat(now)
 		}
 	}
+	if _, ok := elem.FieldByName("IDstr"); ok {
+		f := val.FieldByName("IDstr")
+		if f.CanSet() {
+			f.Set(reflect.ValueOf(DbId("")))
+		}
+	}
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
 	if err != nil {
 		return err

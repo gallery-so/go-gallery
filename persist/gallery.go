@@ -14,13 +14,13 @@ const galleryColName = "galleries"
 
 //-------------------------------------------------------------
 type GalleryDb struct {
-	VersionInt    int64   `bson:"version,omitempty"       json:"version"` // schema version for this model
+	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
 	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time,omitempty" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted,omitempty"`
+	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
+	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	CollectionsLst []DbId `bson:"collections,omitempty"          json:"collections"`
+	OwnerUserIDstr string `bson:"owner_user_id" json:"owner_user_id"`
+	CollectionsLst []DbId `bson:"collections"          json:"collections"`
 }
 
 type Gallery struct {
@@ -29,8 +29,8 @@ type Gallery struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string        `bson:"owner_user_id,omitempty" json:"owner_user_id"`
-	CollectionsLst []*Collection `bson:"collections,omitempty"          json:"collections"`
+	OwnerUserIDstr string        `bson:"owner_user_id" json:"owner_user_id"`
+	CollectionsLst []*Collection `bson:"collections"          json:"collections"`
 }
 
 //-------------------------------------------------------------
