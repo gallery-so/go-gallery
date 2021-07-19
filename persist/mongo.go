@@ -120,6 +120,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 			f.SetFloat(now)
 		}
 	}
+
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
 	if err != nil {
 		return err
