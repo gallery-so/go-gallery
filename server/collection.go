@@ -24,9 +24,9 @@ type collectionCreateInput struct {
 
 type collectionUpdateByIdInput struct {
 	Id     persist.DbId   `json:"id" binding:"required"`
-	Name   string         `json:"name"`
-	Nfts   []*persist.Nft `json:"nfts"`
-	Hidden bool           `json:"hidden"`
+	Name   string         `json:"name,omitempty"`
+	Nfts   []*persist.Nft `json:"nfts,omitempty"`
+	Hidden bool           `json:"hidden,omitempty"`
 }
 type collectionCreateOutput struct {
 	Id persist.DbId `json:"collection_id"`
@@ -93,11 +93,16 @@ func updateCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userId := c.GetString(userIdContextKey)
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), &persist.Collection{
-			NameStr:    input.Name,
-			HiddenBool: input.Hidden,
-			NFTsLst:    input.Nfts,
-		}, c, pRuntime)
+		coll := &persist.Collection{HiddenBool: input.Hidden}
+
+		if input.Name != "" {
+			coll.NameStr = input.Name
+		}
+		if input.Nfts != nil {
+			coll.NFTsLst = input.Nfts
+		}
+
+		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
