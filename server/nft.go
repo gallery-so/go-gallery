@@ -9,6 +9,10 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+const (
+	nftIdQueryNotProvided = "nft id not provided in query values"
+)
+
 type getNftsByIdInput struct {
 	NftId persist.DbId `json:"id" form:"id" binding:"required"`
 }
@@ -26,13 +30,17 @@ func getNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &getNftsByIdInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": "nft id not found in query values"})
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: nftIdQueryNotProvided,
+			})
 			return
 		}
 
 		nfts, err := persist.NftGetById(input.NftId, c, pRuntime)
 		if len(nfts) == 0 || err != nil {
-			c.JSON(http.StatusNoContent, gin.H{"error": fmt.Sprintf("no nfts found with id: %s", input.NftId)})
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error: fmt.Sprintf("no nfts found with id: %s", input.NftId),
+			})
 			return
 		}
 
@@ -40,7 +48,7 @@ func getNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			nfts = nfts[:1]
 			// TODO log that this should not be happening
 		}
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
+		c.JSON(http.StatusOK, nfts[0])
 	}
 }
 
