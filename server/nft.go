@@ -57,13 +57,13 @@ func updateNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		nft := &persist.Nft{}
 		if err := c.ShouldBindJSON(nft); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		err := persist.NftUpdateById(nft.IDstr, nft, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -75,7 +75,7 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByUserIdInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 		nfts, err := persist.NftGetByUserId(input.UserId, c, pRuntime)
@@ -91,15 +91,15 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByUserIdInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 		coll, err := persist.CollGetUnassigned(input.UserId, c, pRuntime)
 		if coll == nil || err != nil {
-			coll = &persist.Collection{NFTsLst: []*persist.Nft{}}
+			coll = &persist.Collection{NftsLst: []*persist.Nft{}}
 		}
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: coll.NFTsLst})
+		c.JSON(http.StatusOK, getNftsOutput{Nfts: coll.NftsLst})
 	}
 }
 

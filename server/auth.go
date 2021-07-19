@@ -52,14 +52,14 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &authUserGetPreflightInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		// GET_PUBLIC_INFO
 		output, err := authUserGetPreflightDb(input, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 
 			return
 		}
@@ -74,7 +74,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -86,7 +86,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c,
 			pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 
