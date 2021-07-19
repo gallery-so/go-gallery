@@ -107,14 +107,15 @@ func CollGetByID(pIDstr DbId,
 }
 
 //-------------------------------------------------------------
-func CollUpdateById(pIDstr DbId,
+func CollUpdate(pIDstr DbId,
+	pUserId DbId,
 	pColl *Collection,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr}, pColl)
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, bson.M{"$set": pColl})
 }
 
 //-------------------------------------------------------------
