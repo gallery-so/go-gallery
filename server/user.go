@@ -63,7 +63,7 @@ func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		up := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(up); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -71,7 +71,7 @@ func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// UPDATE
 		err := userUpdateDb(up, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 		//------------------
@@ -86,7 +86,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -96,7 +96,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			auth,
 			c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusNoContent, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNoContent, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -114,7 +114,7 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userCreateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
 

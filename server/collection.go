@@ -25,11 +25,18 @@ type collectionCreateInput struct {
 	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
 
-type collectionUpdateByIdInput struct {
-	Id     persist.DbId   `json:"id" binding:"required"`
-	Name   string         `json:"name,omitempty"`
-	Nfts   []*persist.Nft `json:"nfts,omitempty"`
-	Hidden bool           `json:"hidden,omitempty"`
+type collectionUpdateNameByIdInput struct {
+	Id   persist.DbId `json:"id" binding:"required"`
+	Name string       `json:"name" binding:"required"`
+}
+
+type collectionUpdateHiddenByIdInput struct {
+	Id     persist.DbId `json:"id" binding:"required"`
+	Hidden bool         `json:"hidden" binding:"required"`
+}
+type collectionUpdateNftsByIdInput struct {
+	Id   persist.DbId   `json:"id" binding:"required"`
+	Nfts []*persist.Nft `json:"nfts" binding:"required"`
 }
 
 type collectionCreateOutput struct {
@@ -95,9 +102,31 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &collectionUpdateByIdInput{}
+		input := &collectionUpdateNameByIdInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		userId := c.GetString(userIdContextKey)
+
+		coll := &persist.Collection{NameStr: input.Name}
+
+		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+
+func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &collectionUpdateHiddenByIdInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
@@ -107,12 +136,27 @@ func updateCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		coll := &persist.Collection{HiddenBool: input.Hidden}
 
-		if input.Name != "" {
-			coll.NameStr = input.Name
+		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			return
 		}
-		if input.Nfts != nil {
-			coll.NFTsLst = input.Nfts
+
+		c.Status(http.StatusOK)
+	}
+}
+
+func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &collectionUpdateNftsByIdInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			return
 		}
+
+		userId := c.GetString(userIdContextKey)
+
+		coll := &persist.Collection{NftsLst: input.Nfts}
 
 		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
 		if err != nil {
@@ -157,7 +201,7 @@ func collectionCreateDb(pInput *collectionCreateInput,
 
 	coll := &persist.CollectionDb{
 		OwnerUserIDstr: pUserIDstr,
-		NFTsLst:        pInput.Nfts,
+		NftsLst:        pInput.Nfts,
 	}
 
 	return persist.CollCreate(coll, pCtx, pRuntime)

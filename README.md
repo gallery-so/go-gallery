@@ -18,7 +18,7 @@ $ go get -u -d ./...
 The app is dependent on mongo running locally. You can use the official docker container:
 
 ```bash
-$ docker run -p 27017:27017 mongo
+$ docker run -p 27017:27017 mongo:4.4.6
 ```
 
 To kill the mongo process, you can close the terminal window, or run:

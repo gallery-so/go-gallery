@@ -25,7 +25,7 @@ type CollectionDb struct {
 	NameStr           string `bson:"name"          json:"name"`
 	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserIDstr    DbId   `bson:"owner_user_id" json:"owner_user_id"`
-	NFTsLst           []DbId `bson:"nfts"          json:"nfts"`
+	NftsLst           []DbId `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	HiddenBool bool `bson:"hidden" json:"hidden"`
@@ -40,7 +40,7 @@ type Collection struct {
 	NameStr           string `bson:"name"          json:"name"`
 	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserIDstr    string `bson:"owner_user_id" json:"owner_user_id"`
-	NFTsLst           []*Nft `bson:"nfts"          json:"nfts"`
+	NftsLst           []*Nft `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	HiddenBool bool `bson:"hidden" json:"hidden"`
