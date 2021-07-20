@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -54,4 +56,33 @@ func TestGetNftById_NotFoundError(t *testing.T) {
 	body := ErrorResponse{}
 	runtime.UnmarshalBody(&body, resp.Body, r)
 	assert.Equal(fmt.Sprintf("no nfts found with id: %s", nonexistentNftId), body.Error)
+}
+
+func TestUpdateNftById_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	// seed DB with nft
+	nftId, err := persist.NftCreate(&persist.Nft{
+		NameStr: "very cool nft",
+	}, context.Background(), r)
+	assert.Nil(err)
+
+	// build update request body
+	type Update struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+	update := Update{Name: "new nft name", Id: string(nftId)}
+	data, err := json.Marshal(update)
+	assert.Nil(err)
+
+	resp, err := http.Post(fmt.Sprintf("%s/nfts/update?id=%s", serverUrl, nftId),
+		"application/json",
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	body := persist.Nft{}
+	runtime.UnmarshalBody(&body, resp.Body, r)
+	assert.Equal(update.Name, body.NameStr)
 }
