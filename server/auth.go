@@ -119,7 +119,7 @@ func authNonceCreateDb(pNonce *persist.UserNonce,
 
 //-------------------------------------------------------------
 // NONCE_GENERATE
-func authGenerateRandomString() string {
+func generateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonceInt := seededRand.Int()
 	nonceStr := fmt.Sprintf("%d", nonceInt)
@@ -170,21 +170,14 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//------------------
 	// OUTPUT
 	output := &authUserLoginOutput{}
 
 	//------------------
 	// USER_CHECK
-	_, nonceValueStr, userIDstr, gErr := userIsValid(pInput.Address, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	nonceValueStr, userIDstr, err := userWithNonce(pInput.Address, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
 	output.UserIDstr = userIDstr
@@ -193,12 +186,12 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	// VERIFY_SIGNATURE
 
 	dataStr := nonceValueStr
-	sigValidBool, gErr := authVerifySignatureAllMethods(pInput.SignatureStr,
+	sigValidBool, err := authVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.Address,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, err
 	}
 
 	output.SignatureValidBool = sigValidBool
@@ -381,13 +374,6 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//------------------
 
 	var nonce *persist.UserNonce
 	var userExistsBool bool
@@ -402,7 +388,9 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	//                 to the front-end. subsequently the client has to create a new user.
 	if user == nil {
 
-		nonce := &persist.UserNonce{}
+		nonce := &persist.UserNonce{
+			ValueStr: generateNonce(),
+		}
 
 		// NONCE_CREATE
 		_, err = authNonceCreateDb(nonce, pCtx, pRuntime)
@@ -411,7 +399,6 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 		}
 
 		userExistsBool = false
-		return nil, errors.New("user does not exist")
 	} else {
 		userExistsBool = true
 	}
@@ -430,3 +417,16 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	}
 	return output, nil
 }
+
+// Questions about auth
+
+/*
+
+1. with having multiple addresses possible, why do nonce's only have a single address?
+2. are nonce's ever rotated once originally generated?
+3. what is USER_CHECK in userCreateDb()?
+4. should we use sigValid for user creation or just return an error?
+5. what is the purpose of preflight returing nonce and user exists when login already looks up nonce and trying to
+login without a user existing would error anyway?
+
+*/

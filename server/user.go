@@ -57,7 +57,7 @@ type userCreateOutput struct {
 //-------------------------------------------------------------
 // HANDLERS
 
-func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		up := &userUpdateInput{}
@@ -80,7 +80,7 @@ func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userGetInput{}
@@ -108,7 +108,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userCreateInput{}
@@ -120,9 +120,9 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		//------------------
 		// USER_CREATE
-		output, gErr := userCreateDb(input, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := userCreateDb(input, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -184,11 +184,11 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 
 	// JWT_GENERATION - signature is valid, so generate JWT key
-	jwtTokenStr, gErr := jwtGeneratePipeline(id,
+	jwtTokenStr, err := jwtGeneratePipeline(id,
 		pCtx,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, err
 	}
 
 	output.JWTtokenStr = jwtTokenStr
@@ -281,9 +281,10 @@ func userDeleteDb(pUserIDstr persist.DbId,
 }
 
 //-------------------------------------------------------------
-func userIsValid(pAddress string,
+// returns  nonce value string, user id, and error
+func userWithNonce(pAddress string,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) (bool, string, persist.DbId, error) {
+	pRuntime *runtime.Runtime) (string, persist.DbId, error) {
 
 	//------------------
 	// CHECK_USER_EXISTS
@@ -291,7 +292,7 @@ func userIsValid(pAddress string,
 		pCtx,
 		pRuntime)
 	if err != nil {
-		return false, "", "", err
+		return "", "", err
 	}
 
 	//------------------
@@ -301,7 +302,7 @@ func userIsValid(pAddress string,
 		pCtx,
 		pRuntime)
 	if err != nil {
-		return false, "", "", err
+		return "", "", err
 	}
 
 	// NONCE_NOT_FOUND - for this particular user
@@ -320,7 +321,7 @@ func userIsValid(pAddress string,
 
 		user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
 		if err != nil {
-			return false, "", "", err
+			return "", "", err
 		}
 
 		userIDstr = user.IDstr
@@ -328,5 +329,5 @@ func userIsValid(pAddress string,
 
 	//------------------
 
-	return userExistsBool, nonceValueStr, userIDstr, nil
+	return nonceValueStr, userIDstr, nil
 }
