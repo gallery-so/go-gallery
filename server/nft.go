@@ -61,7 +61,9 @@ func updateNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		err := persist.NftUpdateById(nft.IDstr, nft, c, pRuntime)
+		userId := c.GetString(userIdContextKey)
+
+		err := persist.NftUpdateById(nft.IDstr, persist.DbId(userId), nft, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
