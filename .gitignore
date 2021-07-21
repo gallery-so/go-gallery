@@ -1,3 +1,5 @@
 scripts/*.csv
 .idea/gallery.iml
 .DS_Store
+
+.vscode/

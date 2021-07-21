@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/gin-contrib/cors"
 	"github.com/go-playground/validator"
 	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,10 @@ func Init(pPortInt int,
 	log.Info("initializing server...")
 
 	pRuntime.Router = gin.Default()
+
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"https://gallery-dev.vercel.app/"}
+	pRuntime.Router.Use(cors.New(config))
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("short_string", shortStringValidator)

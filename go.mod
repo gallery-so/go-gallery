@@ -14,6 +14,7 @@ require (
 	github.com/fatih/color v1.12.0
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/getsentry/sentry-go v0.11.0 // indirect
+	github.com/gin-contrib/cors v1.3.1 // indirect
 	github.com/gin-gonic/gin v1.7.2
 	github.com/gloflow/gloflow v0.0.0-20210713035011-41b59fd5db66
 	github.com/go-playground/validator v9.31.0+incompatible
