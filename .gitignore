@@ -1,3 +1,9 @@
+# data
 scripts/*.csv
+
+# IDE
 .idea/gallery.iml
+.vscode/
+
+# Misc
 .DS_Store
