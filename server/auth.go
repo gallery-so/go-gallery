@@ -109,13 +109,6 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 //-------------------------------------------------------------
 // NONCE
 //-------------------------------------------------------------
-// NONCE_CREATE__PIPELINE
-func authNonceCreateDb(pNonce *persist.UserNonce,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (persist.DbId, error) {
-
-	return persist.AuthNonceCreate(pNonce, pCtx, pRuntime)
-}
 
 //-------------------------------------------------------------
 // NONCE_GENERATE
@@ -175,9 +168,14 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 
 	//------------------
 	// USER_CHECK
-	nonceValueStr, userIDstr, err := userWithNonce(pInput.Address, pCtx, pRuntime)
-	if err != nil {
-		return nil, err
+	nonceValueStr, userIDstr := userWithNonce(pInput.Address, pCtx, pRuntime)
+
+	if userIDstr == "" {
+		return nil, errors.New("no user found for address")
+	}
+
+	if nonceValueStr == "" {
+		return nil, errors.New("no nonce found for address")
 	}
 
 	output.UserIDstr = userIDstr
@@ -211,6 +209,12 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	output.JWTtokenStr = jwtTokenStr
 
 	//------------------
+	// NONCE ROTATE
+
+	err = authNonceRotateDb(pInput.Address, userIDstr, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
+	}
 
 	return output, nil
 }
@@ -374,33 +378,26 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
 	//------------------
-
 	var nonce *persist.UserNonce
-	var userExistsBool bool
 
 	// DB_GET_USER_BY_ADDRESS
 	user, err := persist.UserGetByAddress(pInput.AddressStr, pCtx, pRuntime)
-	if err != nil {
-		return nil, err
-	}
 
-	// NO_USER_FOUND - user doesnt exist in the system, and so return an empty response
-	//                 to the front-end. subsequently the client has to create a new user.
-	if user == nil {
+	userExistsBool := user != nil
+
+	if err != nil || !userExistsBool {
 
 		nonce := &persist.UserNonce{
-			ValueStr: generateNonce(),
+			AddressStr: pInput.AddressStr,
+			ValueStr:   generateNonce(),
 		}
 
 		// NONCE_CREATE
-		_, err = authNonceCreateDb(nonce, pCtx, pRuntime)
+		_, err = persist.AuthNonceCreate(nonce, pCtx, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 
-		userExistsBool = false
-	} else {
-		userExistsBool = true
 	}
 
 	// NONCE_GET
@@ -418,15 +415,17 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	return output, nil
 }
 
-// Questions about auth
+func authNonceRotateDb(pAddress string, pUserIdStr persist.DbId, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
-/*
+	newNonce := &persist.UserNonce{
+		ValueStr:   generateNonce(),
+		AddressStr: pAddress,
+		UserIDstr:  pUserIdStr,
+	}
 
-1. with having multiple addresses possible, why do nonce's only have a single address?
-2. are nonce's ever rotated once originally generated?
-3. what is USER_CHECK in userCreateDb()?
-4. should we use sigValid for user creation or just return an error?
-5. what is the purpose of preflight returing nonce and user exists when login already looks up nonce and trying to
-login without a user existing would error anyway?
-
-*/
+	_, err := persist.AuthNonceCreate(newNonce, pCtx, pRuntime)
+	if err != nil {
+		return err
+	}
+	return nil
+}

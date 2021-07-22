@@ -74,7 +74,7 @@ func TestPersist(pTest *testing.T) {
 
 	resSub := []testGrandchild{}
 
-	err = m.Find(ctx, bson.M{}, &resSub, &options.FindOptions{})
+	err = m.Find(ctx, bson.M{}, &resSub, options.Find())
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()

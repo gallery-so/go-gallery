@@ -42,9 +42,8 @@ type userCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr  string `json:"signature" binding:"required,signature"`
-	AddressStr    string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	NonceValueStr string `json:"nonce"     binding:"required,nonce"`
+	SignatureStr string `json:"signature" binding:"required,signature"`
+	AddressStr   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_CREATE
@@ -143,17 +142,16 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 	output := &userCreateOutput{}
 
-	//------------------
-	// USER_CHECK
-	// _, nonceValueStr, _, gErr := authUserCheck(pInput, pCtx, pRuntime)
-	// if gErr != nil {
-	// 	return nil, gErr
-	// }
+	nonceValueStr, _ := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
+
+	if nonceValueStr == "" {
+		return nil, errors.New("no nonce found for address")
+	}
 
 	//------------------
 	// VERIFY_SIGNATURE
 
-	dataStr := pInput.NonceValueStr
+	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
@@ -174,17 +172,17 @@ func userCreateDb(pInput *userCreateInput,
 	}
 
 	// DB
-	id, err := persist.UserCreate(user, pCtx, pRuntime)
+	userId, err := persist.UserCreate(user, pCtx, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	output.UserIDstr = id
+	output.UserIDstr = userId
 
 	//------------------
 
 	// JWT_GENERATION - signature is valid, so generate JWT key
-	jwtTokenStr, err := jwtGeneratePipeline(id,
+	jwtTokenStr, err := jwtGeneratePipeline(userId,
 		pCtx,
 		pRuntime)
 	if err != nil {
@@ -194,6 +192,12 @@ func userCreateDb(pInput *userCreateInput,
 	output.JWTtokenStr = jwtTokenStr
 
 	//------------------
+	// NONCE ROTATE
+
+	err = authNonceRotateDb(pInput.AddressStr, userId, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
+	}
 
 	return output, nil
 }
@@ -281,53 +285,32 @@ func userDeleteDb(pUserIDstr persist.DbId,
 }
 
 //-------------------------------------------------------------
-// returns  nonce value string, user id, and error
+// returns nonce value string, user id
+// will return empty string if no nonce found
+// will return empty string if no user found
 func userWithNonce(pAddress string,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) (string, persist.DbId, error) {
-
-	//------------------
-	// CHECK_USER_EXISTS
-	userExistsBool, err := persist.UserExistsByAddress(pAddress,
-		pCtx,
-		pRuntime)
-	if err != nil {
-		return "", "", err
-	}
+	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId) {
 
 	//------------------
 	// GET_NONCE - get latest nonce for this user_address from the DB
 
-	nonce, err := persist.AuthNonceGet(pAddress,
+	nonce, _ := persist.AuthNonceGet(pAddress,
 		pCtx,
 		pRuntime)
-	if err != nil {
-		return "", "", err
-	}
 
-	// NONCE_NOT_FOUND - for this particular user
-	var nonceValueStr string
-	if nonce == nil {
-		nonceValueStr = ""
-	} else {
+	if nonce != nil {
 		nonceValueStr = nonce.ValueStr
 	}
 
 	//------------------
 	// GET_ID
 
-	var userIDstr persist.DbId
-	if userExistsBool {
-
-		user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
-		if err != nil {
-			return "", "", err
-		}
-
-		userIDstr = user.IDstr
+	user, _ := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
+	if user != nil {
+		userIdStr = user.IDstr
 	}
-
 	//------------------
 
-	return nonceValueStr, userIDstr, nil
+	return
 }

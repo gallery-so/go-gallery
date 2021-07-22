@@ -52,8 +52,8 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 	// USER_CREATE
 	userCreateInput := &userCreateInput{
-		AddressStr:    addressStr,
-		NonceValueStr: nonceStr,
+		AddressStr:   addressStr,
+		SignatureStr: "how to make this? can we sign the nonce from go?",
 	}
 	user, err := userCreateDb(userCreateInput, ctx, runtime)
 	if err != nil {

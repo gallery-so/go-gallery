@@ -89,10 +89,10 @@ func UserGetById(userId DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*User, error) {
 
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
@@ -120,10 +120,10 @@ func UserGetByAddress(pAddress string,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*User, error) {
 
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
@@ -151,10 +151,10 @@ func UserGetByUsername(pUsername string,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*User, error) {
 
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
