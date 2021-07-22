@@ -142,10 +142,9 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 	output := &userCreateOutput{}
 
-	nonceValueStr, id := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
-
+	nonceValueStr, id, _ := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
 	if nonceValueStr == "" {
-		return nil, errors.New("no nonce found for address")
+		return nil, errors.New("nonce not found for address")
 	}
 	if id != "" {
 		return nil, errors.New("user already exists with a given address")
@@ -289,29 +288,38 @@ func userDeleteDb(pUserIDstr persist.DbId,
 
 //-------------------------------------------------------------
 // returns nonce value string, user id
-// will return empty string if no nonce found
+// will return empty strings and error if no nonce found
 // will return empty string if no user found
 func userWithNonce(pAddress string,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId) {
+	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId, err error) {
 
 	//------------------
 	// GET_NONCE - get latest nonce for this user_address from the DB
 
-	nonce, _ := persist.AuthNonceGet(pAddress,
+	nonce, err := persist.AuthNonceGet(pAddress,
 		pCtx,
 		pRuntime)
-
+	if err != nil {
+		return "", "", err
+	}
 	if nonce != nil {
 		nonceValueStr = nonce.ValueStr
+	} else {
+		return "", "", errors.New("no nonce found")
 	}
 
 	//------------------
 	// GET_ID
 
-	user, _ := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
+	user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
+	if err != nil {
+		return "", "", err
+	}
 	if user != nil {
 		userIdStr = user.IDstr
+	} else {
+		return "", "", errors.New("no user found")
 	}
 	//------------------
 
