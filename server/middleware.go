@@ -70,6 +70,7 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 
 func handleCORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// TODO make origin url env specific
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "https://gallery-dev.vercel.app")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
