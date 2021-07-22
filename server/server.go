@@ -17,6 +17,7 @@ func Init(pPortInt int,
 	log.Info("initializing server...")
 
 	pRuntime.Router = gin.Default()
+	pRuntime.Router.Use(handleCORS())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("short_string", shortStringValidator)
