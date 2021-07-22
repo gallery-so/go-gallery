@@ -10,7 +10,7 @@ RUN apt-get update
 RUN apt-get install -y ca-certificates wget
 
 WORKDIR /home/glry
-ADD .env .env
+ADD bin/.env .env
 ADD bin/main main
 
 CMD "./main"

@@ -64,8 +64,8 @@ func ConfigLoad() *Config {
 
 	viper.Set("true", true)
 	viper.Set("false", false)
-
-	viper.SetConfigFile(fmt.Sprintf("%s/.env", ProjectRootPath))
+	
+	viper.SetConfigFile(getEnvPath())
 
 	// Enable VIPER to read Environment Variables
 	viper.AutomaticEnv()
