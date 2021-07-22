@@ -142,10 +142,13 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 	output := &userCreateOutput{}
 
-	nonceValueStr, _ := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
+	nonceValueStr, id := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
 
 	if nonceValueStr == "" {
 		return nil, errors.New("no nonce found for address")
+	}
+	if id != "" {
+		return nil, errors.New("user already exists with a given address")
 	}
 
 	//------------------
