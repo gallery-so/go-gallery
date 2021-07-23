@@ -78,7 +78,7 @@ func CollGetByUserID(pUserIDstr DbId,
 
 	result := []*Collection{}
 
-	fil := bson.M{"owner_user_id": pUserIDstr}
+	fil := bson.M{"owner_user_id": pUserIDstr, "deleted": false}
 	if pNoHidden {
 		fil["hidden"] = false
 	}
@@ -105,11 +105,10 @@ func CollGetByID(pIDstr DbId,
 
 	result := []*Collection{}
 
-	fil := bson.M{"_id": pIDstr}
+	fil := bson.M{"_id": pIDstr, "deleted": false}
 	if pNoHidden {
 		fil["hidden"] = false
 	}
-
 	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
@@ -168,7 +167,7 @@ func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Run
 
 func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
 	return mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"owner_user_id": pUserId}}},
+		{{Key: "$match", Value: bson.M{"owner_user_id": pUserId, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},
 		{{Key: "$project", Value: bson.M{
 			"nfts": bson.M{
@@ -187,7 +186,10 @@ func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
 					"$expr": bson.M{
-						"$not": bson.M{"$in": []string{"$_id", "$$array"}},
+						"$and": []bson.M{
+							{"$not": bson.M{"$in": []string{"$_id", "$$array"}}},
+							{"$eq": []interface{}{"$deleted", false}},
+						},
 					},
 				}}},
 			},
@@ -201,10 +203,25 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from":         "nfts",
-			"foreignField": "_id",
-			"localField":   "nfts",
-			"as":           "nfts",
+			"from": "nfts",
+			"let":  bson.M{"array": "$nfts"},
+			"pipeline": mongo.Pipeline{
+				{{Key: "$match", Value: bson.M{
+					"$expr": bson.M{
+						"$and": []bson.M{
+							{"$in": []string{"$_id", "$$array"}},
+							{"$eq": []interface{}{"$deleted", false}},
+						},
+					},
+				}}},
+			},
+			"as": "nfts",
 		}}},
+		// {{Key: "$lookup", Value: bson.M{
+		// 	"from":         "nfts",
+		// 	"foreignField": "_id",
+		// 	"localField":   "nfts",
+		// 	"as":           "nfts",
+		// }}},
 	}
 }
