@@ -33,7 +33,7 @@ func TestCreateAndGetNFT(pTest *testing.T) {
 	id, err := NftCreate(&Nft{OwnerUserIdStr: "poop", DescriptionStr: "cool nft", NameStr: "Big Bobby's Balooga"}, ctx, runtime)
 	assert.Nil(pTest, err)
 
-	err = NftUpdateById(id, &Nft{OwnerUserIdStr: "poop", DescriptionStr: "extremely cool nft", NameStr: "Big Bobby's Balooga"}, ctx, runtime)
+	err = NftUpdateById(id, "poop", &Nft{OwnerUserIdStr: "poop", DescriptionStr: "extremely cool nft", NameStr: "Big Bobby's Balooga"}, ctx, runtime)
 	assert.Nil(pTest, err)
 
 	nfts, err := NftGetById(id, ctx, runtime)

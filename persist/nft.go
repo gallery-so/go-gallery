@@ -126,7 +126,7 @@ func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([
 	return result, nil
 }
 
-func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
+func NftUpdateById(pIDstr DbId, pUserIdstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
 
 	//------------------
 	// VALIDATE
@@ -136,7 +136,7 @@ func NftUpdateById(pIDstr DbId, updatedNft *Nft, pCtx context.Context, pRuntime 
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr}, bson.M{"$set": updatedNft})
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_Id": pUserIdstr}, updatedNft)
 }
 
 func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {
