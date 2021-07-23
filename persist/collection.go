@@ -217,11 +217,5 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 			},
 			"as": "nfts",
 		}}},
-		// {{Key: "$lookup", Value: bson.M{
-		// 	"from":         "nfts",
-		// 	"foreignField": "_id",
-		// 	"localField":   "nfts",
-		// 	"as":           "nfts",
-		// }}},
 	}
 }
