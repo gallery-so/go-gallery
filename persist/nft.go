@@ -93,10 +93,10 @@ func NftCreate(pNFT *Nft,
 func NftGetByUserId(pUserIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Nft, error) {
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
@@ -110,10 +110,10 @@ func NftGetByUserId(pUserIDstr DbId,
 
 func NftGetById(pIDstr DbId, pCtx context.Context, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
@@ -175,10 +175,10 @@ func NftBulkUpsertOrRemove(walletAddress string, pNfts []*Nft, pCtx context.Cont
 
 	// FIND DIFFERENCE AND DELETE OUTLIERS
 	// -------------------------------------------------------
-	opts := &options.FindOptions{}
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	dbNfts := []*Nft{}

@@ -109,17 +109,10 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 //-------------------------------------------------------------
 // NONCE
 //-------------------------------------------------------------
-// NONCE_CREATE__PIPELINE
-func authNonceCreateDb(pNonce *persist.UserNonce,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (persist.DbId, error) {
-
-	return persist.AuthNonceCreate(pNonce, pCtx, pRuntime)
-}
 
 //-------------------------------------------------------------
 // NONCE_GENERATE
-func authGenerateRandomString() string {
+func generateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonceInt := seededRand.Int()
 	nonceStr := fmt.Sprintf("%d", nonceInt)
@@ -170,21 +163,14 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//------------------
 	// OUTPUT
 	output := &authUserLoginOutput{}
 
 	//------------------
 	// USER_CHECK
-	_, nonceValueStr, userIDstr, gErr := userIsValid(pInput.Address, pCtx, pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	nonceValueStr, userIDstr, err := getUserWithNonce(pInput.Address, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
 	output.UserIDstr = userIDstr
@@ -193,12 +179,12 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	// VERIFY_SIGNATURE
 
 	dataStr := nonceValueStr
-	sigValidBool, gErr := authVerifySignatureAllMethods(pInput.SignatureStr,
+	sigValidBool, err := authVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.Address,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, err
 	}
 
 	output.SignatureValidBool = sigValidBool
@@ -218,6 +204,12 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 	output.JWTtokenStr = jwtTokenStr
 
 	//------------------
+	// NONCE ROTATE
+
+	err = authNonceRotateDb(pInput.Address, userIDstr, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
+	}
 
 	return output, nil
 }
@@ -381,39 +373,26 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//------------------
-
 	var nonce *persist.UserNonce
-	var userExistsBool bool
 
 	// DB_GET_USER_BY_ADDRESS
 	user, err := persist.UserGetByAddress(pInput.AddressStr, pCtx, pRuntime)
-	if err != nil {
-		return nil, err
-	}
 
-	// NO_USER_FOUND - user doesnt exist in the system, and so return an empty response
-	//                 to the front-end. subsequently the client has to create a new user.
-	if user == nil {
+	userExistsBool := user != nil
 
-		nonce := &persist.UserNonce{}
+	if err != nil || !userExistsBool {
+
+		nonce := &persist.UserNonce{
+			AddressStr: pInput.AddressStr,
+			ValueStr:   generateNonce(),
+		}
 
 		// NONCE_CREATE
-		_, err = authNonceCreateDb(nonce, pCtx, pRuntime)
+		_, err = persist.AuthNonceCreate(nonce, pCtx, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 
-		userExistsBool = false
-		return nil, errors.New("user does not exist")
-	} else {
-		userExistsBool = true
 	}
 
 	// NONCE_GET
@@ -429,4 +408,19 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 		UserExistsBool: userExistsBool,
 	}
 	return output, nil
+}
+
+func authNonceRotateDb(pAddress string, pUserIdStr persist.DbId, pCtx context.Context, pRuntime *runtime.Runtime) error {
+
+	newNonce := &persist.UserNonce{
+		ValueStr:   generateNonce(),
+		AddressStr: pAddress,
+		UserIDstr:  pUserIdStr,
+	}
+
+	_, err := persist.AuthNonceCreate(newNonce, pCtx, pRuntime)
+	if err != nil {
+		return err
+	}
+	return nil
 }

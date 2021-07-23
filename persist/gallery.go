@@ -49,10 +49,10 @@ func GalleryGetByUserID(pUserIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 
-	opts := &options.AggregateOptions{}
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
@@ -70,10 +70,10 @@ func GalleryGetByUserID(pUserIDstr DbId,
 func GalleryGetByID(pIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
-	opts := &options.AggregateOptions{}
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)

@@ -31,7 +31,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
 			// database that is unique to every user and session
-			valid, userId, err := authJwtVerify(jwt, os.Getenv("JWT_SECRET"), runtime)
+			valid, userId, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
 				return
@@ -59,7 +59,7 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 			if len(authHeaders) == 2 {
 				// get string after "Bearer"
 				jwt := authHeaders[1]
-				valid, userId, _ := authJwtVerify(jwt, os.Getenv("JWT_SECRET"), runtime)
+				valid, userId, _ := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 				c.Set(authContextKey, valid)
 				c.Set(userIdContextKey, userId)
 			}

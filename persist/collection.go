@@ -68,10 +68,10 @@ func CollGetByUserID(pUserIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
-	opts := &options.AggregateOptions{}
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
@@ -95,10 +95,10 @@ func CollGetByID(pIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
-	opts := &options.AggregateOptions{}
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
@@ -145,10 +145,10 @@ func CollDelete(pIDstr DbId,
 // returns a collection that is empty except for a list of nfts
 func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Runtime) (*Collection, error) {
 
-	opts := &options.AggregateOptions{}
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
-		opts.MaxTime = &dur
+		opts.SetMaxTime(dur)
 	}
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)

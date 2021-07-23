@@ -1,87 +1,76 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"testing"
-	// "github.com/stretchr/testify/assert"
-	// gfcore "github.com/gloflow/gloflow/go/gf_core"
-	// "github.com/davecgh/go-spew/spew"
+
+	"github.com/mikeydub/go-gallery/runtime"
+	log "github.com/sirupsen/logrus"
 )
 
 //---------------------------------------------------
 func TestAuthUser(pTest *testing.T) {
 
-	// TODO
+	addressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
 
-	// cyan   := color.New(color.FgCyan).SprintFunc()
-	// yellow := color.New(color.FgYellow).SprintFunc()
+	ctx := context.Background()
 
-	// fmt.Println(cyan("TEST__AUTH_USER"), yellow("=============================================="))
+	//--------------------
+	// RUNTIME_SYS
 
-	// addressStr := persist.GLRYuserAddress("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15")
+	mongoURLstr := "mongodb://127.0.0.1:27017"
+	mongoDBnameStr := "glry_test"
+	config := &runtime.Config{
+		// Env            string
+		// BaseURL        string
+		// WebBaseURL     string
+		// Port              int
+		MongoURLstr:       mongoURLstr,
+		MongoDBnameStr:    mongoDBnameStr,
+		JWTtokenTTLsecInt: 86400,
+	}
 
-	// ctx := context.Background()
+	runtime, gErr := runtime.RuntimeGet(config)
+	if gErr != nil {
+		pTest.Fail()
+	}
 
-	// //--------------------
-	// // RUNTIME_SYS
+	//--------------------
+	// USER_GET_PREFLIGHT
 
-	// mongoURLstr    := "mongodb://127.0.0.1:27017"
-	// mongoDBnameStr := "glry_test"
-	// config := &runtime.GLRYconfig {
-	// 	// Env            string
-	// 	// BaseURL        string
-	// 	// WebBaseURL     string
-	// 	// Port              int
-	// 	MongoURLstr:       mongoURLstr,
-	// 	MongoDBnameStr:    mongoDBnameStr,
-	// 	JWTtokenTTLsecInt: 86400,
-	// }
+	userGetPublicInfoInput := &authUserGetPreflightInput{
+		AddressStr: addressStr,
+	}
+	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, runtime)
+	if err != nil {
+		pTest.Fail()
+	}
 
-	// runtime, gErr := runtime.RuntimeGet(config)
-	// if gErr != nil {
-	// 	pTest.Fail()
-	// }
+	nonceStr := output.NonceStr
 
-	// //--------------------
-	// // USER_GET_PREFLIGHT
+	//--------------------
+	// USER_CREATE
+	userCreateInput := &userCreateInput{
+		AddressStr:   addressStr,
+		SignatureStr: "how to make this? can we sign the nonce from go?",
+	}
+	user, err := userCreateDb(userCreateInput, ctx, runtime)
+	if err != nil {
+		pTest.Fail()
+	}
 
-	// userGetPublicInfoInput := &GLRYauthUserGetPreflightInput{
-	// 	AddressStr: user.AddressesLst[0],
-	// }
-	// output, gErr := AuthUserGetPreflightPipeline(userGetPublicInfoInput, ctx, runtime)
-	// if gErr != nil {
-	// 	pTest.Fail()
-	// }
+	//--------------------
+	// USER_DELETE
 
-	// nonceStr := output.NonceStr
+	err = userDeleteDb(user.UserIDstr, ctx, runtime)
+	if err != nil {
+		pTest.Fail()
+	}
 
-	// //--------------------
-	// // USER_CREATE
-	// userCreateInput := &GLRYauthUserCreateInput{
+	//--------------------
 
-	// 	SignatureStr:  ,
-	// 	AddressStr:    addressStr,
-	// 	NonceValueStr: nonceStr,
-	// }
-	// user, gErr := AuthUserCreatePipeline(userCreateInput, ctx, runtime)
-	// if gErr != nil {
-	// 	pTest.Fail()
-	// }
-
-	// // spew.Dump(user)
-
-	// //--------------------
-	// // USER_DELETE
-
-	// gErr = AuthUserDeletePipeline(user.IDstr, ctx, runtime)
-	// if gErr != nil {
-	// 	pTest.Fail()
-	// }
-
-	// //--------------------
-
-	// log.WithFields(log.Fields{"nonce": nonceStr,}).Info("signature validity")
-	// fmt.Println()
-
-	// assert.True(pTest, len(assetsForAccLst) > 0, "more then 0 OpenSea assets should be fetched for Account")
+	log.WithFields(log.Fields{"nonce": nonceStr}).Info("signature validity")
+	fmt.Println()
 
 }

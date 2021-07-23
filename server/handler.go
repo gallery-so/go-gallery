@@ -71,18 +71,18 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// USER_UPDATE
 	// AUTHENTICATED
 
-	usersGroup.POST("/update", jwtRequired(pRuntime), updateUserAuth(pRuntime))
+	usersGroup.POST("/update", jwtRequired(pRuntime), updateUser(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED
 
-	usersGroup.GET("/get", jwtOptional(pRuntime), getUserAuth(pRuntime))
+	usersGroup.GET("/get", jwtOptional(pRuntime), getUser(pRuntime))
 
 	//-------------------------------------------------------------
 	// USER_CREATE
 	// UN-AUTHENTICATED
 
-	usersGroup.POST("/create", createUserAuth(pRuntime))
+	usersGroup.POST("/create", createUser(pRuntime))
 
 }

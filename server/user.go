@@ -42,9 +42,8 @@ type userCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr  string `json:"signature" binding:"required,signature"`
-	AddressStr    string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	NonceValueStr string `json:"nonce"     binding:"required,nonce"`
+	SignatureStr string `json:"signature" binding:"required,signature"`
+	AddressStr   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_CREATE
@@ -57,7 +56,7 @@ type userCreateOutput struct {
 //-------------------------------------------------------------
 // HANDLERS
 
-func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		up := &userUpdateInput{}
@@ -80,7 +79,7 @@ func updateUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userGetInput{}
@@ -108,7 +107,7 @@ func getUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userCreateInput{}
@@ -120,9 +119,9 @@ func createUserAuth(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		//------------------
 		// USER_CREATE
-		output, gErr := userCreateDb(input, c, pRuntime)
-		if gErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gErr})
+		output, err := userCreateDb(input, c, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -143,17 +142,18 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 	output := &userCreateOutput{}
 
-	//------------------
-	// USER_CHECK
-	// _, nonceValueStr, _, gErr := authUserCheck(pInput, pCtx, pRuntime)
-	// if gErr != nil {
-	// 	return nil, gErr
-	// }
+	nonceValueStr, id, _ := getUserWithNonce(pInput.AddressStr, pCtx, pRuntime)
+	if nonceValueStr == "" {
+		return nil, errors.New("nonce not found for address")
+	}
+	if id != "" {
+		return nil, errors.New("user already exists with a given address")
+	}
 
 	//------------------
 	// VERIFY_SIGNATURE
 
-	dataStr := pInput.NonceValueStr
+	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.SignatureStr,
 		dataStr,
 		pInput.AddressStr,
@@ -174,26 +174,32 @@ func userCreateDb(pInput *userCreateInput,
 	}
 
 	// DB
-	id, err := persist.UserCreate(user, pCtx, pRuntime)
+	userId, err := persist.UserCreate(user, pCtx, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	output.UserIDstr = id
+	output.UserIDstr = userId
 
 	//------------------
 
 	// JWT_GENERATION - signature is valid, so generate JWT key
-	jwtTokenStr, gErr := jwtGeneratePipeline(id,
+	jwtTokenStr, err := jwtGeneratePipeline(userId,
 		pCtx,
 		pRuntime)
-	if gErr != nil {
-		return nil, gErr
+	if err != nil {
+		return nil, err
 	}
 
 	output.JWTtokenStr = jwtTokenStr
 
 	//------------------
+	// NONCE ROTATE
+
+	err = authNonceRotateDb(pInput.AddressStr, userId, pCtx, pRuntime)
+	if err != nil {
+		return nil, err
+	}
 
 	return output, nil
 }
@@ -281,18 +287,12 @@ func userDeleteDb(pUserIDstr persist.DbId,
 }
 
 //-------------------------------------------------------------
-func userIsValid(pAddress string,
+// returns nonce value string, user id
+// will return empty strings and error if no nonce found
+// will return empty string if no user found
+func getUserWithNonce(pAddress string,
 	pCtx context.Context,
-	pRuntime *runtime.Runtime) (bool, string, persist.DbId, error) {
-
-	//------------------
-	// CHECK_USER_EXISTS
-	userExistsBool, err := persist.UserExistsByAddress(pAddress,
-		pCtx,
-		pRuntime)
-	if err != nil {
-		return false, "", "", err
-	}
+	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId, err error) {
 
 	//------------------
 	// GET_NONCE - get latest nonce for this user_address from the DB
@@ -301,32 +301,27 @@ func userIsValid(pAddress string,
 		pCtx,
 		pRuntime)
 	if err != nil {
-		return false, "", "", err
+		return "", "", err
 	}
-
-	// NONCE_NOT_FOUND - for this particular user
-	var nonceValueStr string
-	if nonce == nil {
-		nonceValueStr = ""
-	} else {
+	if nonce != nil {
 		nonceValueStr = nonce.ValueStr
+	} else {
+		return "", "", errors.New("no nonce found")
 	}
 
 	//------------------
 	// GET_ID
 
-	var userIDstr persist.DbId
-	if userExistsBool {
-
-		user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
-		if err != nil {
-			return false, "", "", err
-		}
-
-		userIDstr = user.IDstr
+	user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
+	if err != nil {
+		return "", "", err
 	}
-
+	if user != nil {
+		userIdStr = user.IDstr
+	} else {
+		return "", "", errors.New("no user found")
+	}
 	//------------------
 
-	return userExistsBool, nonceValueStr, userIDstr, nil
+	return nonceValueStr, userIdStr, nil
 }

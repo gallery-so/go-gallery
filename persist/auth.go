@@ -73,11 +73,11 @@ func AuthNonceGet(pAddress string,
 	mp := NewMongoStorage(0, noncesCollName, pRuntime)
 
 	opts := options.Find()
-	opts.SetSort(map[string]interface{}{"created_at": -1})
+	opts.SetSort(bson.M{"creation_time": -1})
 	opts.SetLimit(1)
 
 	result := []*UserNonce{}
-	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
+	err := mp.Find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
 		return nil, err

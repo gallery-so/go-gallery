@@ -33,7 +33,7 @@ type jwtClaims struct {
 
 //-------------------------------------------------------------
 // VERIFY
-func authJwtVerify(pJWTtokenStr string,
+func authJwtParse(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
 	pRuntime *runtime.Runtime) (bool, persist.DbId, error) {
 
