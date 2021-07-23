@@ -168,7 +168,7 @@ func authUserLoginPipeline(pInput *authUserLoginInput,
 
 	//------------------
 	// USER_CHECK
-	nonceValueStr, userIDstr, err := userWithNonce(pInput.Address, pCtx, pRuntime)
+	nonceValueStr, userIDstr, err := getUserWithNonce(pInput.Address, pCtx, pRuntime)
 	if err != nil {
 		return nil, err
 	}

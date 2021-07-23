@@ -142,7 +142,7 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 	output := &userCreateOutput{}
 
-	nonceValueStr, id, _ := userWithNonce(pInput.AddressStr, pCtx, pRuntime)
+	nonceValueStr, id, _ := getUserWithNonce(pInput.AddressStr, pCtx, pRuntime)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
@@ -290,7 +290,7 @@ func userDeleteDb(pUserIDstr persist.DbId,
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func userWithNonce(pAddress string,
+func getUserWithNonce(pAddress string,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId, err error) {
 
