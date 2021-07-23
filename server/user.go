@@ -323,5 +323,5 @@ func getUserWithNonce(pAddress string,
 	}
 	//------------------
 
-	return
+	return nonceValueStr, userIdStr, nil
 }
