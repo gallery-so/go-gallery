@@ -59,7 +59,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr, "deleted": false}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func GalleryGetByID(pIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr, "deleted": false}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -96,14 +96,27 @@ func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
 					"$expr": bson.M{
-						"$in": []string{"$_id", "$$childArray"},
+						"$and": []bson.M{
+							{"$in": []string{"$_id", "$$childArray"}},
+							{"$eq": []interface{}{"$deleted", false}},
+						},
 					},
-				}}},
+				},
+				}},
 				{{Key: "$lookup", Value: bson.M{
-					"from":         "nfts",
-					"foreignField": "_id",
-					"localField":   "nfts",
-					"as":           "nfts",
+					"from": "nfts",
+					"let":  bson.M{"array": "$nfts"},
+					"pipeline": mongo.Pipeline{
+						{{Key: "$match", Value: bson.M{
+							"$expr": bson.M{
+								"$and": []bson.M{
+									{"$in": []string{"$_id", "$$array"}},
+									{"$eq": []interface{}{"$deleted", false}},
+								},
+							},
+						}}},
+					},
+					"as": "nfts",
 				}}},
 			},
 			"as": "children",
