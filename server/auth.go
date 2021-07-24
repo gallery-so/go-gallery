@@ -59,6 +59,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// GET_PUBLIC_INFO
 		output, err := authUserGetPreflightDb(input, c, pRuntime)
 		if err != nil {
+			// TODO: log specific error and return user friendly error message instead
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 
 			return
