@@ -23,7 +23,7 @@ type UserNonce struct {
 
 	// nonces are shortlived, and not something to be persisted across DB's
 	// other than mongo. so use mongo-native ID generation
-	ID            DbId    `bson:"_id"           json:"id"`
+	IDstr         DbId    `bson:"_id"           json:"id"`
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"       json:"deleted"`
 
@@ -35,7 +35,7 @@ type UserNonce struct {
 // USER_LOGIN_ATTEMPT
 type UserLoginAttempt struct {
 	VersionInt    int64   `bson:"version"`
-	ID            DbId    `bson:"_id"`
+	IDstr         DbId    `bson:"_id"`
 	CreationTimeF float64 `bson:"creation_time"`
 
 	AddressStr         string `bson:"address"     json:"address"`
