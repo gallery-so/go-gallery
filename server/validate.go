@@ -3,12 +3,12 @@ package server
 import (
 	"strings"
 
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 )
 
 var ethValidator validator.Func = func(fl validator.FieldLevel) bool {
 	addr := fl.Field().String()
-	return len(addr) == 42 && strings.HasSuffix(addr, "0x")
+	return len(addr) == 42 && strings.HasPrefix(addr, "0x")
 }
 
 var signatureValidator validator.Func = func(fl validator.FieldLevel) bool {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
 )
@@ -20,6 +20,7 @@ func Init(pPortInt int,
 	pRuntime.Router.Use(handleCORS())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		log.Info("registering validation")
 		v.RegisterValidation("short_string", shortStringValidator)
 		v.RegisterValidation("medium_string", mediumStringValidator)
 		v.RegisterValidation("eth_addr", ethValidator)
