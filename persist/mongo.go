@@ -33,8 +33,9 @@ func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-	if _, ok := elem.FieldByName("IDstr"); ok {
-		idField := val.FieldByName("IDstr")
+
+	if _, ok := elem.FieldByName("ID"); ok {
+		idField := val.FieldByName("ID")
 		if !idField.CanSet() {
 			// panic because this literally cannot happen in prod
 			panic("unable to set id field on struct")
