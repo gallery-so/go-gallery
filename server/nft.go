@@ -21,6 +21,10 @@ type getNftsByUserIdInput struct {
 	UserId persist.DbId `json:"user_id" form:"user_id" binding:"required"`
 }
 
+type getOpenseaNftsInput struct {
+	WalletAddress string `json:"addr" form:"addr" binding:"required"`
+}
+
 type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
 }
@@ -107,12 +111,12 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ownerWalletAddr := c.Query("addr")
-		if ownerWalletAddr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "owner wallet address not found in query values"})
+		input := &getOpenseaNftsInput{}
+		if err := c.ShouldBindQuery(input); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := OpenSeaPipelineAssetsForAcc(ownerWalletAddr, c, pRuntime)
+		nfts, err := OpenSeaPipelineAssetsForAcc(input.WalletAddress, c, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
