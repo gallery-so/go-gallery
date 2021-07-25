@@ -124,6 +124,11 @@ Run all tests in subdirectory (e.g. /server):
 $ go test ./server/...
 ```
 
+Run a specific test by passing the name as an option:
+```bash
+go test -run {testName}
+```
+
 Add `-v` for detailed logs
 
 ## Deploy
