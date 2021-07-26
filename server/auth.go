@@ -374,16 +374,19 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
 	//------------------
-	var nonce *persist.UserNonce
 
 	// DB_GET_USER_BY_ADDRESS
 	user, err := persist.UserGetByAddress(pInput.AddressStr, pCtx, pRuntime)
 
 	userExistsBool := user != nil
 
+	output := &authUserGetPreflightOutput{
+		UserExistsBool: userExistsBool,
+	}
+	var nonce *persist.UserNonce
 	if err != nil || !userExistsBool {
 
-		nonce := &persist.UserNonce{
+		nonce = &persist.UserNonce{
 			AddressStr: pInput.AddressStr,
 			ValueStr:   generateNonce(),
 		}
@@ -394,20 +397,14 @@ func authUserGetPreflightDb(pInput *authUserGetPreflightInput,
 			return nil, err
 		}
 
+	} else {
+		nonce, err = persist.AuthNonceGet(pInput.AddressStr, pCtx, pRuntime)
+		if err != nil {
+			return nil, err
+		}
 	}
+	output.NonceStr = nonce.ValueStr
 
-	// NONCE_GET
-	nonce, err = persist.AuthNonceGet(pInput.AddressStr, pCtx, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	//-------------------------------------------------------------
-
-	output := &authUserGetPreflightOutput{
-		NonceStr:       nonce.ValueStr,
-		UserExistsBool: userExistsBool,
-	}
 	return output, nil
 }
 
