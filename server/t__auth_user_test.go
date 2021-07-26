@@ -2,11 +2,10 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 //---------------------------------------------------
@@ -17,37 +16,19 @@ func TestAuthUser(pTest *testing.T) {
 	ctx := context.Background()
 
 	//--------------------
-	// RUNTIME_SYS
-
-	mongoURLstr := "mongodb://127.0.0.1:27017"
-	mongoDBnameStr := "glry_test"
-	config := &runtime.Config{
-		// Env            string
-		// BaseURL        string
-		// WebBaseURL     string
-		// Port              int
-		MongoURLstr:       mongoURLstr,
-		MongoDBnameStr:    mongoDBnameStr,
-		JWTtokenTTLsecInt: 86400,
-	}
-
-	runtime, gErr := runtime.RuntimeGet(config)
-	if gErr != nil {
-		pTest.Fail()
-	}
-
-	//--------------------
 	// USER_GET_PREFLIGHT
 
 	userGetPublicInfoInput := &authUserGetPreflightInput{
 		AddressStr: addressStr,
 	}
-	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, runtime)
+	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, r)
 	if err != nil {
-		pTest.Fail()
+		pTest.FailNow()
 	}
 
 	nonceStr := output.NonceStr
+
+	assert.NotEmpty(pTest, nonceStr)
 
 	//--------------------
 	// USER_CREATE
@@ -55,7 +36,7 @@ func TestAuthUser(pTest *testing.T) {
 		AddressStr:   addressStr,
 		SignatureStr: "how to make this? can we sign the nonce from go?",
 	}
-	user, err := userCreateDb(userCreateInput, ctx, runtime)
+	user, err := userCreateDb(userCreateInput, ctx, r)
 	if err != nil {
 		pTest.Fail()
 	}
@@ -63,7 +44,7 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 	// USER_DELETE
 
-	err = userDeleteDb(user.UserIDstr, ctx, runtime)
+	err = userDeleteDb(user.UserIDstr, ctx, r)
 	if err != nil {
 		pTest.Fail()
 	}
@@ -71,6 +52,5 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 
 	log.WithFields(log.Fields{"nonce": nonceStr}).Info("signature validity")
-	fmt.Println()
 
 }

@@ -301,12 +301,12 @@ func getUserWithNonce(pAddress string,
 		pCtx,
 		pRuntime)
 	if err != nil {
-		return "", "", err
+		return nonceValueStr, userIdStr, err
 	}
 	if nonce != nil {
 		nonceValueStr = nonce.ValueStr
 	} else {
-		return "", "", errors.New("no nonce found")
+		return nonceValueStr, userIdStr, errors.New("no nonce found")
 	}
 
 	//------------------
@@ -314,12 +314,12 @@ func getUserWithNonce(pAddress string,
 
 	user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
 	if err != nil {
-		return "", "", err
+		return nonceValueStr, userIdStr, err
 	}
 	if user != nil {
 		userIdStr = user.IDstr
 	} else {
-		return "", "", errors.New("no user found")
+		return nonceValueStr, userIdStr, errors.New("no user found")
 	}
 	//------------------
 
