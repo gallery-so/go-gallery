@@ -29,6 +29,7 @@ type userGetInput struct {
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
+	UserId      string   ` json:"id"`
 	UserNameStr string   ` json:"username"`
 	BioStr      string   ` json:"bio"`
 	Addresses   []string ` json:"addresses"`
@@ -241,6 +242,7 @@ func userGetDb(pInput *userGetInput,
 	}
 
 	output := &userGetOutput{
+		UserId:      string(user.IDstr),
 		UserNameStr: user.UserNameStr,
 		BioStr:      user.BioStr,
 	}
