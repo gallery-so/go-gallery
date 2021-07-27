@@ -20,7 +20,7 @@ import (
 
 // INPUT - USER_LOGIN
 type authUserLoginInput struct {
-	SignatureStr string `json:"signature" binding:"required,short_string"`
+	SignatureStr string `json:"signature" binding:"required,medium_string"`
 	Address      string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
@@ -75,7 +75,8 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusOK, ErrorResponse{Error: err.Error()})
+			// TODO this should be Bad Request I think
+			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}
 

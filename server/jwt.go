@@ -51,11 +51,11 @@ func authJwtParse(pJWTtokenStr string,
 	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
 	spew.Dump(claims)
 
-	if claims, ok := JWTtoken.Claims.(jwtClaims); ok && JWTtoken.Valid {
-		return JWTtoken.Valid, claims.UserId, nil
-	} else {
-		return false, "", errors.New("failed to verify JWT token for a user")
+	if !JWTtoken.Valid {
+		return false, "", errors.New("JWT token is invalid")
 	}
+
+	return true, claims.UserId, nil
 }
 
 //-------------------------------------------------------------
