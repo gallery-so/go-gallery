@@ -29,10 +29,10 @@ type userGetInput struct {
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
-	UserId      string   ` json:"id"`
-	UserNameStr string   ` json:"username"`
-	BioStr      string   ` json:"bio"`
-	Addresses   []string ` json:"addresses"`
+	UserId      persist.DbId ` json:"id"`
+	UserNameStr string       ` json:"username"`
+	BioStr      string       ` json:"bio"`
+	Addresses   []string     ` json:"addresses"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -242,7 +242,7 @@ func userGetDb(pInput *userGetInput,
 	}
 
 	output := &userGetOutput{
-		UserId:      string(user.IDstr),
+		UserId:      user.IDstr,
 		UserNameStr: user.UserNameStr,
 		BioStr:      user.BioStr,
 	}
