@@ -127,7 +127,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 		return err
 	}
 	if result.MatchedCount == 0 {
-		// TODO this should return a 404
+		// TODO this should return a 404 or 204
 		return errors.New("could not find document to update")
 	}
 
