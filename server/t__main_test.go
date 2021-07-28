@@ -8,13 +8,20 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
-var testServer *httptest.Server
-var serverUrl string
-var r *runtime.Runtime
+type TestConfig struct {
+	server 			*httptest.Server
+	serverUrl 		string
+	r 				*runtime.Runtime
+	testUserAddress string
+	user1			*TestUser
+	user2			*TestUser
+}
+
+var tc *TestConfig
 
 func TestMain(m *testing.M) {
-    testServer, serverUrl, r = setup()
+    tc = setup()
     code := m.Run() 
-    teardown(testServer)
+    teardown(tc.server)
     os.Exit(code)
 }
