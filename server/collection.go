@@ -85,12 +85,14 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		ownerId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		//------------------
 		// CREATE
 
-		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
+		id, err := collectionCreateDb(input, persist.DbId(userId), c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error: err.Error(),
@@ -110,7 +112,9 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{NameStr: input.Name}
 
@@ -132,7 +136,9 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{HiddenBool: input.Hidden}
 
@@ -154,7 +160,9 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{NftsLst: input.Nfts}
 
@@ -178,7 +186,9 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		err := persist.CollDelete(input.Id, persist.DbId(userId), c, pRuntime)
 		if err != nil {

@@ -5,12 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
-)
-
-const (
-	nftIdQueryNotProvided = "nft id not provided in query values"
 )
 
 type getNftsByIdInput struct {
@@ -35,7 +32,7 @@ func getNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: nftIdQueryNotProvided,
+				Error: copy.NftIdQueryNotProvided,
 			})
 			return
 		}
@@ -61,14 +58,23 @@ func updateNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		nft := &persist.Nft{}
 		if err := c.ShouldBindJSON(nft); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			// TODO: think about how to log errors
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: err.Error(),
+			})
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		id, _ := c.Get(userIdContextKey)
+		userId := id.(persist.DbId)
 
 		err := persist.NftUpdateById(nft.IDstr, persist.DbId(userId), nft, c, pRuntime)
 		if err != nil {
+			if err.Error() == copy.CouldNotFindDocument {
+				c.JSON(http.StatusNotFound, ErrorResponse{Error: err.Error()})
+				return	
+			}
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
 		}

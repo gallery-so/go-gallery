@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -127,7 +128,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 	}
 	if result.MatchedCount == 0 {
 		// TODO this should return a 404 or 204
-		return errors.New("could not find document to update")
+		return errors.New(copy.CouldNotFindDocument)
 	}
 
 	return nil
@@ -151,8 +152,8 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	if err != nil {
 		return err
 	}
-	if result.ModifiedCount == 0 || result.MatchedCount == 0 {
-		return errors.New("could not find document to update")
+	if result.MatchedCount == 0 {
+		return errors.New(copy.CouldNotFindDocument)
 	}
 
 	return nil
