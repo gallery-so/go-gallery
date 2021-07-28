@@ -17,7 +17,7 @@ type userUpdateInput struct {
 	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"description"`
-	Addresses   []string     `json:"addresses" `
+	Addresses   []string     `json:"addresses"`
 }
 
 // INPUT - USER_GET
@@ -29,10 +29,10 @@ type userGetInput struct {
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
-	UserId      persist.DbId ` json:"id"`
-	UserNameStr string       ` json:"username"`
-	BioStr      string       ` json:"bio"`
-	Addresses   []string     ` json:"addresses"`
+	UserId      persist.DbId `json:"id"`
+	UserNameStr string       `json:"username"`
+	BioStr      string       `json:"bio"`
+	Addresses   []string     `json:"addresses"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
