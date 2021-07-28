@@ -1,19 +1,39 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
+type TestUser struct {
+	id 		persist.DbId
+	address string
+	jwt 	string
+}
+
+func generateTestUser(r *runtime.Runtime) *TestUser {
+	ctx := context.Background()
+	address := "0x32Be343B94f860124dC4fEe278FDCBD38C102D88"
+	user := &persist.User{
+		AddressesLst: []string{address},
+	}
+	id, _ := persist.UserCreate(user, ctx, r)
+	jwt, _ := jwtGeneratePipeline(id, ctx, r)
+
+	return &TestUser{id, address, jwt}
+}
+
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
-func setup() (*httptest.Server, string, *runtime.Runtime) {
+func setup() *TestConfig {
 	// Initialize runtime
 	runtime, _ := runtime.RuntimeGet(runtime.ConfigLoad())
 
@@ -23,7 +43,13 @@ func setup() (*httptest.Server, string, *runtime.Runtime) {
 	ts := httptest.NewServer(HandlersInit(runtime))
 	log.Info("server connected! ✅")
 
-	return ts, fmt.Sprintf("%s/glry/v1", ts.URL), runtime
+	return &TestConfig{
+		server: ts,
+		serverUrl: fmt.Sprintf("%s/glry/v1", ts.URL),
+		r: runtime,
+		user1: generateTestUser(runtime),
+		user2: generateTestUser(runtime),
+	}
 }
 
 // Should be called at the end of every integration test
@@ -33,8 +59,12 @@ func teardown(ts *httptest.Server) {
 	// TODO: drop mongo database, etc.
 }
 
-func assertValidJSONResponse(assert *assert.Assertions, resp *http.Response) {
+func assertValidResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal(http.StatusOK, resp.StatusCode, "Status should be 200")
+}
+
+func assertValidJSONResponse(assert *assert.Assertions, resp *http.Response) {
+	assertValidResponse(assert, resp)
 	val, ok := resp.Header["Content-Type"]
 	assert.True(ok, "Content-Type header should be set")
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
