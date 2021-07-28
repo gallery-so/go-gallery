@@ -18,13 +18,13 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
 				return
 			}
 			// get string after "Bearer"
@@ -33,18 +33,18 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 			// database that is unique to every user and session
 			valid, userId, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if err != nil {
-				c.JSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
 				return
 			}
 
 			if !valid {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid jwt"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid jwt"})
 				return
 			}
 
 			c.Set(userIdContextKey, userId)
 		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
 			return
 		}
 		c.Next()
