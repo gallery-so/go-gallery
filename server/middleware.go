@@ -12,6 +12,7 @@ import (
 const (
 	userIdContextKey = "user_id"
 	authContextKey   = "authenticated"
+	invalidAuthHeaderError = "invalid authorization header format"
 )
 
 func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {

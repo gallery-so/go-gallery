@@ -135,7 +135,7 @@ func NftUpdateById(pIDstr DbId, pUserIdstr DbId, updatedNft *Nft, pCtx context.C
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_Id": pUserIdstr}, updatedNft)
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserIdstr}, updatedNft)
 }
 
 func NftBulkUpsert(walletAddress string, pNfts []*Nft, pCtx context.Context, pRuntime *runtime.Runtime) error {

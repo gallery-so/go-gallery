@@ -111,7 +111,6 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 
 // update must be a pointer to a struct
 func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
-
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
 	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
