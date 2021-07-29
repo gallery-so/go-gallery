@@ -21,7 +21,7 @@ func TestAuthUser(pTest *testing.T) {
 	userGetPublicInfoInput := &authUserGetPreflightInput{
 		AddressStr: addressStr,
 	}
-	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, r)
+	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, tc.r)
 	if err != nil {
 		pTest.FailNow()
 	}
@@ -36,7 +36,7 @@ func TestAuthUser(pTest *testing.T) {
 		AddressStr:   addressStr,
 		SignatureStr: "how to make this? can we sign the nonce from go?",
 	}
-	user, err := userCreateDb(userCreateInput, ctx, r)
+	user, err := userCreateDb(userCreateInput, ctx, tc.r)
 	if err != nil {
 		pTest.Fail()
 	}
@@ -44,7 +44,7 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 	// USER_DELETE
 
-	err = userDeleteDb(user.UserIDstr, ctx, r)
+	err = userDeleteDb(user.UserIDstr, ctx, tc.r)
 	if err != nil {
 		pTest.Fail()
 	}

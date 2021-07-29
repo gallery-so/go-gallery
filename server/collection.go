@@ -85,12 +85,14 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		ownerId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		//------------------
 		// CREATE
 
-		id, err := collectionCreateDb(input, persist.DbId(ownerId), c, pRuntime)
+		id, err := collectionCreateDb(input, userId, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error: err.Error(),
@@ -110,11 +112,13 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{NameStr: input.Name}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -132,11 +136,13 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{HiddenBool: input.Hidden}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -154,11 +160,13 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
 		coll := &persist.Collection{NftsLst: input.Nfts}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -178,9 +186,11 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userId := c.GetString(userIdContextKey)
+		// TODO: make this a util, especially since coercion to persist.DbId may break
+		val, _ := c.Get(userIdContextKey)
+		userId := val.(persist.DbId)
 
-		err := persist.CollDelete(input.Id, persist.DbId(userId), c, pRuntime)
+		err := persist.CollDelete(input.Id, userId, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error: err.Error(),

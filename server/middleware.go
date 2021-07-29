@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
@@ -18,13 +19,13 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+				c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
 				return
 			}
 			// get string after "Bearer"
@@ -44,7 +45,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 
 			c.Set(userIdContextKey, userId)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid authorization header format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		c.Next()

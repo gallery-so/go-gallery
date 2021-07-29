@@ -17,7 +17,7 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 
 	user := &persist.User{AddressesLst: []string{"0x485b8ac36535fae56b2910780245dd69dda270bc"}}
 
-	userID, err := persist.UserCreate(user, ctx, r)
+	userID, err := persist.UserCreate(user, ctx, tc.r)
 	assert.Nil(pTest, err)
 
 	nft := &persist.Nft{
@@ -34,13 +34,13 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 		OpenSeaIDint:    32087758,
 	}
 
-	_, err = persist.NftCreateBulk([]*persist.Nft{nft, nft2}, ctx, r)
+	_, err = persist.NftCreateBulk([]*persist.Nft{nft, nft2}, ctx, tc.r)
 	assert.Nil(pTest, err)
 
-	nfts, err := OpenSeaPipelineAssetsForAcc("0x485b8ac36535fae56b2910780245dd69dda270bc", ctx, r)
+	nfts, err := OpenSeaPipelineAssetsForAcc("0x485b8ac36535fae56b2910780245dd69dda270bc", ctx, tc.r)
 	assert.Nil(pTest, err)
 
-	nftsByUser, err := persist.NftGetByUserId(userID, ctx, r)
+	nftsByUser, err := persist.NftGetByUserId(userID, ctx, tc.r)
 	assert.Nil(pTest, err)
 
 	for _, nft := range nfts {
