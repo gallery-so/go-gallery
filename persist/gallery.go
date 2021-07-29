@@ -25,7 +25,7 @@ type GalleryDb struct {
 
 type Gallery struct {
 	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id"           json:"id" binding:"required"`
+	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
