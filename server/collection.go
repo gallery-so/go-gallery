@@ -92,7 +92,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// CREATE
 
-		id, err := collectionCreateDb(input, persist.DbId(userId), c, pRuntime)
+		id, err := collectionCreateDb(input, userId, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error: err.Error(),
@@ -118,7 +118,7 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		coll := &persist.Collection{NameStr: input.Name}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -142,7 +142,7 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		coll := &persist.Collection{HiddenBool: input.Hidden}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -166,7 +166,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		coll := &persist.Collection{NftsLst: input.Nfts}
 
-		err := persist.CollUpdate(input.Id, persist.DbId(userId), coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -190,7 +190,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		val, _ := c.Get(userIdContextKey)
 		userId := val.(persist.DbId)
 
-		err := persist.CollDelete(input.Id, persist.DbId(userId), c, pRuntime)
+		err := persist.CollDelete(input.Id, userId, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error: err.Error(),
