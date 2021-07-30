@@ -19,7 +19,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	collectionsGroup := apiGroupV1.Group("/collections")
 
-	collectionsGroup.GET("/get", jwtOptional(pRuntime), getAllCollectionsForUser(pRuntime))
+	collectionsGroup.GET("/get", jwtOptional(pRuntime), getCollections(pRuntime))
 	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
 	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
 	collectionsGroup.POST("/update/name", jwtRequired(pRuntime), updateCollectionName(pRuntime))
