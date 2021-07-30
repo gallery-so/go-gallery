@@ -57,5 +57,5 @@ func TestUpdateCollectionById_Success(t *testing.T) {
 	runtime.UnmarshalBody(&body, resp.Body, tc.r)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
-	// assert.Equal(update.Name, body.Collections[0].NameStr)
+	assert.Equal(update.Name, body.Collections[0].NameStr)
 }
