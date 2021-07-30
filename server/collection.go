@@ -11,9 +11,11 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
-type collectionGetInput struct {
-	Id     persist.DbId `form:"id" json:"id"`
-	UserId persist.DbId `form:"user_id" json:"user_id"`
+type collectionGetByUserIdInput struct {
+	UserId persist.DbId `form:"user_id" json:"user_id" binding:"required"`
+}
+type collectionGetByIdInput struct {
+	Id persist.DbId `form:"id" json:"id" binding:"required"`
 }
 
 type collectionGetOutput struct {
@@ -49,12 +51,12 @@ type collectionDeleteInput struct {
 //-------------------------------------------------------------
 // HANDLERS
 
-func getCollections(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getCollectionsByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
 
-		input := &collectionGetInput{}
+		input := &collectionGetByUserIdInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error: err.Error(),
@@ -63,37 +65,46 @@ func getCollections(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
+		colls, err := persist.CollGetByUserID(input.UserId, auth, c, pRuntime)
+		if len(colls) == 0 || err != nil {
+			colls = []*persist.Collection{}
+		}
 
-		switch {
-		case input.Id != "":
-			colls, err := persist.CollGetByID(input.Id, auth, c, pRuntime)
-			if len(colls) == 0 || err != nil {
-				c.JSON(http.StatusNotFound, ErrorResponse{
-					Error: fmt.Sprintf("no collections found with id: %s", input.Id),
-				})
-				return
-			}
-			if len(colls) > 1 {
-				colls = colls[:1]
-				// TODO log that this should not be happening
-			}
+		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
 
-			c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
-			return
-		case input.UserId != "":
-			colls, err := persist.CollGetByUserID(input.UserId, auth, c, pRuntime)
-			if len(colls) == 0 || err != nil {
-				colls = []*persist.Collection{}
-			}
+	}
+}
 
-			c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
-			return
-		default:
+//-------------------------------------------------------------
+func getCollectionsById(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//------------------
+		// INPUT
+
+		input := &collectionGetByIdInput{}
+		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "user id or collection id not found in request",
+				Error: err.Error(),
 			})
 			return
 		}
+
+		auth := c.GetBool(authContextKey)
+		colls, err := persist.CollGetByID(input.Id, auth, c, pRuntime)
+		if len(colls) == 0 || err != nil {
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error: fmt.Sprintf("no collections found with id: %s", input.Id),
+			})
+			return
+		}
+		if len(colls) > 1 {
+			colls = colls[:1]
+			// TODO log that this should not be happening
+		}
+
+		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
+		return
+
 	}
 }
 
