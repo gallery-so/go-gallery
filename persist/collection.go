@@ -46,6 +46,22 @@ type Collection struct {
 	HiddenBool bool `bson:"hidden" json:"hidden"`
 }
 
+type CollectionUpdateNameInput struct {
+	NameStr string `bson:"name" json:"name"`
+}
+
+type CollectionUpdateNftsInput struct {
+	NftsLst []DbId `bson:"nfts" json:"nfts"`
+}
+
+type CollectionUpdateHiddenInput struct {
+	HiddenBool bool `bson:"hidden" json:"hidden"`
+}
+
+type CollectionUpdateCollectorsNoteInput struct {
+	CollectorsNoteStr string `bson:"collectors_note" json:"collectors_note"`
+}
+
 //-------------------------------------------------------------
 func CollCreate(pColl *CollectionDb,
 	pCtx context.Context,
@@ -64,7 +80,7 @@ func CollCreate(pColl *CollectionDb,
 
 //-------------------------------------------------------------
 func CollGetByUserID(pUserIDstr DbId,
-	pNoHidden bool,
+	pShowHidden bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -79,9 +95,10 @@ func CollGetByUserID(pUserIDstr DbId,
 	result := []*Collection{}
 
 	fil := bson.M{"owner_user_id": pUserIDstr, "deleted": false}
-	if pNoHidden {
+	if !pShowHidden {
 		fil["hidden"] = false
 	}
+
 	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
@@ -119,13 +136,13 @@ func CollGetByID(pIDstr DbId,
 //-------------------------------------------------------------
 func CollUpdate(pIDstr DbId,
 	pUserId DbId,
-	pColl *Collection,
+	pUpdate interface{},
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, pColl)
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, pUpdate)
 }
 
 //-------------------------------------------------------------
