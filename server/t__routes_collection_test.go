@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateCollectionById_Success(t *testing.T) {
+func TestUpdateCollectionNameById_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with nft
