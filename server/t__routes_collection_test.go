@@ -16,7 +16,7 @@ import (
 func TestUpdateCollectionNameById_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	// seed DB with nft
+	// seed DB with collection
 	collId, err := persist.CollCreate(&persist.CollectionDb{
 		NameStr:        "very cool collection",
 		OwnerUserIDstr: tc.user1.id,
