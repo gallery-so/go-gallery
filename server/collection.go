@@ -11,14 +11,14 @@ import (
 )
 
 type collectionGetByIdInput struct {
-	Id persist.DbId `json:"id" binding:"required"`
+	Id persist.DbId `form:"id" json:"id" binding:"required"`
 }
 
 type collectionGetByUserIdInput struct {
-	UserId persist.DbId `json:"user_id" binding:"required"`
+	UserId persist.DbId `form:"user_id" json:"user_id" binding:"required"`
 }
 type collectionGetOutput struct {
-	Collections []*persist.Collection `json:"nfts"`
+	Collections []*persist.Collection `json:"collections"`
 }
 
 type collectionCreateInput struct {
@@ -36,7 +36,7 @@ type collectionUpdateHiddenByIdInput struct {
 }
 type collectionUpdateNftsByIdInput struct {
 	Id   persist.DbId   `json:"id" binding:"required"`
-	Nfts []*persist.Nft `json:"nfts" binding:"required"`
+	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
 
 type collectionCreateOutput struct {
@@ -56,7 +56,7 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		// INPUT
 
 		input := &collectionGetByUserIdInput{}
-		if err := c.ShouldBindJSON(input); err != nil {
+		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error: err.Error(),
 			})
@@ -65,7 +65,7 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		auth := c.GetBool(authContextKey)
 
-		colls, err := persist.CollGetByUserID(input.UserId, !auth, c, pRuntime)
+		colls, err := persist.CollGetByUserID(input.UserId, auth, c, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
@@ -120,9 +120,9 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		coll := &persist.Collection{NameStr: input.Name}
+		update := &persist.CollectionUpdateNameInput{NameStr: input.Name}
 
-		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, update, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -146,9 +146,9 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		coll := &persist.Collection{HiddenBool: input.Hidden}
+		update := &persist.CollectionUpdateHiddenInput{HiddenBool: input.Hidden}
 
-		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
+		err := persist.CollUpdate(input.Id, userId, update, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
@@ -172,7 +172,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		coll := &persist.Collection{NftsLst: input.Nfts}
+		coll := &persist.CollectionUpdateNftsInput{NftsLst: input.Nfts}
 
 		err := persist.CollUpdate(input.Id, userId, coll, c, pRuntime)
 		if err != nil {

@@ -65,15 +65,17 @@ func updateNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
-		id, _ := c.Get(userIdContextKey)
-		userId := id.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		err := persist.NftUpdateById(nft.IDstr, userId, nft, c, pRuntime)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, ErrorResponse{Error: err.Error()})
-				return	
+				return
 			}
 			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 			return
