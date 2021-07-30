@@ -85,9 +85,11 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
-		val, _ := c.Get(userIdContextKey)
-		userId := val.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		//------------------
 		// CREATE
@@ -113,8 +115,11 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		// TODO: make this a util, especially since coercion to persist.DbId may break
-		val, _ := c.Get(userIdContextKey)
-		userId := val.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		coll := &persist.Collection{NameStr: input.Name}
 
@@ -136,9 +141,11 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
-		val, _ := c.Get(userIdContextKey)
-		userId := val.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		coll := &persist.Collection{HiddenBool: input.Hidden}
 
@@ -160,9 +167,11 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
-		val, _ := c.Get(userIdContextKey)
-		userId := val.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		coll := &persist.Collection{NftsLst: input.Nfts}
 
@@ -186,9 +195,11 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
-		val, _ := c.Get(userIdContextKey)
-		userId := val.(persist.DbId)
+		userId, ok := getUserIdFromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			return
+		}
 
 		err := persist.CollDelete(input.Id, userId, c, pRuntime)
 		if err != nil {

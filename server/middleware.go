@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
+	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
@@ -84,4 +85,16 @@ func handleCORS() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func getUserIdFromCtx(c *gin.Context) (persist.DbId, bool) {
+	val, ok := c.Get(userIdContextKey)
+	if !ok {
+		return "", false
+	}
+	userId, ok := val.(persist.DbId)
+	if !ok {
+		return "", false
+	}
+	return userId, true
 }
