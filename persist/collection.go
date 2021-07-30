@@ -108,7 +108,7 @@ func CollGetByUserID(pUserIDstr DbId,
 
 //-------------------------------------------------------------
 func CollGetByID(pIDstr DbId,
-	pNoHidden bool,
+	pShowHidden bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -123,7 +123,7 @@ func CollGetByID(pIDstr DbId,
 	result := []*Collection{}
 
 	fil := bson.M{"_id": pIDstr, "deleted": false}
-	if pNoHidden {
+	if !pShowHidden {
 		fil["hidden"] = false
 	}
 	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {

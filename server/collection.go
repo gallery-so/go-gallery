@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,13 +11,13 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+type collectionGetByUserIdInput struct {
+	UserId persist.DbId `form:"user_id" json:"user_id" binding:"required"`
+}
 type collectionGetByIdInput struct {
 	Id persist.DbId `form:"id" json:"id" binding:"required"`
 }
 
-type collectionGetByUserIdInput struct {
-	UserId persist.DbId `form:"user_id" json:"user_id" binding:"required"`
-}
 type collectionGetOutput struct {
 	Collections []*persist.Collection `json:"collections"`
 }
@@ -50,7 +51,7 @@ type collectionDeleteInput struct {
 //-------------------------------------------------------------
 // HANDLERS
 
-func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getCollectionsByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -64,15 +65,50 @@ func getAllCollectionsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-
 		colls, err := persist.CollGetByUserID(input.UserId, auth, c, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
+
 	}
 }
+
+//-------------------------------------------------------------
+func getCollectionsById(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//------------------
+		// INPUT
+
+		input := &collectionGetByIdInput{}
+		if err := c.ShouldBindQuery(input); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: err.Error(),
+			})
+			return
+		}
+
+		auth := c.GetBool(authContextKey)
+		colls, err := persist.CollGetByID(input.Id, auth, c, pRuntime)
+		if len(colls) == 0 || err != nil {
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error: fmt.Sprintf("no collections found with id: %s", input.Id),
+			})
+			return
+		}
+		if len(colls) > 1 {
+			colls = colls[:1]
+			// TODO log that this should not be happening
+		}
+
+		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
+		return
+
+	}
+}
+
+//------------------------------------------------------------
 
 func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {

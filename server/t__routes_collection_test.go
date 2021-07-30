@@ -44,7 +44,7 @@ func TestUpdateCollectionNameById_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?user_id=%s", tc.serverUrl, tc.user1.id))
+	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverUrl, collId))
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
