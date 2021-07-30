@@ -114,7 +114,6 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: make this a util, especially since coercion to persist.DbId may break
 		userId, ok := getUserIdFromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
