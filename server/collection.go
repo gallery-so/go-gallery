@@ -76,7 +76,7 @@ func getCollectionsByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 }
 
 //-------------------------------------------------------------
-func getCollectionsById(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getCollectionById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
