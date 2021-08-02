@@ -1,10 +1,10 @@
 package runtime
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
-	"os"
-	"fmt"
 )
 
 var (
@@ -20,10 +20,15 @@ func fileExists(path string) bool {
 }
 
 func getEnvPath() string {
-	envPath := ".env"
-	envIsLocal := fileExists(envPath)
-	if !envIsLocal {
-		envPath = fmt.Sprintf("%s/bin/.env", ProjectRootPath)
+	localEnvPath := ".env"
+	if fileExists(localEnvPath) {
+		return localEnvPath
 	}
-	return envPath
+
+	binEnvPath := fmt.Sprintf("%s/bin/.env", ProjectRootPath)
+	if fileExists(binEnvPath) {
+		return binEnvPath
+	}
+
+	return ""
 }
