@@ -53,7 +53,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(portMetrics, 4000)
 
 	viper.SetDefault(mongoURL, "mongodb://localhost:27017")
-	viper.SetDefault(mongoDBname, "glry")
+	viper.SetDefault(mongoDBname, "gallery")
 	viper.SetDefault(mongoSslCAfilePathStr, "")
 
 	viper.SetDefault(sentryEndpoint, "")
@@ -64,15 +64,17 @@ func ConfigLoad() *Config {
 
 	viper.Set("true", true)
 	viper.Set("false", false)
-	
-	viper.SetConfigFile(getEnvPath())
 
 	// Enable VIPER to read Environment Variables
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err != nil {
-		log.WithFields(log.Fields{"err": err}).Fatal("Error reading config")
-		panic(-1)
+	envPath := getEnvPath()
+	if envPath != "" {
+		viper.SetConfigFile(envPath)
+		if err := viper.ReadInConfig(); err != nil {
+			log.WithFields(log.Fields{"err": err}).Fatal("Error reading config")
+			panic(-1)
+		}
 	}
 
 	config := &Config{
@@ -90,9 +92,6 @@ func ConfigLoad() *Config {
 
 		AWSsecretsBool: viper.GetBool(awsSecrets),
 	}
-
-	fmt.Println("CONFIG----------------------------------")
-	// spew.Dump(config)
 
 	return config
 }
