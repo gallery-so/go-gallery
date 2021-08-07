@@ -40,17 +40,6 @@ func UserUpdateById(pIDstr DbId, pUser interface{},
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
-	mp.CreateIndex(pCtx, mongo.IndexModel{
-		Keys: bson.M{"name": 1},
-		Options: &options.IndexOptions{
-			Unique: boolin(true),
-			Collation: &options.Collation{
-				Locale:   "en",
-				Strength: 2,
-			},
-		},
-	})
-
 	opts := options.Update()
 	opts.SetCollation(&options.Collation{Locale: "en", Strength: 2})
 
