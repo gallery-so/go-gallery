@@ -8,6 +8,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	log "github.com/sirupsen/logrus"
@@ -29,6 +30,26 @@ import (
 type jwtClaims struct {
 	UserId persist.DbId `json:"user_id"`
 	jwt.StandardClaims
+}
+
+type jwtValidateResponse struct {
+	IsValid bool         `json:"valid"`
+	UserId  persist.DbId `json:"user_id"`
+}
+
+// HANDLER
+//-------------------------------------------------------------
+
+func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		auth := c.GetBool(authContextKey)
+		userId, _ := getUserIdFromCtx(c)
+
+		c.JSON(200, jwtValidateResponse{
+			IsValid: auth,
+			UserId:  userId,
+		})
+	}
 }
 
 //-------------------------------------------------------------

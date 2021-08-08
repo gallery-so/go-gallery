@@ -63,6 +63,12 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	authGroup.GET("/get_preflight", jwtOptional(pRuntime), getAuthPreflight(pRuntime))
 
 	//-------------------------------------------------------------
+	// AUTH VALIDATE_JWT
+
+	// [GET] /glry/v1/auth/jwt_valid
+	authGroup.GET("/jwt_valid", jwtOptional(pRuntime), validateJwt(pRuntime))
+
+	//-------------------------------------------------------------
 	// AUTH_USER_LOGIN
 	// UN-AUTHENTICATED
 
