@@ -1,10 +1,16 @@
 package server
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/microcosm-cc/bluemonday"
 )
+
+var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`/^[\w.]+$/i`)
+var consecutivePeriodsUnderscoresRegex = regexp.MustCompile(`/^(?=[\w.]*$)(?!.*[_.]{2})[^_.].*[^_.]$/`)
+var sanitizationPolicy = bluemonday.UGCPolicy()
 
 var ethValidator validator.Func = func(fl validator.FieldLevel) bool {
 	addr := fl.Field().String()
@@ -38,4 +44,14 @@ var shortStringValidator validator.Func = func(fl validator.FieldLevel) bool {
 var mediumStringValidator validator.Func = func(fl validator.FieldLevel) bool {
 	s := fl.Field().String()
 	return len(s) < 500
+}
+
+var usernameValidator validator.Func = func(fl validator.FieldLevel) bool {
+	s := fl.Field().String()
+	if s == "" {
+		return true
+	}
+	return len(s) >= 2 && len(s) <= 50 &&
+		alphanumericUnderscoresPeriodsRegex.MatchString(s) &&
+		consecutivePeriodsUnderscoresRegex.MatchString(s)
 }
