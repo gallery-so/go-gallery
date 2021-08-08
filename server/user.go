@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -264,9 +265,10 @@ func userUpdateDb(pInput *userUpdateInput,
 	return persist.UserUpdateById(
 		pInput.UserId,
 		persist.UserUpdateInput{
-			UserNameStr:  pInput.UserNameStr,
-			BioStr:       pInput.BioStr,
-			AddressesLst: pInput.Addresses,
+			UserNameIdempotentStr: strings.ToLower(pInput.UserNameStr),
+			UserNameStr:           pInput.UserNameStr,
+			BioStr:                pInput.BioStr,
+			AddressesLst:          pInput.Addresses,
 		},
 		pCtx,
 		pRuntime,

@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -19,15 +20,17 @@ type User struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	UserNameStr  string   `bson:"name"         json:"name"`       // mutable
-	AddressesLst []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	BioStr       string   `bson:"bio"  json:"bio"`
+	UserNameStr           string   `bson:"username"         json:"username"` // mutable
+	UserNameIdempotentStr string   `bson:"username_idempotent" json:"username_idempotent"`
+	AddressesLst          []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	BioStr                string   `bson:"bio"  json:"bio"`
 }
 
 type UserUpdateInput struct {
-	UserNameStr  string   `bson:"name,omitempty"`
-	AddressesLst []string `bson:"addresses,omitempty"`
-	BioStr       string   `bson:"bio,omitempty"`
+	UserNameStr           string   `bson:"username,omitempty"`
+	UserNameIdempotentStr string   `bson:"username_idempotent,omitempty"`
+	AddressesLst          []string `bson:"addresses,omitempty"`
+	BioStr                string   `bson:"bio,omitempty"`
 }
 
 //-------------------------------------------------------------
@@ -40,12 +43,9 @@ func UserUpdateById(pIDstr DbId, pUser interface{},
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
-	opts := options.Update()
-	opts.SetCollation(&options.Collation{Locale: "en", Strength: 2})
-
 	err := mp.Update(pCtx, bson.M{
 		"_id": pIDstr,
-	}, pUser, opts)
+	}, pUser)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("attempt to update username to a taken username")
@@ -174,7 +174,7 @@ func UserGetByUsername(pUsername string,
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"username": pUsername}, &result, opts)
+	err := mp.Find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result, opts)
 
 	if err != nil {
 		return nil, err
