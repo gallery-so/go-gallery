@@ -81,7 +81,7 @@ func updateNftById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
