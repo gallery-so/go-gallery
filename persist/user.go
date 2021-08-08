@@ -7,6 +7,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -18,24 +19,37 @@ type User struct {
 	CreationTimeF float64 `bson:"creation_time," json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted,"`
 
-	UserNameStr  string   `bson:"name,"         json:"name"`       // mutable
-	AddressesLst []string `bson:"addresses,"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	BioStr       string   `bson:"bio,"  json:"bio"`
+	UserNameStr  string   `bson:"name"         json:"name"`       // mutable
+	AddressesLst []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	BioStr       string   `bson:"bio"  json:"bio"`
+}
+
+type UserUpdateInput struct {
+	UserNameStr  string   `bson:"name,omitempty"`
+	AddressesLst []string `bson:"addresses,omitempty"`
+	BioStr       string   `bson:"bio,omitempty"`
 }
 
 //-------------------------------------------------------------
 // USER
 //-------------------------------------------------------------
 // UPDATE
-func UserUpdate(pUser *User,
+func UserUpdateById(pIDstr DbId, pUser interface{},
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
+
+	opts := options.Update()
+	opts.SetCollation(&options.Collation{Locale: "en", Strength: 2})
+
 	err := mp.Update(pCtx, bson.M{
-		"_id": pUser.IDstr,
-	}, pUser)
+		"_id": pIDstr,
+	}, pUser, opts)
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return fmt.Errorf("attempt to update username to a taken username")
+		}
 		return err
 	}
 

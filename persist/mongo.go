@@ -190,6 +190,10 @@ func (m *MongoStorage) Count(ctx context.Context, filter bson.M, opts ...*option
 	return m.collection.CountDocuments(ctx, filter, opts...)
 }
 
+func (m *MongoStorage) CreateIndex(ctx context.Context, index mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
+	return m.collection.Indexes().CreateOne(ctx, index, opts...)
+}
+
 // CREATE_ID
 func generateId(creationTime float64) DbId {
 	h := md5.New()
@@ -197,4 +201,9 @@ func generateId(creationTime float64) DbId {
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	return DbId(hexStr)
+}
+
+// function that returns the pointer to the bool passed in
+func boolin(b bool) *bool {
+	return &b
 }

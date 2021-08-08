@@ -260,19 +260,13 @@ func userUpdateDb(pInput *userUpdateInput,
 	pRuntime *runtime.Runtime) error {
 
 	//------------------
-	// VALIDATE
-	err := runtime.Validate(pInput, pRuntime)
-	if err != nil {
-		return err
-	}
 
-	//------------------
-
-	return persist.UserUpdate(
-		&persist.User{
-			IDstr:       pInput.UserId,
-			UserNameStr: pInput.UserNameStr,
-			BioStr:      pInput.BioStr,
+	return persist.UserUpdateById(
+		pInput.UserId,
+		persist.UserUpdateInput{
+			UserNameStr:  pInput.UserNameStr,
+			BioStr:       pInput.BioStr,
+			AddressesLst: pInput.Addresses,
 		},
 		pCtx,
 		pRuntime,

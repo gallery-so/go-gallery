@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -11,7 +12,9 @@ import (
 	"github.com/gloflow/gloflow/go/gf_core"
 	"github.com/go-playground/validator"
 	log "github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/gin-gonic/gin"
 )
@@ -111,6 +114,17 @@ func RuntimeGet(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 	}
 
 	runtimeSys.Mongo_db = db.MongoDB
+
+	err := setupMongoIndexes(db.MongoDB)
+	if err != nil {
+		return nil, gf_core.Error__create("unable to setup mongo indexes",
+			"mongodb_ensure_index_error",
+			nil,
+			err,
+			"runtime",
+			runtimeSys,
+		)
+	}
 
 	//------------------
 	// CHECK!! - is Validator threadsafe, so that it can be used
@@ -232,4 +246,19 @@ func DBgetCustomTLSConfig(pCAfilePathStr string,
 	// spew.Dump(tlsConfig)
 
 	return tlsConfig, nil
+}
+
+func setupMongoIndexes(db *mongo.Database) error {
+	b := true
+	db.Collection("collections").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+		Keys: bson.M{"name": 1},
+		Options: &options.IndexOptions{
+			Unique: &b,
+			Collation: &options.Collation{
+				Locale:   "en",
+				Strength: 2,
+			},
+		},
+	})
+	return nil
 }
