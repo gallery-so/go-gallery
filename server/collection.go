@@ -164,7 +164,7 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -190,7 +190,7 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -216,7 +216,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -244,7 +244,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 

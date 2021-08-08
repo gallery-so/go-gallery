@@ -76,7 +76,7 @@ func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		//------------------
 		// OUTPUT
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
