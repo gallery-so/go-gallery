@@ -15,7 +15,7 @@ import (
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
 	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
-	UserNameStr string       `json:"username"`
+	UserNameStr string       `json:"username" binding:"username"`
 	BioStr      string       `json:"description"`
 	Addresses   []string     `json:"addresses"`
 }
@@ -265,7 +265,7 @@ func userUpdateDb(pInput *userUpdateInput,
 		pInput.UserId,
 		persist.UserUpdateInput{
 			UserNameStr:  pInput.UserNameStr,
-			BioStr:       pInput.BioStr,
+			BioStr:       sanitizationPolicy.Sanitize(pInput.BioStr),
 			AddressesLst: pInput.Addresses,
 		},
 		pCtx,
