@@ -26,9 +26,10 @@ type collectionCreateInput struct {
 	Nfts []persist.DbId `json:"nfts" binding:"required"`
 }
 
-type collectionUpdateNameByIdInput struct {
-	Id   persist.DbId `json:"id" binding:"required"`
-	Name string       `json:"name" binding:"required"`
+type collectionUpdateInfoByIdInput struct {
+	Id             persist.DbId `json:"id" binding:"required"`
+	Name           string       `json:"name" binding:"required"`
+	CollectorsNote string       `json:"collectors_note"`
 }
 
 type collectionUpdateHiddenByIdInput struct {
@@ -142,9 +143,9 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &collectionUpdateNameByIdInput{}
+		input := &collectionUpdateInfoByIdInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 			return
@@ -156,7 +157,7 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.CollectionUpdateNameInput{NameStr: input.Name}
+		update := &persist.CollectionUpdateInfoInput{NameStr: input.Name, CollectorsNoteStr: input.CollectorsNote}
 
 		err := persist.CollUpdate(input.Id, userId, update, c, pRuntime)
 		if err != nil {
@@ -164,7 +165,7 @@ func updateCollectionName(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -190,7 +191,7 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -216,7 +217,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -244,7 +245,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 

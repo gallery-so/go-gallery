@@ -26,6 +26,7 @@ func Init(pPortInt int,
 		v.RegisterValidation("eth_addr", ethValidator)
 		v.RegisterValidation("nonce", nonceValidator)
 		v.RegisterValidation("signature", signatureValidator)
+		v.RegisterValidation("username", usernameValidator)
 	}
 
 	// HANDLERS

@@ -16,7 +16,7 @@ import (
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
 	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
-	UserNameStr string       `json:"username"`
+	UserNameStr string       `json:"username" binding:"username"`
 	BioStr      string       `json:"description"`
 	Addresses   []string     `json:"addresses"`
 }
@@ -77,7 +77,7 @@ func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		//------------------
 		// OUTPUT
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
 
@@ -267,7 +267,7 @@ func userUpdateDb(pInput *userUpdateInput,
 		persist.UserUpdateInput{
 			UserNameIdempotentStr: strings.ToLower(pInput.UserNameStr),
 			UserNameStr:           pInput.UserNameStr,
-			BioStr:                pInput.BioStr,
+			BioStr:                sanitizationPolicy.Sanitize(pInput.BioStr),
 			AddressesLst:          pInput.Addresses,
 		},
 		pCtx,
