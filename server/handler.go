@@ -23,7 +23,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	collectionsGroup.GET("/user_get", jwtOptional(pRuntime), getCollectionsByUserId(pRuntime))
 	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
 	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
-	collectionsGroup.POST("/update/name", jwtRequired(pRuntime), updateCollectionName(pRuntime))
+	collectionsGroup.POST("/update/info", jwtRequired(pRuntime), updateCollectionInfo(pRuntime))
 	collectionsGroup.POST("/update/hidden", jwtRequired(pRuntime), updateCollectionHidden(pRuntime))
 	collectionsGroup.POST("/update/nfts", jwtRequired(pRuntime), updateCollectionNfts(pRuntime))
 

@@ -46,8 +46,9 @@ type Collection struct {
 	HiddenBool bool `bson:"hidden" json:"hidden"`
 }
 
-type CollectionUpdateNameInput struct {
-	NameStr string `bson:"name" json:"name"`
+type CollectionUpdateInfoInput struct {
+	NameStr           string `bson:"name" json:"name"`
+	CollectorsNoteStr string `bson:"collectors_note" json:"collectors_note"`
 }
 
 type CollectionUpdateNftsInput struct {
