@@ -15,35 +15,35 @@ import (
 
 // persist.GLRYnft struct tags reflect the json data of an open sea response and therefore
 // can be unmarshalled from the api response
-type openSeaApiResponse struct {
-	Assets []*OpenseaNFT `json:"assets"`
+type openSeaAPIresponse struct {
+	Assets []*openseaNFT `json:"assets"`
 }
 
-type OpenseaNFT struct {
-	VersionInt int64 `json:"version"` // schema version for this model
-	IDint      int   `json:"id"`
+type openseaNFT struct {
+	Version int64 `json:"version"` // schema version for this model
+	ID      int   `json:"id"`
 
-	NameStr        string `json:"name"`
-	DescriptionStr string `json:"description"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 
-	ExternalURLstr      string           `json:"external_url"`
-	TokenMetadataUrlStr string           `json:"token_metadata_url"`
-	CreatorAddressStr   string           `json:"creator_address"`
-	CreatorNameStr      string           `json:"creator_name"`
-	Contract            persist.Contract `json:"asset_contract"`
+	ExternalURL      string           `json:"external_url"`
+	TokenMetadataURL string           `json:"token_metadata_url"`
+	CreatorAddress   string           `json:"creator_address"`
+	CreatorName      string           `json:"creator_name"`
+	Contract         persist.Contract `json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	TokenIdStr string `json:"token_id"`
+	TokenID string `json:"token_id"`
 
 	// IMAGES - OPENSEA
-	ImageURLstr             string `json:"image_url"`
-	ImageThumbnailURLstr    string `json:"image_thumbnail_url"`
-	ImagePreviewURLstr      string `json:"image_preview_url"`
-	ImageOriginalUrlStr     string `json:"image_original_url"`
-	AnimationUrlStr         string `json:"animation_url"`
-	AnimationOriginalUrlStr string `json:"animation_original_url"`
+	ImageURL             string `json:"image_url"`
+	ImageThumbnailURL    string `json:"image_thumbnail_url"`
+	ImagePreviewURL      string `json:"image_preview_url"`
+	ImageOriginalURL     string `json:"image_original_url"`
+	AnimationURL         string `json:"animation_url"`
+	AnimationOriginalURL string `json:"animation_original_url"`
 
 	AcquisitionDateStr string `json:"acquisition_date"`
 }
@@ -53,31 +53,30 @@ type OpenseaNFT struct {
 
 // ADD!! - persist OpenSea fetched assets as well.
 
-func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx context.Context,
+func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress string,
 	pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 
 	//--------------------
 	// OPENSEA_FETCH
-	openSeaAssetsForAccLst, err := OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr, pCtx)
+	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pCtx, pOwnerWalletAddress)
 	if err != nil {
 		return nil, err
 	}
 
 	//--------------------
 
-	asGalleryNfts, err := openseaToGalleryNfts(openSeaAssetsForAccLst, pOwnerWalletAddressStr, pCtx, pRuntime)
+	asGalleryNfts, err := openseaToGalleryNfts(pCtx, openSeaAssetsForAccLst, pOwnerWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
 	// DB_PERSIST
 	// CREATE_OR_UPDATE_BULK
-	err = persist.NftBulkUpsert(pOwnerWalletAddressStr, asGalleryNfts, pCtx, pRuntime)
+	err = persist.NftBulkUpsert(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
 	if err != nil {
 		return nil, err
 	}
-	err = persist.NftRemoveDifference(asGalleryNfts, pOwnerWalletAddressStr, pCtx, pRuntime)
+	err = persist.NftRemoveDifference(pCtx, asGalleryNfts, pOwnerWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +85,7 @@ func OpenSeaPipelineAssetsForAcc(pOwnerWalletAddressStr string,
 }
 
 //-------------------------------------------------------------
-func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
-	pCtx context.Context) ([]*OpenseaNFT, error) {
+func openSeaFetchAssetsForAcc(pCtx context.Context, pOwnerWalletAddressStr string) ([]*openseaNFT, error) {
 
 	/*{
 	*	"id": 21976544,
@@ -266,7 +264,7 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 		return nil, errs[0]
 	}
 
-	response := openSeaApiResponse{}
+	response := openSeaAPIresponse{}
 	err := json.Unmarshal(respBytes, &response)
 	if err != nil {
 
@@ -278,39 +276,39 @@ func OpenSeaFetchAssetsForAcc(pOwnerWalletAddressStr string,
 	return response.Assets, nil
 }
 
-func openseaToGalleryNfts(openseaNfts []*OpenseaNFT, pWalletAddress string, pCtx context.Context, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
-	ownerUser, err := persist.UserGetByAddress(pWalletAddress, pCtx, pRuntime)
+func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaNFT, pWalletAddress string, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
+	ownerUser, err := persist.UserGetByAddress(pCtx, pWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 	nfts := make([]*persist.Nft, len(openseaNfts))
 	for i, openseaNft := range openseaNfts {
-		nfts[i] = openseaToGalleryNft(openseaNft, pWalletAddress, ownerUser.IDstr)
+		nfts[i] = openseaToGalleryNft(openseaNft, pWalletAddress, ownerUser.ID)
 	}
 	return nfts, nil
 }
 
-func openseaToGalleryNft(nft *OpenseaNFT, pWalletAddres string, ownerUserId persist.DbId) *persist.Nft {
+func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID persist.DbID) *persist.Nft {
 
 	result := &persist.Nft{
-		OwnerUserIdStr:          ownerUserId,
-		OwnerAddressStr:         pWalletAddres,
-		NameStr:                 nft.NameStr,
-		DescriptionStr:          nft.DescriptionStr,
-		ExternalURLstr:          nft.ExternalURLstr,
-		ImageURLstr:             nft.ImageURLstr,
-		CreatorAddressStr:       nft.CreatorAddressStr,
-		AnimationUrlStr:         nft.AnimationUrlStr,
-		OpenSeaTokenIDstr:       nft.TokenIdStr,
-		OpenSeaIDint:            nft.IDint,
-		ImageThumbnailURLstr:    nft.ImageThumbnailURLstr,
-		ImagePreviewURLstr:      nft.ImagePreviewURLstr,
-		ImageOriginalUrlStr:     nft.ImageOriginalUrlStr,
-		TokenMetadataUrlStr:     nft.TokenMetadataUrlStr,
-		Contract:                nft.Contract,
-		AcquisitionDateStr:      nft.AcquisitionDateStr,
-		CreatorNameStr:          nft.CreatorNameStr,
-		AnimationOriginalUrlStr: nft.AnimationOriginalUrlStr,
+		OwnerUserID:          ownerUserID,
+		OwnerAddress:         pWalletAddres,
+		Name:                 nft.Name,
+		Description:          nft.Description,
+		ExternalURL:          nft.ExternalURL,
+		ImageURL:             nft.ImageURL,
+		CreatorAddress:       nft.CreatorAddress,
+		AnimationURL:         nft.AnimationURL,
+		OpenSeaTokenID:       nft.TokenID,
+		OpenSeaID:            nft.ID,
+		ImageThumbnailURL:    nft.ImageThumbnailURL,
+		ImagePreviewURL:      nft.ImagePreviewURL,
+		ImageOriginalURL:     nft.ImageOriginalURL,
+		TokenMetadataURL:     nft.TokenMetadataURL,
+		Contract:             nft.Contract,
+		AcquisitionDateStr:   nft.AcquisitionDateStr,
+		CreatorName:          nft.CreatorName,
+		AnimationOriginalURL: nft.AnimationOriginalURL,
 	}
 
 	return result

@@ -15,6 +15,7 @@ import (
 )
 
 //---------------------------------------------------
+// TODO make this work
 func TestAuthSignatures(pTest *testing.T) {
 
 	cyan := color.New(color.FgCyan).SprintFunc()
@@ -122,7 +123,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		MongoDBnameStr:    mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
-	runtime, gErr := runtime.RuntimeGet(config)
+	runtime, gErr := runtime.GetRuntime(config)
 	if gErr != nil {
 		pTest.Fail()
 	}

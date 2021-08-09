@@ -15,7 +15,7 @@ import (
 //-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
-	UserId      persist.DbId `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
+	UserID      persist.DbID `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username" binding:"username"`
 	BioStr      string       `json:"description"`
 	Addresses   []string     `json:"addresses"`
@@ -23,14 +23,14 @@ type userUpdateInput struct {
 
 // INPUT - USER_GET
 type userGetInput struct {
-	UserId   persist.DbId `json:"user_id" form:"user_id"`
+	UserID   persist.DbID `json:"user_id" form:"user_id"`
 	Address  string       `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	Username string       `json:"username" form:"username"`
 }
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
-	UserId      persist.DbId `json:"id"`
+	UserID      persist.DbID `json:"id"`
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"bio"`
 	Addresses   []string     `json:"addresses"`
@@ -44,15 +44,15 @@ type userCreateInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	SignatureStr string `json:"signature" binding:"required,signature"`
-	AddressStr   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Signature string `json:"signature" binding:"required,signature"`
+	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 // OUTPUT - USER_CREATE
 type userCreateOutput struct {
-	SignatureValidBool bool         `json:"signature_valid"`
-	JWTtokenStr        string       `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
-	UserIDstr          persist.DbId `json:"user_id"`
+	SignatureValid bool         `json:"signature_valid"`
+	JWTtoken       string       `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
+	UserID         persist.DbID `json:"user_id"`
 }
 
 //-------------------------------------------------------------
@@ -64,15 +64,15 @@ func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		up := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(up); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
 		//------------------
 		// UPDATE
-		err := userUpdateDb(up, c, pRuntime)
+		err := userUpdateDb(c, up, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 		//------------------
@@ -87,17 +87,20 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
 		auth := c.GetBool(authContextKey)
 
-		output, err := userGetDb(input,
+		output, err := userGetDb(
+			c,
+			input,
 			auth,
-			c, pRuntime)
+			pRuntime,
+		)
 		if err != nil {
-			c.JSON(http.StatusNoContent, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusNoContent, errorResponse{Error: err.Error()})
 			return
 		}
 
@@ -115,15 +118,15 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userCreateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
 		//------------------
 		// USER_CREATE
-		output, err := userCreateDb(input, c, pRuntime)
+		output, err := userCreateDb(c, input, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 
@@ -137,14 +140,13 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 //-------------------------------------------------------------
 // USER_CREATE__PIPELINE
-func userCreateDb(pInput *userCreateInput,
-	pCtx context.Context,
+func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
 
 	//------------------
 	output := &userCreateOutput{}
 
-	nonceValueStr, id, _ := getUserWithNonce(pInput.AddressStr, pCtx, pRuntime)
+	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
@@ -156,15 +158,15 @@ func userCreateDb(pInput *userCreateInput,
 	// VERIFY_SIGNATURE
 
 	dataStr := nonceValueStr
-	sigValidBool, err := authVerifySignatureAllMethods(pInput.SignatureStr,
+	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		dataStr,
-		pInput.AddressStr,
+		pInput.Address,
 		pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	output.SignatureValidBool = sigValidBool
+	output.SignatureValid = sigValidBool
 	if !sigValidBool {
 		return output, nil
 	}
@@ -172,33 +174,32 @@ func userCreateDb(pInput *userCreateInput,
 	//------------------
 
 	user := &persist.User{
-		AddressesLst: []string{pInput.AddressStr},
+		Addresses: []string{pInput.Address},
 	}
 
 	// DB
-	userId, err := persist.UserCreate(user, pCtx, pRuntime)
+	userID, err := persist.UserCreate(pCtx, user, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	output.UserIDstr = userId
+	output.UserID = userID
 
 	//------------------
 
 	// JWT_GENERATION - signature is valid, so generate JWT key
-	jwtTokenStr, err := jwtGeneratePipeline(userId,
-		pCtx,
+	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID,
 		pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	output.JWTtokenStr = jwtTokenStr
+	output.JWTtoken = jwtTokenStr
 
 	//------------------
 	// NONCE ROTATE
 
-	err = authNonceRotateDb(pInput.AddressStr, userId, pCtx, pRuntime)
+	err = authNonceRotateDb(pCtx, pInput.Address, userID, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +209,8 @@ func userCreateDb(pInput *userCreateInput,
 
 //-------------------------------------------------------------
 // USER_GET__PIPELINE
-func userGetDb(pInput *userGetInput,
+func userGetDb(pCtx context.Context, pInput *userGetInput,
 	pAuthenticatedBool bool,
-	pCtx context.Context,
 	pRuntime *runtime.Runtime) (*userGetOutput, error) {
 
 	//------------------
@@ -218,20 +218,20 @@ func userGetDb(pInput *userGetInput,
 	var user *persist.User
 	var err error
 	switch {
-	case pInput.UserId != "":
-		user, err = persist.UserGetById(pInput.UserId, pCtx, pRuntime)
+	case pInput.UserID != "":
+		user, err = persist.UserGetByID(pCtx, pInput.UserID, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 		break
 	case pInput.Username != "":
-		user, err = persist.UserGetByUsername(pInput.Username, pCtx, pRuntime)
+		user, err = persist.UserGetByUsername(pCtx, pInput.Username, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 		break
 	case pInput.Address != "":
-		user, err = persist.UserGetByAddress(pInput.Address, pCtx, pRuntime)
+		user, err = persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
 		if err != nil {
 			return nil, err
 		}
@@ -243,34 +243,33 @@ func userGetDb(pInput *userGetInput,
 	}
 
 	output := &userGetOutput{
-		UserId:      user.IDstr,
-		UserNameStr: user.UserNameStr,
-		BioStr:      user.BioStr,
+		UserID:      user.ID,
+		UserNameStr: user.UserName,
+		BioStr:      user.Bio,
 	}
 
 	if pAuthenticatedBool {
-		output.Addresses = user.AddressesLst
+		output.Addresses = user.Addresses
 	}
 
 	return output, nil
 }
 
 //-------------------------------------------------------------
-func userUpdateDb(pInput *userUpdateInput,
-	pCtx context.Context,
+func userUpdateDb(pCtx context.Context, pInput *userUpdateInput,
 	pRuntime *runtime.Runtime) error {
 
 	//------------------
 
-	return persist.UserUpdateById(
-		pInput.UserId,
-		persist.UserUpdateInput{
-			UserNameIdempotentStr: strings.ToLower(pInput.UserNameStr),
-			UserNameStr:           pInput.UserNameStr,
-			BioStr:                sanitizationPolicy.Sanitize(pInput.BioStr),
-			AddressesLst:          pInput.Addresses,
-		},
+	return persist.UserUpdateByID(
 		pCtx,
+		pInput.UserID,
+		persist.UserUpdateInput{
+			UserNameIdempotent: strings.ToLower(pInput.UserNameStr),
+			UserName:           pInput.UserNameStr,
+			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
+			Addresses:          pInput.Addresses,
+		},
 		pRuntime,
 	)
 
@@ -278,48 +277,44 @@ func userUpdateDb(pInput *userUpdateInput,
 
 //-------------------------------------------------------------
 // USER_DELETE__PIPELINE
-func userDeleteDb(pUserIDstr persist.DbId,
-	pCtx context.Context,
+func userDeleteDb(pCtx context.Context, pUserIDstr persist.DbID,
 	pRuntime *runtime.Runtime) error {
-	return persist.UserDelete(pUserIDstr, pCtx, pRuntime)
+	return persist.UserDelete(pCtx, pUserIDstr, pRuntime)
 }
 
 //-------------------------------------------------------------
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func getUserWithNonce(pAddress string,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (nonceValueStr string, userIdStr persist.DbId, err error) {
+func getUserWithNonce(pCtx context.Context, pAddress string,
+	pRuntime *runtime.Runtime) (nonceValue string, userID persist.DbID, err error) {
 
 	//------------------
 	// GET_NONCE - get latest nonce for this user_address from the DB
 
-	nonce, err := persist.AuthNonceGet(pAddress,
-		pCtx,
-		pRuntime)
+	nonce, err := persist.AuthNonceGet(pCtx, pAddress, pRuntime)
 	if err != nil {
-		return nonceValueStr, userIdStr, err
+		return nonceValue, userID, err
 	}
 	if nonce != nil {
-		nonceValueStr = nonce.ValueStr
+		nonceValue = nonce.Value
 	} else {
-		return nonceValueStr, userIdStr, errors.New("no nonce found")
+		return nonceValue, userID, errors.New("no nonce found")
 	}
 
 	//------------------
 	// GET_ID
 
-	user, err := persist.UserGetByAddress(pAddress, pCtx, pRuntime)
+	user, err := persist.UserGetByAddress(pCtx, pAddress, pRuntime)
 	if err != nil {
-		return nonceValueStr, userIdStr, err
+		return nonceValue, userID, err
 	}
 	if user != nil {
-		userIdStr = user.IDstr
+		userID = user.ID
 	} else {
-		return nonceValueStr, userIdStr, errors.New("no user found")
+		return nonceValue, userID, errors.New("no user found")
 	}
 	//------------------
 
-	return nonceValueStr, userIdStr, nil
+	return nonceValue, userID, nil
 }

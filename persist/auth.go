@@ -19,42 +19,40 @@ const (
 
 // USER_NONCE
 type UserNonce struct {
-	VersionInt int64 `bson:"version" mapstructure:"version"`
+	Version int64 `bson:"version" mapstructure:"version"`
 
-	// nonces are shortlived, and not something to be persisted across DB's
-	// other than mongo. so use mongo-native ID generation
-	IDstr         DbId    `bson:"_id"           json:"id"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"       json:"deleted"`
+	ID           DbID    `bson:"_id"           json:"id"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"       json:"deleted"`
 
-	ValueStr   string `bson:"value"   json:"value"`
-	UserIDstr  DbId   `bson:"user_id" json:"user_id"`
-	AddressStr string `bson:"address"     json:"address"`
+	Value   string `bson:"value"   json:"value"`
+	UserID  DbID   `bson:"user_id" json:"user_id"`
+	Address string `bson:"address"     json:"address"`
 }
 
 // USER_LOGIN_ATTEMPT
 type UserLoginAttempt struct {
-	VersionInt    int64   `bson:"version"`
-	IDstr         DbId    `bson:"_id"`
-	CreationTimeF float64 `bson:"creation_time"`
+	Version      int64   `bson:"version"`
+	ID           DbID    `bson:"_id"`
+	CreationTime float64 `bson:"creation_time"`
+	Deleted      bool    `bson:"deleted"       json:"deleted"`
 
-	AddressStr         string `bson:"address"     json:"address"`
-	SignatureStr       string `bson:"signature"`
-	NonceValueStr      string `bson:"nonce_value"`
-	UserExistsBool     bool   `bson:"user_exists"`
-	SignatureValidBool bool   `bson:"signature_valid"`
+	Address        string `bson:"address"     json:"address"`
+	Signature      string `bson:"signature"`
+	NonceValue     string `bson:"nonce_value"`
+	UserExists     bool   `bson:"user_exists"`
+	SignatureValid bool   `bson:"signature_valid"`
 
-	ReqHostAddrStr string              `bson:"req_host_addr"`
-	ReqHeaders     map[string][]string `bson:"req_headers"`
+	ReqHostAddr string              `bson:"req_host_addr"`
+	ReqHeaders  map[string][]string `bson:"req_headers"`
 }
 
 //-------------------------------------------------------------
 // LOGIN_ATTEMPT
 //-------------------------------------------------------------
 // CREATE
-func AuthUserLoginAttemptCreate(pLoginAttempt *UserLoginAttempt,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (DbId, error) {
+func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAttempt,
+	pRuntime *runtime.Runtime) (DbID, error) {
 
 	mp := NewMongoStorage(0, loginAttemptCollName, pRuntime)
 
@@ -66,8 +64,7 @@ func AuthUserLoginAttemptCreate(pLoginAttempt *UserLoginAttempt,
 // NONCE
 //-------------------------------------------------------------
 // GET
-func AuthNonceGet(pAddress string,
-	pCtx context.Context,
+func AuthNonceGet(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*UserNonce, error) {
 
 	mp := NewMongoStorage(0, noncesCollName, pRuntime)
@@ -92,9 +89,8 @@ func AuthNonceGet(pAddress string,
 
 //-------------------------------------------------------------
 // CREATE
-func AuthNonceCreate(pNonce *UserNonce,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (DbId, error) {
+func AuthNonceCreate(pCtx context.Context, pNonce *UserNonce,
+	pRuntime *runtime.Runtime) (DbID, error) {
 
 	mp := NewMongoStorage(0, noncesCollName, pRuntime)
 

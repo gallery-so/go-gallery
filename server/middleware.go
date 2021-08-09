@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	userIdContextKey = "user_id"
+	userIDcontextKey = "user_id"
 	authContextKey   = "authenticated"
 )
 
@@ -20,22 +20,22 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
+				c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
 				return
 			}
 			// get string after "Bearer"
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
 			// database that is unique to every user and session
-			valid, userId, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
+			valid, userID, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, ErrorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: err.Error()})
 				return
 			}
 
@@ -44,9 +44,9 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 				return
 			}
 
-			c.Set(userIdContextKey, userId)
+			c.Set(userIDcontextKey, userID)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		c.Next()
@@ -61,9 +61,9 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 			if len(authHeaders) == 2 {
 				// get string after "Bearer"
 				jwt := authHeaders[1]
-				valid, userId, _ := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
+				valid, userID, _ := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 				c.Set(authContextKey, valid)
-				c.Set(userIdContextKey, userId)
+				c.Set(userIDcontextKey, userID)
 			}
 		}
 		c.Next()
@@ -87,14 +87,14 @@ func handleCORS() gin.HandlerFunc {
 	}
 }
 
-func getUserIdFromCtx(c *gin.Context) (persist.DbId, bool) {
-	val, ok := c.Get(userIdContextKey)
+func getUserIDfromCtx(c *gin.Context) (persist.DbID, bool) {
+	val, ok := c.Get(userIDcontextKey)
 	if !ok {
 		return "", false
 	}
-	userId, ok := val.(persist.DbId)
+	userID, ok := val.(persist.DbID)
 	if !ok {
 		return "", false
 	}
-	return userId, true
+	return userID, true
 }

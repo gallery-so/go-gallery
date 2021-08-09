@@ -16,7 +16,7 @@ func main() {
 	portStr := config.Port
 
 	// RUNTIME
-	runtime, gErr := runtime.RuntimeGet(config)
+	runtime, gErr := runtime.GetRuntime(config)
 	if gErr != nil {
 		panic(gErr.Error)
 	}
