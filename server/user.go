@@ -24,7 +24,7 @@ type userUpdateInput struct {
 // INPUT - USER_GET
 type userGetInput struct {
 	UserId   persist.DbId `json:"user_id" form:"user_id"`
-	Address  string       `json:"address" form:"addr" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Address  string       `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	Username string       `json:"username" form:"username"`
 }
 

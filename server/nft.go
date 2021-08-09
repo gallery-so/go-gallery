@@ -19,7 +19,7 @@ type getNftsByUserIdInput struct {
 }
 
 type getOpenseaNftsInput struct {
-	WalletAddress string `json:"addr" form:"addr" binding:"required"`
+	WalletAddress string `json:"address" form:"address" binding:"required"`
 }
 
 type getNftsOutput struct {
