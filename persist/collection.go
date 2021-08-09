@@ -70,12 +70,7 @@ func CollCreate(pColl *CollectionDb,
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	id, err := mp.Insert(pCtx, pColl)
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
+	return mp.Insert(pCtx, pColl)
 
 }
 

@@ -42,7 +42,7 @@ func GalleryCreate(pGallery *GalleryDb,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) (DbId, error) {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
 }
@@ -54,7 +54,7 @@ func GalleryUpdate(pIDstr DbId,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
@@ -71,7 +71,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
@@ -93,7 +93,7 @@ func GalleryGetByID(pIDstr DbId,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
@@ -113,35 +113,19 @@ func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
 	if !pAuth {
 		andExpr = append(andExpr, bson.M{"$eq": []interface{}{"$hidden", false}})
 	}
+
+	innerMatch := bson.M{
+		"$expr": bson.M{
+			"$and": andExpr,
+		},
+	}
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "collections",
-			"let":  bson.M{"childArray": "$collections"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{
-					"$expr": bson.M{
-						"$and": andExpr,
-					},
-				},
-				}},
-				{{Key: "$lookup", Value: bson.M{
-					"from": "nfts",
-					"let":  bson.M{"array": "$nfts"},
-					"pipeline": mongo.Pipeline{
-						{{Key: "$match", Value: bson.M{
-							"$expr": bson.M{
-								"$and": []bson.M{
-									{"$in": []string{"$_id", "$$array"}},
-									{"$eq": []interface{}{"$deleted", false}},
-								},
-							},
-						}}},
-					},
-					"as": "nfts",
-				}}},
-			},
-			"as": "children",
+			"from":     "collections",
+			"let":      bson.M{"childArray": "$collections"},
+			"pipeline": newCollectionPipeline(innerMatch),
+			"as":       "collections",
 		}}},
 	}
 }
