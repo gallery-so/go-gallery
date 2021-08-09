@@ -150,7 +150,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 			Filter: bson.M{"opensea_id": v.OpenSeaID},
 			Update: bson.M{
 				"$setOnInsert": bson.M{
-					"_id":        generateId(now),
+					"_id":        generateID(now),
 					"created_at": now,
 				},
 				"$set": v,

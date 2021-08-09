@@ -40,7 +40,7 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", tc.r)
 	assert.Nil(pTest, err)
 
-	nftsByUser, err := persist.NftGetByUserId(ctx, userID, tc.r)
+	nftsByUser, err := persist.NftGetByUserID(ctx, userID, tc.r)
 	assert.Nil(pTest, err)
 
 	for _, nft := range nfts {

@@ -37,7 +37,7 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := persist.NftGetById(c, input.NftID, pRuntime)
+		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
@@ -71,7 +71,7 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		err := persist.NftUpdateById(c, nft.ID, userID, nft, pRuntime)
+		err := persist.NftUpdateByID(c, nft.ID, userID, nft, pRuntime)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
@@ -92,7 +92,7 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := persist.NftGetByUserId(c, input.UserID, pRuntime)
+		nfts, err := persist.NftGetByUserID(c, input.UserID, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
