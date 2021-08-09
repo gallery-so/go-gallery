@@ -19,7 +19,7 @@ type GalleryDb struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string `bson:"owner_user_id" json:"owner_user_id"`
+	OwnerUserIDstr DbId   `bson:"owner_user_id" json:"owner_user_id"`
 	CollectionsLst []DbId `bson:"collections"          json:"collections"`
 }
 
@@ -29,8 +29,12 @@ type Gallery struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string        `bson:"owner_user_id" json:"owner_user_id"`
+	OwnerUserIDstr DbId          `bson:"owner_user_id" json:"owner_user_id"`
 	CollectionsLst []*Collection `bson:"collections"          json:"collections"`
+}
+
+type GalleryUpdateInput struct {
+	Collections []DbId `bson:"collections" json:"collections"`
 }
 
 //-------------------------------------------------------------
@@ -41,11 +45,23 @@ func GalleryCreate(pGallery *GalleryDb,
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
+}
 
+//-------------------------------------------------------------
+func GalleryUpdate(pIDstr DbId,
+	pOwnerUserID DbId,
+	pUpdate interface{},
+	pCtx context.Context,
+	pRuntime *runtime.Runtime) error {
+
+	mp := NewMongoStorage(0, collectionColName, pRuntime)
+
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
 
 //-------------------------------------------------------------
 func GalleryGetByUserID(pUserIDstr DbId,
+	pAuth bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 
@@ -59,7 +75,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr, "deleted": false}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -68,6 +84,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 
 //-------------------------------------------------------------
 func GalleryGetByID(pIDstr DbId,
+	pAuth bool,
 	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 	opts := options.Aggregate()
@@ -80,14 +97,22 @@ func GalleryGetByID(pIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr, "deleted": false}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
 
-func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
+func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
+
+	andExpr := []bson.M{
+		{"$in": []string{"$_id", "$$childArray"}},
+		{"$eq": []interface{}{"$deleted", false}},
+	}
+	if !pAuth {
+		andExpr = append(andExpr, bson.M{"$eq": []interface{}{"$hidden", false}})
+	}
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
@@ -96,10 +121,7 @@ func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
 					"$expr": bson.M{
-						"$and": []bson.M{
-							{"$in": []string{"$_id", "$$childArray"}},
-							{"$eq": []interface{}{"$deleted", false}},
-						},
+						"$and": andExpr,
 					},
 				},
 				}},
