@@ -17,56 +17,55 @@ const (
 
 //-------------------------------------------------------------
 type CollectionDb struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	Version      int64   `bson:"version"       json:"version"` // schema version for this model
+	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"`
 
-	NameStr           string `bson:"name"          json:"name"`
-	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserIDstr    DbId   `bson:"owner_user_id" json:"owner_user_id"`
-	NftsLst           []DbId `bson:"nfts"          json:"nfts"`
+	Name           string `bson:"name"          json:"name"`
+	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    DbID   `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []DbID `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	HiddenBool bool `bson:"hidden" json:"hidden"`
+	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
 type Collection struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	Version      int64   `bson:"version"       json:"version"` // schema version for this model
+	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"`
 
-	NameStr           string `bson:"name"          json:"name"`
-	CollectorsNoteStr string `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserIDstr    string `bson:"owner_user_id" json:"owner_user_id"`
-	NftsLst           []*Nft `bson:"nfts"          json:"nfts"`
+	Name           string `bson:"name"          json:"name"`
+	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    string `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []*Nft `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	HiddenBool bool `bson:"hidden" json:"hidden"`
+	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
 type CollectionUpdateInfoInput struct {
-	NameStr           string `bson:"name" json:"name"`
-	CollectorsNoteStr string `bson:"collectors_note" json:"collectors_note"`
+	Name           string `bson:"name" json:"name"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 type CollectionUpdateNftsInput struct {
-	NftsLst []DbId `bson:"nfts" json:"nfts"`
+	Nfts []DbID `bson:"nfts" json:"nfts"`
 }
 
 type CollectionUpdateHiddenInput struct {
-	HiddenBool bool `bson:"hidden" json:"hidden"`
+	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
 type CollectionUpdateCollectorsNoteInput struct {
-	CollectorsNoteStr string `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 //-------------------------------------------------------------
-func CollCreate(pColl *CollectionDb,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (DbId, error) {
+func CollCreate(pCtx context.Context, pColl *CollectionDb,
+	pRuntime *runtime.Runtime) (DbID, error) {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
@@ -75,9 +74,8 @@ func CollCreate(pColl *CollectionDb,
 }
 
 //-------------------------------------------------------------
-func CollGetByUserID(pUserIDstr DbId,
+func CollGetByUserID(pCtx context.Context, pUserIDstr DbID,
 	pShowHidden bool,
-	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
 	opts := options.Aggregate()
@@ -103,9 +101,8 @@ func CollGetByUserID(pUserIDstr DbId,
 }
 
 //-------------------------------------------------------------
-func CollGetByID(pIDstr DbId,
+func CollGetByID(pCtx context.Context, pID DbID,
 	pShowHidden bool,
-	pCtx context.Context,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
 	opts := options.Aggregate()
@@ -118,7 +115,7 @@ func CollGetByID(pIDstr DbId,
 
 	result := []*Collection{}
 
-	fil := bson.M{"_id": pIDstr, "deleted": false}
+	fil := bson.M{"_id": pID, "deleted": false}
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
@@ -130,32 +127,30 @@ func CollGetByID(pIDstr DbId,
 }
 
 //-------------------------------------------------------------
-func CollUpdate(pIDstr DbId,
-	pUserId DbId,
+func CollUpdate(pCtx context.Context, pIDstr DbID,
+	pUserID DbID,
 	pUpdate interface{},
-	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, pUpdate)
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
 //-------------------------------------------------------------
-func CollDelete(pIDstr DbId,
-	pUserId DbId,
-	pCtx context.Context,
+func CollDelete(pCtx context.Context, pIDstr DbID,
+	pUserID DbID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserId}, bson.M{"$set": bson.M{"deleted": true}})
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 }
 
 //-------------------------------------------------------------
 
 // returns a collection that is empty except for a list of nfts
-func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Runtime) (*Collection, error) {
+func CollGetUnassigned(pCtx context.Context, pUserID DbID, pRuntime *runtime.Runtime) (*Collection, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -167,7 +162,7 @@ func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Run
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserId), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
 		return nil, err
 	}
 	if len(result) != 1 {
@@ -178,9 +173,9 @@ func CollGetUnassigned(pUserId DbId, pCtx context.Context, pRuntime *runtime.Run
 
 }
 
-func newUnassignedCollectionPipeline(pUserId DbId) mongo.Pipeline {
+func newUnassignedCollectionPipeline(pUserID DbID) mongo.Pipeline {
 	return mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"owner_user_id": pUserId, "deleted": false}}},
+		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},
 		{{Key: "$project", Value: bson.M{
 			"nfts": bson.M{

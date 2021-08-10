@@ -11,27 +11,27 @@ import (
 
 func TestUnassignedWithAggregation(t *testing.T) {
 
-	runtime, gErr := runtime.RuntimeGet(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	runtime, gErr := runtime.GetRuntime(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	if gErr != nil {
 		t.Fail()
 	}
 
-	user := &User{UserNameStr: "Bob", AddressesLst: []string{"0x456d569592f15Af845D0dbe984C12BAB8F430e31"}}
+	user := &User{UserName: "Bob", Addresses: []string{"0x456d569592f15Af845D0dbe984C12BAB8F430e31"}}
 
-	userId, err := UserCreate(user, context.Background(), runtime)
+	userID, err := UserCreate(context.Background(), user, runtime)
 	assert.Nil(t, err)
 
 	nfts := []*Nft{}
 
 	for i := 0; i < 30; i++ {
-		nfts = append(nfts, &Nft{NameStr: fmt.Sprint(i), OwnerUserIdStr: userId})
+		nfts = append(nfts, &Nft{Name: fmt.Sprint(i), OwnerUserID: userID})
 	}
-	nftIds, err := NftCreateBulk(nfts, context.Background(), runtime)
+	nftIds, err := NftCreateBulk(context.Background(), nfts, runtime)
 	assert.Nil(t, err)
 	assert.Len(t, nftIds, 30)
 
-	nftsInColOne := []DbId{}
-	nftsInColTwo := []DbId{}
+	nftsInColOne := []DbID{}
+	nftsInColTwo := []DbID{}
 
 	for i, id := range nftIds {
 
@@ -44,18 +44,18 @@ func TestUnassignedWithAggregation(t *testing.T) {
 	assert.Len(t, nftsInColOne, 10)
 	assert.Len(t, nftsInColTwo, 3)
 
-	_, err = CollCreate(&CollectionDb{NameStr: "Poop", NftsLst: nftsInColOne, OwnerUserIDstr: userId}, context.Background(), runtime)
+	_, err = CollCreate(context.Background(), &CollectionDb{Name: "Poop", Nfts: nftsInColOne, OwnerUserID: userID}, runtime)
 	assert.Nil(t, err)
-	_, err = CollCreate(&CollectionDb{NameStr: "Baby", NftsLst: nftsInColTwo, OwnerUserIDstr: userId}, context.Background(), runtime)
-	assert.Nil(t, err)
-
-	unassignedCollection, err := CollGetUnassigned(user.IDstr, context.Background(), runtime)
+	_, err = CollCreate(context.Background(), &CollectionDb{Name: "Baby", Nfts: nftsInColTwo, OwnerUserID: userID}, runtime)
 	assert.Nil(t, err)
 
-	unassignedIds := []DbId{}
+	unassignedCollection, err := CollGetUnassigned(context.Background(), user.ID, runtime)
+	assert.Nil(t, err)
 
-	for _, k := range unassignedCollection.NftsLst {
-		unassignedIds = append(unassignedIds, k.IDstr)
+	unassignedIds := []DbID{}
+
+	for _, k := range unassignedCollection.Nfts {
+		unassignedIds = append(unassignedIds, k.ID)
 	}
 
 	assert.Len(t, unassignedIds, len(nftIds)-(len(nftsInColOne)+len(nftsInColTwo)))

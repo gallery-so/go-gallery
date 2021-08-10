@@ -34,7 +34,7 @@ type DB struct {
 }
 
 //-------------------------------------------------------------
-func RuntimeGet(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
+func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 
 	//------------------
 	// LOGS
@@ -104,7 +104,7 @@ func RuntimeGet(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 
 	mongoDBnameStr := pConfig.MongoDBnameStr
 
-	db, gErr := DBinit(mongoURLstr,
+	db, gErr := dbInit(mongoURLstr,
 		mongoDBnameStr,
 		pConfig,
 		runtimeSys)
@@ -143,7 +143,7 @@ func RuntimeGet(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 }
 
 //-------------------------------------------------------------
-func DBinit(pMongoURLstr string,
+func dbInit(pMongoURLstr string,
 	pMongoDBNamestr string,
 	pConfig *Config,
 	pRuntimeSys *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
@@ -182,7 +182,7 @@ func DBinit(pMongoURLstr string,
 			CAfilePathStr := "rds-combined-ca-bundle.pem"
 
 			// TLS_CONFIG
-			TLSconfig, gErr = DBgetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
+			TLSconfig, gErr = dbGetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
 			if gErr != nil {
 				return nil, nil, gErr
 			}
@@ -215,7 +215,7 @@ func DBinit(pMongoURLstr string,
 }
 
 //-------------------------------------------------------------
-func DBgetCustomTLSConfig(pCAfilePathStr string,
+func dbGetCustomTLSConfig(pCAfilePathStr string,
 	pRuntimeSys *gf_core.Runtime_sys) (*tls.Config, *gf_core.Gf_error) {
 
 	certs, err := ioutil.ReadFile(pCAfilePathStr)

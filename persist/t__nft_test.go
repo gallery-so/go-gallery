@@ -25,21 +25,21 @@ func TestCreateAndGetNFT(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	runtime, gErr := runtime.RuntimeGet(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	runtime, gErr := runtime.GetRuntime(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	if gErr != nil {
 		pTest.Fail()
 	}
 
-	id, err := NftCreate(&Nft{OwnerUserIdStr: "poop", DescriptionStr: "cool nft", NameStr: "Big Bobby's Balooga"}, ctx, runtime)
+	id, err := NftCreate(ctx, &Nft{OwnerUserID: "poop", Description: "cool nft", Name: "Big Bobby's Balooga"}, runtime)
 	assert.Nil(pTest, err)
 
-	err = NftUpdateById(id, "poop", &Nft{OwnerUserIdStr: "poop", DescriptionStr: "extremely cool nft", NameStr: "Big Bobby's Balooga"}, ctx, runtime)
+	err = NftUpdateByID(ctx, id, "poop", &Nft{OwnerUserID: "poop", Description: "extremely cool nft", Name: "Big Bobby's Balooga"}, runtime)
 	assert.Nil(pTest, err)
 
-	nfts, err := NftGetById(id, ctx, runtime)
+	nfts, err := NftGetByID(ctx, id, runtime)
 	assert.Nil(pTest, err)
 
-	assert.Equal(pTest, "extremely cool nft", nfts[0].DescriptionStr)
+	assert.Equal(pTest, "extremely cool nft", nfts[0].Description)
 
 	//--------------------
 }

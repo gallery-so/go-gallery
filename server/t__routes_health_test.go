@@ -12,11 +12,11 @@ import (
 func TestHealthcheck(t *testing.T) {
 	assert := assert.New(t)
 
-	resp, err := http.Get(fmt.Sprintf("%s/health", tc.serverUrl))
+	resp, err := http.Get(fmt.Sprintf("%s/health", tc.serverURL))
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
-	body := HealthcheckResponse{}
+	body := healthcheckResponse{}
 	runtime.UnmarshalBody(&body, resp.Body, tc.r)
 	assert.Equal("gallery operational", body.Message)
 	assert.Equal("local", body.Env)

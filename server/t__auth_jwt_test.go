@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO change tests to reflect changes to jwt
+// TODO make this work
 //---------------------------------------------------
 func TestAuthJWT(pTest *testing.T) {
 
 	ctx := context.Background()
 
-	testUserId := persist.DbId("testid")
+	testUserID := persist.DbID("testid")
 
 	//--------------------
 	// RUNTIME_SYS
@@ -32,7 +32,7 @@ func TestAuthJWT(pTest *testing.T) {
 		MongoDBnameStr:    mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
-	runtime, gErr := runtime.RuntimeGet(config)
+	runtime, gErr := runtime.GetRuntime(config)
 	if gErr != nil {
 		pTest.Fail()
 	}
@@ -46,7 +46,7 @@ func TestAuthJWT(pTest *testing.T) {
 	// GENERATE
 	JWTtokenStr, err := jwtGenerate(testSigningKeyStr,
 		testIssuerStr,
-		testUserId,
+		testUserID,
 		runtime)
 	if err != nil {
 		pTest.Fail()
@@ -65,7 +65,7 @@ func TestAuthJWT(pTest *testing.T) {
 	//--------------------
 	// JWT_PIPELINES
 
-	newJWTtokenStr, err := jwtGeneratePipeline(testUserId, ctx, runtime)
+	newJWTtokenStr, err := jwtGeneratePipeline(ctx, testUserID, runtime)
 	if err != nil {
 		pTest.Fail()
 	}

@@ -15,42 +15,42 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 
 	ctx := context.Background()
 
-	user := &persist.User{AddressesLst: []string{"0x485b8ac36535fae56b2910780245dd69dda270bc"}}
+	user := &persist.User{Addresses: []string{"0x485b8ac36535fae56b2910780245dd69dda270bc"}}
 
-	userID, err := persist.UserCreate(user, ctx, tc.r)
+	userID, err := persist.UserCreate(ctx, user, tc.r)
 	assert.Nil(pTest, err)
 
 	nft := &persist.Nft{
-		OwnerUserIdStr:  userID,
-		OwnerAddressStr: "0x485b8ac36535fae56b2910780245dd69dda270bc",
-		NameStr:         "test",
-		OpenSeaIDint:    0,
+		OwnerUserID:  userID,
+		OwnerAddress: "0x485b8ac36535fae56b2910780245dd69dda270bc",
+		Name:         "test",
+		OpenSeaID:    0,
 	}
 
 	nft2 := &persist.Nft{
-		OwnerUserIdStr:  userID,
-		OwnerAddressStr: "0x485b8ac36535fae56b2910780245dd69dda270bc",
-		NameStr:         "test2",
-		OpenSeaIDint:    32087758,
+		OwnerUserID:  userID,
+		OwnerAddress: "0x485b8ac36535fae56b2910780245dd69dda270bc",
+		Name:         "test2",
+		OpenSeaID:    32087758,
 	}
 
-	_, err = persist.NftCreateBulk([]*persist.Nft{nft, nft2}, ctx, tc.r)
+	_, err = persist.NftCreateBulk(ctx, []*persist.Nft{nft, nft2}, tc.r)
 	assert.Nil(pTest, err)
 
-	nfts, err := OpenSeaPipelineAssetsForAcc("0x485b8ac36535fae56b2910780245dd69dda270bc", ctx, tc.r)
+	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", tc.r)
 	assert.Nil(pTest, err)
 
-	nftsByUser, err := persist.NftGetByUserId(userID, ctx, tc.r)
+	nftsByUser, err := persist.NftGetByUserID(ctx, userID, tc.r)
 	assert.Nil(pTest, err)
 
 	for _, nft := range nfts {
-		fmt.Println(nft.NameStr)
+		fmt.Println(nft.Name)
 	}
 
 	fmt.Println("----------------------------------------------- BY USER")
 
 	for _, nft := range nftsByUser {
-		fmt.Println(nft.NameStr)
+		fmt.Println(nft.Name)
 	}
 
 	assert.Equal(pTest, len(nfts), len(nftsByUser))

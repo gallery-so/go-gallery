@@ -9,19 +9,19 @@ import (
 )
 
 type TestConfig struct {
-	server 			*httptest.Server
-	serverUrl 		string
-	r 				*runtime.Runtime
+	server          *httptest.Server
+	serverURL       string
+	r               *runtime.Runtime
 	testUserAddress string
-	user1			*TestUser
-	user2			*TestUser
+	user1           *TestUser
+	user2           *TestUser
 }
 
 var tc *TestConfig
 
 func TestMain(m *testing.M) {
-    tc = setup()
-    code := m.Run() 
-    teardown(tc.server)
-    os.Exit(code)
+	tc = setup()
+	code := m.Run()
+	teardown(tc.server)
+	os.Exit(code)
 }
