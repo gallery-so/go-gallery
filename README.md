@@ -30,7 +30,7 @@ $ ./bin/main
 The app will connect to a local mongo instance by default. To spin it up, you can use the official docker container:
 
 ```bash
-$ docker run -p 27017:27017 mongo:4.4.6
+$ docker run -p 27017:27017 mongo
 ```
 
 ### Healthcheck
