@@ -10,11 +10,11 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
-type galleryGetByUserIdInput struct {
-	UserId persist.DbID `form:"user_id" json:"user_id" binding:"required"`
+type galleryGetByUserIDInput struct {
+	UserID persist.DbID `form:"user_id" json:"user_id" binding:"required"`
 }
-type galleryGetByIdInput struct {
-	Id persist.DbID `form:"id" json:"id" binding:"required"`
+type galleryGetByIDInput struct {
+	ID persist.DbID `form:"id" json:"id" binding:"required"`
 }
 
 type galleryCreateInput struct {
@@ -22,7 +22,7 @@ type galleryCreateInput struct {
 }
 
 type galleryUpdateInput struct {
-	Id          persist.DbID   `form:"id" json:"id" binding:"required"`
+	ID          persist.DbID   `form:"id" json:"id" binding:"required"`
 	Collections []persist.DbID `json:"collections" binding:"required"`
 }
 
@@ -31,18 +31,18 @@ type galleryGetOutput struct {
 }
 
 type galleryCreateOutput struct {
-	Id persist.DbID `json:"id"`
+	ID persist.DbID `json:"id"`
 }
 
 //-------------------------------------------------------------
 // HANDLERS
 
-func getGalleriesByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
 
-		input := &galleryGetByUserIdInput{}
+		input := &galleryGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
@@ -51,7 +51,7 @@ func getGalleriesByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByUserID(c, input.UserId, auth, pRuntime)
+		galleries, err := persist.GalleryGetByUserID(c, input.UserID, auth, pRuntime)
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.Gallery{}
 		}
@@ -62,12 +62,12 @@ func getGalleriesByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 }
 
 //-------------------------------------------------------------
-func getGalleryById(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
 
-		input := &galleryGetByIdInput{}
+		input := &galleryGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
@@ -76,10 +76,10 @@ func getGalleryById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByID(c, input.Id, auth, pRuntime)
+		galleries, err := persist.GalleryGetByID(c, input.ID, auth, pRuntime)
 		if len(galleries) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, errorResponse{
-				Error: fmt.Sprintf("no galleries found with id: %s", input.Id),
+				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
 			})
 			return
 		}
@@ -112,7 +112,7 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		update := &persist.GalleryUpdateInput{Collections: input.Collections}
 
-		err := persist.GalleryUpdate(input.Id, userID, update, c, pRuntime)
+		err := persist.GalleryUpdate(input.ID, userID, update, c, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -146,6 +146,6 @@ func createGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, galleryCreateOutput{Id: id})
+		c.JSON(http.StatusOK, galleryCreateOutput{ID: id})
 	}
 }
