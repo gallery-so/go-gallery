@@ -11,14 +11,14 @@ import (
 )
 
 type testGrandchild struct {
-	IDstr         DbId    `bson:"_id,omitempty"`
+	IDstr         DbID    `bson:"_id,omitempty"`
 	CreationTimeF float64 `bson:"creation_time"`
 	ImportantData string  `bson:"data"`
 	Deleted       bool    `bson:"deleted"`
 }
 
 type testChild struct {
-	IDstr         DbId     `bson:"_id,omitempty"`
+	IDstr         DbID     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
@@ -26,7 +26,7 @@ type testChild struct {
 }
 
 type testGrandparent struct {
-	IDstr         DbId     `bson:"_id,omitempty"`
+	IDstr         DbID     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
@@ -48,7 +48,7 @@ func TestPersist(pTest *testing.T) {
 	//--------------------
 	// RUNTIME_SYS
 
-	runtime, gErr := runtime.RuntimeGet(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	runtime, gErr := runtime.GetRuntime(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	if gErr != nil {
 		pTest.Fail()
 	}

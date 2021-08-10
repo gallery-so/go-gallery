@@ -19,8 +19,8 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	collectionsGroup := apiGroupV1.Group("/collections")
 
-	collectionsGroup.GET("/get", jwtOptional(pRuntime), getCollectionById(pRuntime))
-	collectionsGroup.GET("/user_get", jwtOptional(pRuntime), getCollectionsByUserId(pRuntime))
+	collectionsGroup.GET("/get", jwtOptional(pRuntime), getCollectionByID(pRuntime))
+	collectionsGroup.GET("/user_get", jwtOptional(pRuntime), getCollectionsByUserID(pRuntime))
 	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
 	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
 	collectionsGroup.POST("/update/info", jwtRequired(pRuntime), updateCollectionInfo(pRuntime))
@@ -33,10 +33,10 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	nftsGroup := apiGroupV1.Group("/nfts")
 
-	nftsGroup.GET("/get", jwtOptional(pRuntime), getNftById(pRuntime))
+	nftsGroup.GET("/get", jwtOptional(pRuntime), getNftByID(pRuntime))
 	nftsGroup.GET("/user_get", jwtOptional(pRuntime), getNftsForUser(pRuntime))
 	nftsGroup.GET("/opensea_get", jwtOptional(pRuntime), getNftsFromOpensea(pRuntime))
-	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftById(pRuntime))
+	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftByID(pRuntime))
 	nftsGroup.GET("/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
 
 	// HEALTH

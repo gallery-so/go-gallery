@@ -7,19 +7,6 @@ import (
 )
 
 //-------------------------------------------------------------
-// VALIDATE
-func Validate(pInput interface{},
-	pRuntime *Runtime) error {
-
-	err := pRuntime.Validator.Struct(pInput)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//-------------------------------------------------------------
 // UNMARSHALL BODY
 // input must be a pointer to a struct with json tags
 func UnmarshalBody(pInput interface{}, body io.Reader, pRuntime *Runtime) error {

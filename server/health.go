@@ -7,14 +7,14 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
-type HealthcheckResponse struct {
+type healthcheckResponse struct {
 	Message string `json:"msg"`
 	Env     string `json:"env"`
 }
 
 func healthcheck(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, HealthcheckResponse{
+		c.JSON(http.StatusOK, healthcheckResponse{
 			Message: "gallery operational",
 			Env:     pRuntime.Config.EnvStr,
 		})

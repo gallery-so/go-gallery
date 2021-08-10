@@ -15,17 +15,17 @@ const galleryColName = "galleries"
 //-------------------------------------------------------------
 type GalleryDb struct {
 	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	IDstr         DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
 	OwnerUserIDstr string `bson:"owner_user_id" json:"owner_user_id"`
-	CollectionsLst []DbId `bson:"collections"          json:"collections"`
+	CollectionsLst []DbID `bson:"collections"          json:"collections"`
 }
 
 type Gallery struct {
 	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	IDstr         DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
@@ -34,9 +34,8 @@ type Gallery struct {
 }
 
 //-------------------------------------------------------------
-func GalleryCreate(pGallery *GalleryDb,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (DbId, error) {
+func GalleryCreate(pCtx context.Context, pGallery *GalleryDb,
+	pRuntime *runtime.Runtime) (DbID, error) {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
@@ -45,8 +44,7 @@ func GalleryCreate(pGallery *GalleryDb,
 }
 
 //-------------------------------------------------------------
-func GalleryGetByUserID(pUserIDstr DbId,
-	pCtx context.Context,
+func GalleryGetByUserID(pCtx context.Context, pUserID DbID,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 
 	opts := options.Aggregate()
@@ -59,7 +57,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserIDstr, "deleted": false}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -67,8 +65,7 @@ func GalleryGetByUserID(pUserIDstr DbId,
 }
 
 //-------------------------------------------------------------
-func GalleryGetByID(pIDstr DbId,
-	pCtx context.Context,
+func GalleryGetByID(pCtx context.Context, pID DbID,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -80,7 +77,7 @@ func GalleryGetByID(pIDstr DbId,
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pIDstr, "deleted": false}), &result, opts); err != nil {
+	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}), &result, opts); err != nil {
 		return nil, err
 	}
 

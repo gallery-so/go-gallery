@@ -11,7 +11,7 @@ import (
 //---------------------------------------------------
 func TestAuthUser(pTest *testing.T) {
 
-	addressStr := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
+	address := "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"
 
 	ctx := context.Background()
 
@@ -19,24 +19,24 @@ func TestAuthUser(pTest *testing.T) {
 	// USER_GET_PREFLIGHT
 
 	userGetPublicInfoInput := &authUserGetPreflightInput{
-		AddressStr: addressStr,
+		Address: address,
 	}
-	output, err := authUserGetPreflightDb(userGetPublicInfoInput, ctx, tc.r)
+	output, err := authUserGetPreflightDb(ctx, userGetPublicInfoInput, tc.r)
 	if err != nil {
 		pTest.FailNow()
 	}
 
-	nonceStr := output.NonceStr
+	nonce := output.Nonce
 
-	assert.NotEmpty(pTest, nonceStr)
+	assert.NotEmpty(pTest, nonce)
 
 	//--------------------
 	// USER_CREATE
 	userCreateInput := &userCreateInput{
-		AddressStr:   addressStr,
-		SignatureStr: "how to make this? can we sign the nonce from go?",
+		Address:   address,
+		Signature: "how to make this? can we sign the nonce from go?",
 	}
-	user, err := userCreateDb(userCreateInput, ctx, tc.r)
+	user, err := userCreateDb(ctx, userCreateInput, tc.r)
 	if err != nil {
 		pTest.Fail()
 	}
@@ -44,13 +44,14 @@ func TestAuthUser(pTest *testing.T) {
 	//--------------------
 	// USER_DELETE
 
-	err = userDeleteDb(user.UserIDstr, ctx, tc.r)
+	// TODO why segfault?
+	err = userDeleteDb(ctx, user.UserID, tc.r)
 	if err != nil {
 		pTest.Fail()
 	}
 
 	//--------------------
 
-	log.WithFields(log.Fields{"nonce": nonceStr}).Info("signature validity")
+	log.WithFields(log.Fields{"nonce": nonce}).Info("signature validity")
 
 }

@@ -13,28 +13,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateCollectionNameById_Success(t *testing.T) {
+func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with collection
-	collId, err := persist.CollCreate(&persist.CollectionDb{
-		NameStr:        "very cool collection",
-		OwnerUserIDstr: tc.user1.id,
-	}, context.Background(), tc.r)
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDb{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+	}, tc.r)
 	assert.Nil(err)
 
 	// build update request body
 	type Update struct {
-		Id   persist.DbId `json:"id"`
-		Name string       `json:"name"`
+		ID             persist.DbID `json:"id"`
+		Name           string       `json:"name"`
+		CollectorsNote string       `json:"collectors_note"`
 	}
-	update := Update{Name: "new coll name", Id: collId}
+	update := Update{Name: "new coll name", ID: collID}
 	data, err := json.Marshal(update)
 	assert.Nil(err)
 
 	// send update request
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/collections/update/name", tc.serverUrl),
+		fmt.Sprintf("%s/collections/update/info", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
@@ -44,7 +45,7 @@ func TestUpdateCollectionNameById_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverUrl, collId))
+	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
@@ -57,5 +58,5 @@ func TestUpdateCollectionNameById_Success(t *testing.T) {
 	runtime.UnmarshalBody(&body, resp.Body, tc.r)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collections[0].NameStr)
+	assert.Equal(update.Name, body.Collections[0].Name)
 }

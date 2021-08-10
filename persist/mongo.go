@@ -16,7 +16,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type DbId string
+type DbID string
 
 type MongoStorage struct {
 	version    int64
@@ -29,29 +29,29 @@ func NewMongoStorage(version int64, collName string, runtime *runtime.Runtime) *
 }
 
 // insert must be a pointer to a struct
-func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DbId, error) {
+func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DbID, error) {
 
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
 
-	if _, ok := elem.FieldByName("IDstr"); ok {
-		idField := val.FieldByName("IDstr")
+	if _, ok := elem.FieldByName("ID"); ok {
+		idField := val.FieldByName("ID")
 		if !idField.CanSet() {
 			// panic because this literally cannot happen in prod
 			panic("unable to set id field on struct")
 		}
-		if _, ok = elem.FieldByName("CreationTimeF"); ok {
-			val.FieldByName("CreationTimeF").SetFloat(now)
+		if _, ok = elem.FieldByName("CreationTime"); ok {
+			val.FieldByName("CreationTime").SetFloat(now)
 		} else {
 			// panic because this literally cannot happen in prod
 			panic("creation time field required for id-able structs")
 		}
-		idField.Set(reflect.ValueOf(generateId(now)))
+		idField.Set(reflect.ValueOf(generateID(now)))
 	}
 
-	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
-		f := val.FieldByName("LastUpdatedF")
+	if _, ok := elem.FieldByName("LastUpdated"); ok {
+		f := val.FieldByName("LastUpdated")
 		if f.CanSet() {
 			f.SetFloat(now)
 		}
@@ -62,33 +62,33 @@ func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*
 		return "", err
 	}
 
-	return DbId(res.InsertedID.(string)), nil
+	return DbID(res.InsertedID.(string)), nil
 }
 
 // insert must be a slice of pointers to a struct
-func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DbId, error) {
+func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DbID, error) {
 
 	for _, k := range insert {
 		elem := reflect.TypeOf(k).Elem()
 		val := reflect.ValueOf(k).Elem()
 		now := float64(time.Now().UnixNano()) / 1000000000.0
-		if _, ok := elem.FieldByName("IDstr"); ok {
-			idField := val.FieldByName("IDstr")
+		if _, ok := elem.FieldByName("ID"); ok {
+			idField := val.FieldByName("ID")
 			if !idField.CanSet() {
 				// panic because this literally cannot happen in prod
 				panic("unable to set id field on struct")
 			}
-			if _, ok = elem.FieldByName("CreationTimeF"); ok {
-				val.FieldByName("CreationTimeF").SetFloat(now)
+			if _, ok = elem.FieldByName("CreationTime"); ok {
+				val.FieldByName("CreationTime").SetFloat(now)
 			} else {
 				// panic because this literally cannot happen in prod
 				panic("creation time field required for id-able structs")
 			}
-			idField.Set(reflect.ValueOf(generateId(now)))
+			idField.Set(reflect.ValueOf(generateID(now)))
 		}
 
-		if _, ok := elem.FieldByName("LastUpdatedF"); ok {
-			f := val.FieldByName("LastUpdatedF")
+		if _, ok := elem.FieldByName("LastUpdated"); ok {
+			f := val.FieldByName("LastUpdated")
 			if f.CanSet() {
 				f.SetFloat(now)
 			}
@@ -100,11 +100,11 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 		return nil, err
 	}
 
-	ids := make([]DbId, len(res.InsertedIDs))
+	ids := make([]DbID, len(res.InsertedIDs))
 
 	for i, v := range res.InsertedIDs {
 		if id, ok := v.(string); ok {
-			ids[i] = DbId(id)
+			ids[i] = DbID(id)
 		}
 	}
 	return ids, nil
@@ -114,8 +114,8 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 	elem := reflect.TypeOf(update).Elem()
 	val := reflect.ValueOf(update).Elem()
-	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
-		f := val.FieldByName("LastUpdatedF")
+	if _, ok := elem.FieldByName("LastUpdated"); ok {
+		f := val.FieldByName("LastUpdated")
 		if f.CanSet() {
 			now := float64(time.Now().UnixNano()) / 1000000000.0
 			f.SetFloat(now)
@@ -141,14 +141,14 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	elem := reflect.TypeOf(upsert).Elem()
 	val := reflect.ValueOf(upsert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-	if _, ok := elem.FieldByName("LastUpdatedF"); ok {
-		f := val.FieldByName("LastUpdatedF")
+	if _, ok := elem.FieldByName("LastUpdated"); ok {
+		f := val.FieldByName("LastUpdated")
 		if f.CanSet() {
 			f.SetFloat(now)
 		}
 	}
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateId(now), "created_at": now}, "$set": upsert}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(now), "created_at": now}, "$set": upsert}, opts...)
 	if err != nil {
 		return err
 	}
@@ -195,12 +195,12 @@ func (m *MongoStorage) CreateIndex(ctx context.Context, index mongo.IndexModel, 
 }
 
 // CREATE_ID
-func generateId(creationTime float64) DbId {
+func generateID(creationTime float64) DbID {
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(creationTime)))
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
-	return DbId(hexStr)
+	return DbID(hexStr)
 }
 
 // function that returns the pointer to the bool passed in

@@ -14,19 +14,19 @@ import (
 )
 
 type TestUser struct {
-	id 		persist.DbId
+	id      persist.DbID
 	address string
-	jwt 	string
+	jwt     string
 }
 
 func generateTestUser(r *runtime.Runtime) *TestUser {
 	ctx := context.Background()
 	address := "0x32Be343B94f860124dC4fEe278FDCBD38C102D88"
 	user := &persist.User{
-		AddressesLst: []string{address},
+		Addresses: []string{address},
 	}
-	id, _ := persist.UserCreate(user, ctx, r)
-	jwt, _ := jwtGeneratePipeline(id, ctx, r)
+	id, _ := persist.UserCreate(ctx, user, r)
+	jwt, _ := jwtGeneratePipeline(ctx, id, r)
 
 	return &TestUser{id, address, jwt}
 }
@@ -35,7 +35,7 @@ func generateTestUser(r *runtime.Runtime) *TestUser {
 // Initializes the runtime, connects to mongodb, and starts a test server
 func setup() *TestConfig {
 	// Initialize runtime
-	runtime, _ := runtime.RuntimeGet(runtime.ConfigLoad())
+	runtime, _ := runtime.GetRuntime(runtime.ConfigLoad())
 
 	// Initialize test server
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
@@ -44,11 +44,11 @@ func setup() *TestConfig {
 	log.Info("server connected! ✅")
 
 	return &TestConfig{
-		server: ts,
-		serverUrl: fmt.Sprintf("%s/glry/v1", ts.URL),
-		r: runtime,
-		user1: generateTestUser(runtime),
-		user2: generateTestUser(runtime),
+		server:    ts,
+		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
+		r:         runtime,
+		user1:     generateTestUser(runtime),
+		user2:     generateTestUser(runtime),
 	}
 }
 

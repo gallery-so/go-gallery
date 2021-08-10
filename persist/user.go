@@ -15,36 +15,35 @@ import (
 const usersCollName = "users"
 
 type User struct {
-	VersionInt    int64   `bson:"version"` // schema version for this model
-	IDstr         DbId    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	Version      int64   `bson:"version"` // schema version for this model
+	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"`
 
-	UserNameStr           string   `bson:"username"         json:"username"` // mutable
-	UserNameIdempotentStr string   `bson:"username_idempotent" json:"username_idempotent"`
-	AddressesLst          []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	BioStr                string   `bson:"bio"  json:"bio"`
+	UserName           string   `bson:"username"         json:"username"` // mutable
+	UserNameIdempotent string   `bson:"username_idempotent" json:"username_idempotent"`
+	Addresses          []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	Bio                string   `bson:"bio"  json:"bio"`
 }
 
 type UserUpdateInput struct {
-	UserNameStr           string   `bson:"username,omitempty"`
-	UserNameIdempotentStr string   `bson:"username_idempotent,omitempty"`
-	AddressesLst          []string `bson:"addresses,omitempty"`
-	BioStr                string   `bson:"bio,omitempty"`
+	UserName           string   `bson:"username,omitempty"`
+	UserNameIdempotent string   `bson:"username_idempotent,omitempty"`
+	Addresses          []string `bson:"addresses,omitempty"`
+	Bio                string   `bson:"bio,omitempty"`
 }
 
 //-------------------------------------------------------------
 // USER
 //-------------------------------------------------------------
 // UPDATE
-func UserUpdateById(pIDstr DbId, pUser interface{},
-	pCtx context.Context,
+func UserUpdateByID(pCtx context.Context, pID DbID, pUser interface{},
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	err := mp.Update(pCtx, bson.M{
-		"_id": pIDstr,
+		"_id": pID,
 	}, pUser)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
@@ -58,8 +57,7 @@ func UserUpdateById(pIDstr DbId, pUser interface{},
 
 //-------------------------------------------------------------
 // EXISTS BY ADDRESS
-func UserExistsByAddress(pAddress string,
-	pCtx context.Context,
+func UserExistsByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
@@ -75,9 +73,8 @@ func UserExistsByAddress(pAddress string,
 
 //-------------------------------------------------------------
 // CREATE
-func UserCreate(pUser *User,
-	pCtx context.Context,
-	pRuntime *runtime.Runtime) (DbId, error) {
+func UserCreate(pCtx context.Context, pUser *User,
+	pRuntime *runtime.Runtime) (DbID, error) {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
@@ -87,8 +84,7 @@ func UserCreate(pUser *User,
 
 //-------------------------------------------------------------
 // DELETE
-func UserDelete(pUserID DbId,
-	pCtx context.Context,
+func UserDelete(pCtx context.Context, pUserID DbID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
@@ -99,8 +95,7 @@ func UserDelete(pUserID DbId,
 
 //-------------------------------------------------------------
 // GET BY ID
-func UserGetById(userId DbId,
-	pCtx context.Context,
+func UserGetByID(pCtx context.Context, userID DbID,
 	pRuntime *runtime.Runtime) (*User, error) {
 
 	opts := options.Find()
@@ -112,7 +107,7 @@ func UserGetById(userId DbId,
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"_id": userId}, &result, opts)
+	err := mp.Find(pCtx, bson.M{"_id": userID}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -130,8 +125,7 @@ func UserGetById(userId DbId,
 
 //-------------------------------------------------------------
 // GET BY ADDRESS
-func UserGetByAddress(pAddress string,
-	pCtx context.Context,
+func UserGetByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*User, error) {
 
 	opts := options.Find()
@@ -161,8 +155,7 @@ func UserGetByAddress(pAddress string,
 
 //-------------------------------------------------------------
 // GET BY USERNAME
-func UserGetByUsername(pUsername string,
-	pCtx context.Context,
+func UserGetByUsername(pCtx context.Context, pUsername string,
 	pRuntime *runtime.Runtime) (*User, error) {
 
 	opts := options.Find()

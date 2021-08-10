@@ -9,7 +9,7 @@ import (
 )
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`/^[\w.]+$/i`)
-var consecutivePeriodsUnderscoresRegex = regexp.MustCompile(`/^(?=[\w.]*$)(?!.*[_.]{2})[^_.].*[^_.]$/`)
+var consecutivePeriodsUnderscoresRegex = regexp.MustCompile(`/^[\w.]+$/i`)
 var sanitizationPolicy = bluemonday.UGCPolicy()
 
 var ethValidator validator.Func = func(fl validator.FieldLevel) bool {
