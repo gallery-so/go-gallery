@@ -39,7 +39,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 
 	// build update request body
 	type Update struct {
-		Id          persist.DbID   `json:"id"`
+		ID          persist.DbID   `json:"id"`
 		Collections []persist.DbID `json:"collections"`
 	}
 
@@ -50,7 +50,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 
 	t.Log(copy)
 
-	update := Update{Collections: copy, Id: id}
+	update := Update{Collections: copy, ID: id}
 	data, err := json.Marshal(update)
 	assert.Nil(err)
 
@@ -81,6 +81,6 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	runtime.UnmarshalBody(&body, resp.Body, tc.r)
 	assert.Len(body.Galleries, 1)
 	assert.Empty(body.Error)
-	assert.Equal(update.Collections[2], body.Galleries[0].CollectionsLst[1].ID)
-	assert.Len(body.Galleries[0].CollectionsLst, 9)
+	assert.Equal(update.Collections[2], body.Galleries[0].Collections[1].ID)
+	assert.Len(body.Galleries[0].Collections, 9)
 }

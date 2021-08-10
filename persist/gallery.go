@@ -14,23 +14,23 @@ const galleryColName = "galleries"
 
 //-------------------------------------------------------------
 type GalleryDb struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	Version      int64   `bson:"version"       json:"version"` // schema version for this model
+	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"`
 
 	OwnerUserID DbID   `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []DbID `bson:"collections"          json:"collections"`
 }
 
 type Gallery struct {
-	VersionInt    int64   `bson:"version"       json:"version"` // schema version for this model
-	IDstr         DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
-	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
-	DeletedBool   bool    `bson:"deleted"`
+	Version      int64   `bson:"version"       json:"version"` // schema version for this model
+	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted"`
 
-	OwnerUserIDstr DbID          `bson:"owner_user_id" json:"owner_user_id"`
-	CollectionsLst []*Collection `bson:"collections"          json:"collections"`
+	OwnerUserID DbID          `bson:"owner_user_id" json:"owner_user_id"`
+	Collections []*Collection `bson:"collections"          json:"collections"`
 }
 
 type GalleryUpdateInput struct {

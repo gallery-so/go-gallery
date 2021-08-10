@@ -74,7 +74,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDb,
 }
 
 //-------------------------------------------------------------
-func CollGetByUserID(pCtx context.Context, pUserIDstr DbID,
+func CollGetByUserID(pCtx context.Context, pUserID DbID,
 	pShowHidden bool,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -88,7 +88,7 @@ func CollGetByUserID(pCtx context.Context, pUserIDstr DbID,
 
 	result := []*Collection{}
 
-	fil := bson.M{"owner_user_id": pUserIDstr, "deleted": false}
+	fil := bson.M{"owner_user_id": pUserID, "deleted": false}
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
