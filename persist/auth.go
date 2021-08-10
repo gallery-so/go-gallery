@@ -15,25 +15,25 @@ const (
 	noncesCollName       = "nonces"
 )
 
-//-------------------------------------------------------------
-
-// USER_NONCE
+// UserNonce represents a short lived nonce that holds a value to be signed
+// by a user cryptographically to prove they are the owner of a given address.
 type UserNonce struct {
 	Version int64 `bson:"version" mapstructure:"version"`
 
-	ID           DbID    `bson:"_id"           json:"id"`
+	ID           DBID    `bson:"_id"           json:"id"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"       json:"deleted"`
 
 	Value   string `bson:"value"   json:"value"`
-	UserID  DbID   `bson:"user_id" json:"user_id"`
+	UserID  DBID   `bson:"user_id" json:"user_id"`
 	Address string `bson:"address"     json:"address"`
 }
 
-// USER_LOGIN_ATTEMPT
+// UserLoginAttempt represents a single attempt for a user to login despite the success
+// of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
 	Version      int64   `bson:"version"`
-	ID           DbID    `bson:"_id"`
+	ID           DBID    `bson:"_id"`
 	CreationTime float64 `bson:"creation_time"`
 	Deleted      bool    `bson:"deleted"       json:"deleted"`
 
@@ -47,12 +47,9 @@ type UserLoginAttempt struct {
 	ReqHeaders  map[string][]string `bson:"req_headers"`
 }
 
-//-------------------------------------------------------------
-// LOGIN_ATTEMPT
-//-------------------------------------------------------------
-// CREATE
+// AuthUserLoginAttemptCreate inserts a single login attempt into the database and will return the ID of the inserted attempt
 func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAttempt,
-	pRuntime *runtime.Runtime) (DbID, error) {
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, loginAttemptCollName, pRuntime)
 
@@ -60,10 +57,7 @@ func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAt
 
 }
 
-//-------------------------------------------------------------
-// NONCE
-//-------------------------------------------------------------
-// GET
+// AuthNonceGet returns the most recent nonce for a given address
 func AuthNonceGet(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*UserNonce, error) {
 
@@ -87,10 +81,9 @@ func AuthNonceGet(pCtx context.Context, pAddress string,
 	return result[0], nil
 }
 
-//-------------------------------------------------------------
-// CREATE
+// AuthNonceCreate inserts a new nonce into the database and will return the ID of the inserted nonce
 func AuthNonceCreate(pCtx context.Context, pNonce *UserNonce,
-	pRuntime *runtime.Runtime) (DbID, error) {
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, noncesCollName, pRuntime)
 

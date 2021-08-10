@@ -9,7 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 )
 
-//-------------------------------------------------------------
 func main() {
 
 	config := runtime.ConfigLoad()

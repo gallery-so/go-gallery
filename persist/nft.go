@@ -15,16 +15,17 @@ const (
 	nftCollectionColName = "nft_collections"
 )
 
+// Nft represents an nft both in the database and throughout the application
 type Nft struct {
 	Version      int64   `bson:"version"              json:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"                  json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"                  json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time"        json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
 	Name           string `bson:"name"                 json:"name"`
 	Description    string `bson:"description"          json:"description"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	OwnerUserID    DbID   `bson:"owner_user_id" json:"user_id"`
+	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
 
 	ExternalURL      string   `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
@@ -50,6 +51,7 @@ type Nft struct {
 	AcquisitionDateStr string `bson:"acquisition_date" json:"acquisition_date"`
 }
 
+// Contract represents a smart contract's information for a given NFT
 type Contract struct {
 	ContractAddress      string `bson:"contract_address"     json:"address"`
 	ContractName         string `bson:"contract_name" json:"name"`
@@ -60,8 +62,10 @@ type Contract struct {
 	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
 }
 
+// NftCreateBulk is a helper function to create multiple nfts in one call and returns
+// the ids of each nft created
 func NftCreateBulk(pCtx context.Context, pNfts []*Nft,
-	pRuntime *runtime.Runtime) ([]DbID, error) {
+	pRuntime *runtime.Runtime) ([]DBID, error) {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
@@ -79,15 +83,17 @@ func NftCreateBulk(pCtx context.Context, pNfts []*Nft,
 	return ids, nil
 }
 
+// NftCreate inserts an NFT into the database
 func NftCreate(pCtx context.Context, pNFT *Nft,
-	pRuntime *runtime.Runtime) (DbID, error) {
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
 	return mp.Insert(pCtx, pNFT)
 }
 
-func NftGetByUserID(pCtx context.Context, pUserID DbID,
+// NftGetByUserID finds an nft by its owner user id
+func NftGetByUserID(pCtx context.Context, pUserID DBID,
 	pRuntime *runtime.Runtime) ([]*Nft, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -104,7 +110,8 @@ func NftGetByUserID(pCtx context.Context, pUserID DbID,
 	return result, nil
 }
 
-func NftGetByID(pCtx context.Context, pID DbID, pRuntime *runtime.Runtime) ([]*Nft, error) {
+// NftGetByID finds an nft by its id
+func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -122,20 +129,21 @@ func NftGetByID(pCtx context.Context, pID DbID, pRuntime *runtime.Runtime) ([]*N
 	return result, nil
 }
 
-func NftUpdateByID(pCtx context.Context, pID DbID, pUserID DbID, update interface{}, pRuntime *runtime.Runtime) error {
+// NftUpdateByID updates an nft by its id, also ensuring that the NFT is owned
+// by a given authorized user
+// pUpdate is a struct that has bson tags representing the fields to be updated
+func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interface{}, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, update)
+	return mp.Update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
 }
 
+// NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
+// This function's primary purpose is to be used when syncing a user's NFTs from an external provider
 func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
-
-	// UPSERT
-	// --------------------------------------------------------
-	weWantToUpsertHere := true
 
 	upsertModels := make([]mongo.WriteModel, len(pNfts))
 
@@ -146,7 +154,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 		// TODO last updated
 
 		upsertModels[i] = &mongo.UpdateOneModel{
-			Upsert: &weWantToUpsertHere,
+			Upsert: boolin(true),
 			Filter: bson.M{"opensea_id": v.OpenSeaID},
 			Update: bson.M{
 				"$setOnInsert": bson.M{
@@ -165,6 +173,8 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 	return nil
 }
 
+// NftRemoveDifference will update all nfts that are not in the given slice of nfts with having an
+// empty owner id and address
 func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress string, pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, nftColName, pRuntime)
@@ -200,14 +210,15 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 
 	return nil
 }
-func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DbID, error) {
+
+func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
 	currOpenseaIds := map[int]bool{}
 
 	for _, v := range nfts {
 		currOpenseaIds[v.OpenSeaID] = true
 	}
 
-	diff := []DbID{}
+	diff := []DBID{}
 	for _, v := range dbNfts {
 		if !currOpenseaIds[v.OpenSeaID] {
 			diff = append(diff, v.ID)
