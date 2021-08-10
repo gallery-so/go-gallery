@@ -11,19 +11,19 @@ import (
 )
 
 type galleryGetByUserIdInput struct {
-	UserId persist.DbId `form:"user_id" json:"user_id" binding:"required"`
+	UserId persist.DbID `form:"user_id" json:"user_id" binding:"required"`
 }
 type galleryGetByIdInput struct {
-	Id persist.DbId `form:"id" json:"id" binding:"required"`
+	Id persist.DbID `form:"id" json:"id" binding:"required"`
 }
 
 type galleryCreateInput struct {
-	OwnerUserID persist.DbId `form:"owner_user_id" json:"owner_user_id" binding:"required"`
+	OwnerUserID persist.DbID `form:"owner_user_id" json:"owner_user_id" binding:"required"`
 }
 
 type galleryUpdateInput struct {
-	Id          persist.DbId   `form:"id" json:"id" binding:"required"`
-	Collections []persist.DbId `json:"collections" binding:"required"`
+	Id          persist.DbID   `form:"id" json:"id" binding:"required"`
+	Collections []persist.DbID `json:"collections" binding:"required"`
 }
 
 type galleryGetOutput struct {
@@ -31,7 +31,7 @@ type galleryGetOutput struct {
 }
 
 type galleryCreateOutput struct {
-	Id persist.DbId `json:"id"`
+	Id persist.DbID `json:"id"`
 }
 
 //-------------------------------------------------------------
@@ -44,14 +44,14 @@ func getGalleriesByUserId(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &galleryGetByUserIdInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
+			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
 			})
 			return
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByUserID(input.UserId, auth, c, pRuntime)
+		galleries, err := persist.GalleryGetByUserID(c, input.UserId, auth, pRuntime)
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.Gallery{}
 		}
@@ -69,16 +69,16 @@ func getGalleryById(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &galleryGetByIdInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
+			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
 			})
 			return
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByID(input.Id, auth, c, pRuntime)
+		galleries, err := persist.GalleryGetByID(c, input.Id, auth, pRuntime)
 		if len(galleries) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, ErrorResponse{
+			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no galleries found with id: %s", input.Id),
 			})
 			return
@@ -100,21 +100,21 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
-		userId, ok := getUserIdFromCtx(c)
+		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		update := &persist.GalleryUpdateInput{Collections: input.Collections}
 
-		err := persist.GalleryUpdate(input.Id, userId, update, c, pRuntime)
+		err := persist.GalleryUpdate(input.Id, userID, update, c, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 
@@ -128,21 +128,21 @@ func createGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
-		userId, ok := getUserIdFromCtx(c)
+		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		insert := &persist.GalleryDb{OwnerUserIDstr: userId}
+		insert := &persist.GalleryDb{OwnerUserID: userID}
 
-		id, err := persist.GalleryCreate(insert, c, pRuntime)
+		id, err := persist.GalleryCreate(c, insert, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 

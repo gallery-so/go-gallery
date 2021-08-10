@@ -16,14 +16,14 @@ import (
 func TestUpdateGalleryById_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	colls := []persist.DbId{}
+	colls := []persist.DbID{}
 
 	for i := 0; i < 10; i++ {
-		col := &persist.CollectionDb{NameStr: "asdad", OwnerUserIDstr: tc.user1.id, CollectorsNoteStr: "yee"}
+		col := &persist.CollectionDb{Name: "asdad", OwnerUserID: tc.user1.id, CollectorsNote: "yee"}
 		if i == 3 {
-			col.HiddenBool = true
+			col.Hidden = true
 		}
-		id, err := persist.CollCreate(col, context.TODO(), tc.r)
+		id, err := persist.CollCreate(context.TODO(), col, tc.r)
 		assert.Nil(err)
 		colls = append(colls, id)
 	}
@@ -31,16 +31,16 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	t.Log(colls)
 
 	// seed DB with collection
-	id, err := persist.GalleryCreate(&persist.GalleryDb{
-		OwnerUserIDstr: tc.user1.id,
-		CollectionsLst: colls,
-	}, context.Background(), tc.r)
+	id, err := persist.GalleryCreate(context.Background(), &persist.GalleryDb{
+		OwnerUserID: tc.user1.id,
+		Collections: colls,
+	}, tc.r)
 	assert.Nil(err)
 
 	// build update request body
 	type Update struct {
-		Id          persist.DbId   `json:"id"`
-		Collections []persist.DbId `json:"collections"`
+		Id          persist.DbID   `json:"id"`
+		Collections []persist.DbID `json:"collections"`
 	}
 
 	copy := colls
@@ -56,7 +56,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 
 	// send update request
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/galleries/update", tc.serverUrl),
+		fmt.Sprintf("%s/galleries/update", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
@@ -66,7 +66,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// retrieve updated gallery
-	getUrl := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverUrl, tc.user1.id)
+	getUrl := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
 	t.Log(getUrl)
 	resp, err = http.Get(getUrl)
 	assert.Nil(err)
@@ -81,6 +81,6 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	runtime.UnmarshalBody(&body, resp.Body, tc.r)
 	assert.Len(body.Galleries, 1)
 	assert.Empty(body.Error)
-	assert.Equal(update.Collections[2], body.Galleries[0].CollectionsLst[1].IDstr)
+	assert.Equal(update.Collections[2], body.Galleries[0].CollectionsLst[1].ID)
 	assert.Len(body.Galleries[0].CollectionsLst, 9)
 }
