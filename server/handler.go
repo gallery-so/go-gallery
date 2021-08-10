@@ -14,6 +14,17 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	authHandlersInit(pRuntime, apiGroupV1)
 
 	//-------------------------------------------------------------
+	// GALLERIES
+	//-------------------------------------------------------------
+
+	galleriesGroup := apiGroupV1.Group("/galleries")
+
+	galleriesGroup.GET("/get", jwtOptional(pRuntime), getGalleryById(pRuntime))
+	galleriesGroup.GET("/user_get", jwtOptional(pRuntime), getGalleriesByUserId(pRuntime))
+	galleriesGroup.POST("/create", jwtRequired(pRuntime), createGallery(pRuntime))
+	galleriesGroup.POST("/update", jwtRequired(pRuntime), updateGallery(pRuntime))
+
+	//-------------------------------------------------------------
 	// COLLECTIONS
 	//-------------------------------------------------------------
 

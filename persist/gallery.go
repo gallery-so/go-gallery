@@ -19,8 +19,8 @@ type GalleryDb struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string `bson:"owner_user_id" json:"owner_user_id"`
-	CollectionsLst []DbID `bson:"collections"          json:"collections"`
+	OwnerUserID string `bson:"owner_user_id" json:"owner_user_id"`
+	Collections []DbID `bson:"collections"          json:"collections"`
 }
 
 type Gallery struct {
@@ -29,18 +29,33 @@ type Gallery struct {
 	CreationTimeF float64 `bson:"creation_time" json:"creation_time"`
 	DeletedBool   bool    `bson:"deleted"`
 
-	OwnerUserIDstr string        `bson:"owner_user_id" json:"owner_user_id"`
+	OwnerUserIDstr DbId          `bson:"owner_user_id" json:"owner_user_id"`
 	CollectionsLst []*Collection `bson:"collections"          json:"collections"`
+}
+
+type GalleryUpdateInput struct {
+	Collections []DbId `bson:"collections" json:"collections"`
 }
 
 //-------------------------------------------------------------
 func GalleryCreate(pCtx context.Context, pGallery *GalleryDb,
 	pRuntime *runtime.Runtime) (DbID, error) {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
+}
 
+//-------------------------------------------------------------
+func GalleryUpdate(pIDstr DbId,
+	pOwnerUserID DbId,
+	pUpdate interface{},
+	pCtx context.Context,
+	pRuntime *runtime.Runtime) error {
+
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
+
+	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
 
 //-------------------------------------------------------------
@@ -53,7 +68,7 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DbID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
@@ -73,7 +88,7 @@ func GalleryGetByID(pCtx context.Context, pID DbID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
@@ -84,39 +99,28 @@ func GalleryGetByID(pCtx context.Context, pID DbID,
 	return result, nil
 }
 
-func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
+func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
+
+	andExpr := []bson.M{
+		{"$in": []string{"$_id", "$$childArray"}},
+		{"$eq": []interface{}{"$deleted", false}},
+	}
+	if !pAuth {
+		andExpr = append(andExpr, bson.M{"$eq": []interface{}{"$hidden", false}})
+	}
+
+	innerMatch := bson.M{
+		"$expr": bson.M{
+			"$and": andExpr,
+		},
+	}
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "collections",
-			"let":  bson.M{"childArray": "$collections"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{
-					"$expr": bson.M{
-						"$and": []bson.M{
-							{"$in": []string{"$_id", "$$childArray"}},
-							{"$eq": []interface{}{"$deleted", false}},
-						},
-					},
-				},
-				}},
-				{{Key: "$lookup", Value: bson.M{
-					"from": "nfts",
-					"let":  bson.M{"array": "$nfts"},
-					"pipeline": mongo.Pipeline{
-						{{Key: "$match", Value: bson.M{
-							"$expr": bson.M{
-								"$and": []bson.M{
-									{"$in": []string{"$_id", "$$array"}},
-									{"$eq": []interface{}{"$deleted", false}},
-								},
-							},
-						}}},
-					},
-					"as": "nfts",
-				}}},
-			},
-			"as": "children",
+			"from":     "collections",
+			"let":      bson.M{"childArray": "$collections"},
+			"pipeline": newCollectionPipeline(innerMatch),
+			"as":       "collections",
 		}}},
 	}
 }

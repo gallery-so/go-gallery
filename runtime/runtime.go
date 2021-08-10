@@ -250,7 +250,7 @@ func dbGetCustomTLSConfig(pCAfilePathStr string,
 
 func setupMongoIndexes(db *mongo.Database) error {
 	b := true
-	db.Collection("collections").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	db.Collection("users").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
 		Keys: bson.M{"username_idempotent": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,

@@ -9,7 +9,7 @@ import (
 )
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`/^[\w.]+$/i`)
-var consecutivePeriodsUnderscoresRegex = regexp.MustCompile(`/^[\w.]+$/i`)
+
 var sanitizationPolicy = bluemonday.UGCPolicy()
 
 var ethValidator validator.Func = func(fl validator.FieldLevel) bool {
@@ -53,5 +53,19 @@ var usernameValidator validator.Func = func(fl validator.FieldLevel) bool {
 	}
 	return len(s) >= 2 && len(s) <= 50 &&
 		alphanumericUnderscoresPeriodsRegex.MatchString(s) &&
-		consecutivePeriodsUnderscoresRegex.MatchString(s)
+		!consecutivePeriodsOrUnderscores(s)
+}
+
+func consecutivePeriodsOrUnderscores(s string) bool {
+	for i, r := range s {
+		if r == '.' || r == '_' {
+			if i > 0 && (rune(s[i-1]) == '.' || rune(s[i-1]) == '_') {
+				return true
+			}
+			if i < len(s)-1 && (rune(s[i+1]) == '.' || rune(s[i+1]) == '_') {
+				return true
+			}
+		}
+	}
+	return false
 }
