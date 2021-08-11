@@ -14,7 +14,7 @@ const (
 	port        = "GLRY_PORT"
 	portMetrics = "GLRY_PORT_METRIM"
 
-	mongoURLSecretName    = "GLRY_MONGO_URL"
+	mongoURLSecretName    = "projects/1066359838176/secrets/GLRY_MONGO_URL"
 	mongoTLSSecretName    = "GLRY_TLS"
 	mongoUseTLS           = "GLRY_MONGO_USE_TLS"
 	mongoDBname           = "GLRY_MONGO_DB_NAME"
@@ -31,8 +31,8 @@ type Config struct {
 	Port        int
 	PortMetrics int
 
-	MongoURLstr           string
-	MongoDBnameStr        string
+	MongoURL              string
+	MongoDBName           string
 	MongoUseTLS           bool
 	MongoSslCAfilePathStr string
 
@@ -75,26 +75,30 @@ func ConfigLoad() *Config {
 		}
 	}
 
-	// TODO secret name
-	mgoURL, err := accessSecret(context.Background(), mongoURLSecretName)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
-		panic(-1)
-	}
-
 	config := &Config{
 		EnvStr:      viper.GetString(env),
 		BaseURL:     viper.GetString(baseURL),
 		Port:        viper.GetInt(port),
 		PortMetrics: viper.GetInt(portMetrics),
 
-		MongoURLstr:           string(mgoURL),
 		MongoUseTLS:           viper.GetBool(mongoUseTLS),
-		MongoDBnameStr:        viper.GetString(mongoDBname),
+		MongoDBName:           viper.GetString(mongoDBname),
 		MongoSslCAfilePathStr: viper.GetString(mongoSslCAfilePathStr),
 
 		SentryEndpointStr: viper.GetString(sentryEndpoint),
 		JWTtokenTTLsecInt: int64(viper.GetInt(jwtTokenTTLsecInt)),
+	}
+
+	if config.EnvStr == "local" {
+		config.MongoURL = "mongodb://localhost:27017/"
+	} else {
+		// TODO secret name
+		mgoURL, err := accessSecret(context.Background(), mongoURLSecretName)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
+			panic(-1)
+		}
+		config.MongoURL = string(mgoURL)
 	}
 
 	return config

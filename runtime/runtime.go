@@ -44,9 +44,9 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	//------------------
 	// DB
 
-	mongoURLstr := pConfig.MongoURLstr
+	mongoURLstr := pConfig.MongoURL
 
-	mongoDBnameStr := pConfig.MongoDBnameStr
+	mongoDBnameStr := pConfig.MongoDBName
 
 	db, err := dbInit(mongoURLstr,
 		mongoDBnameStr,
@@ -103,7 +103,6 @@ func dbInit(pMongoURLstr string,
 }
 
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
-
 
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()

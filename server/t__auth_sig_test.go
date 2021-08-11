@@ -119,8 +119,8 @@ func TestAuthSignatures(pTest *testing.T) {
 		// BaseURL        string
 		// WebBaseURL     string
 		// Port              int
-		MongoURLstr:       mongoURLstr,
-		MongoDBnameStr:    mongoDBnameStr,
+		MongoURL:          mongoURLstr,
+		MongoDBName:       mongoDBnameStr,
 		JWTtokenTTLsecInt: 86400,
 	}
 	runtime, gErr := runtime.GetRuntime(config)

@@ -11,7 +11,7 @@ import (
 
 func TestUnassignedWithAggregation(t *testing.T) {
 
-	runtime, gErr := runtime.GetRuntime(&runtime.Config{MongoURLstr: "mongodb://127.0.0.1:27017", MongoDBnameStr: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
+	runtime, gErr := runtime.GetRuntime(&runtime.Config{MongoURL: "mongodb://127.0.0.1:27017", MongoDBName: "gallery", Port: 4000, BaseURL: "http://localhost:4000", EnvStr: "glry_test"})
 	if gErr != nil {
 		t.Fail()
 	}

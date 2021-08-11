@@ -12,8 +12,6 @@ import (
 // exists. The version can be a version number as a string (e.g. "5") or an
 // alias (e.g. "latest").
 func accessSecret(pCtx context.Context, pName string) ([]byte, error) {
-	// name := "projects/my-project/secrets/my-secret/versions/5"
-	// name := "projects/my-project/secrets/my-secret/versions/latest"
 
 	// Create the client.
 	client, err := secretmanager.NewClient(pCtx)
