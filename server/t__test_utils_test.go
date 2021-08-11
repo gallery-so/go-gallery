@@ -15,21 +15,24 @@ import (
 )
 
 type TestUser struct {
-	id      persist.DbID
-	address string
-	jwt     string
+	id       persist.DbID
+	address  string
+	jwt      string
+	username string
 }
 
 func generateTestUser(r *runtime.Runtime) *TestUser {
 	ctx := context.Background()
+	username := util.RandStringBytes(8)
 	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
 	user := &persist.User{
+		UserName: username,
 		Addresses: []string{address},
 	}
 	id, _ := persist.UserCreate(ctx, user, r)
 	jwt, _ := jwtGeneratePipeline(ctx, id, r)
 
-	return &TestUser{id, address, jwt}
+	return &TestUser{id, address, jwt, username}
 }
 
 // Should be called at the beginning of every integration test
