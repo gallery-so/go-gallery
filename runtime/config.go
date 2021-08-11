@@ -10,7 +10,6 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
-//-------------------------------------------------------------
 const (
 	env         = "GLRY_ENV"
 	baseURL     = "GLRY_BASE_URL"
@@ -26,6 +25,7 @@ const (
 	awsSecrets        = "GLRY_AWS_SECRETS"
 )
 
+// Config represents an application configuration that is determined at runtime start
 type Config struct {
 	EnvStr      string
 	BaseURL     string
@@ -42,7 +42,8 @@ type Config struct {
 	AWSsecretsBool bool
 }
 
-//-------------------------------------------------------------
+// ConfigLoad loads the runtime configuration from the viper config and grabs necessary secrets
+// from GCP
 func ConfigLoad() *Config {
 
 	//------------------
@@ -96,7 +97,6 @@ func ConfigLoad() *Config {
 	return config
 }
 
-//-------------------------------------------------------------
 // GET_AWS_SECRETS
 func ConfigGetAWSsecrets(pEnvStr string,
 	pRuntimeSys *gf_core.Runtime_sys) (map[string]map[string]interface{}, *gf_core.Gf_error) {

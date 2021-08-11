@@ -16,7 +16,7 @@ func TestAuthJWT(pTest *testing.T) {
 
 	ctx := context.Background()
 
-	testUserID := persist.DbID("testid")
+	testUserID := persist.DBID("testid")
 
 	//--------------------
 	// RUNTIME_SYS

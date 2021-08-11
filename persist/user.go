@@ -14,9 +14,10 @@ import (
 
 const usersCollName = "users"
 
+// User represents a user in the datase and throughout the application
 type User struct {
 	Version      int64   `bson:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
@@ -26,6 +27,7 @@ type User struct {
 	Bio                string   `bson:"bio"  json:"bio"`
 }
 
+// UserUpdateInput represents the data to be updated when updating a user
 type UserUpdateInput struct {
 	UserName           string   `bson:"username,omitempty"`
 	UserNameIdempotent string   `bson:"username_idempotent,omitempty"`
@@ -33,18 +35,16 @@ type UserUpdateInput struct {
 	Bio                string   `bson:"bio,omitempty"`
 }
 
-//-------------------------------------------------------------
-// USER
-//-------------------------------------------------------------
-// UPDATE
-func UserUpdateByID(pCtx context.Context, pID DbID, pUser interface{},
+// UserUpdateByID updates a user by ID
+// pUpdate represents a struct with bson tags to specify which fields to update
+func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
 	err := mp.Update(pCtx, bson.M{
 		"_id": pID,
-	}, pUser)
+	}, pUpdate)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("attempt to update username to a taken username")
@@ -55,8 +55,7 @@ func UserUpdateByID(pCtx context.Context, pID DbID, pUser interface{},
 	return nil
 }
 
-//-------------------------------------------------------------
-// EXISTS BY ADDRESS
+// UserExistsByAddress returns true if a user exists with the given address
 func UserExistsByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
@@ -71,10 +70,9 @@ func UserExistsByAddress(pCtx context.Context, pAddress string,
 	return countInt > 0, nil
 }
 
-//-------------------------------------------------------------
-// CREATE
+// UserCreate inserts a user into the database
 func UserCreate(pCtx context.Context, pUser *User,
-	pRuntime *runtime.Runtime) (DbID, error) {
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
 
@@ -82,9 +80,8 @@ func UserCreate(pCtx context.Context, pUser *User,
 
 }
 
-//-------------------------------------------------------------
-// DELETE
-func UserDelete(pCtx context.Context, pUserID DbID,
+// UserDelete marks a user as deleted in the database
+func UserDelete(pCtx context.Context, pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, usersCollName, pRuntime)
@@ -93,9 +90,8 @@ func UserDelete(pCtx context.Context, pUserID DbID,
 
 }
 
-//-------------------------------------------------------------
-// GET BY ID
-func UserGetByID(pCtx context.Context, userID DbID,
+// UserGetByID returns a user by a given ID
+func UserGetByID(pCtx context.Context, userID DBID,
 	pRuntime *runtime.Runtime) (*User, error) {
 
 	opts := options.Find()
@@ -123,8 +119,7 @@ func UserGetByID(pCtx context.Context, userID DbID,
 	return result[0], nil
 }
 
-//-------------------------------------------------------------
-// GET BY ADDRESS
+// UserGetByAddress returns a user by a given wallet address
 func UserGetByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*User, error) {
 
@@ -153,8 +148,7 @@ func UserGetByAddress(pCtx context.Context, pAddress string,
 	return result[0], nil
 }
 
-//-------------------------------------------------------------
-// GET BY USERNAME
+// UserGetByUsername returns a user by a given username (case insensitive)
 func UserGetByUsername(pCtx context.Context, pUsername string,
 	pRuntime *runtime.Runtime) (*User, error) {
 

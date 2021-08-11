@@ -30,7 +30,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		// METAMASK
 
 		// personal.sign() - "Ethereum Signed Message:" header
-		map[string]string{
+		{
 			"name":           "metamask_00",
 			"wallet_address": "0xBA47Bef4ca9e8F86149D2f109478c6bd8A642C97",
 			"msg":            "test_msg_glry===2222==",
@@ -39,7 +39,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		// personal.sign() - "Ethereum Signed Message:" header
-		map[string]string{
+		{
 			"name":           "metamask_0",
 			"wallet_address": "0xBA47Bef4ca9e8F86149D2f109478c6bd8A642C97",
 			"msg":            "test_msg_glry",
@@ -48,7 +48,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		// personal.sign() - "Ethereum Signed Message:" header
-		map[string]string{
+		{
 			"name":           "metamask_1",
 			"wallet_address": "0xBA47Bef4ca9e8F86149D2f109478c6bd8A642C97",
 			"msg":            "test_msg_glry=====",
@@ -57,7 +57,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		// personal.sign() - "Ethereum Signed Message:" header
-		map[string]string{
+		{
 			"name":           "metamask_2",
 			"wallet_address": "0x4e6Dde64f6cd29294282000214Fe586b9112739B",
 			"msg":            "testNonceValue",
@@ -66,7 +66,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		// personal.sign() - "Ethereum Signed Message:" header
-		map[string]string{
+		{
 			"name":           "metamask_32",
 			"wallet_address": "0x4e6Dde64f6cd29294282000214Fe586b9112739B",
 			"msg":            "test_msg_glry",
@@ -78,7 +78,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		// WALLET_CONNECT
 
 		// no header
-		map[string]string{
+		{
 			"name":           "wallet_connect",
 			"wallet_address": "0x4e6Dde64f6cd29294282000214Fe586b9112739B",
 			"msg":            "testNonceValue",
@@ -87,7 +87,7 @@ func TestAuthSignatures(pTest *testing.T) {
 		},
 
 		// no header
-		map[string]string{
+		{
 			"name":           "wallet_connect",
 			"wallet_address": "0x4e6Dde64f6cd29294282000214Fe586b9112739B",
 			"msg":            "test_msg_glry",

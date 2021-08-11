@@ -16,10 +16,10 @@ import (
 func TestUpdateGalleryById_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	colls := []persist.DbID{}
+	colls := []persist.DBID{}
 
 	for i := 0; i < 10; i++ {
-		col := &persist.CollectionDb{Name: "asdad", OwnerUserID: tc.user1.id, CollectorsNote: "yee"}
+		col := &persist.CollectionDB{Name: "asdad", OwnerUserID: tc.user1.id, CollectorsNote: "yee"}
 		if i == 3 {
 			col.Hidden = true
 		}
@@ -31,7 +31,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	t.Log(colls)
 
 	// seed DB with collection
-	id, err := persist.GalleryCreate(context.Background(), &persist.GalleryDb{
+	id, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{
 		OwnerUserID: tc.user1.id,
 		Collections: colls,
 	}, tc.r)
@@ -39,8 +39,8 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 
 	// build update request body
 	type Update struct {
-		ID          persist.DbID   `json:"id"`
-		Collections []persist.DbID `json:"collections"`
+		ID          persist.DBID   `json:"id"`
+		Collections []persist.DBID `json:"collections"`
 	}
 
 	copy := colls
@@ -66,9 +66,9 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// retrieve updated gallery
-	getUrl := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
-	t.Log(getUrl)
-	resp, err = http.Get(getUrl)
+	getURL := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
+	t.Log(getURL)
+	resp, err = http.Get(getURL)
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 

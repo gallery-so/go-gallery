@@ -12,45 +12,54 @@ import (
 
 const galleryColName = "galleries"
 
-//-------------------------------------------------------------
-type GalleryDb struct {
+// GalleryDB represents a group of collections of NFTs in the database.
+// Collections of NFTs will be represented as a list of collection IDs creating
+// a join relationship in the database
+// This struct will only be used in database operations
+type GalleryDB struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
-	OwnerUserID DbID   `bson:"owner_user_id" json:"owner_user_id"`
-	Collections []DbID `bson:"collections"          json:"collections"`
+	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
+	Collections []DBID `bson:"collections"          json:"collections"`
 }
 
+// Gallery represents a group of collections of NFTS in the application.
+// Collections are represented as structs instead of IDs
+// This struct will be decoded from a find database operation and used throughout
+// the application where GalleryDB is not used
 type Gallery struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
-	OwnerUserID DbID          `bson:"owner_user_id" json:"owner_user_id"`
+	OwnerUserID DBID          `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []*Collection `bson:"collections"          json:"collections"`
 }
 
+// GalleryUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
 type GalleryUpdateInput struct {
-	Collections []DbID `bson:"collections" json:"collections"`
+	Collections []DBID `bson:"collections" json:"collections"`
 }
 
-//-------------------------------------------------------------
-func GalleryCreate(pCtx context.Context, pGallery *GalleryDb,
-	pRuntime *runtime.Runtime) (DbID, error) {
+// GalleryCreate inserts a new gallery into the database and returns the ID of the new gallery
+func GalleryCreate(pCtx context.Context, pGallery *GalleryDB,
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
 	return mp.Insert(pCtx, pGallery)
 }
 
-//-------------------------------------------------------------
-func GalleryUpdate(pIDstr DbID,
-	pOwnerUserID DbID,
+// GalleryUpdate updates a gallery in the database by ID, also ensuring the gallery
+// is owned by a given authorized user.
+// pUpdate is a struct that contains bson tags representing the fields to be updated
+func GalleryUpdate(pCtx context.Context, pIDstr DBID,
+	pOwnerUserID DBID,
 	pUpdate interface{},
-	pCtx context.Context,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, galleryColName, pRuntime)
@@ -58,8 +67,9 @@ func GalleryUpdate(pIDstr DbID,
 	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
 
-//-------------------------------------------------------------
-func GalleryGetByUserID(pCtx context.Context, pUserID DbID, pAuth bool,
+// GalleryGetByUserID gets a gallery by its owner user ID and will variably return
+// hidden collections depending on the auth status of the caller
+func GalleryGetByUserID(pCtx context.Context, pUserID DBID, pAuth bool,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 
 	opts := options.Aggregate()
@@ -79,8 +89,9 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DbID, pAuth bool,
 	return result, nil
 }
 
-//-------------------------------------------------------------
-func GalleryGetByID(pCtx context.Context, pID DbID, pAuth bool,
+// GalleryGetByID gets a gallery by its ID and will variably return
+// hidden collections depending on the auth status of the caller
+func GalleryGetByID(pCtx context.Context, pID DBID, pAuth bool,
 	pRuntime *runtime.Runtime) ([]*Gallery, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {

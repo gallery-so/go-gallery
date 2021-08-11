@@ -19,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//-------------------------------------------------------------
+// Runtime represents the runtime of the application and its services
 type Runtime struct {
 	Config     *Config
 	DB         *DB
@@ -28,12 +28,13 @@ type Runtime struct {
 	Router     *gin.Engine
 }
 
+// DB is an abstract represenation of a MongoDB database and Client to interact with it
 type DB struct {
 	MongoClient *mongo.Client
 	MongoDB     *mongo.Database
 }
 
-//-------------------------------------------------------------
+// GetRuntime sets up the runtime to be used at the start of the application
 func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 
 	//------------------
@@ -142,7 +143,6 @@ func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 	return runtime, nil
 }
 
-//-------------------------------------------------------------
 func dbInit(pMongoURLstr string,
 	pMongoDBNamestr string,
 	pConfig *Config,
@@ -158,7 +158,6 @@ func dbInit(pMongoURLstr string,
 
 	log.WithFields(log.Fields{}).Info("connecting to mongo...")
 
-	//-------------------------------------------------------------
 	// GF_GET_DB
 	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gf_core.Gf_error) {
 
@@ -200,7 +199,6 @@ func dbInit(pMongoURLstr string,
 		return mongoDB, mongoClient, nil
 	}
 
-	//-------------------------------------------------------------
 	mongoDB, mongoClient, gErr := GFgetDBfun()
 	if gErr != nil {
 		return nil, gErr
@@ -214,7 +212,6 @@ func dbInit(pMongoURLstr string,
 	return db, nil
 }
 
-//-------------------------------------------------------------
 func dbGetCustomTLSConfig(pCAfilePathStr string,
 	pRuntimeSys *gf_core.Runtime_sys) (*tls.Config, *gf_core.Gf_error) {
 

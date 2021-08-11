@@ -28,7 +28,7 @@ type authUserLoginInput struct {
 type authUserLoginOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"`
-	UserID         persist.DbID `json:"user_id"`
+	UserID         persist.DBID `json:"user_id"`
 	Address        string       `json:"address"`
 }
 
@@ -43,7 +43,6 @@ type authUserGetPreflightOutput struct {
 	UserExists bool   `json:"user_exists"`
 }
 
-//-------------------------------------------------------------
 // HANDLERS
 
 func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
@@ -110,11 +109,8 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 // NONCE
-//-------------------------------------------------------------
 
-//-------------------------------------------------------------
 // NONCE_GENERATE
 func generateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -123,7 +119,6 @@ func generateNonce() string {
 	return nonceStr
 }
 
-//-------------------------------------------------------------
 // LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLoginInput,
 	pReq *http.Request,
@@ -159,7 +154,6 @@ func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLog
 	return output, err
 }
 
-//-------------------------------------------------------------
 // USER_LOGIN__PIPELINE
 func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
@@ -218,7 +212,6 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 	return output, nil
 }
 
-//-------------------------------------------------------------
 // VERIFY_SIGNATURE_ALL_METHODS
 
 func authVerifySignatureAllMethods(pSignatureStr string,
@@ -251,7 +244,6 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 	return validBool, nil
 }
 
-//-------------------------------------------------------------
 // VERIFY_SIGNATURE
 
 // FINISH!! - also return the reason why the signature verification failed.
@@ -370,7 +362,6 @@ func authVerifySignature(pSignatureStr string,
 	return validBool, nil
 }
 
-//-------------------------------------------------------------
 // USER_GET_PREFLIGHT__PIPELINE
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
@@ -410,7 +401,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	return output, nil
 }
 
-func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DbID, pRuntime *runtime.Runtime) error {
+func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DBID, pRuntime *runtime.Runtime) error {
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),

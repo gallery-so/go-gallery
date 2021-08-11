@@ -10,8 +10,7 @@ import (
 var (
 	_, b, _, _ = runtime.Caller(0)
 
-	// Root folder of this project
-	ProjectRootPath = filepath.Join(filepath.Dir(b), "..")
+	projectRootPath = filepath.Join(filepath.Dir(b), "..")
 )
 
 func fileExists(path string) bool {
@@ -25,7 +24,7 @@ func getEnvPath() string {
 		return localEnvPath
 	}
 
-	binEnvPath := fmt.Sprintf("%s/bin/.env", ProjectRootPath)
+	binEnvPath := fmt.Sprintf("%s/bin/.env", projectRootPath)
 	if fileExists(binEnvPath) {
 		return binEnvPath
 	}

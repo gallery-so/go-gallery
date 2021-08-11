@@ -5,17 +5,14 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
-//-------------------------------------------------------------
-func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
+func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	apiGroupV1 := pRuntime.Router.Group("/glry/v1")
 
 	// AUTH_HANDLERS
 	authHandlersInit(pRuntime, apiGroupV1)
 
-	//-------------------------------------------------------------
 	// GALLERIES
-	//-------------------------------------------------------------
 
 	galleriesGroup := apiGroupV1.Group("/galleries")
 
@@ -24,9 +21,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	galleriesGroup.POST("/create", jwtRequired(pRuntime), createGallery(pRuntime))
 	galleriesGroup.POST("/update", jwtRequired(pRuntime), updateGallery(pRuntime))
 
-	//-------------------------------------------------------------
 	// COLLECTIONS
-	//-------------------------------------------------------------
 
 	collectionsGroup := apiGroupV1.Group("/collections")
 
@@ -38,9 +33,7 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	collectionsGroup.POST("/update/hidden", jwtRequired(pRuntime), updateCollectionHidden(pRuntime))
 	collectionsGroup.POST("/update/nfts", jwtRequired(pRuntime), updateCollectionNfts(pRuntime))
 
-	//-------------------------------------------------------------
 	// NFTS
-	//-------------------------------------------------------------
 
 	nftsGroup := apiGroupV1.Group("/nfts")
 
@@ -53,8 +46,6 @@ func HandlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	// HEALTH
 	apiGroupV1.GET("/health", healthcheck(pRuntime))
 
-	//-------------------------------------------------------------
-
 	return pRuntime.Router
 }
 
@@ -64,7 +55,6 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 
 	authGroup := parent.Group("/auth")
 
-	//-------------------------------------------------------------
 	// AUTH_GET_PREFLIGHT
 	// UN-AUTHENTICATED
 
@@ -73,31 +63,26 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// [GET] /glry/v1/auth/get_preflight?addr=:walletAddress
 	authGroup.GET("/get_preflight", jwtOptional(pRuntime), getAuthPreflight(pRuntime))
 
-	//-------------------------------------------------------------
 	// AUTH VALIDATE_JWT
 
 	// [GET] /glry/v1/auth/jwt_valid
 	authGroup.GET("/jwt_valid", jwtOptional(pRuntime), validateJwt(pRuntime))
 
-	//-------------------------------------------------------------
 	// AUTH_USER_LOGIN
 	// UN-AUTHENTICATED
 
 	usersGroup.POST("/login", login(pRuntime))
 
-	//-------------------------------------------------------------
 	// USER_UPDATE
 	// AUTHENTICATED
 
 	usersGroup.POST("/update", jwtRequired(pRuntime), updateUser(pRuntime))
 
-	//-------------------------------------------------------------
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED
 
 	usersGroup.GET("/get", jwtOptional(pRuntime), getUser(pRuntime))
 
-	//-------------------------------------------------------------
 	// USER_CREATE
 	// UN-AUTHENTICATED
 
