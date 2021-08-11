@@ -8,7 +8,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
-var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile(`/^[\w.]+$/i`)
+var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
 
 var sanitizationPolicy = bluemonday.UGCPolicy()
 
