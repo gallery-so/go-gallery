@@ -264,7 +264,7 @@ func userUpdateDb(pCtx context.Context, pInput *userUpdateInput,
 	return persist.UserUpdateByID(
 		pCtx,
 		pInput.UserID,
-		persist.UserUpdateInput{
+		&persist.UserUpdateInput{
 			UserNameIdempotent: strings.ToLower(pInput.UserNameStr),
 			UserName:           pInput.UserNameStr,
 			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
