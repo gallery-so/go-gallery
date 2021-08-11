@@ -16,20 +16,25 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type DbID string
+// DBID represents a mongo database ID
+type DBID string
 
+// MongoStorage represents the currently accessed collection and the version of the "schema"
 type MongoStorage struct {
 	version    int64
 	collection *mongo.Collection
 }
 
+// NewMongoStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
+// and the specified version
 func NewMongoStorage(version int64, collName string, runtime *runtime.Runtime) *MongoStorage {
 	coll := runtime.DB.MongoDB.Collection(collName)
 	return &MongoStorage{version: version, collection: coll}
 }
 
+// Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
 // insert must be a pointer to a struct
-func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DbID, error) {
+func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DBID, error) {
 
 	elem := reflect.TypeOf(insert).Elem()
 	val := reflect.ValueOf(insert).Elem()
@@ -62,11 +67,12 @@ func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*
 		return "", err
 	}
 
-	return DbID(res.InsertedID.(string)), nil
+	return DBID(res.InsertedID.(string)), nil
 }
 
+// InsertMany inserts many documents into a mongo database while filling out the fields id, creation time, and last updated for each
 // insert must be a slice of pointers to a struct
-func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DbID, error) {
+func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
 
 	for _, k := range insert {
 		elem := reflect.TypeOf(k).Elem()
@@ -100,16 +106,17 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 		return nil, err
 	}
 
-	ids := make([]DbID, len(res.InsertedIDs))
+	ids := make([]DBID, len(res.InsertedIDs))
 
 	for i, v := range res.InsertedIDs {
 		if id, ok := v.(string); ok {
-			ids[i] = DbID(id)
+			ids[i] = DBID(id)
 		}
 	}
 	return ids, nil
 }
 
+// Update updates a document in the mongo database while filling out the field LastUpdated
 // update must be a pointer to a struct
 func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 	elem := reflect.TypeOf(update).Elem()
@@ -134,6 +141,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 	return nil
 }
 
+// Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 // upsert must be a pointer to a struct, will not fill reflectively fill insert fields such as id or creation time
 func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
@@ -159,6 +167,7 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	return nil
 }
 
+// Find finds documents in the mongo database which is not deleted
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
@@ -173,6 +182,7 @@ func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface
 
 }
 
+// Aggregate performs an aggregation operation on the mongo database
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
 func (m *MongoStorage) Aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
 
@@ -185,22 +195,24 @@ func (m *MongoStorage) Aggregate(ctx context.Context, agg mongo.Pipeline, result
 
 }
 
+// Count counts the number of documents in the mongo database which is not deleted
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
 func (m *MongoStorage) Count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
 }
 
+// CreateIndex creates a new index in the mongo database
 func (m *MongoStorage) CreateIndex(ctx context.Context, index mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
 	return m.collection.Indexes().CreateOne(ctx, index, opts...)
 }
 
-// CREATE_ID
-func generateID(creationTime float64) DbID {
+func generateID(creationTime float64) DBID {
 	h := md5.New()
 	h.Write([]byte(fmt.Sprint(creationTime)))
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
-	return DbID(hexStr)
+	return DBID(hexStr)
 }
 
 // function that returns the pointer to the bool passed in

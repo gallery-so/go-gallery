@@ -11,11 +11,11 @@ import (
 )
 
 type getNftsByIDInput struct {
-	NftID persist.DbID `json:"id" form:"id" binding:"required"`
+	NftID persist.DBID `json:"id" form:"id" binding:"required"`
 }
 
 type getNftsByUserIDInput struct {
-	UserID persist.DbID `json:"user_id" form:"user_id" binding:"required"`
+	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
 }
 
 type getOpenseaNftsInput struct {

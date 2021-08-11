@@ -15,7 +15,7 @@ import (
 )
 
 type TestUser struct {
-	id       persist.DbID
+	id       persist.DBID
 	address  string
 	jwt      string
 	username string
@@ -45,6 +45,7 @@ func setup() *TestConfig {
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	runtime.Router = gin.Default()
 	ts := httptest.NewServer(CoreInit(runtime))
+
 	log.Info("server connected! ✅")
 
 	return &TestConfig{

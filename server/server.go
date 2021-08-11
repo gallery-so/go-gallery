@@ -28,7 +28,7 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	return HandlersInit(pRuntime)
+	return handlersInit(pRuntime)
 }
 
 func Init(pPortInt int,

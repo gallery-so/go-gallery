@@ -15,25 +15,32 @@ const (
 	collectionColName = "collections"
 )
 
-//-------------------------------------------------------------
-type CollectionDb struct {
+// CollectionDB is the struct that represents a collection of NFTs in the database
+// CollectionDB will not store the NFTs by value but instead by ID creating a join relationship
+// between collections and NFTS
+// This struct will only be used when updating or querying the database
+type CollectionDB struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    DbID   `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []DbID `bson:"nfts"          json:"nfts"`
+	OwnerUserID    DBID   `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []DBID `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
+// Collection represents a collection of NFTs in the application. Collection will contain
+// the value of each NFT represented as a struct as opposed to just the ID of the NFT
+// This struct will always be decoded from a get database operation and will be used throughout
+// the application where CollectionDB does not apply
 type Collection struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DbID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
@@ -46,26 +53,25 @@ type Collection struct {
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
+// CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionUpdateInfoInput struct {
 	Name           string `bson:"name" json:"name"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
+// CollectionUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateNftsInput struct {
-	Nfts []DbID `bson:"nfts" json:"nfts"`
+	Nfts []DBID `bson:"nfts" json:"nfts"`
 }
 
+// CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionUpdateHiddenInput struct {
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
-type CollectionUpdateCollectorsNoteInput struct {
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-}
-
-//-------------------------------------------------------------
-func CollCreate(pCtx context.Context, pColl *CollectionDb,
-	pRuntime *runtime.Runtime) (DbID, error) {
+// CollCreate inserts a single CollectionDB into the database and will return the ID of the inserted document
+func CollCreate(pCtx context.Context, pColl *CollectionDB,
+	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
 
@@ -73,8 +79,9 @@ func CollCreate(pCtx context.Context, pColl *CollectionDb,
 
 }
 
-//-------------------------------------------------------------
-func CollGetByUserID(pCtx context.Context, pUserID DbID,
+// CollGetByUserID will form an aggregation pipeline to get all collections owned by a user
+// and variably show hidden collections depending on the auth status of the caller
+func CollGetByUserID(pCtx context.Context, pUserID DBID,
 	pShowHidden bool,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -100,8 +107,9 @@ func CollGetByUserID(pCtx context.Context, pUserID DbID,
 	return result, nil
 }
 
-//-------------------------------------------------------------
-func CollGetByID(pCtx context.Context, pID DbID,
+// CollGetByID will form an aggregation pipeline to get a single collection by ID and
+// variably show hidden collections depending on the auth status of the caller
+func CollGetByID(pCtx context.Context, pID DBID,
 	pShowHidden bool,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
 
@@ -126,9 +134,11 @@ func CollGetByID(pCtx context.Context, pID DbID,
 	return result, nil
 }
 
-//-------------------------------------------------------------
-func CollUpdate(pCtx context.Context, pIDstr DbID,
-	pUserID DbID,
+// CollUpdate will update a single collection by ID, also ensuring that the collection is owned
+// by a given authorized user.
+// pUpdate will be a struct with bson tags that represent the fields to be updated
+func CollUpdate(pCtx context.Context, pIDstr DBID,
+	pUserID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
@@ -137,9 +147,10 @@ func CollUpdate(pCtx context.Context, pIDstr DbID,
 	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
-//-------------------------------------------------------------
-func CollDelete(pCtx context.Context, pIDstr DbID,
-	pUserID DbID,
+// CollDelete will delete a single collection by ID, also ensuring that the collection is owned
+// by a given authorized user.
+func CollDelete(pCtx context.Context, pIDstr DBID,
+	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := NewMongoStorage(0, collectionColName, pRuntime)
@@ -147,10 +158,9 @@ func CollDelete(pCtx context.Context, pIDstr DbID,
 	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 }
 
-//-------------------------------------------------------------
-
-// returns a collection that is empty except for a list of nfts
-func CollGetUnassigned(pCtx context.Context, pUserID DbID, pRuntime *runtime.Runtime) (*Collection, error) {
+// CollGetUnassigned returns a collection that is empty except for a list of nfts that are not
+// assigned to any collection
+func CollGetUnassigned(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) (*Collection, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -173,7 +183,7 @@ func CollGetUnassigned(pCtx context.Context, pUserID DbID, pRuntime *runtime.Run
 
 }
 
-func newUnassignedCollectionPipeline(pUserID DbID) mongo.Pipeline {
+func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},

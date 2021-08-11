@@ -48,7 +48,6 @@ type openseaNFT struct {
 	AcquisitionDateStr string `json:"acquisition_date"`
 }
 
-//-------------------------------------------------------------
 // OPEN_SEA_PIPELINE__ASSETS_FOR_ACC
 
 // ADD!! - persist OpenSea fetched assets as well.
@@ -84,7 +83,6 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	return asGalleryNfts, nil
 }
 
-//-------------------------------------------------------------
 func openSeaFetchAssetsForAcc(pCtx context.Context, pOwnerWalletAddressStr string) ([]*openseaNFT, error) {
 
 	/*{
@@ -288,7 +286,7 @@ func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaNFT, pWall
 	return nfts, nil
 }
 
-func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID persist.DbID) *persist.Nft {
+func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID persist.DBID) *persist.Nft {
 
 	result := &persist.Nft{
 		OwnerUserID:          ownerUserID,

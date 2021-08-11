@@ -12,10 +12,9 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
-//-------------------------------------------------------------
 // INPUT - USER_UPDATE
 type userUpdateInput struct {
-	UserID      persist.DbID `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
+	UserID      persist.DBID `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username" binding:"username"`
 	BioStr      string       `json:"description"`
 	Addresses   []string     `json:"addresses"`
@@ -23,14 +22,14 @@ type userUpdateInput struct {
 
 // INPUT - USER_GET
 type userGetInput struct {
-	UserID   persist.DbID `json:"user_id" form:"user_id"`
+	UserID   persist.DBID `json:"user_id" form:"user_id"`
 	Address  string       `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	Username string       `json:"username" form:"username"`
 }
 
 // OUTPUT - USER_GET
 type userGetOutput struct {
-	UserID      persist.DbID `json:"id"`
+	UserID      persist.DBID `json:"id"`
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"bio"`
 	Addresses   []string     `json:"addresses"`
@@ -52,10 +51,9 @@ type userCreateInput struct {
 type userCreateOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
-	UserID         persist.DbID `json:"user_id"`
+	UserID         persist.DBID `json:"user_id"`
 }
 
-//-------------------------------------------------------------
 // HANDLERS
 
 func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
@@ -138,7 +136,6 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 // USER_CREATE__PIPELINE
 func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
@@ -207,7 +204,6 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	return output, nil
 }
 
-//-------------------------------------------------------------
 // USER_GET__PIPELINE
 func userGetDb(pCtx context.Context, pInput *userGetInput,
 	pAuthenticatedBool bool,
@@ -255,7 +251,6 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 	return output, nil
 }
 
-//-------------------------------------------------------------
 func userUpdateDb(pCtx context.Context, pInput *userUpdateInput,
 	pRuntime *runtime.Runtime) error {
 
@@ -275,19 +270,17 @@ func userUpdateDb(pCtx context.Context, pInput *userUpdateInput,
 
 }
 
-//-------------------------------------------------------------
 // USER_DELETE__PIPELINE
-func userDeleteDb(pCtx context.Context, pUserIDstr persist.DbID,
+func userDeleteDb(pCtx context.Context, pUserIDstr persist.DBID,
 	pRuntime *runtime.Runtime) error {
 	return persist.UserDelete(pCtx, pUserIDstr, pRuntime)
 }
 
-//-------------------------------------------------------------
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
 func getUserWithNonce(pCtx context.Context, pAddress string,
-	pRuntime *runtime.Runtime) (nonceValue string, userID persist.DbID, err error) {
+	pRuntime *runtime.Runtime) (nonceValue string, userID persist.DBID, err error) {
 
 	//------------------
 	// GET_NONCE - get latest nonce for this user_address from the DB
