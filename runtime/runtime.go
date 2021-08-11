@@ -5,27 +5,23 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/exec"
+	"time"
 
-	"github.com/gloflow/gloflow/go/gf_core"
-	"github.com/go-playground/validator"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
-	Config     *Config
-	DB         *DB
-	Validator  *validator.Validate
-	RuntimeSys *gf_core.Runtime_sys
-	Router     *gin.Engine
+	Config *Config
+	DB     *DB
+	Router *gin.Engine
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -35,7 +31,7 @@ type DB struct {
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
-func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
+func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	//------------------
 	// LOGS
@@ -46,98 +42,29 @@ func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 	log.SetLevel(log.DebugLevel)
 
 	//------------------
-	// RUNTIME_SYS
-	runtimeSys := &gf_core.Runtime_sys{
-		Service_name_str:            "gallery",
-		Names_prefix_str:            "glry",
-		Errors_send_to_mongodb_bool: true,
-	}
-
-	// DBgetCustomTLSConfig(pConfig.MongoSslCAfilePathStr, runtimeSys)
-
-	//------------------
-	// ERRORS_SEND_TO_SENTRY
-
-	if pConfig.SentryEndpointStr != "" {
-		runtimeSys.Errors_send_to_sentry_bool = true
-	}
-
-	//------------------
 	// DB
 
-	var mongoURLstr string
-	// var mongoSslCAfilePathStr string
-	// var mongoUserStr string
-	// var mongoPassStr string
-
-	if pConfig.AWSsecretsBool {
-
-		log.WithFields(log.Fields{
-			"env": pConfig.EnvStr,
-		}).Info("Loading Mongo params from AWS Secrets Manager")
-
-		secretsMap, gErr := ConfigGetAWSsecrets(pConfig.EnvStr, runtimeSys)
-		if gErr != nil {
-			return nil, gErr
-		}
-
-		// MONGO_URL
-		mongoURLstr = secretsMap["glry_mongo_url"]["main"].(string)
-
-		// spew.Dump(secretsMap)
-
-		/*//------------------
-		// MONGO_SSL_CA_FILE
-		mongoSslCAfilePathStr = "./glry_mongo_ssl_ca_file.pem"
-		mongoSslCAbase64str := secretsMap["glry_mongo_ssl_ca_file"]["main"].(string)
-
-		err = ioutil.WriteFile(mongoSslCAfilePathStr, []byte(mongoSslCAstr), 0644)
-		if err != nil {
-			panic(err)
-		}
-
-		//------------------*/
-
-	} else {
-		mongoURLstr = pConfig.MongoURLstr
-		// mongoSslCAfilePathStr = pConfig.MongoSslCAfilePathStr
-	}
+	mongoURLstr := pConfig.MongoURLstr
 
 	mongoDBnameStr := pConfig.MongoDBnameStr
 
-	db, gErr := dbInit(mongoURLstr,
+	db, err := dbInit(mongoURLstr,
 		mongoDBnameStr,
-		pConfig,
-		runtimeSys)
+		pConfig)
 
-	if gErr != nil {
-		return nil, gErr
-	}
-
-	runtimeSys.Mongo_db = db.MongoDB
-
-	err := setupMongoIndexes(db.MongoDB)
 	if err != nil {
-		return nil, gf_core.Error__create("unable to setup mongo indexes",
-			"mongodb_ensure_index_error",
-			nil,
-			err,
-			"runtime",
-			runtimeSys,
-		)
+		return nil, err
 	}
 
-	//------------------
-	// CHECK!! - is Validator threadsafe, so that it can be used
-	//           by several (possibly concurrently) threads.
-	validator := validator.New()
+	err = setupMongoIndexes(db.MongoDB)
+	if err != nil {
+		return nil, err
+	}
 
 	// RUNTIME
 	runtime := &Runtime{
-		Config:     pConfig,
-		DB:         db,
-		Validator:  validator,
-		RuntimeSys: runtimeSys,
+		Config: pConfig,
+		DB:     db,
 	}
 
 	return runtime, nil
@@ -145,64 +72,27 @@ func GetRuntime(pConfig *Config) (*Runtime, *gf_core.Gf_error) {
 
 func dbInit(pMongoURLstr string,
 	pMongoDBNamestr string,
-	pConfig *Config,
-	pRuntimeSys *gf_core.Runtime_sys) (*DB, *gf_core.Gf_error) {
-
-	// AWS CONN STRING
-	// mongodb://gallerydevmain:<insertYourPassword>@host:27017?
-	// 		ssl=true
-	// 		ssl_ca_certs=rds-combined-ca-bundle.pem
-	// 		replicaSet=rs0
-	//		readPreference=secondaryPreferred
-	// 		retryWrites=false
+	pConfig *Config) (*DB, error) {
 
 	log.WithFields(log.Fields{}).Info("connecting to mongo...")
 
-	// GF_GET_DB
-	GFgetDBfun := func() (*mongo.Database, *mongo.Client, *gf_core.Gf_error) {
-
-		// wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
-
-		var TLSconfig *tls.Config
-		var gErr *gf_core.Gf_error
-
-		if pConfig.AWSsecretsBool {
-			fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-			fmt.Println(pConfig.MongoSslCAfilePathStr)
-			cmd := exec.Command("wget", "https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stdout
-
-			err := cmd.Run()
-			if err != nil {
-				panic(err)
-			}
-
-			CAfilePathStr := "rds-combined-ca-bundle.pem"
-
-			// TLS_CONFIG
-			TLSconfig, gErr = dbGetCustomTLSConfig(CAfilePathStr, pRuntimeSys)
-			if gErr != nil {
-				return nil, nil, gErr
-			}
+	var tlsConf *tls.Config
+	if pConfig.MongoUseTLS {
+		// TODO secret name
+		tlsCerts, err := accessSecret(context.Background(), mongoTLSSecretName)
+		// TLS_CONFIG
+		tlsConf, err = dbGetCustomTLSConfig(tlsCerts)
+		if err != nil {
+			return nil, err
 		}
-
-		mongoDB, mongoClient, gErr := gf_core.Mongo__connect_new(pMongoURLstr,
-			pMongoDBNamestr,
-			TLSconfig,
-			pRuntimeSys)
-		if gErr != nil {
-			return nil, nil, gErr
-		}
-		log.Info("mongo connected! ✅")
-
-		return mongoDB, mongoClient, nil
 	}
-
-	mongoDB, mongoClient, gErr := GFgetDBfun()
-	if gErr != nil {
-		return nil, gErr
+	mongoDB, mongoClient, err := connectMongo(pMongoURLstr,
+		pMongoDBNamestr,
+		tlsConf)
+	if err != nil {
+		return nil, err
 	}
+	log.Info("mongo connected! ✅")
 
 	db := &DB{
 		MongoClient: mongoClient,
@@ -212,35 +102,16 @@ func dbInit(pMongoURLstr string,
 	return db, nil
 }
 
-func dbGetCustomTLSConfig(pCAfilePathStr string,
-	pRuntimeSys *gf_core.Runtime_sys) (*tls.Config, *gf_core.Gf_error) {
+func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
 
-	certs, err := ioutil.ReadFile(pCAfilePathStr)
-
-	if err != nil {
-		gErr := gf_core.Error__create("failed to read local CA file for mongo TLS connection",
-			"file_read_error",
-			map[string]interface{}{
-				"ca_file_path": pCAfilePathStr,
-			}, err, "runtime", pRuntimeSys)
-		return nil, gErr
-	}
 
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()
 
-	ok := tlsConfig.RootCAs.AppendCertsFromPEM(certs)
+	ok := tlsConfig.RootCAs.AppendCertsFromPEM(pCerts)
 	if !ok {
-		gErr := gf_core.Error__create("failed to parse local CA file for mongo TLS connection",
-			"crypto_cert_ca_parse",
-			map[string]interface{}{
-				"ca_file_path": pCAfilePathStr,
-			}, nil, "runtime", pRuntimeSys)
-		return nil, gErr
+		return nil, fmt.Errorf("unable to append certs from pem")
 	}
-
-	// fmt.Println("###########################################")
-	// spew.Dump(tlsConfig)
 
 	return tlsConfig, nil
 }
@@ -254,4 +125,34 @@ func setupMongoIndexes(db *mongo.Database) error {
 		},
 	})
 	return nil
+}
+
+func connectMongo(pMongoURL string,
+	pDbName string,
+	pTLS *tls.Config,
+) (*mongo.Database, *mongo.Client, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+	defer cancel()
+
+	mOpts := options.Client().ApplyURI(pMongoURL)
+
+	// TLS
+	if pTLS != nil {
+		mOpts.SetTLSConfig(pTLS)
+	}
+
+	mClient, err := mongo.Connect(ctx, mOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = mClient.Ping(ctx, readpref.Primary())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	db := mClient.Database(pDbName)
+
+	return db, mClient, nil
 }
