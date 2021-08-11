@@ -10,11 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//-------------------------------------------------------------
-
-func Init(pPortInt int,
-	pRuntime *runtime.Runtime) {
-
+// CoreInit initializes core server functionality. This is abstracted
+// so the test server can also utilize it
+func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 	log.Info("initializing server...")
 
 	pRuntime.Router = gin.Default()
@@ -30,8 +28,13 @@ func Init(pPortInt int,
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	// HANDLERS
-	HandlersInit(pRuntime)
+	return HandlersInit(pRuntime)
+}
+
+func Init(pPortInt int,
+	pRuntime *runtime.Runtime) {
+
+	CoreInit(pRuntime)
 
 	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
 		panic(err)
