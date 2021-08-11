@@ -12,10 +12,10 @@ import (
 )
 
 type collectionGetByUserIDInput struct {
-	UserID persist.DbID `form:"user_id" json:"user_id" binding:"required"`
+	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
 }
 type collectionGetByIDInput struct {
-	ID persist.DbID `form:"id" json:"id" binding:"required"`
+	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 
 type collectionGetOutput struct {
@@ -23,33 +23,32 @@ type collectionGetOutput struct {
 }
 
 type collectionCreateInput struct {
-	Nfts []persist.DbID `json:"nfts" binding:"required"`
+	Nfts []persist.DBID `json:"nfts" binding:"required"`
 }
 
 type collectionUpdateInfoByIDInput struct {
-	ID             persist.DbID `json:"id" binding:"required"`
+	ID             persist.DBID `json:"id" binding:"required"`
 	Name           string       `json:"name" binding:"required"`
 	CollectorsNote string       `json:"collectors_note"`
 }
 
 type collectionUpdateHiddenByIDInput struct {
-	ID     persist.DbID `json:"id" binding:"required"`
+	ID     persist.DBID `json:"id" binding:"required"`
 	Hidden bool         `json:"hidden" binding:"required"`
 }
 type collectionUpdateNftsByIDinput struct {
-	ID   persist.DbID   `json:"id" binding:"required"`
-	Nfts []persist.DbID `json:"nfts" binding:"required"`
+	ID   persist.DBID   `json:"id" binding:"required"`
+	Nfts []persist.DBID `json:"nfts" binding:"required"`
 }
 
 type collectionCreateOutput struct {
-	ID persist.DbID `json:"collection_id"`
+	ID persist.DBID `json:"collection_id"`
 }
 
 type collectionDeleteInput struct {
-	ID persist.DbID `json:"id" binding:"required"`
+	ID persist.DBID `json:"id" binding:"required"`
 }
 
-//-------------------------------------------------------------
 // HANDLERS
 
 func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
@@ -76,7 +75,6 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
@@ -249,13 +247,12 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 // CREATE
 func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
-	pUserID persist.DbID,
-	pRuntime *runtime.Runtime) (persist.DbID, error) {
+	pUserID persist.DBID,
+	pRuntime *runtime.Runtime) (persist.DBID, error) {
 
-	coll := &persist.CollectionDb{
+	coll := &persist.CollectionDB{
 		OwnerUserID: pUserID,
 		Nfts:        pInput.Nfts,
 	}
@@ -263,5 +260,3 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	return persist.CollCreate(pCtx, coll, pRuntime)
 
 }
-
-//-------------------------------------------------------------

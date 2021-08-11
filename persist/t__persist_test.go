@@ -11,14 +11,14 @@ import (
 )
 
 type testGrandchild struct {
-	IDstr         DbID    `bson:"_id,omitempty"`
+	IDstr         DBID    `bson:"_id,omitempty"`
 	CreationTimeF float64 `bson:"creation_time"`
 	ImportantData string  `bson:"data"`
 	Deleted       bool    `bson:"deleted"`
 }
 
 type testChild struct {
-	IDstr         DbID     `bson:"_id,omitempty"`
+	IDstr         DBID     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`
@@ -26,7 +26,7 @@ type testChild struct {
 }
 
 type testGrandparent struct {
-	IDstr         DbID     `bson:"_id,omitempty"`
+	IDstr         DBID     `bson:"_id,omitempty"`
 	CreationTimeF float64  `bson:"creation_time"`
 	ImportantData string   `bson:"data"`
 	Deleted       bool     `bson:"deleted"`

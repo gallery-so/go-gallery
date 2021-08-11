@@ -87,12 +87,12 @@ func handleCORS() gin.HandlerFunc {
 	}
 }
 
-func getUserIDfromCtx(c *gin.Context) (persist.DbID, bool) {
+func getUserIDfromCtx(c *gin.Context) (persist.DBID, bool) {
 	val, ok := c.Get(userIDcontextKey)
 	if !ok {
 		return "", false
 	}
-	userID, ok := val.(persist.DbID)
+	userID, ok := val.(persist.DBID)
 	if !ok {
 		return "", false
 	}

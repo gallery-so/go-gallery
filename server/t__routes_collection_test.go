@@ -17,7 +17,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with collection
-	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDb{
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 	}, tc.r)
@@ -25,7 +25,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 
 	// build update request body
 	type Update struct {
-		ID             persist.DbID `json:"id"`
+		ID             persist.DBID `json:"id"`
 		Name           string       `json:"name"`
 		CollectorsNote string       `json:"collectors_note"`
 	}

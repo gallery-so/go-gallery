@@ -33,6 +33,20 @@ func TestValidate_signatureValidator(pTest *testing.T) {
 	testValidatorWithTestValues(pTest, signatureValidator, testSignatures)
 }
 
+func TestValidate_usernameValidator(pTest *testing.T) {
+	var testUsernames = []testValue {
+		{"username", "Valid username", true},
+		{"1234", "Valid username", true},
+		{"userName1234", "Valid username", true},
+		{"User_name.1234", "Valid username", true},
+		{"a", "Username must be at least 2 characters", false},
+		{"thisUsernameIsTooLongBecauseItHasMoreThanFiftyCharacters", "Username must not be more than 50 characters", false},
+		{"username&", "Username must only have alphanumeric, underscore, and period characters", false},
+		{"user..name", "Username cannot have consecutive periods", false},
+	}
+	testValidatorWithTestValues(pTest, usernameValidator, testUsernames)
+}
+
 func testValidatorWithTestValues(pTest *testing.T, validatorFunc validator.Func, testValues []testValue) {
 	validate := validator.New()
 	validate.RegisterValidation("validatorName", validatorFunc)

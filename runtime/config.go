@@ -8,7 +8,6 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
-//-------------------------------------------------------------
 const (
 	env         = "GLRY_ENV"
 	baseURL     = "GLRY_BASE_URL"
@@ -25,6 +24,7 @@ const (
 	jwtTokenTTLsecInt = "GLRY_JWT_TOKEN_TTL_SECS"
 )
 
+// Config represents an application configuration that is determined at runtime start
 type Config struct {
 	EnvStr      string
 	BaseURL     string
@@ -40,7 +40,8 @@ type Config struct {
 	JWTtokenTTLsecInt int64
 }
 
-//-------------------------------------------------------------
+// ConfigLoad loads the runtime configuration from the viper config and grabs necessary secrets
+// from GCP
 func ConfigLoad() *Config {
 
 	//------------------

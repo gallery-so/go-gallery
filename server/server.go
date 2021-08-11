@@ -10,8 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//-------------------------------------------------------------
-
+// Init - initialize the server
 func Init(pPortInt int,
 	pRuntime *runtime.Runtime) {
 
@@ -31,7 +30,7 @@ func Init(pPortInt int,
 	}
 
 	// HANDLERS
-	HandlersInit(pRuntime)
+	handlersInit(pRuntime)
 
 	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
 		panic(err)

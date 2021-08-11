@@ -17,19 +17,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//-------------------------------------------------------------
+// Runtime represents the runtime of the application and its services
 type Runtime struct {
 	Config *Config
 	DB     *DB
 	Router *gin.Engine
 }
 
+// DB is an abstract represenation of a MongoDB database and Client to interact with it
 type DB struct {
 	MongoClient *mongo.Client
 	MongoDB     *mongo.Database
 }
 
-//-------------------------------------------------------------
+// GetRuntime sets up the runtime to be used at the start of the application
 func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	//------------------
@@ -69,7 +70,6 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	return runtime, nil
 }
 
-//-------------------------------------------------------------
 func dbInit(pMongoURLstr string,
 	pMongoDBNamestr string,
 	pConfig *Config) (*DB, error) {
@@ -86,7 +86,6 @@ func dbInit(pMongoURLstr string,
 			return nil, err
 		}
 	}
-
 	mongoDB, mongoClient, err := connectMongo(pMongoURLstr,
 		pMongoDBNamestr,
 		tlsConf)
@@ -103,8 +102,8 @@ func dbInit(pMongoURLstr string,
 	return db, nil
 }
 
-//-------------------------------------------------------------
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
+
 
 	tlsConfig := new(tls.Config)
 	tlsConfig.RootCAs = x509.NewCertPool()

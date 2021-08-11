@@ -25,20 +25,18 @@ import (
 // 	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
 // }
 
-//-------------------------------------------------------------
 // JWT_CLAIMS
 type jwtClaims struct {
-	UserID persist.DbID `json:"user_id"`
+	UserID persist.DBID `json:"user_id"`
 	jwt.StandardClaims
 }
 
 type jwtValidateResponse struct {
 	IsValid bool         `json:"valid"`
-	UserID  persist.DbID `json:"user_id"`
+	UserID  persist.DBID `json:"user_id"`
 }
 
 // HANDLER
-//-------------------------------------------------------------
 
 func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -52,11 +50,10 @@ func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 // VERIFY
 func authJwtParse(pJWTtokenStr string,
 	pJWTsecretKeyStr string,
-	pRuntime *runtime.Runtime) (bool, persist.DbID, error) {
+	pRuntime *runtime.Runtime) (bool, persist.DBID, error) {
 
 	claims := jwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
@@ -79,12 +76,11 @@ func authJwtParse(pJWTtokenStr string,
 	return true, claims.UserID, nil
 }
 
-//-------------------------------------------------------------
 // GENERATE__PIPELINE
 
 // ADD!! - mark all other JWT's for this address as deleted to exclude them from future use.
 
-func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DbID,
+func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID,
 	pRuntime *runtime.Runtime) (string, error) {
 
 	// previously we would generate a random string and use that as jwt secret and store
@@ -105,13 +101,12 @@ func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DbID,
 	return jwtTokenStr, nil
 }
 
-//-------------------------------------------------------------
 // GENERATE
 // ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
 
 func jwtGenerate(pSigningKeyStr string,
 	pIssuerStr string,
-	pUserID persist.DbID,
+	pUserID persist.DBID,
 	pRuntime *runtime.Runtime) (string, error) {
 
 	signingKeyBytesLst := []byte(pSigningKeyStr)

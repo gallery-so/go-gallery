@@ -11,19 +11,19 @@ import (
 )
 
 type galleryGetByUserIDInput struct {
-	UserID persist.DbID `form:"user_id" json:"user_id" binding:"required"`
+	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
 }
 type galleryGetByIDInput struct {
-	ID persist.DbID `form:"id" json:"id" binding:"required"`
+	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 
 type galleryCreateInput struct {
-	OwnerUserID persist.DbID `form:"owner_user_id" json:"owner_user_id" binding:"required"`
+	OwnerUserID persist.DBID `form:"owner_user_id" json:"owner_user_id" binding:"required"`
 }
 
 type galleryUpdateInput struct {
-	ID          persist.DbID   `form:"id" json:"id" binding:"required"`
-	Collections []persist.DbID `json:"collections" binding:"required"`
+	ID          persist.DBID   `form:"id" json:"id" binding:"required"`
+	Collections []persist.DBID `json:"collections" binding:"required"`
 }
 
 type galleryGetOutput struct {
@@ -31,10 +31,9 @@ type galleryGetOutput struct {
 }
 
 type galleryCreateOutput struct {
-	ID persist.DbID `json:"id"`
+	ID persist.DBID `json:"id"`
 }
 
-//-------------------------------------------------------------
 // HANDLERS
 
 func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
@@ -61,7 +60,6 @@ func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
 func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
@@ -94,8 +92,6 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-//-------------------------------------------------------------
-
 func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
@@ -112,7 +108,7 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		update := &persist.GalleryUpdateInput{Collections: input.Collections}
 
-		err := persist.GalleryUpdate(input.ID, userID, update, c, pRuntime)
+		err := persist.GalleryUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -121,8 +117,6 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
-
-//-------------------------------------------------------------
 
 func createGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -138,7 +132,7 @@ func createGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		insert := &persist.GalleryDb{OwnerUserID: userID}
+		insert := &persist.GalleryDB{OwnerUserID: userID}
 
 		id, err := persist.GalleryCreate(c, insert, pRuntime)
 		if err != nil {
