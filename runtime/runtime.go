@@ -76,17 +76,20 @@ func dbInit(pMongoURLstr string,
 
 	log.WithFields(log.Fields{}).Info("connecting to mongo...")
 
-	// TODO secret name
-	tlsCerts, err := accessSecret(context.Background(), "MONGO TLS SECRET NAME")
-	// TLS_CONFIG
-	tlsConfig, err := dbGetCustomTLSConfig(tlsCerts)
-	if err != nil {
-		return nil, err
+	var tlsConf *tls.Config
+	if pConfig.MongoUseTLS {
+		// TODO secret name
+		tlsCerts, err := accessSecret(context.Background(), mongoTLSSecretName)
+		// TLS_CONFIG
+		tlsConf, err = dbGetCustomTLSConfig(tlsCerts)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	mongoDB, mongoClient, err := connectMongo(pMongoURLstr,
 		pMongoDBNamestr,
-		tlsConfig)
+		tlsConf)
 	if err != nil {
 		return nil, err
 	}

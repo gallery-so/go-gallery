@@ -13,6 +13,7 @@ env_variables:
   GLRY_MONGO_DB_NAME: gallery
   # TODO: use SSL in prod
   GLRY_MONGO_SSL_CA_FILE_PATH: ""
+  GLRY_MONGO_USE_TLS: true
 
   GLRY_SENTRY_ENDPOINT: ""
   GLRY_JWT_TOKEN_TTL_SECS: 259200

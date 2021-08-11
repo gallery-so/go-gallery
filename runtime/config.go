@@ -15,6 +15,9 @@ const (
 	port        = "GLRY_PORT"
 	portMetrics = "GLRY_PORT_METRIM"
 
+	mongoURLSecretName    = "GLRY_MONGO_URL"
+	mongoTLSSecretName    = "GLRY_TLS"
+	mongoUseTLS           = "GLRY_MONGO_USE_TLS"
 	mongoDBname           = "GLRY_MONGO_DB_NAME"
 	mongoSslCAfilePathStr = "GLRY_MONGO_SSL_CA_FILE_PATH"
 
@@ -30,6 +33,7 @@ type Config struct {
 
 	MongoURLstr           string
 	MongoDBnameStr        string
+	MongoUseTLS           bool
 	MongoSslCAfilePathStr string
 
 	SentryEndpointStr string
@@ -47,6 +51,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(portMetrics, 4000)
 
 	viper.SetDefault(mongoDBname, "gallery")
+	viper.SetDefault(mongoUseTLS, false)
 	viper.SetDefault(mongoSslCAfilePathStr, "")
 
 	viper.SetDefault(sentryEndpoint, "")
@@ -70,7 +75,7 @@ func ConfigLoad() *Config {
 	}
 
 	// TODO secret name
-	mgoURL, err := accessSecret(context.Background(), "MONGO SECRET NAME HERE")
+	mgoURL, err := accessSecret(context.Background(), mongoURLSecretName)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
 		panic(-1)
@@ -83,6 +88,7 @@ func ConfigLoad() *Config {
 		PortMetrics: viper.GetInt(portMetrics),
 
 		MongoURLstr:           string(mgoURL),
+		MongoUseTLS:           viper.GetBool(mongoUseTLS),
 		MongoDBnameStr:        viper.GetString(mongoDBname),
 		MongoSslCAfilePathStr: viper.GetString(mongoSslCAfilePathStr),
 
@@ -92,28 +98,3 @@ func ConfigLoad() *Config {
 
 	return config
 }
-
-//-------------------------------------------------------------
-// GET_AWS_SECRETS
-// func ConfigGetAWSsecrets(pEnvStr string,
-// 	pRuntimeSys *gf_core.Runtime_sys) (map[string]map[string]interface{}, *gf_core.Gf_error) {
-
-// 	secretsLst := []string{
-// 		"glry_mongo_url",
-// 	}
-
-// 	secretValuesMap := map[string]map[string]interface{}{}
-// 	for _, secretNameStr := range secretsLst {
-
-// 		secretFullNameStr := fmt.Sprintf("%s_%s", secretNameStr, pEnvStr)
-
-// 		secretMap, gErr := gf_aws.AWS_SECMNGR__get_secret(secretFullNameStr, pRuntimeSys)
-// 		if gErr != nil {
-// 			return nil, gErr
-// 		}
-
-// 		secretValuesMap[secretNameStr] = secretMap
-// 	}
-
-// 	return secretValuesMap, nil
-// }
