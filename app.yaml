@@ -7,13 +7,8 @@ main: ./cmd/server
 env_variables:
   GLRY_ENV: development
   GLRY_PORT: 8080
-
-  # TODO: use secrets manager in prod
-  GLRY_MONGO_URL: mongodb+srv://glry-dev:OlLAbxBTyVicDND1@gallery-cluster.2anpm.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
   GLRY_MONGO_DB_NAME: gallery
-  # TODO: use SSL in prod
-  GLRY_MONGO_SSL_CA_FILE_PATH: ""
+  # TODO: use TLS in prod
   GLRY_MONGO_USE_TLS: false
-
   GLRY_SENTRY_ENDPOINT: ""
   GLRY_JWT_TOKEN_TTL_SECS: 259200

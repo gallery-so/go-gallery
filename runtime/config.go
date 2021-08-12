@@ -14,11 +14,10 @@ const (
 	port        = "GLRY_PORT"
 	portMetrics = "GLRY_PORT_METRIM"
 
-	mongoURLSecretName    = "projects/1066359838176/secrets/GLRY_MONGO_URL"
+	mongoURLSecretName    = "projects/1066359838176/secrets/GLRY_MONGO_URL/versions/latest"
 	mongoTLSSecretName    = "GLRY_TLS"
 	mongoUseTLS           = "GLRY_MONGO_USE_TLS"
 	mongoDBname           = "GLRY_MONGO_DB_NAME"
-	mongoSslCAfilePathStr = "GLRY_MONGO_SSL_CA_FILE_PATH"
 
 	sentryEndpoint    = "GLRY_SENTRY_ENDPOINT"
 	jwtTokenTTLsecInt = "GLRY_JWT_TOKEN_TTL_SECS"
@@ -34,7 +33,6 @@ type Config struct {
 	MongoURL              string
 	MongoDBName           string
 	MongoUseTLS           bool
-	MongoSslCAfilePathStr string
 
 	SentryEndpointStr string
 	JWTtokenTTLsecInt int64
@@ -53,7 +51,6 @@ func ConfigLoad() *Config {
 
 	viper.SetDefault(mongoDBname, "gallery")
 	viper.SetDefault(mongoUseTLS, false)
-	viper.SetDefault(mongoSslCAfilePathStr, "")
 
 	viper.SetDefault(sentryEndpoint, "")
 	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24*3)
@@ -83,7 +80,6 @@ func ConfigLoad() *Config {
 
 		MongoUseTLS:           viper.GetBool(mongoUseTLS),
 		MongoDBName:           viper.GetString(mongoDBname),
-		MongoSslCAfilePathStr: viper.GetString(mongoSslCAfilePathStr),
 
 		SentryEndpointStr: viper.GetString(sentryEndpoint),
 		JWTtokenTTLsecInt: int64(viper.GetInt(jwtTokenTTLsecInt)),
@@ -92,7 +88,6 @@ func ConfigLoad() *Config {
 	if config.EnvStr == "local" {
 		config.MongoURL = "mongodb://localhost:27017/"
 	} else {
-		// TODO secret name
 		mgoURL, err := accessSecret(context.Background(), mongoURLSecretName)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")

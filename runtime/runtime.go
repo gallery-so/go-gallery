@@ -78,9 +78,10 @@ func dbInit(pMongoURLstr string,
 
 	var tlsConf *tls.Config
 	if pConfig.MongoUseTLS {
-		// TODO secret name
 		tlsCerts, err := accessSecret(context.Background(), mongoTLSSecretName)
-		// TLS_CONFIG
+		if err != nil {
+			return nil, err
+		}
 		tlsConf, err = dbGetCustomTLSConfig(tlsCerts)
 		if err != nil {
 			return nil, err
