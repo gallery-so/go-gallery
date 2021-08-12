@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -27,6 +28,7 @@ func generateTestUser(r *runtime.Runtime) *TestUser {
 	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
 	user := &persist.User{
 		UserName: username,
+		UserNameIdempotent: strings.ToLower(username),
 		Addresses: []string{address},
 	}
 	id, _ := persist.UserCreate(ctx, user, r)

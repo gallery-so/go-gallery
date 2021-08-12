@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/stretchr/testify/assert"
@@ -187,74 +188,66 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	assert.Equal(update.UserNameStr, user.UserName)
 }
 
-// TODO: this test doesn't attach an auth header.
-// endpoint attempts to make an update, instead of short-circuiting with a 401.
-// func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
-// 	assert := assert.New(t)
+func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
+	assert := assert.New(t)
 
-// 	// seed DB with user
-// 	username := "BingBongBingBing"
-// 	userID, err := persist.UserCreate(context.Background(), &persist.User{
-// 		UserName: username,
-// 		UserNameIdempotent: strings.ToLower(username),
-// 		Addresses: []string{tc.user1.address},
-// 		Bio: "punk",
-// 	}, tc.r)
-// 	assert.Nil(err)
+	// seed DB with user
+	username := "BingBongBingBing"
+	userID, err := persist.UserCreate(context.Background(), &persist.User{
+		UserName: username,
+		UserNameIdempotent: strings.ToLower(username),
+		Addresses: []string{tc.user1.address},
+		Bio: "punk",
+	}, tc.r)
+	assert.Nil(err)
 
-// 	update := userUpdateInput{
-// 		UserID: userID,
-// 		UserNameStr: "kaito",
-// 	}
-// 	data, err := json.Marshal(update)
-// 	assert.Nil(err)
+	update := userUpdateInput{
+		UserID: userID,
+		UserNameStr: "kaito",
+	}
+	data, err := json.Marshal(update)
+	assert.Nil(err)
 
-// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
-// 	assert.Nil(err)
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	assert.Nil(err)
-// 	// assertValidJSONResponse(assert, resp)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	spew.Dump(resp.Body)
+	assertValidJSONResponse(assert, resp)
+}
 
-// 	// user, err := persist.UserGetByID(context.Background(), userID, tc.r)
-// 	// assert.Nil(err)
-// 	// assert.Equal(update.UserNameStr, user.UserName)
-// }
+func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
+	assert := assert.New(t)
 
+	// seed DB with user
+	username := "BingBongBingBong"
+	userID, err := persist.UserCreate(context.Background(), &persist.User{
+		UserName: username,
+		UserNameIdempotent: strings.ToLower(username),
+		Addresses: []string{tc.user1.address},
+		Bio: "punk",
+	}, tc.r)
+	assert.Nil(err)
+	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	assert.Nil(err)
 
-// TODO: this test should fail because the username is taken
-// func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
-// 	assert := assert.New(t)
+	update := userUpdateInput{
+		UserID: userID,
+		UserNameStr: tc.user1.username,
+	}
+	data, err := json.Marshal(update)
+	assert.Nil(err)
 
-// 	// seed DB with user
-// 	username := "BingBongBingBong"
-// 	userID, err := persist.UserCreate(context.Background(), &persist.User{
-// 		UserName: username,
-// 		UserNameIdempotent: strings.ToLower(username),
-// 		Addresses: []string{tc.user1.address},
-// 		Bio: "punk",
-// 	}, tc.r)
-// 	assert.Nil(err)
-// 	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
-// 	assert.Nil(err)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertGalleryErrorResponse(assert, resp)
 
-// 	takenUsername := tc.user1.username
-// 	update := userUpdateInput{
-// 		UserID: userID,
-// 		UserNameStr: takenUsername,
-// 	}
-// 	data, err := json.Marshal(update)
-// 	assert.Nil(err)
-
-// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
-// 	assert.Nil(err)
-// 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	assert.Nil(err)
-// 	assertValidJSONResponse(assert, resp)
-
-// 	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
-// 	assert.Nil(err)
-// 	assert.Equal(update.UserNameStr, user.UserName)
-// }
+	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+	assert.Nil(err)
+	assert.NotEqual(update.UserNameStr, user.UserName)
+}
