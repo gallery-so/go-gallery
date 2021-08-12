@@ -20,13 +20,13 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
 				return
 			}
 			// get string after "Bearer"
