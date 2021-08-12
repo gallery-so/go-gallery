@@ -12,7 +12,6 @@ type TestConfig struct {
 	server          *httptest.Server
 	serverURL       string
 	r               *runtime.Runtime
-	testUserAddress string
 	user1           *TestUser
 	user2           *TestUser
 }

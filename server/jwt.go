@@ -6,12 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
-	log "github.com/sirupsen/logrus"
 )
 
 // USER_JWT_KEY - is unique per user, and stored in the DB for now.
@@ -65,9 +63,6 @@ func authJwtParse(pJWTtokenStr string,
 	if err != nil {
 		return false, "", err
 	}
-
-	log.WithFields(log.Fields{}).Debug("JWT CLAIMS --------------")
-	spew.Dump(claims)
 
 	if !JWTtoken.Valid {
 		return false, "", errors.New("JWT token is invalid")
