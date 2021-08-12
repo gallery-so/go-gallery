@@ -17,7 +17,7 @@ const usersCollName = "users"
 // User represents a user in the datase and throughout the application
 type User struct {
 	Version      int64   `bson:"version"` // schema version for this model
-	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
@@ -29,10 +29,10 @@ type User struct {
 
 // UserUpdateInput represents the data to be updated when updating a user
 type UserUpdateInput struct {
-	UserName           string   `bson:"username,omitempty"`
-	UserNameIdempotent string   `bson:"username_idempotent,omitempty"`
-	Addresses          []string `bson:"addresses,omitempty"`
-	Bio                string   `bson:"bio,omitempty"`
+	UserName           string   `bson:"username"`
+	UserNameIdempotent string   `bson:"username_idempotent"`
+	Addresses          []string `bson:"addresses"`
+	Bio                string   `bson:"bio"`
 }
 
 // UserUpdateByID updates a user by ID

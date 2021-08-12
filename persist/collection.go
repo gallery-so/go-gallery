@@ -21,7 +21,7 @@ const (
 // This struct will only be used when updating or querying the database
 type CollectionDB struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
@@ -40,7 +40,7 @@ type CollectionDB struct {
 // the application where CollectionDB does not apply
 type Collection struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id,omitempty"           json:"id" binding:"required"`
+	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 

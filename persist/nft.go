@@ -18,7 +18,7 @@ const (
 // Nft represents an nft both in the database and throughout the application
 type Nft struct {
 	Version      int64   `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id,omitempty"                  json:"id" binding:"required"`
+	ID           DBID    `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time"        json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
