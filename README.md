@@ -27,10 +27,14 @@ $ ./bin/main
 
 ### Mongo
 
-The app will connect to a local mongo instance by default. To spin it up, you can use the official docker container:
+The app will connect to a local mongo instance and local redis instance by default. To spin it up, you can use the official docker containers:
 
 ```bash
 $ docker run -p 27017:27017 mongo
+```
+
+```bash
+$ docker run -p 6379:6379 redis
 ```
 
 ### Healthcheck
