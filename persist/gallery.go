@@ -68,10 +68,10 @@ func GalleryUpdate(pCtx context.Context, pIDstr DBID,
 }
 
 // GalleryAddCollections adds collections to the specified gallery
-func GalleryAddCollections(pCtx context.Context, pID DBID, pCollectionIDs []DBID, pRuntime *runtime.Runtime) error {
+func GalleryAddCollections(pCtx context.Context, pID DBID, pUserID DBID, pCollectionIDs []DBID, pRuntime *runtime.Runtime) error {
 	mp := NewMongoStorage(0, galleryColName, pRuntime)
 
-	return mp.Push(pCtx, bson.M{"_id": pID}, "collections", pCollectionIDs)
+	return mp.Push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
 }
 
 // GalleryGetByUserID gets a gallery by its owner user ID and will variably return

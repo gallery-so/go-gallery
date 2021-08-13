@@ -263,7 +263,7 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 		return "", err
 	}
 
-	err = persist.GalleryAddCollections(pCtx, pInput.GalleryID, []persist.DBID{collID}, pRuntime)
+	err = persist.GalleryAddCollections(pCtx, pInput.GalleryID, pUserID, []persist.DBID{collID}, pRuntime)
 	if err != nil {
 		return "", err
 	}
