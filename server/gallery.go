@@ -18,7 +18,7 @@ type galleryGetByIDInput struct {
 }
 
 type galleryCreateInput struct {
-	OwnerUserID persist.DBID `form:"owner_user_id" json:"owner_user_id" binding:"required"`
+	Collections []persist.DBID `form:"collections" json:"collections" binding:"required"`
 }
 
 type galleryUpdateInput struct {
