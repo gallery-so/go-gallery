@@ -106,12 +106,26 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 	return nil
 }
 
+// Push pushes items into an array field for a given queried document
+func (m *MongoStorage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		// TODO this should return a 404 or 204
+		return errors.New(copy.CouldNotFindDocument)
+	}
+
+	return nil
+}
+
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-
 	asMap, err := structToBsonMap(upsert)
 	if err != nil {
 		return err

@@ -17,7 +17,7 @@ func TestHealthcheck(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := healthcheckResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal("gallery operational", body.Message)
 	assert.Equal("local", body.Env)
 }

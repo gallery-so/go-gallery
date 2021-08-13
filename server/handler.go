@@ -18,7 +18,6 @@ func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	galleriesGroup.GET("/get", jwtOptional(pRuntime), getGalleryByID(pRuntime))
 	galleriesGroup.GET("/user_get", jwtOptional(pRuntime), getGalleriesByUserID(pRuntime))
-	galleriesGroup.POST("/create", jwtRequired(pRuntime), createGallery(pRuntime))
 	galleriesGroup.POST("/update", jwtRequired(pRuntime), updateGallery(pRuntime))
 
 	// COLLECTIONS

@@ -12,3 +12,4 @@ env_variables:
   GLRY_MONGO_USE_TLS: false
   GLRY_SENTRY_ENDPOINT: ""
   GLRY_JWT_TOKEN_TTL_SECS: 259200
+  GLRY_ALLOWED_ORIGINS: "https://gallery-dev.vercel.app,http://localhost:3000"

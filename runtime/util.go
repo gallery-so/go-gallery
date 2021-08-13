@@ -8,7 +8,7 @@ import (
 
 // UnmarshallBody takes a request body and unmarshals it into the given struct
 // input must be a pointer to a struct with json tags
-func UnmarshalBody(pInput interface{}, body io.Reader, pRuntime *Runtime) error {
+func UnmarshallBody(pInput interface{}, body io.Reader, pRuntime *Runtime) error {
 	buf := &bytes.Buffer{}
 
 	if _, err := io.Copy(buf, body); err != nil {
