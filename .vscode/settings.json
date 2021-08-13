@@ -1,0 +1,31 @@
+{
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.insertSpaces": false,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    },
+    "editor.suggest.snippetsPreventQuickSuggestions": false
+  },
+  "go.autocompleteUnimportedPackages": true,
+  "go.toolsManagement.autoUpdate": true,
+  "go.buildOnSave": "off",
+  "go.lintOnSave": "workspace",
+  "go.lintTool": "golint",
+  "go.vetOnSave": "workspace",
+  "go.delveConfig": {
+    "dlvLoadConfig": {
+      "followPointers": true,
+      "maxVariableRecurse": 1,
+      "maxStringLen": 64,
+      "maxArrayValues": 64,
+      "maxStructFields": -1
+    },
+    "apiVersion": 2,
+    "showGlobalVariables": false,
+    "debugAdapter": "legacy",
+    "substitutePath": []
+  }
+}
