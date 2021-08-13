@@ -86,7 +86,7 @@ func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*optio
 func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
 
 	mapsToInsert := make([]interface{}, len(insert))
-	for _, k := range insert {
+	for i, k := range insert {
 		now := float64(time.Now().UnixNano()) / 1000000000.0
 		asMap, err := structToBsonMap(k)
 		if err != nil {
@@ -95,7 +95,7 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 		asMap["_id"] = generateID(now)
 		asMap["created_at"] = now
 		asMap["last_updated"] = now
-		mapsToInsert = append(mapsToInsert, asMap)
+		mapsToInsert[i] = asMap
 	}
 
 	res, err := m.collection.InsertMany(ctx, mapsToInsert, opts...)

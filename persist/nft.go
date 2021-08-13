@@ -152,7 +152,12 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 
 		now := float64(time.Now().UnixNano()) / 1000000000.0
 
-		// TODO last updated
+		asMap, err := structToBsonMap(v)
+		if err != nil {
+			return err
+		}
+		asMap["last_updated"] = now
+		delete(asMap, "_id")
 
 		upsertModels[i] = &mongo.UpdateOneModel{
 			Upsert: boolin(true),
@@ -162,7 +167,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 					"_id":        generateID(now),
 					"created_at": now,
 				},
-				"$set": v,
+				"$set": asMap,
 			},
 		}
 	}
