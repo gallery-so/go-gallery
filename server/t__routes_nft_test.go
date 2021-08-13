@@ -29,7 +29,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.Nft{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(name, body.Name)
 }
 
@@ -41,7 +41,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(copy.NftIDQueryNotProvided, body.Error)
 }
 
@@ -55,7 +55,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(fmt.Sprintf("no nfts found with id: %s", nonexistentNftID), body.Error)
 }
 
@@ -96,7 +96,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 
 	// ensure nft was updated
 	body := persist.Nft{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(update.Name, body.Name)
 }
 
@@ -125,7 +125,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(copy.InvalidAuthHeader, body.Error)
 }
 
@@ -152,7 +152,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.NotEmpty(body.Error)
 }
 
@@ -181,7 +181,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Equal(copy.CouldNotFindDocument, body.Error)
 }
 
@@ -219,7 +219,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 
 	// ensure nft was NOT updated
 	body := persist.Nft{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.NotEqual(update.Name, body.Name)
 }
 
@@ -259,6 +259,6 @@ func TestUpdateNftByID_UpdatingSomeoneElsesNft_CantDo(t *testing.T) {
 
 	// ensure nft was NOT updated
 	body := persist.Nft{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.NotEqual(update.Name, body.Name)
 }

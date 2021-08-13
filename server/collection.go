@@ -23,7 +23,8 @@ type collectionGetOutput struct {
 }
 
 type collectionCreateInput struct {
-	Nfts []persist.DBID `json:"nfts" binding:"required"`
+	GalleryID persist.DBID   `form:"gallery_id" json:"gallery_id" binding:"required"`
+	Nfts      []persist.DBID `json:"nfts" binding:"required"`
 }
 
 type collectionUpdateInfoByIDInput struct {
@@ -257,6 +258,16 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 		Nfts:        pInput.Nfts,
 	}
 
-	return persist.CollCreate(pCtx, coll, pRuntime)
+	collID, err := persist.CollCreate(pCtx, coll, pRuntime)
+	if err != nil {
+		return "", err
+	}
+
+	err = persist.GalleryAddCollections(pCtx, pInput.GalleryID, pUserID, []persist.DBID{collID}, pRuntime)
+	if err != nil {
+		return "", err
+	}
+
+	return collID, nil
 
 }

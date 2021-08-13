@@ -76,7 +76,7 @@ func NftCreateBulk(pCtx context.Context, pNfts []*Nft,
 		nfts[i] = v
 	}
 
-	ids, err := mp.InsertMany(pCtx, nfts)
+	ids, err := mp.insertMany(pCtx, nfts)
 
 	if err != nil {
 		return nil, err

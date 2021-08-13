@@ -16,7 +16,7 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 	log.Info("initializing server...")
 
 	pRuntime.Router = gin.Default()
-	pRuntime.Router.Use(handleCORS())
+	pRuntime.Router.Use(handleCORS(pRuntime.Config))
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -31,6 +31,7 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 	return handlersInit(pRuntime)
 }
 
+// Init initializes the server
 func Init(pPortInt int,
 	pRuntime *runtime.Runtime) {
 

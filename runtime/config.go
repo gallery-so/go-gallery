@@ -5,14 +5,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 const (
-	env         = "GLRY_ENV"
-	baseURL     = "GLRY_BASE_URL"
-	port        = "GLRY_PORT"
-	portMetrics = "GLRY_PORT_METRIM"
+	env            = "GLRY_ENV"
+	baseURL        = "GLRY_BASE_URL"
+	port           = "GLRY_PORT"
+	portMetrics    = "GLRY_PORT_METRIM"
+	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
 	mongoURLSecretName = "projects/1066359838176/secrets/GLRY_MONGO_URL/versions/latest"
 	mongoTLSSecretName = "projects/1066359838176/secrets/GLRY_TLS/versions/latest"
@@ -28,10 +28,11 @@ const (
 
 // Config represents an application configuration that is determined at runtime start
 type Config struct {
-	EnvStr      string
-	BaseURL     string
-	Port        int
-	PortMetrics int
+	EnvStr         string
+	BaseURL        string
+	Port           int
+	PortMetrics    int
+	AllowedOrigins string
 
 	MongoURL    string
 	MongoDBName string
@@ -54,6 +55,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(baseURL, "http://localhost:4000")
 	viper.SetDefault(port, 4000)
 	viper.SetDefault(portMetrics, 4000)
+	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 
 	viper.SetDefault(mongoDBname, "gallery")
 	viper.SetDefault(mongoUseTLS, false)
@@ -81,10 +83,11 @@ func ConfigLoad() *Config {
 	}
 
 	config := &Config{
-		EnvStr:      viper.GetString(env),
-		BaseURL:     viper.GetString(baseURL),
-		Port:        viper.GetInt(port),
-		PortMetrics: viper.GetInt(portMetrics),
+		EnvStr:         viper.GetString(env),
+		BaseURL:        viper.GetString(baseURL),
+		Port:           viper.GetInt(port),
+		PortMetrics:    viper.GetInt(portMetrics),
+		AllowedOrigins: viper.GetString(allowedOrigins),
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 		MongoDBName: viper.GetString(mongoDBname),

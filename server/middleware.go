@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 const (
@@ -70,10 +71,15 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func handleCORS() gin.HandlerFunc {
+func handleCORS(runtimeConfig *runtime.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO make origin url env specific
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "https://gallery-dev.vercel.app")
+		requestOrigin := c.Request.Header.Get("Origin")
+		allowedOrigins := strings.Split(runtimeConfig.AllowedOrigins, ",")
+
+		if (util.Contains(allowedOrigins, requestOrigin)) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")

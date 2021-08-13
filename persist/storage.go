@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -61,37 +62,19 @@ func (m *storage) withRedis(rdb redisDB, runtime *runtime.Runtime) *storage {
 	return m
 }
 
-// insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
-// insert must be a pointer to a struct
+// Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DBID, error) {
 
-	elem := reflect.TypeOf(insert).Elem()
-	val := reflect.ValueOf(insert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-
-	if _, ok := elem.FieldByName("ID"); ok {
-		idField := val.FieldByName("ID")
-		if !idField.CanSet() {
-			// panic because this literally cannot happen in prod
-			panic("unable to set id field on struct")
-		}
-		if _, ok = elem.FieldByName("CreationTime"); ok {
-			val.FieldByName("CreationTime").SetFloat(now)
-		} else {
-			// panic because this literally cannot happen in prod
-			panic("creation time field required for id-able structs")
-		}
-		idField.Set(reflect.ValueOf(generateID(now)))
+	asMap, err := structToBsonMap(insert)
+	if err != nil {
+		return "", err
 	}
+	asMap["_id"] = generateID(now)
+	asMap["created_at"] = now
+	asMap["last_updated"] = now
 
-	if _, ok := elem.FieldByName("LastUpdated"); ok {
-		f := val.FieldByName("LastUpdated")
-		if f.CanSet() {
-			f.SetFloat(now)
-		}
-	}
-
-	res, err := m.collection.InsertOne(ctx, insert, opts...)
+	res, err := m.collection.InsertOne(ctx, asMap, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -100,37 +83,22 @@ func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*optio
 }
 
 // InsertMany inserts many documents into a mongo database while filling out the fields id, creation time, and last updated for each
-// insert must be a slice of pointers to a struct
-func (m *storage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
+func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
 
+	mapsToInsert := make([]interface{}, len(insert))
 	for _, k := range insert {
-		elem := reflect.TypeOf(k).Elem()
-		val := reflect.ValueOf(k).Elem()
 		now := float64(time.Now().UnixNano()) / 1000000000.0
-		if _, ok := elem.FieldByName("ID"); ok {
-			idField := val.FieldByName("ID")
-			if !idField.CanSet() {
-				// panic because this literally cannot happen in prod
-				panic("unable to set id field on struct")
-			}
-			if _, ok = elem.FieldByName("CreationTime"); ok {
-				val.FieldByName("CreationTime").SetFloat(now)
-			} else {
-				// panic because this literally cannot happen in prod
-				panic("creation time field required for id-able structs")
-			}
-			idField.Set(reflect.ValueOf(generateID(now)))
+		asMap, err := structToBsonMap(k)
+		if err != nil {
+			return nil, err
 		}
-
-		if _, ok := elem.FieldByName("LastUpdated"); ok {
-			f := val.FieldByName("LastUpdated")
-			if f.CanSet() {
-				f.SetFloat(now)
-			}
-		}
+		asMap["_id"] = generateID(now)
+		asMap["created_at"] = now
+		asMap["last_updated"] = now
+		mapsToInsert = append(mapsToInsert, asMap)
 	}
 
-	res, err := m.collection.InsertMany(ctx, insert, opts...)
+	res, err := m.collection.InsertMany(ctx, mapsToInsert, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,20 +113,17 @@ func (m *storage) InsertMany(ctx context.Context, insert []interface{}, opts ...
 	return ids, nil
 }
 
-// update updates a document in the mongo database while filling out the field LastUpdated
-// update must be a pointer to a struct
+// Update updates a document in the mongo database while filling out the field LastUpdated
 func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
-	elem := reflect.TypeOf(update).Elem()
-	val := reflect.ValueOf(update).Elem()
-	if _, ok := elem.FieldByName("LastUpdated"); ok {
-		f := val.FieldByName("LastUpdated")
-		if f.CanSet() {
-			now := float64(time.Now().UnixNano()) / 1000000000.0
-			f.SetFloat(now)
-		}
-	}
+	now := float64(time.Now().UnixNano()) / 1000000000.0
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
+	asMap, err := structToBsonMap(update)
+	if err != nil {
+		return err
+	}
+	asMap["last_updated"] = now
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -170,22 +135,33 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 	return nil
 }
 
-// upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
-// upsert must be a pointer to a struct, will not fill reflectively fill insert fields such as id or creation time
+// Push pushes items into an array field for a given queried document
+func (m *storage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		// TODO this should return a 404 or 204
+		return errors.New(copy.CouldNotFindDocument)
+	}
+
+	return nil
+}
+
+// Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
-	elem := reflect.TypeOf(upsert).Elem()
-	val := reflect.ValueOf(upsert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-	if _, ok := elem.FieldByName("LastUpdated"); ok {
-		f := val.FieldByName("LastUpdated")
-		if f.CanSet() {
-			f.SetFloat(now)
-		}
+	asMap, err := structToBsonMap(upsert)
+	if err != nil {
+		return err
 	}
+	asMap["last_updated"] = now
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(now), "created_at": now}, "$set": upsert}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(now), "created_at": now}, "$set": asMap}, opts...)
 	if err != nil {
 		return err
 	}
@@ -279,4 +255,41 @@ func generateID(creationTime float64) DBID {
 // function that returns the pointer to the bool passed in
 func boolin(b bool) *bool {
 	return &b
+}
+
+func structToBsonMap(v interface{}) (bson.M, error) {
+	val := reflect.ValueOf(v)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("%v is not a struct, is of type %T", v, v)
+	}
+	bsonMap := bson.M{}
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		tag, ok := val.Type().Field(i).Tag.Lookup("bson")
+		if ok {
+			spl := strings.Split(tag, ",")
+			if len(spl) > 1 {
+				switch spl[1] {
+				case "omitempty":
+					if isValueEmpty(field) {
+						continue
+					}
+				}
+			}
+			if field.CanInterface() {
+				bsonMap[spl[0]] = field.Interface()
+			}
+		}
+	}
+	return bsonMap, nil
+}
+
+func isValueEmpty(field reflect.Value) bool {
+	if field.IsZero() {
+		return true
+	}
+	return field.IsNil()
 }

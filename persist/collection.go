@@ -156,7 +156,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 
 	mp := newStorage(0, collectionColName, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"deleted": true})
 }
 
 // CollGetUnassigned returns a collection that is empty except for a list of nfts that are not
