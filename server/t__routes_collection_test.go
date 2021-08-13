@@ -55,7 +55,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 	assert.Equal(update.Name, body.Collections[0].Name)

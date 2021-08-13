@@ -64,8 +64,6 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		//------------------
-		// OUTPUT
 		c.JSON(http.StatusOK, output)
 	}
 }
@@ -103,8 +101,6 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 				Expires: expirationTime,
 			})*/
 
-		//------------------
-		// OUTPUT
 		c.JSON(http.StatusOK, output)
 	}
 }

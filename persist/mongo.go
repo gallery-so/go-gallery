@@ -119,17 +119,33 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 // Update updates a document in the mongo database while filling out the field LastUpdated
 // update must be a pointer to a struct
 func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
-	elem := reflect.TypeOf(update).Elem()
-	val := reflect.ValueOf(update).Elem()
-	if _, ok := elem.FieldByName("LastUpdated"); ok {
-		f := val.FieldByName("LastUpdated")
-		if f.CanSet() {
-			now := float64(time.Now().UnixNano()) / 1000000000.0
-			f.SetFloat(now)
-		}
-	}
+	// TODO this won't work because update structs don't have this field
+	// elem := reflect.TypeOf(update).Elem()
+	// val := reflect.ValueOf(update).Elem()
+	// if _, ok := elem.FieldByName("LastUpdated"); ok {
+	// 	f := val.FieldByName("LastUpdated")
+	// 	if f.CanSet() {
+	// 		now := float64(time.Now().UnixNano()) / 1000000000.0
+	// 		f.SetFloat(now)
+	// 	}
+	// }
 
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		// TODO this should return a 404 or 204
+		return errors.New(copy.CouldNotFindDocument)
+	}
+
+	return nil
+}
+
+// Push pushes items into an array field for a given queried document
+func (m *MongoStorage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
 	if err != nil {
 		return err
 	}
@@ -146,15 +162,17 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
-	elem := reflect.TypeOf(upsert).Elem()
-	val := reflect.ValueOf(upsert).Elem()
 	now := float64(time.Now().UnixNano()) / 1000000000.0
-	if _, ok := elem.FieldByName("LastUpdated"); ok {
-		f := val.FieldByName("LastUpdated")
-		if f.CanSet() {
-			f.SetFloat(now)
-		}
-	}
+
+	// TODO this won't work because update structs don't have this field
+	// elem := reflect.TypeOf(upsert).Elem()
+	// val := reflect.ValueOf(upsert).Elem()
+	// if _, ok := elem.FieldByName("LastUpdated"); ok {
+	// 	f := val.FieldByName("LastUpdated")
+	// 	if f.CanSet() {
+	// 		f.SetFloat(now)
+	// 	}
+	// }
 
 	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(now), "created_at": now}, "$set": upsert}, opts...)
 	if err != nil {

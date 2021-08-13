@@ -9,10 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
-	// "github.com/davecgh/go-spew/spew"
 )
 
-// INPUT - USER_UPDATE
 type userUpdateInput struct {
 	UserID      persist.DBID `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
 	UserNameStr string       `json:"username" binding:"username"`
@@ -20,14 +18,12 @@ type userUpdateInput struct {
 	Addresses   []string     `json:"addresses"`
 }
 
-// INPUT - USER_GET
 type userGetInput struct {
 	UserID   persist.DBID `json:"user_id" form:"user_id"`
 	Address  string       `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	Username string       `json:"username" form:"username"`
 }
 
-// OUTPUT - USER_GET
 type userGetOutput struct {
 	UserID      persist.DBID `json:"id"`
 	UserNameStr string       `json:"username"`
@@ -47,14 +43,12 @@ type userCreateInput struct {
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
-// OUTPUT - USER_CREATE
 type userCreateOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
 	UserID         persist.DBID `json:"user_id"`
+	GalleryID      persist.DBID `json:"gallery_id"`
 }
-
-// HANDLERS
 
 func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -66,15 +60,12 @@ func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		//------------------
-		// UPDATE
 		err := userUpdateDb(c, up, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
-		//------------------
-		// OUTPUT
+
 		c.JSON(http.StatusOK, successOutput{Success: true})
 	}
 }
@@ -102,9 +93,6 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		//------------------
-		// OUTPUT
-
 		c.JSON(http.StatusOK, output)
 
 	}
@@ -120,27 +108,20 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		//------------------
-		// USER_CREATE
 		output, err := userCreateDb(c, input, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 
-		//------------------
-		// OUTPUT
-
 		c.JSON(http.StatusOK, output)
 
 	}
 }
 
-// USER_CREATE__PIPELINE
 func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
 
-	//------------------
 	output := &userCreateOutput{}
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
@@ -150,9 +131,6 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	if id != "" {
 		return nil, errors.New("user already exists with a given address")
 	}
-
-	//------------------
-	// VERIFY_SIGNATURE
 
 	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
@@ -168,13 +146,10 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 		return output, nil
 	}
 
-	//------------------
-
 	user := &persist.User{
 		Addresses: []string{pInput.Address},
 	}
 
-	// DB
 	userID, err := persist.UserCreate(pCtx, user, pRuntime)
 	if err != nil {
 		return nil, err
@@ -182,9 +157,6 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 
 	output.UserID = userID
 
-	//------------------
-
-	// JWT_GENERATION - signature is valid, so generate JWT key
 	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID,
 		pRuntime)
 	if err != nil {
@@ -193,13 +165,19 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 
 	output.JWTtoken = jwtTokenStr
 
-	//------------------
-	// NONCE ROTATE
-
 	err = authNonceRotateDb(pCtx, pInput.Address, userID, pRuntime)
 	if err != nil {
 		return nil, err
 	}
+
+	galleryInsert := &persist.GalleryDB{OwnerUserID: userID}
+
+	galleryID, err := persist.GalleryCreate(pCtx, galleryInsert, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	output.GalleryID = galleryID
 
 	return output, nil
 }

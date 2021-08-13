@@ -78,7 +78,7 @@ func TestUpdateGalleryById_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := GalleryGetResponse{}
-	runtime.UnmarshalBody(&body, resp.Body, tc.r)
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Len(body.Galleries, 1)
 	assert.Empty(body.Error)
 	assert.Equal(update.Collections[2], body.Galleries[0].Collections[1].ID)

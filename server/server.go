@@ -31,6 +31,7 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 	return handlersInit(pRuntime)
 }
 
+// Init initializes the server
 func Init(pPortInt int,
 	pRuntime *runtime.Runtime) {
 
