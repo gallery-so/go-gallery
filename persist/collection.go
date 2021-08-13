@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -73,9 +74,9 @@ type CollectionUpdateHiddenInput struct {
 func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
-	return mp.Insert(pCtx, pColl)
+	return mp.insert(pCtx, pColl)
 
 }
 
@@ -91,7 +92,7 @@ func CollGetByUserID(pCtx context.Context, pUserID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	result := []*Collection{}
 
@@ -100,7 +101,7 @@ func CollGetByUserID(pCtx context.Context, pUserID DBID,
 		fil["hidden"] = false
 	}
 
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +120,7 @@ func CollGetByID(pCtx context.Context, pID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	result := []*Collection{}
 
@@ -127,7 +128,7 @@ func CollGetByID(pCtx context.Context, pID DBID,
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
-	if err := mp.Aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -142,9 +143,9 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
 // CollDelete will delete a single collection by ID, also ensuring that the collection is owned
@@ -153,14 +154,14 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 }
 
 // CollGetUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
-func CollGetUnassigned(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) (*Collection, error) {
+func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRuntime *runtime.Runtime) (*Collection, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -168,15 +169,35 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, pRuntime *runtime.Run
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	result := []*Collection{}
 
-	if err := mp.Aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
+	if !skipCache {
+		if cachedResult, err := mp.cacheGet(pCtx, string(pUserID)); err == nil && cachedResult != "" {
+			err = json.Unmarshal([]byte(cachedResult), &result)
+			if err != nil {
+				return nil, err
+			}
+			return result[0], nil
+		}
+	}
+
+	if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
 		return nil, err
 	}
 	if len(result) != 1 {
 		return nil, errors.New("multiple collections of unassigned nfts found")
+	}
+
+	toCache, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := mp.cacheSet(pCtx, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
+		return nil, err
 	}
 
 	return result[0], nil

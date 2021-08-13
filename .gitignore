@@ -7,3 +7,5 @@ scripts/*.csv
 
 # Misc
 .DS_Store
+
+go.sum

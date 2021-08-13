@@ -49,9 +49,9 @@ type GalleryUpdateInput struct {
 func GalleryCreate(pCtx context.Context, pGallery *GalleryDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := NewMongoStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, galleryColName, pRuntime)
 
-	return mp.Insert(pCtx, pGallery)
+	return mp.insert(pCtx, pGallery)
 }
 
 // GalleryUpdate updates a gallery in the database by ID, also ensuring the gallery
@@ -62,9 +62,9 @@ func GalleryUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, galleryColName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
 
 // GalleryGetByUserID gets a gallery by its owner user ID and will variably return
@@ -78,11 +78,11 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DBID, pAuth bool,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -99,11 +99,11 @@ func GalleryGetByID(pCtx context.Context, pID DBID, pAuth bool,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
-	if err := mp.Aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 

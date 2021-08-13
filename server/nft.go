@@ -18,8 +18,14 @@ type getNftsByUserIDInput struct {
 	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
 }
 
+type getUnassignedNFTByUserIDInput struct {
+	UserID    persist.DBID `json:"user_id" form:"user_id" binding:"required"`
+	SkipCache bool         `json:"skip_cache" form:"skip_cache"`
+}
+
 type getOpenseaNftsInput struct {
 	WalletAddress string `json:"address" form:"address" binding:"required"`
+	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
 }
 
 type getNftsOutput struct {
@@ -103,12 +109,12 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getNftsByUserIDInput{}
+		input := &getUnassignedNFTByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		coll, err := persist.CollGetUnassigned(c, input.UserID, pRuntime)
+		coll, err := persist.CollGetUnassigned(c, input.UserID, input.SkipCache, pRuntime)
 		if coll == nil || err != nil {
 			coll = &persist.Collection{Nfts: []*persist.Nft{}}
 		}
@@ -124,7 +130,7 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, pRuntime)
+		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}

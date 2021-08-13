@@ -55,18 +55,18 @@ func TestPersist(pTest *testing.T) {
 
 	//--------------------
 
-	m := NewMongoStorage(1, "grand_children_collection", runtime)
+	m := newStorage(1, "grand_children_collection", runtime)
 
 	sub := testGrandchild{ImportantData: "hype"}
 
-	_, err := m.Insert(ctx, &sub, &options.InsertOneOptions{})
+	_, err := m.insert(ctx, &sub, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
 
 	up := testGrandchild{ImportantData: "potty"}
-	err = m.Update(ctx, bson.M{"data": "ima childs child"}, &up, &options.UpdateOptions{})
+	err = m.update(ctx, bson.M{"data": "ima childs child"}, &up, &options.UpdateOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
@@ -74,7 +74,7 @@ func TestPersist(pTest *testing.T) {
 
 	resSub := []testGrandchild{}
 
-	err = m.Find(ctx, bson.M{}, &resSub, options.Find())
+	err = m.find(ctx, bson.M{}, &resSub, options.Find())
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
@@ -88,18 +88,18 @@ func TestPersist(pTest *testing.T) {
 
 	// PARENT
 
-	p := NewMongoStorage(1, "children_collection", runtime)
+	p := newStorage(1, "children_collection", runtime)
 
 	parent := testChild{ImportantData: "ima child", Children: []string{string(resSub[0].IDstr)}}
 
-	_, err = p.Insert(ctx, &parent, &options.InsertOneOptions{})
+	_, err = p.insert(ctx, &parent, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
 
 	resParent := []testChild{}
-	if err := p.Find(ctx, bson.M{}, &resParent); err != nil {
+	if err := p.find(ctx, bson.M{}, &resParent); err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
@@ -111,18 +111,18 @@ func TestPersist(pTest *testing.T) {
 
 	// GRANDPARENT
 
-	gp := NewMongoStorage(1, "grand_parents_collection", runtime)
+	gp := newStorage(1, "grand_parents_collection", runtime)
 
 	gparent := testGrandparent{ImportantData: "ima gparent", Children: []string{string(resParent[0].IDstr)}}
 
-	_, err = gp.Insert(ctx, &gparent, &options.InsertOneOptions{})
+	_, err = gp.insert(ctx, &gparent, &options.InsertOneOptions{})
 	if err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
 
 	resGParent := []testGrandparent{}
-	if err := gp.Find(ctx, bson.M{}, &resGParent); err != nil {
+	if err := gp.find(ctx, bson.M{}, &resGParent); err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
@@ -166,7 +166,7 @@ func TestPersist(pTest *testing.T) {
 
 	res := []map[string]interface{}{}
 
-	if err := gp.Aggregate(ctx, pipeline, &res); err != nil {
+	if err := gp.aggregate(ctx, pipeline, &res); err != nil {
 		pTest.Log(err)
 		pTest.Fail()
 	}
