@@ -17,6 +17,7 @@ type galleryGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 
+
 type galleryUpdateInput struct {
 	ID          persist.DBID   `form:"id" json:"id" binding:"required"`
 	Collections []persist.DBID `json:"collections" binding:"required"`
