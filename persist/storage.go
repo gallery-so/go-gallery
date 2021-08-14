@@ -30,7 +30,7 @@ const (
 
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
-	opeseaGetTTL            time.Duration = time.Minute * 1
+	openseaGetTTL            time.Duration = time.Minute * 1
 )
 
 // DBID represents a mongo database ID
