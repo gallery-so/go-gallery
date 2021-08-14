@@ -18,7 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// RedisDB represents the database number to use for the redis client
+// redisDB represents the database number to use for the redis client
 type redisDB int
 
 const (
@@ -30,7 +30,7 @@ const (
 
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
-	openseaGetTTL            time.Duration = time.Minute * 1
+	openseaGetTTL           time.Duration = time.Minute * 1
 )
 
 // DBID represents a mongo database ID

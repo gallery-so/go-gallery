@@ -230,7 +230,7 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nf
 	return mp.cacheSet(pCtx, string(pWalletAddress), toCache, openseaGetTTL)
 }
 
-// NftOpenseaCacheGet adds a set of nfts to the opensea cache under a given wallet address
+// NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
 func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaGetRDB, pRuntime)
