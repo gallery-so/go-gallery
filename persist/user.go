@@ -27,12 +27,11 @@ type User struct {
 	Bio                string   `bson:"bio"  json:"bio"`
 }
 
-// UserUpdateInput represents the data to be updated when updating a user
-type UserUpdateInput struct {
-	UserName           string   `bson:"username"`
-	UserNameIdempotent string   `bson:"username_idempotent"`
-	Addresses          []string `bson:"addresses"`
-	Bio                string   `bson:"bio"`
+// UserUpdateInfoInput represents the data to be updated when updating a user
+type UserUpdateInfoInput struct {
+	UserName           string `bson:"username"`
+	UserNameIdempotent string `bson:"username_idempotent"`
+	Bio                string `bson:"bio"`
 }
 
 // UserUpdateByID updates a user by ID
@@ -175,4 +174,11 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 	}
 
 	return result[0], nil
+}
+
+// UserAddAddresses pushes addresses into a user's address list
+func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
+	mp := NewMongoStorage(0, usersCollName, pRuntime)
+
+	return mp.Push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

@@ -132,7 +132,6 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	assert.Nil(err)
 
 	update := userUpdateInput{
-		UserID:      userID,
 		UserNameStr: "kaito",
 	}
 	data, err := json.Marshal(update)
@@ -169,7 +168,6 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	assert.Nil(err)
 
 	update := userUpdateInput{
-		UserID:      userID,
 		UserNameStr: username,
 	}
 	data, err := json.Marshal(update)
@@ -193,7 +191,7 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 
 	// seed DB with user
 	username := "BingBongBingBing"
-	userID, err := persist.UserCreate(context.Background(), &persist.User{
+	_, err := persist.UserCreate(context.Background(), &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
 		Addresses:          []string{tc.user1.address},
@@ -202,7 +200,6 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 	assert.Nil(err)
 
 	update := userUpdateInput{
-		UserID:      userID,
 		UserNameStr: "kaito",
 	}
 	data, err := json.Marshal(update)
@@ -233,7 +230,6 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert.Nil(err)
 
 	update := userUpdateInput{
-		UserID:      userID,
 		UserNameStr: tc.user1.username,
 	}
 	data, err := json.Marshal(update)

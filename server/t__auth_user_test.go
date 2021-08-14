@@ -32,7 +32,7 @@ func TestAuthUser(pTest *testing.T) {
 
 	//--------------------
 	// USER_CREATE
-	userCreateInput := &userCreateInput{
+	userCreateInput := &userAddAddressInput{
 		Address:   address,
 		Signature: "how to make this? can we sign the nonce from go?",
 	}
