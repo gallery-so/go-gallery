@@ -227,7 +227,7 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nf
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(pCtx, string(pWalletAddress), toCache, opeseaGetTTL)
+	return mp.cacheSet(pCtx, string(pWalletAddress), toCache, openseaGetTTL)
 }
 
 // NftOpenseaCacheGet adds a set of nfts to the opensea cache under a given wallet address
