@@ -12,10 +12,8 @@ import (
 )
 
 type userUpdateInput struct {
-	UserID      persist.DBID `json:"user_id" binding:"required"` // len=42"` // standard ETH "0x"-prefixed address
-	UserNameStr string       `json:"username" binding:"username"`
-	BioStr      string       `json:"description"`
-	Addresses   []string     `json:"addresses"`
+	UserNameStr string `json:"username" binding:"username"`
+	BioStr      string `json:"description"`
 }
 
 type userGetInput struct {
@@ -35,7 +33,7 @@ type userGetOutput struct {
 //         this is to allow for users interupting the onboarding flow, and to be able to come back to it later
 //         and the system recognize that their user already exists.
 //         the users entering details on the user as they onboard are all user-update operations.
-type userCreateInput struct {
+type userAddAddressInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
@@ -50,7 +48,11 @@ type userCreateOutput struct {
 	GalleryID      persist.DBID `json:"gallery_id"`
 }
 
-func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+type userAddAddressOutput struct {
+	SignatureValid bool `json:"signature_valid"`
+}
+
+func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		up := &userUpdateInput{}
@@ -59,8 +61,13 @@ func updateUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
 
-		err := userUpdateDb(c, up, pRuntime)
+		err := userUpdateInfoDB(c, userID, up, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -101,7 +108,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &userCreateInput{}
+		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
@@ -118,8 +125,34 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 	}
 }
+func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
 
-func userCreateDb(pCtx context.Context, pInput *userCreateInput,
+		input := &userAddAddressInput{}
+
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+
+		output, err := addAddressToUserDB(c, userID, input, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, output)
+
+	}
+}
+
+func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
@@ -182,7 +215,45 @@ func userCreateDb(pCtx context.Context, pInput *userCreateInput,
 	return output, nil
 }
 
-// USER_GET__PIPELINE
+func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userAddAddressInput,
+	pRuntime *runtime.Runtime) (*userAddAddressOutput, error) {
+
+	output := &userAddAddressOutput{}
+
+	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	if nonceValueStr == "" {
+		return nil, errors.New("nonce not found for address")
+	}
+	if id != "" {
+		return nil, errors.New("user already exists with a given address")
+	}
+
+	dataStr := nonceValueStr
+	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
+		dataStr,
+		pInput.Address,
+		pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	output.SignatureValid = sigValidBool
+	if !sigValidBool {
+		return output, nil
+	}
+
+	if err = persist.UserAddAddresses(pCtx, pUserID, []string{pInput.Address}, pRuntime); err != nil {
+		return nil, err
+	}
+
+	err = authNonceRotateDb(pCtx, pInput.Address, pUserID, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	return output, nil
+}
+
 func userGetDb(pCtx context.Context, pInput *userGetInput,
 	pAuthenticatedBool bool,
 	pRuntime *runtime.Runtime) (*userGetOutput, error) {
@@ -229,19 +300,18 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 	return output, nil
 }
 
-func userUpdateDb(pCtx context.Context, pInput *userUpdateInput,
+func userUpdateInfoDB(pCtx context.Context, pUserID persist.DBID, pInput *userUpdateInput,
 	pRuntime *runtime.Runtime) error {
 
 	//------------------
 
 	return persist.UserUpdateByID(
 		pCtx,
-		pInput.UserID,
-		&persist.UserUpdateInput{
+		pUserID,
+		&persist.UserUpdateInfoInput{
 			UserNameIdempotent: strings.ToLower(pInput.UserNameStr),
 			UserName:           pInput.UserNameStr,
 			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
-			Addresses:          pInput.Addresses,
 		},
 		pRuntime,
 	)
