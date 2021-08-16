@@ -52,25 +52,26 @@ type openseaNFT struct {
 
 // ADD!! - persist OpenSea fetched assets as well.
 
-func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress string,
+func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress string, skipCache bool,
 	pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 
-	//--------------------
-	// OPENSEA_FETCH
+	if !skipCache {
+		nfts, err := persist.NftOpenseaCacheGet(pCtx, pOwnerWalletAddress, pRuntime)
+		if err == nil && len(nfts) > 0 {
+			return nfts, nil
+		}
+	}
+
 	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pCtx, pOwnerWalletAddress)
 	if err != nil {
 		return nil, err
 	}
-
-	//--------------------
 
 	asGalleryNfts, err := openseaToGalleryNfts(pCtx, openSeaAssetsForAccLst, pOwnerWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	// DB_PERSIST
-	// CREATE_OR_UPDATE_BULK
 	err = persist.NftBulkUpsert(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
 	if err != nil {
 		return nil, err
@@ -79,6 +80,8 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	if err != nil {
 		return nil, err
 	}
+
+	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
 
 	return asGalleryNfts, nil
 }

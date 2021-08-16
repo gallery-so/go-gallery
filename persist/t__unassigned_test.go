@@ -49,7 +49,7 @@ func TestUnassignedWithAggregation(t *testing.T) {
 	_, err = CollCreate(context.Background(), &CollectionDB{Name: "Baby", Nfts: nftsInColTwo, OwnerUserID: userID}, runtime)
 	assert.Nil(t, err)
 
-	unassignedCollection, err := CollGetUnassigned(context.Background(), user.ID, runtime)
+	unassignedCollection, err := CollGetUnassigned(context.Background(), user.ID, true, runtime)
 	assert.Nil(t, err)
 
 	unassignedIds := []DBID{}

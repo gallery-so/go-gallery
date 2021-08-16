@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,24 +18,52 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// redisDB represents the database number to use for the redis client
+type redisDB int
+
+const (
+	// CollectionsUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
+	CollectionsUnassignedRDB redisDB = iota
+	// OpenseaGetRDB is a throttled cache for expensive queries finding Opensea NFTs
+	OpenseaGetRDB
+)
+
+var (
+	collectionUnassignedTTL time.Duration = time.Minute * 1
+	openseaGetTTL           time.Duration = time.Minute * 5
+)
+
 // DBID represents a mongo database ID
 type DBID string
 
-// MongoStorage represents the currently accessed collection and the version of the "schema"
-type MongoStorage struct {
+// storage represents the currently accessed collection and the version of the "schema"
+type storage struct {
 	version    int64
 	collection *mongo.Collection
+	rdbClient  *redis.Client
 }
 
-// NewMongoStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
+// newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
 // and the specified version
-func NewMongoStorage(version int64, collName string, runtime *runtime.Runtime) *MongoStorage {
+func newStorage(version int64, collName string, runtime *runtime.Runtime) *storage {
 	coll := runtime.DB.MongoDB.Collection(collName)
-	return &MongoStorage{version: version, collection: coll}
+
+	return &storage{version: version, collection: coll}
+}
+
+// withRedis attaches a redis client to the Storage instance
+func (m *storage) withRedis(rdb redisDB, runtime *runtime.Runtime) *storage {
+	client := redis.NewClient(&redis.Options{
+		Addr:     runtime.Config.RedisURL,
+		Password: runtime.Config.RedisPassword, // no password set
+		DB:       int(rdb),                     // use default DB
+	})
+	m.rdbClient = client
+	return m
 }
 
 // Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
-func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DBID, error) {
+func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DBID, error) {
 
 	now := float64(time.Now().UnixNano()) / 1000000000.0
 	asMap, err := structToBsonMap(insert)
@@ -54,10 +83,10 @@ func (m *MongoStorage) Insert(ctx context.Context, insert interface{}, opts ...*
 }
 
 // InsertMany inserts many documents into a mongo database while filling out the fields id, creation time, and last updated for each
-func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
+func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]DBID, error) {
 
 	mapsToInsert := make([]interface{}, len(insert))
-	for _, k := range insert {
+	for i, k := range insert {
 		now := float64(time.Now().UnixNano()) / 1000000000.0
 		asMap, err := structToBsonMap(k)
 		if err != nil {
@@ -66,7 +95,7 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 		asMap["_id"] = generateID(now)
 		asMap["created_at"] = now
 		asMap["last_updated"] = now
-		mapsToInsert = append(mapsToInsert, asMap)
+		mapsToInsert[i] = asMap
 	}
 
 	res, err := m.collection.InsertMany(ctx, mapsToInsert, opts...)
@@ -85,7 +114,7 @@ func (m *MongoStorage) InsertMany(ctx context.Context, insert []interface{}, opt
 }
 
 // Update updates a document in the mongo database while filling out the field LastUpdated
-func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
+func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 	now := float64(time.Now().UnixNano()) / 1000000000.0
 
 	asMap, err := structToBsonMap(update)
@@ -107,7 +136,7 @@ func (m *MongoStorage) Update(ctx context.Context, query bson.M, update interfac
 }
 
 // Push pushes items into an array field for a given queried document
-func (m *MongoStorage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
+func (m *storage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
 
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
 	if err != nil {
@@ -122,7 +151,7 @@ func (m *MongoStorage) Push(ctx context.Context, query bson.M, field string, val
 }
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
-func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
+func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
 	now := float64(time.Now().UnixNano()) / 1000000000.0
@@ -143,9 +172,9 @@ func (m *MongoStorage) Upsert(ctx context.Context, query bson.M, upsert interfac
 	return nil
 }
 
-// Find finds documents in the mongo database which is not deleted
+// find finds documents in the mongo database which is not deleted
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
-func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
+func (m *storage) find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
 
 	filter["deleted"] = false
 
@@ -158,9 +187,9 @@ func (m *MongoStorage) Find(ctx context.Context, filter bson.M, result interface
 
 }
 
-// Aggregate performs an aggregation operation on the mongo database
+// aggregate performs an aggregation operation on the mongo database
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
-func (m *MongoStorage) Aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
+func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
 
 	cur, err := m.collection.Aggregate(ctx, agg, opts...)
 	if err != nil {
@@ -171,16 +200,48 @@ func (m *MongoStorage) Aggregate(ctx context.Context, agg mongo.Pipeline, result
 
 }
 
-// Count counts the number of documents in the mongo database which is not deleted
+// count counts the number of documents in the mongo database which is not deleted
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
-func (m *MongoStorage) Count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
 	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
 }
 
-// CreateIndex creates a new index in the mongo database
-func (m *MongoStorage) CreateIndex(ctx context.Context, index mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
+// createIndex creates a new index in the mongo database
+func (m *storage) createIndex(ctx context.Context, index mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
 	return m.collection.Indexes().CreateOne(ctx, index, opts...)
+}
+
+// cacheSet sets a value in the redis cache
+func (m *storage) cacheSet(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	if m.rdbClient == nil {
+		return errors.New("no redis client attached to storage instance")
+	}
+	return m.rdbClient.Set(ctx, key, value, expiration).Err()
+}
+
+// cacheSetKeepTTL sets a value in the redis cache without resetting TTL
+func (m *storage) cacheSetKeepTTL(ctx context.Context, key string, value interface{}) error {
+	if m.rdbClient == nil {
+		return errors.New("no redis client attached to storage instance")
+	}
+	return m.rdbClient.Set(ctx, key, value, redis.KeepTTL).Err()
+}
+
+// cacheGet gets a value from the redis cache
+func (m *storage) cacheGet(ctx context.Context, key string) (string, error) {
+	if m.rdbClient == nil {
+		return "", errors.New("no redis client attached to storage instance")
+	}
+	return m.rdbClient.Get(ctx, key).Result()
+}
+
+// cacheClose closes the redis client
+func (m *storage) cacheClose() error {
+	if m.rdbClient == nil {
+		return errors.New("no redis client attached to storage instance")
+	}
+	return m.rdbClient.Close()
 }
 
 func generateID(creationTime float64) DBID {

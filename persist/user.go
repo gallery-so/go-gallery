@@ -39,9 +39,9 @@ type UserUpdateInfoInput struct {
 func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
-	err := mp.Update(pCtx, bson.M{
+	err := mp.update(pCtx, bson.M{
 		"_id": pID,
 	}, pUpdate)
 	if err != nil {
@@ -58,9 +58,9 @@ func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 func UserExistsByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
-	countInt, err := mp.Count(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}})
+	countInt, err := mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}})
 
 	if err != nil {
 		return false, err
@@ -73,9 +73,9 @@ func UserExistsByAddress(pCtx context.Context, pAddress string,
 func UserCreate(pCtx context.Context, pUser *User,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
-	return mp.Insert(pCtx, pUser)
+	return mp.insert(pCtx, pUser)
 
 }
 
@@ -83,9 +83,9 @@ func UserCreate(pCtx context.Context, pUser *User,
 func UserDelete(pCtx context.Context, pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
-	return mp.Update(pCtx, bson.M{"_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
+	return mp.update(pCtx, bson.M{"_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 
 }
 
@@ -99,10 +99,10 @@ func UserGetByID(pCtx context.Context, userID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"_id": userID}, &result, opts)
+	err := mp.find(pCtx, bson.M{"_id": userID}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -128,10 +128,10 @@ func UserGetByAddress(pCtx context.Context, pAddress string,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -157,10 +157,10 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.Find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result, opts)
+	err := mp.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result, opts)
 
 	if err != nil {
 		return nil, err

@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -37,21 +36,12 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	_, err = persist.NftCreateBulk(ctx, []*persist.Nft{nft, nft2}, tc.r)
 	assert.Nil(pTest, err)
 
-	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", tc.r)
+	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", false, tc.r)
+
 	assert.Nil(pTest, err)
 
 	nftsByUser, err := persist.NftGetByUserID(ctx, userID, tc.r)
 	assert.Nil(pTest, err)
-
-	for _, nft := range nfts {
-		fmt.Println(nft.Name)
-	}
-
-	fmt.Println("----------------------------------------------- BY USER")
-
-	for _, nft := range nftsByUser {
-		fmt.Println(nft.Name)
-	}
 
 	assert.Equal(pTest, len(nfts), len(nftsByUser))
 

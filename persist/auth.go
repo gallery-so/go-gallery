@@ -51,9 +51,9 @@ type UserLoginAttempt struct {
 func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAttempt,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := NewMongoStorage(0, loginAttemptCollName, pRuntime)
+	mp := newStorage(0, loginAttemptCollName, pRuntime)
 
-	return mp.Insert(pCtx, pLoginAttempt)
+	return mp.insert(pCtx, pLoginAttempt)
 
 }
 
@@ -61,14 +61,14 @@ func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAt
 func AuthNonceGet(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*UserNonce, error) {
 
-	mp := NewMongoStorage(0, noncesCollName, pRuntime)
+	mp := newStorage(0, noncesCollName, pRuntime)
 
 	opts := options.Find()
 	opts.SetSort(bson.M{"creation_time": -1})
 	opts.SetLimit(1)
 
 	result := []*UserNonce{}
-	err := mp.Find(pCtx, bson.M{"address": pAddress}, &result, opts)
+	err := mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -85,8 +85,8 @@ func AuthNonceGet(pCtx context.Context, pAddress string,
 func AuthNonceCreate(pCtx context.Context, pNonce *UserNonce,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := NewMongoStorage(0, noncesCollName, pRuntime)
+	mp := newStorage(0, noncesCollName, pRuntime)
 
-	return mp.Insert(pCtx, pNonce)
+	return mp.insert(pCtx, pNonce)
 
 }
