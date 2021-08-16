@@ -178,7 +178,7 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 
 // UserAddAddresses pushes addresses into a user's address list
 func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
-	mp := NewMongoStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, usersCollName, pRuntime)
 
 	return mp.Push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

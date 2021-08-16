@@ -211,13 +211,13 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 // VERIFY_SIGNATURE_ALL_METHODS
 
 func authVerifySignatureAllMethods(pSignatureStr string,
-	pDataStr string,
+	pNonce string,
 	pAddressStr string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
 	// DATA_HEADER - TRUE
 	validBool, gErr := authVerifySignature(pSignatureStr,
-		pDataStr,
+		pNonce,
 		pAddressStr,
 		true, // pUseDataHeaderBool
 		pRuntime)
@@ -228,7 +228,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 	// DATA_HEADER - FALSE
 	if !validBool {
 		validBool, gErr = authVerifySignature(pSignatureStr,
-			pDataStr,
+			pNonce,
 			pAddressStr,
 			false, // pUseDataHeaderBool
 			pRuntime)
@@ -349,22 +349,15 @@ func authVerifySignature(pSignatureStr string,
 	if !validBool {
 		return false, errors.New("address does not match signature")
 	}
-	//------------------
-	// VERIFY
-	validBool = crypto.VerifySignature(publicKeyBytesLst, dataHash.Bytes(), signatureNoRecoverIDbytesLst)
 
-	//------------------
+	validBool = crypto.VerifySignature(publicKeyBytesLst, dataHash.Bytes(), signatureNoRecoverIDbytesLst)
 
 	return validBool, nil
 }
 
-// USER_GET_PREFLIGHT__PIPELINE
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
-	//------------------
-
-	// DB_GET_USER_BY_ADDRESS
 	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
 
 	userExistsBool := user != nil
@@ -380,7 +373,6 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 			Value:   generateNonce(),
 		}
 
-		// NONCE_CREATE
 		_, err = persist.AuthNonceCreate(pCtx, nonce, pRuntime)
 		if err != nil {
 			return nil, err

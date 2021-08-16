@@ -19,7 +19,7 @@ const (
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
 	mongoDBname        = "GLRY_MONGO_DB_NAME"
 
-	redisURL            = "REDIS_URL"
+	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "projects/1066359838176/secrets/GLRY_REDIS_PASS/versions/latest"
 
 	sentryEndpoint    = "GLRY_SENTRY_ENDPOINT"

@@ -165,9 +165,8 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return nil, errors.New("user already exists with a given address")
 	}
 
-	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
-		dataStr,
+		nonceValueStr,
 		pInput.Address,
 		pRuntime)
 	if err != nil {
