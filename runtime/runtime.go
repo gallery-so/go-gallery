@@ -122,6 +122,7 @@ func setupMongoIndexes(db *mongo.Database) error {
 		Keys: bson.M{"username_idempotent": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,
+			Sparse: &b,
 		},
 	})
 	return nil

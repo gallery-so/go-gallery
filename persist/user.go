@@ -21,8 +21,8 @@ type User struct {
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
 	Deleted      bool    `bson:"deleted"`
 
-	UserName           string   `bson:"username"         json:"username"` // mutable
-	UserNameIdempotent string   `bson:"username_idempotent" json:"username_idempotent"`
+	UserName           string   `bson:"username,omitempty"         json:"username"` // mutable
+	UserNameIdempotent string   `bson:"username_idempotent,omitempty" json:"username_idempotent"`
 	Addresses          []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
 	Bio                string   `bson:"bio"  json:"bio"`
 }
