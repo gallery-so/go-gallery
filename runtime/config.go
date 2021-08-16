@@ -107,12 +107,13 @@ func ConfigLoad() *Config {
 			log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
 			panic(-1)
 		}
-		redisPassword, err := accessSecret(context.Background(), redisPassSecretName)
-		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
-			panic(-1)
-		}
-		config.RedisPassword = string(redisPassword)
+		// TODO no redis password at the moment
+		// redisPassword, err := accessSecret(context.Background(), redisPassSecretName)
+		// if err != nil {
+		// 	log.WithFields(log.Fields{"err": err}).Fatal("Error reading secret")
+		// 	panic(-1)
+		// }
+		// config.RedisPassword = string(redisPassword)
 		config.MongoURL = string(mgoURL)
 	}
 
