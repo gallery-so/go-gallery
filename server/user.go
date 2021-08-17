@@ -13,7 +13,7 @@ import (
 
 type userUpdateInput struct {
 	UserNameStr string `json:"username" binding:"username"`
-	BioStr      string `json:"description"`
+	BioStr      string `json:"bio"`
 }
 
 type userGetInput struct {
