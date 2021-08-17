@@ -26,7 +26,7 @@ def create_user_id(wallet_address):
 # glry-users.csv
 # username, profile_slug, wallet_address, email, created_at
 # User schema
-# version, id, creation_time, deleted, name, addresses, description, last_seen
+# version, id, creation_time, deleted, name, addresses, bio, last_seen
 with open('glry-users.csv') as usersfile:
     reader = csv.DictReader(usersfile)
     for row in reader:
@@ -41,16 +41,16 @@ with open('glry-users.csv') as usersfile:
             "deleted": False,
             "name": row['username'],
             "addresses": [row['wallet_address']],
-            "description": None,
+            "bio": None,
             "last_seen": None
         }
         user2.insert_one(user_document)
 
 
 # Collections
-# version, id, creation_time, deleted, name, description, owner_user_id, nfts, hidden
+# version, id, creation_time, deleted, name, bio, owner_user_id, nfts, hidden
 
 # NFT
-# version, id, creation_time, deleted, name, description, collection_names, external_url, creator_address, contract_address, opensea_id, opensea_token_id, image_url, image_thumbnail_url, image_preview_url, animation_url
+# version, id, creation_time, deleted, name, bio, collection_names, external_url, creator_address, contract_address, opensea_id, opensea_token_id, image_url, image_thumbnail_url, image_preview_url, animation_url
 
 # version=0
