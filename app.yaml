@@ -1,6 +1,6 @@
 # GCP app.yaml reference: https://cloud.google.com/appengine/docs/standard/python/config/appref
 
-runtime: go115 # gcp doesn't support go 1.16 yet
+runtime: go116 
 
 main: ./cmd/server
 
