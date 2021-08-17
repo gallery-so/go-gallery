@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -65,6 +66,16 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	runtime := &Runtime{
 		Config: pConfig,
 		DB:     db,
+	}
+
+	// TEST REDIS CONNECTION
+	client := redis.NewClient(&redis.Options{
+		Addr:     runtime.Config.RedisURL,
+		Password: runtime.Config.RedisPassword,
+		DB:       0,
+	})
+	if err = client.Ping().Err(); err != nil {
+		return nil, err
 	}
 
 	return runtime, nil

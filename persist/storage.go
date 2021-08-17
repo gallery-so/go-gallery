@@ -55,8 +55,8 @@ func newStorage(version int64, collName string, runtime *runtime.Runtime) *stora
 func (m *storage) withRedis(rdb redisDB, runtime *runtime.Runtime) *storage {
 	client := redis.NewClient(&redis.Options{
 		Addr:     runtime.Config.RedisURL,
-		Password: runtime.Config.RedisPassword, // no password set
-		DB:       int(rdb),                     // use default DB
+		Password: runtime.Config.RedisPassword,
+		DB:       int(rdb),
 	})
 	m.rdbClient = client
 	return m
