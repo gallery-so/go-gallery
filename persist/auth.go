@@ -22,7 +22,7 @@ type UserNonce struct {
 
 	ID           DBID    `bson:"_id"           json:"id"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted"       json:"deleted"`
+	Deleted      bool    `bson:"deleted"       json:"-"`
 
 	Value   string `bson:"value"   json:"value"`
 	UserID  DBID   `bson:"user_id" json:"user_id"`
@@ -35,7 +35,7 @@ type UserLoginAttempt struct {
 	Version      int64   `bson:"version"`
 	ID           DBID    `bson:"_id"`
 	CreationTime float64 `bson:"creation_time"`
-	Deleted      bool    `bson:"deleted"       json:"deleted"`
+	Deleted      bool    `bson:"deleted"       json:"-"`
 
 	Address        string `bson:"address"     json:"address"`
 	Signature      string `bson:"signature"`

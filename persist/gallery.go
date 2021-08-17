@@ -20,7 +20,7 @@ type GalleryDB struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted"`
+	Deleted      bool    `bson:"deleted"	   json:"-"`
 
 	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []DBID `bson:"collections"          json:"collections"`
@@ -34,7 +34,7 @@ type Gallery struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted"`
+	Deleted      bool    `bson:"deleted" 	   json:"-"`
 
 	OwnerUserID DBID          `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []*Collection `bson:"collections"          json:"collections"`

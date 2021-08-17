@@ -21,7 +21,7 @@ type Nft struct {
 	Version      int64   `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time"        json:"creation_time"`
-	Deleted      bool    `bson:"deleted"`
+	Deleted      bool    `bson:"deleted"			  json:"-"`
 
 	Name           string `bson:"name"                 json:"name"`
 	Description    string `bson:"description"          json:"description"`
