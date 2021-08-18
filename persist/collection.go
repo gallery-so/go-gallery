@@ -21,10 +21,10 @@ const (
 // between collections and NFTS
 // This struct will only be used when updating or querying the database
 type CollectionDB struct {
-	Version      int64   `bson:"version"       	json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"           	json:"id" binding:"required"`
-	CreationTime float64 `bson:"creation_time" 	json:"creation_time"`
-	Deleted      bool    `bson:"deleted"		json:"-"`
+	Version      int64   `bson:"version" json:"version"` // schema version for this model
+	ID           DBID    `bson:"_id" json:"id" binding:"required"`
+	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	Deleted      bool    `bson:"deleted" json:"-"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
@@ -43,7 +43,7 @@ type Collection struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted"	   json:"-"`
+	Deleted      bool    `bson:"deleted" json:"-"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
