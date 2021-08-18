@@ -77,6 +77,7 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	if err = client.Ping().Err(); err != nil {
 		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, runtime.Config.RedisURL)
 	}
+	log.Info("redis connected! ✅")
 
 	return runtime, nil
 }

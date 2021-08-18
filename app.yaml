@@ -1,6 +1,6 @@
 # GCP app.yaml reference: https://cloud.google.com/appengine/docs/standard/python/config/appref
 
-runtime: go116 
+runtime: go116
 
 main: ./cmd/server
 
@@ -14,3 +14,6 @@ env_variables:
   GLRY_JWT_TOKEN_TTL_SECS: 259200
   GLRY_ALLOWED_ORIGINS: "https://gallery-dev.vercel.app,http://localhost:3000"
   GLRY_REDIS_URL: "10.164.246.67:6379"
+
+vpc_access_connector:
+  name: projects/1066359838176/locations/us-west2/connectors/redis-connector
