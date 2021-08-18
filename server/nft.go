@@ -19,8 +19,7 @@ type getNftsByUserIDInput struct {
 }
 
 type getUnassignedNFTByUserIDInput struct {
-	UserID    persist.DBID `json:"user_id" form:"user_id" binding:"required"`
-	SkipCache bool         `json:"skip_cache" form:"skip_cache"`
+	SkipCache bool `json:"skip_cache" form:"skip_cache"`
 }
 
 type getOpenseaNftsInput struct {
@@ -114,7 +113,13 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		coll, err := persist.CollGetUnassigned(c, input.UserID, input.SkipCache, pRuntime)
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+		coll, err := persist.CollGetUnassigned(c, userID, input.SkipCache, pRuntime)
 		if coll == nil || err != nil {
 			coll = &persist.Collection{Nfts: []*persist.Nft{}}
 		}
