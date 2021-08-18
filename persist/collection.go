@@ -184,8 +184,21 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 		}
 	}
 
-	if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
+	countColls, err := mp.count(pCtx, bson.M{"owner_user_id": pUserID})
+	if err != nil {
 		return nil, err
+	}
+
+	if countColls == 0 {
+		nfts, err := NftGetByUserID(pCtx, pUserID, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		result = []*Collection{{Nfts: nfts}}
+	} else {
+		if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
+			return nil, err
+		}
 	}
 	if len(result) != 1 {
 		return nil, errors.New("multiple collections of unassigned nfts found")
