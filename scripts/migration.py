@@ -45,6 +45,7 @@ nft_documents = []
 #  }
 user_collection_dict = {}
 
+
 with open('glry-users.csv') as usersfile:
     reader = csv.DictReader(usersfile)
     for row in reader:
@@ -62,7 +63,7 @@ with open('glry-users.csv') as usersfile:
             "deleted": False,
             "name": row['username'],
             "addresses": [row['wallet_address']],
-            "description": None,
+            "bio": None,
             "last_seen": None
         }
 
