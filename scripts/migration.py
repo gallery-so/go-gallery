@@ -72,12 +72,12 @@ with open('glry-users.csv') as usersfile:
             'version': 0,
             '_id': 0, # TODO change
             'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
-            'deleted': false,
-            'name': null, # Default gallery will not have a name
-            'collectors_note': null, # Default gallery will not have a collectors note
+            'deleted': False,
+            'name': None, # Default gallery will not have a name
+            'collectors_note': None, # Default gallery will not have a collectors note
             'owner_user_id': user_id,
             'nfts': [],
-            'hidden': false
+            'hidden': False
         }
 
         # NFTs marked as hidden in the alpha will be put in the "hidden" collection representing unassigned NFTs.
@@ -85,19 +85,19 @@ with open('glry-users.csv') as usersfile:
             'version': 0,
             '_id': 0, # TODO change
             'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
-            'deleted': false,
+            'deleted': False,
             'name': 'GLRY__RESERVED__UNASSIGNED', # TODO change name to reserved name
-            'collectors_note': null, # Hidden collection doesnt need collectors note
+            'collectors_note': None, # Hidden collection doesnt need collectors note
             'owner_user_id': user_id,
             'nfts': [],
-            'hidden': true
+            'hidden': True
         }
 
         gallery_document = {
             'version': 0,
             '_id':  0, # TODO create id the same way as done on backend
             'creation_time': creation_time_unix,
-            'deleted': false,
+            'deleted': False,
             'owner_user_id': user_id,
             'collections': []
         }
@@ -133,25 +133,25 @@ with open('glry-nfts.csv') as nftsFile:
             'version': 0,
             '_id':  0, #TODO generate id same way as backend,
             'creation_time': creation_time_unix,
-            'deleted': false,
+            'deleted': False,
             'name': row['name'],
             'description': row['description'],
-            'collectors_note': null,
+            'collectors_note': None,
             'external_url': row['external_url'],
-            'token_metadata_url': null, # Need to get from OpenSea
+            'token_metadata_url': None, # Need to get from OpenSea
             'creator_address': row['creator_address'],
-            'creator_name': null, # Need to get from OpenSea
-            'owner_address': null, # TODO do we need this field? Should we have owner_id (GLRY user id instead?)
+            'creator_name': None, # Need to get from OpenSea
+            'owner_address': None, # TODO do we need this field? Should we have owner_id (GLRY user id instead?)
             'contract': contract_document, #TODO should this be a reference to the document instead?
-            'opensea_id': null, # Need to get from OpenSea. but do we need? We only need contract address and token_id to query in OpenSea
+            'opensea_id': None, # Need to get from OpenSea. but do we need? We only need contract address and token_id to query in OpenSea
             'opensea_token_id': row['token_id'],
-            'image_url': null, # Need to get from OpenSea
+            'image_url': None, # Need to get from OpenSea
             'image_thumbnail_url': row['image_thumbnail_url'],
             'image_preview_url': row['image_preview_url'],
-            'image_original_url': null, # Need to get from OpenSea
-            'animation_url': null, # Need to get from OpenSea
-            'animation_original_url': null, # Need to get from OpenSea
-            'acquisition_date': null, # Need to get from OpenSea
+            'image_original_url': None, # Need to get from OpenSea
+            'animation_url': None, # Need to get from OpenSea
+            'animation_original_url': None, # Need to get from OpenSea
+            'acquisition_date': None, # Need to get from OpenSea
         }
 
         nft_documents.append(nft_document)
@@ -173,7 +173,7 @@ with open('glry-nfts.csv') as nftsFile:
 ##############
 
 # client = MongoClient(
-#     "mongodb+srv://mike:<w6jhy5oivdMCVqzC>@cluster0.p9jwh.mongodb.net/test?retryWrites=true&w=majority")
+#     "mongodb+srv://mike:<w6jhy5oivdMCVqzC>@cluster0.p9jwh.mongodb.net/test?retryWrites=True&w=majority")
 # testDb = client.test
 
 # # Select database collections (equivalent to tables)
