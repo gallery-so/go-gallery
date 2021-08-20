@@ -14,12 +14,15 @@ const (
 	portMetrics    = "GLRY_PORT_METRIM"
 	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
+	// TODO: project ID, secret name should be injected from env vars
 	mongoURLSecretName = "projects/1066359838176/secrets/GLRY_MONGO_URL/versions/latest"
+	// TODO: project ID, secret name should be injected from env vars
 	mongoTLSSecretName = "projects/1066359838176/secrets/GLRY_TLS/versions/latest"
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
 	mongoDBname        = "GLRY_MONGO_DB_NAME"
 
-	redisURL            = "GLRY_REDIS_URL"
+	redisURL = "GLRY_REDIS_URL"
+	// TODO: project ID, secret name should be injected from env vars
 	redisPassSecretName = "projects/1066359838176/secrets/GLRY_REDIS_PASS/versions/latest"
 
 	sentryEndpoint    = "GLRY_SENTRY_ENDPOINT"

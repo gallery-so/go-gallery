@@ -19,7 +19,7 @@ type User struct {
 	Version      int64   `bson:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
 	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted"	   json:"-"`
+	Deleted      bool    `bson:"deleted" json:"-"`
 
 	UserName           string   `bson:"username,omitempty"         json:"username"` // mutable
 	UserNameIdempotent string   `bson:"username_idempotent,omitempty" json:"username_idempotent"`

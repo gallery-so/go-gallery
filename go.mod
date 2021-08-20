@@ -14,6 +14,7 @@ require (
 	github.com/fatih/color v1.12.0
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-playground/validator/v10 v10.8.0
+	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.13.1 // indirect
