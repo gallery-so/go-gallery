@@ -202,7 +202,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return nil, err
 	}
 
-	galleryInsert := &persist.GalleryDB{OwnerUserID: userID}
+	galleryInsert := &persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err := persist.GalleryCreate(pCtx, galleryInsert, pRuntime)
 	if err != nil {
