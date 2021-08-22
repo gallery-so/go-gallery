@@ -27,12 +27,13 @@ func generateTestUser(r *runtime.Runtime) *TestUser {
 	username := util.RandStringBytes(8)
 	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
 	user := &persist.User{
-		UserName: username,
+		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
-		Addresses: []string{address},
+		Addresses:          []string{address},
 	}
 	id, _ := persist.UserCreate(ctx, user, r)
 	jwt, _ := jwtGeneratePipeline(ctx, id, r)
+	authNonceRotateDb(ctx, address, id, r)
 
 	return &TestUser{id, address, jwt, username}
 }

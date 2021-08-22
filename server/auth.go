@@ -360,13 +360,13 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
 
-	userExistsBool := user != nil
+	userExistsBool := user != nil && err == nil
 
 	output := &authUserGetPreflightOutput{
 		UserExists: userExistsBool,
 	}
 	var nonce *persist.UserNonce
-	if err != nil || !userExistsBool {
+	if !userExistsBool {
 
 		nonce = &persist.UserNonce{
 			Address: pInput.Address,
