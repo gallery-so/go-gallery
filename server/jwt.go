@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"time"
 
@@ -41,7 +42,7 @@ func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		auth := c.GetBool(authContextKey)
 		userID, _ := getUserIDfromCtx(c)
 
-		c.JSON(200, jwtValidateResponse{
+		c.JSON(http.StatusOK, jwtValidateResponse{
 			IsValid: auth,
 			UserID:  userID,
 		})

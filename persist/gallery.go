@@ -51,6 +51,10 @@ func GalleryCreate(pCtx context.Context, pGallery *GalleryDB,
 
 	mp := newStorage(0, galleryColName, pRuntime)
 
+	if pGallery.Collections == nil {
+		pGallery.Collections = []DBID{}
+	}
+
 	return mp.insert(pCtx, pGallery)
 }
 

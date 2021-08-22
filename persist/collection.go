@@ -76,6 +76,10 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 
 	mp := newStorage(0, collectionColName, pRuntime)
 
+	if pColl.Nfts == nil {
+		pColl.Nfts = []DBID{}
+	}
+
 	return mp.insert(pCtx, pColl)
 
 }

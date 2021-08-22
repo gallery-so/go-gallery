@@ -136,7 +136,8 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 }
 
 // Push pushes items into an array field for a given queried document
-func (m *storage) Push(ctx context.Context, query bson.M, field string, value ...interface{}) error {
+// value must be an array
+func (m *storage) Push(ctx context.Context, query bson.M, field string, value interface{}) error {
 
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
 	if err != nil {

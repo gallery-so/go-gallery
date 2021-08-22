@@ -59,8 +59,8 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 
 	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
 
-	// [GET] /glry/v1/auth/get_preflight?addr=:walletAddress
-	authGroup.GET("/get_preflight", jwtOptional(pRuntime), getAuthPreflight(pRuntime))
+	// [GET] /glry/v1/auth/get_preflight?address=:walletAddress
+	authGroup.GET("/get_preflight", getAuthPreflight(pRuntime))
 
 	// AUTH VALIDATE_JWT
 

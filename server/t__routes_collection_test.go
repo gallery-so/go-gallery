@@ -61,6 +61,64 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert.Equal(update.Name, body.Collections[0].Name)
 }
 
+func TestCreateCollection_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	nfts := []*persist.Nft{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id}, tc.r)
+
+	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs}
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	// send update request
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/create", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
+
+	type CreateResp struct {
+		ID    persist.DBID `json:"collection_id"`
+		Error string       `json:"error"`
+	}
+
+	createResp := &CreateResp{}
+	err = runtime.UnmarshallBody(createResp, resp.Body, tc.r)
+	assert.Nil(err)
+	assert.Empty(createResp.Error)
+
+	// retrieve updated nft
+	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, createResp.ID))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	type CollectionGetResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+	// ensure nft was updated
+	body := CollectionGetResponse{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Collections, 1)
+	assert.Len(body.Collections[0].Nfts, 3)
+	assert.Empty(body.Error)
+
+	gallery, err := persist.GalleryGetByID(context.Background(), gid, true, tc.r)
+	fmt.Println(gallery[0])
+	assert.Nil(err)
+	assert.Len(gallery[0].Collections, 1)
+}
+
 func TestGetUnassignedCollection_Success(t *testing.T) {
 	assert := assert.New(t)
 
