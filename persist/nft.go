@@ -27,7 +27,6 @@ type Nft struct {
 	Description    string `bson:"description"          json:"description"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
-	OwnerUsername  string `json:"owner_username"`
 
 	ExternalURL      string   `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
@@ -108,13 +107,6 @@ func NftGetByUserID(pCtx context.Context, pUserID DBID,
 	if err := mp.find(pCtx, bson.M{"owner_user_id": pUserID}, &result, opts); err != nil {
 		return nil, err
 	}
-	ownerUser, err := UserGetByID(pCtx, pUserID, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-	for _, v := range result {
-		v.OwnerUsername = ownerUser.UserName
-	}
 
 	return result, nil
 }
@@ -133,14 +125,6 @@ func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*N
 
 	if err := mp.find(pCtx, bson.M{"_id": pID}, &result, opts); err != nil {
 		return nil, err
-	}
-
-	for _, v := range result {
-		ownerUser, err := UserGetByID(pCtx, v.OwnerUserID, pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		v.OwnerUsername = ownerUser.UserName
 	}
 
 	return result, nil
