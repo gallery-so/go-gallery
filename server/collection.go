@@ -35,7 +35,7 @@ type collectionUpdateInfoByIDInput struct {
 
 type collectionUpdateHiddenByIDInput struct {
 	ID     persist.DBID `json:"id" binding:"required"`
-	Hidden bool         `json:"hidden" binding:"required"`
+	Hidden bool         `json:"hidden"`
 }
 type collectionUpdateNftsByIDinput struct {
 	ID   persist.DBID   `json:"id" binding:"required"`
