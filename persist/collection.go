@@ -245,6 +245,7 @@ func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 						"$and": []bson.M{
 							{"$not": bson.M{"$in": []string{"$_id", "$$array"}}},
 							{"$eq": []interface{}{"$deleted", false}},
+							{"$eq": []interface{}{"$owner_user_id", pUserID}},
 						},
 					},
 				}}},
