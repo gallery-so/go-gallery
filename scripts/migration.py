@@ -37,10 +37,7 @@ nft_documents = []
 # The collections will be bulk inserted into Mongo at the end of the script.
 
 # {
-#    `user_id`: {
-#        default_collection: {} <- collection document representing visible NFTs
-#        hidden_collection: {} <- <- collection document representing hidden NFTs
-#    }
+#    `user_id`: default_collection
 #  }
 user_collection_dict = {}
 
@@ -73,7 +70,7 @@ with open("glry-users.csv") as usersfile:
         default_collection_document = {
             "version": 0,
             "_id": default_col_id,
-            "creation_time": time.time_ns(),  # Is it fine if creation_time for all migrated data is just the original user's created_time?
+            "creation_time": time.time_ns(),
             "deleted": False,
             "owner_user_id": user_id,
             "nfts": [],
