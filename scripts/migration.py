@@ -49,7 +49,7 @@ with open("glry-users.csv") as usersfile:
     reader = csv.DictReader(usersfile)
     for user in reader:
         # load creation time as datetime
-        print(user["username"])
+        print("USER", user['\ufeff"id"'])
         creation_time_unix = datetime.datetime.strptime(
             user["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
         ).timestamp()
@@ -94,38 +94,35 @@ with open("glry-users.csv") as usersfile:
 
         # Add the collection documents to the collection dictionary.
         # Use the supabase user id as the key instead of generated id, because the supabase user id is also available in the NFT csv, so it's easier to use.
-        supabase_user_id = user["id"]
+        supabase_user_id = user['\ufeff"id"']
         user_dict[supabase_user_id] = user_document
         user_collection_dict[supabase_user_id] = default_collection_document
 
 
 with open("glry-nfts.csv") as nftsFile:
     reader = csv.DictReader(nftsFile)
-    # Sort the data by user_id and position. That way all nfts are already in the correct order so we can insert them into the Collections documents without accounting for position
-    sortedNfts = sorted(reader, key=lambda row: (row["user_id"], row["position"]))
-    for nft in sortedNfts:
 
-        creation_time_unix = datetime.datetime.strptime(
-            nft["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).timestamp()
+    # TODO sort these somehow
+    for nft in reader:
 
         supabase_user_id = nft["user_id"]
+
         user = user_dict[supabase_user_id]
 
-        r = requests.get(
-            "https://api.opensea.io/api/v1/asset/{}/{}".format(
-                nft["contract_address"], nft["token_id"]
-            )
+        get_url = "https://api.opensea.io/api/v1/asset/{}/{}".format(
+            nft["contract_address"], nft["token_id"]
         )
+        print(get_url)
+        r = requests.get(get_url)
 
         opensea_asset = r.json()
+        print(opensea_asset)
 
         nft_id = create_id()
         contract_document = {"contract_address": nft["contract_address"]}
         nft_document = {
             "version": 0,
             "_id": nft_id,
-            "creation_time": creation_time_unix,
             "deleted": False,
             "name": nft["name"],
             "description": nft["description"],
@@ -153,7 +150,7 @@ with open("glry-nfts.csv") as nftsFile:
         # only append nfts to the default collection if they are not hidden
         # all other nfts will be considered unassigned
         if not nft["hidden"]:
-            coll.nfts.append(nft_id)
+            coll["nfts"].append(nft_id)
     # add all colls to collection_documents
     for coll in user_collection_dict:
         collection_documents.append(coll)

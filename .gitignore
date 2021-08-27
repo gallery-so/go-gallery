@@ -1,5 +1,4 @@
-# data
-scripts/*.csv
+
 
 # IDE
 .idea/gallery.iml
@@ -7,3 +6,4 @@ scripts/*.csv
 # Misc
 .DS_Store
 
+*.csv
