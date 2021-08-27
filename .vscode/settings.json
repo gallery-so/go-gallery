@@ -27,5 +27,6 @@
     "showGlobalVariables": false,
     "debugAdapter": "legacy",
     "substitutePath": []
-  }
+  },
+  "python.formatting.provider": "black"
 }
