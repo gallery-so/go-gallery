@@ -70,6 +70,11 @@ type CollectionUpdateHiddenInput struct {
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
+// CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
+type CollectionUpdateDeletedInput struct {
+	Deleted bool `bson:"deleted" json:"-"`
+}
+
 // CollCreate inserts a single CollectionDB into the database and will return the ID of the inserted document
 func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
@@ -125,7 +130,6 @@ func CollGetByUserID(pCtx context.Context, pUserID DBID,
 func CollGetByID(pCtx context.Context, pID DBID,
 	pShowHidden bool,
 	pRuntime *runtime.Runtime) ([]*Collection, error) {
-
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -185,8 +189,9 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime)
+	update := &CollectionUpdateDeletedInput{Deleted: true}
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, bson.M{"deleted": true})
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
 }
 
 // CollGetUnassigned returns a collection that is empty except for a list of nfts that are not

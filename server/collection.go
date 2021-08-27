@@ -222,7 +222,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := collectionDeleteInput{}
+		input := &collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
@@ -238,10 +238,19 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		err := persist.CollDelete(c, input.ID, userID, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{
-				Error: err.Error(),
-			})
-			return
+			switch err.(type) {
+			case *persist.DocumentNotFoundError:
+				c.JSON(http.StatusNotFound, errorResponse{
+					Error: err.Error(),
+				})
+				return
+
+			default:
+				c.JSON(http.StatusInternalServerError, errorResponse{
+					Error: err.Error(),
+				})
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, successOutput{Success: true})
