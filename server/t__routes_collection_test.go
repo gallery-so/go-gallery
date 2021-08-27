@@ -157,3 +157,77 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	assert.Len(body.Nfts, 1)
 	assert.Empty(body.Error)
 }
+
+func TestDeleteCollection_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	verifyCollectionExistsInDbForID(assert, collID)
+
+	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user1)
+
+	assertValidResponse(assert, resp)
+
+	// Assert that the collection was deleted
+	collectionsAfterDelete, err := persist.CollGetByID(context.Background(), collID, false, tc.r)
+	assert.Nil(err)
+
+	assert.True(len(collectionsAfterDelete) == 0)
+}
+
+func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
+	assert := assert.New(t)
+
+	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	verifyCollectionExistsInDbForID(assert, collID)
+
+	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, nil)
+
+	assert.Equal(401, resp.StatusCode)
+}
+
+func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
+	assert := assert.New(t)
+
+	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	verifyCollectionExistsInDbForID(assert, collID)
+
+	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
+	assert.Equal(404, resp.StatusCode)
+}
+
+func createCollectionInDbForUserID(assert *assert.Assertions, userID persist.DBID) persist.DBID {
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: userID,
+	}, tc.r)
+	assert.Nil(err)
+
+	return collID
+}
+
+func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {
+	collectionsBeforeDelete, err := persist.CollGetByID(context.Background(), collID, false, tc.r)
+	assert.Nil(err)
+	assert.Equal(collectionsBeforeDelete[0].ID, collID)
+}
+
+func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authenticatedUser *TestUser) *http.Response {
+	data, err := json.Marshal(requestBody)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/delete", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+
+	if authenticatedUser != nil {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authenticatedUser.jwt))
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+
+	return resp
+}

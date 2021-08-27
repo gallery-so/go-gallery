@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -128,8 +127,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 		return err
 	}
 	if result.MatchedCount == 0 {
-		// TODO this should return a 404 or 204
-		return errors.New(copy.CouldNotFindDocument)
+		return &DocumentNotFoundError{}
 	}
 
 	return nil
@@ -144,8 +142,7 @@ func (m *storage) Push(ctx context.Context, query bson.M, field string, value in
 		return err
 	}
 	if result.MatchedCount == 0 {
-		// TODO this should return a 404 or 204
-		return errors.New(copy.CouldNotFindDocument)
+		return &DocumentNotFoundError{}
 	}
 
 	return nil
@@ -167,7 +164,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errors.New(copy.CouldNotFindDocument)
+		return &DocumentNotFoundError{}
 	}
 
 	return nil
