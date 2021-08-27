@@ -135,11 +135,27 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 	return nil
 }
 
-// Push pushes items into an array field for a given queried document
+// push pushes items into an array field for a given queried document(s)
 // value must be an array
-func (m *storage) Push(ctx context.Context, query bson.M, field string, value interface{}) error {
+func (m *storage) push(ctx context.Context, query bson.M, field string, value interface{}) error {
 
 	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		// TODO this should return a 404 or 204
+		return errors.New(copy.CouldNotFindDocument)
+	}
+
+	return nil
+}
+
+// pull puls items from an array field for a given queried document(s)
+// value must be an array
+func (m *storage) pull(ctx context.Context, query bson.M, field string, value interface{}) error {
+
+	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$pull", Value: bson.M{field: bson.M{"$in": value}}}})
 	if err != nil {
 		return err
 	}

@@ -180,5 +180,5 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
 	mp := newStorage(0, usersCollName, pRuntime)
 
-	return mp.Push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
+	return mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

@@ -208,9 +208,9 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		coll := &persist.CollectionUpdateNftsInput{Nfts: input.Nfts}
+		update := &persist.CollectionUpdateNftsInput{Nfts: input.Nfts}
 
-		err := persist.CollUpdate(c, input.ID, userID, coll, pRuntime)
+		err := persist.CollUpdateNFTs(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return

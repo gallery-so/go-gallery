@@ -76,8 +76,16 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 
 	mp := newStorage(0, collectionColName, pRuntime)
 
+	if pColl.OwnerUserID == "" {
+		return "", errors.New("owner_user_id is required")
+	}
+
 	if pColl.Nfts == nil {
 		pColl.Nfts = []DBID{}
+	} else {
+		if err := mp.pull(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
+			return "", err
+		}
 	}
 
 	return mp.insert(pCtx, pColl)
@@ -148,6 +156,24 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime)
+
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+}
+
+// CollUpdateNFTs will update a collections NFTs ensuring that the collection is owned
+// by a given authorized user as well as that no other collection contains the NFTs
+// being included in the updated collection. This is to ensure that the NFTs are not
+// being shared between collections.
+func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
+	pUserID DBID,
+	pUpdate *CollectionUpdateNftsInput,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+
+	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
+		return err
+	}
 
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
