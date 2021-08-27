@@ -175,10 +175,10 @@ collectionCollection = db.collections
 nftCollection = db.nfts
 
 # Bulk insert into database
-userCollection.bulk_write(user_documents)
-galleryCollection.bulk_write(gallery_documents)
-collectionCollection.bulk_write(collection_documents)
-nftCollection.bulk_write(nft_documents)
+userCollection.insert_many(user_documents)
+galleryCollection.insert_many(gallery_documents)
+collectionCollection.insert_many(collection_documents)
+nftCollection.insert_many(nft_documents)
 
 
 # migration strategy
