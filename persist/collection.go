@@ -147,9 +147,13 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	err := mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	if err != nil {
+		return err
+	}
+	return mp.cacheDelete(pCtx, string(pUserID))
 }
 
 // CollDelete will delete a single collection by ID, also ensuring that the collection is owned
