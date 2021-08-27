@@ -157,8 +157,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 		return err
 	}
 	if result.MatchedCount == 0 {
-		// TODO this should return a 404 or 204
-		return errors.New(copy.CouldNotFindDocument)
+		return &DocumentNotFoundError{}
 	}
 
 	return nil
