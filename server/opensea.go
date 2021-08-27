@@ -28,8 +28,7 @@ type openseaNFT struct {
 
 	ExternalURL      string           `json:"external_url"`
 	TokenMetadataURL string           `json:"token_metadata_url"`
-	CreatorAddress   string           `json:"creator_address"`
-	CreatorName      string           `json:"creator_name"`
+	Creator          openseaCreator   `json:"creator"`
 	Contract         persist.Contract `json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
@@ -46,6 +45,15 @@ type openseaNFT struct {
 	AnimationOriginalURL string `json:"animation_original_url"`
 
 	AcquisitionDateStr string `json:"acquisition_date"`
+}
+
+type openseaCreator struct {
+	User    openseaUser `json:"user"`
+	Address string      `json:"address"`
+}
+
+type openseaUser struct {
+	Username string `json:"username"`
 }
 
 // OPEN_SEA_PIPELINE__ASSETS_FOR_ACC
@@ -298,7 +306,7 @@ func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID pers
 		Description:          nft.Description,
 		ExternalURL:          nft.ExternalURL,
 		ImageURL:             nft.ImageURL,
-		CreatorAddress:       nft.CreatorAddress,
+		CreatorAddress:       nft.Creator.Address,
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
 		OpenSeaID:            nft.ID,
@@ -308,7 +316,7 @@ func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID pers
 		TokenMetadataURL:     nft.TokenMetadataURL,
 		Contract:             nft.Contract,
 		AcquisitionDateStr:   nft.AcquisitionDateStr,
-		CreatorName:          nft.CreatorName,
+		CreatorName:          nft.Creator.User.Username,
 		AnimationOriginalURL: nft.AnimationOriginalURL,
 	}
 
