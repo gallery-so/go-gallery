@@ -201,11 +201,9 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
 # SAVE TO DB #
 ##############
 
-# mongo_url = os.environ["MONGO_URL"]
+mongo_url = os.environ["MONGO_URL"]
 
-client = MongoClient(
-    "mongodb+srv://gallery-dev:oUvMLIfKBjb8j0E6@gallery-dev.a4n8f.mongodb.net/gallery?retryWrites=true&w=majority"
-)
+client = MongoClient(mongo_url)
 db = client.gallery
 
 # Select database collections (equivalent to tables)
