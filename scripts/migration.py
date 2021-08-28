@@ -155,7 +155,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
 
         gallery_document = {
             "version": 0,
-            "_id": gallery_id,  # TODO create id the same way as done on backend
+            "_id": gallery_id,
             "creation_time": time.time_ns(),
             "last_updated": time.time_ns(),
             "deleted": False,
