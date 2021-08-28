@@ -234,6 +234,14 @@ func (m *storage) cacheGet(ctx context.Context, key string) (string, error) {
 	return m.rdbClient.Get(ctx, key).Result()
 }
 
+// cacheDelete deletes a value from the redis cache
+func (m *storage) cacheDelete(ctx context.Context, key string) error {
+	if m.rdbClient == nil {
+		return errors.New("no redis client attached to storage instance")
+	}
+	return m.rdbClient.Del(ctx, key).Err()
+}
+
 // cacheClose closes the redis client
 func (m *storage) cacheClose() error {
 	if m.rdbClient == nil {
