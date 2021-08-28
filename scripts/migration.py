@@ -134,7 +134,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "deleted": False,
             "user_id": user_id,
             "address": user["wallet_address"],
-            "value": random.randint(1, 1000000000),
+            "value": str(random.randint(1, 1000000000)),
         }
 
         default_col_id = create_id()
