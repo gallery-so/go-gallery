@@ -27,3 +27,5 @@ bin
 
 # VSCode settings
 .vscode
+*.csv
+.env

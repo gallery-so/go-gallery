@@ -75,7 +75,7 @@ func GalleryUpdate(pCtx context.Context, pIDstr DBID,
 func GalleryAddCollections(pCtx context.Context, pID DBID, pUserID DBID, pCollectionIDs []DBID, pRuntime *runtime.Runtime) error {
 	mp := newStorage(0, galleryColName, pRuntime)
 
-	return mp.Push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
+	return mp.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
 }
 
 // GalleryGetByUserID gets a gallery by its owner user ID and will variably return

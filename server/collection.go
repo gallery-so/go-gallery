@@ -23,8 +23,10 @@ type collectionGetOutput struct {
 }
 
 type collectionCreateInput struct {
-	GalleryID persist.DBID   `form:"gallery_id" json:"gallery_id" binding:"required"`
-	Nfts      []persist.DBID `json:"nfts" binding:"required"`
+	GalleryID      persist.DBID   `json:"gallery_id" binding:"required"`
+	Nfts           []persist.DBID `json:"nfts" binding:"required"`
+	Name           string         `json:"name"`
+	CollectorsNote string         `json:"collectors_note"`
 }
 
 type collectionUpdateInfoByIDInput struct {
@@ -208,9 +210,9 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		coll := &persist.CollectionUpdateNftsInput{Nfts: input.Nfts}
+		update := &persist.CollectionUpdateNftsInput{Nfts: input.Nfts}
 
-		err := persist.CollUpdate(c, input.ID, userID, coll, pRuntime)
+		err := persist.CollUpdateNFTs(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -263,8 +265,10 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	pRuntime *runtime.Runtime) (persist.DBID, error) {
 
 	coll := &persist.CollectionDB{
-		OwnerUserID: pUserID,
-		Nfts:        pInput.Nfts,
+		OwnerUserID:    pUserID,
+		Nfts:           pInput.Nfts,
+		Name:           pInput.Name,
+		CollectorsNote: pInput.CollectorsNote,
 	}
 
 	collID, err := persist.CollCreate(pCtx, coll, pRuntime)
