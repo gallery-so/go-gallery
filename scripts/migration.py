@@ -34,7 +34,7 @@ collection_documents = []
 gallery_documents = []
 nft_documents = []
 nonce_documents = []
-errors = []
+errored_documents = []
 
 # Initialize a dictionary to keep track of collections. After we create empty collections for each user, we need to populate them with NFTs when we iterate through the NFT csv.
 # Therefore, using a dictionary with the user_id as the key will make it efficient to populate the correct user's collection.
@@ -101,8 +101,8 @@ def create_nft(nft):
         # all other nfts will be considered unassigned
         if not nft["hidden"]:
             user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
-    except Exception as e:
-        errors.append(e)
+    except:
+        errored_documents.append(nft)
 
 
 with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
@@ -188,12 +188,13 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
         threads.append(t)
         t.start()
 
-    # add all colls to collection_documents
     for thread in threads:
         thread.join()
+
+    # add all colls to collection_documents
     for coll in user_collection_dict.values():
         collection_documents.append(coll)
-    for err in errors:
+    for err in errored_documents:
         print(err)
 
 
