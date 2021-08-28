@@ -186,24 +186,6 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
-// CollUpdateNFTs will update a collections NFTs ensuring that the collection is owned
-// by a given authorized user as well as that no other collection contains the NFTs
-// being included in the updated collection. This is to ensure that the NFTs are not
-// being shared between collections.
-func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
-	pUserID DBID,
-	pUpdate *CollectionUpdateNftsInput,
-	pRuntime *runtime.Runtime) error {
-
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
-
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
-		return err
-	}
-
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
-}
-
 // CollDelete will delete a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 func CollDelete(pCtx context.Context, pIDstr DBID,
