@@ -23,7 +23,7 @@ const (
 type CollectionDB struct {
 	Version      int64   `bson:"version" json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id" json:"id" binding:"required"`
-	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	CreationTime float64 `bson:"created_at" json:"created_at"`
 	Deleted      bool    `bson:"deleted" json:"-"`
 
 	Name           string `bson:"name"          json:"name"`
@@ -42,7 +42,7 @@ type CollectionDB struct {
 type Collection struct {
 	Version      int64   `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
-	CreationTime float64 `bson:"creation_time" json:"creation_time"`
+	CreationTime float64 `bson:"created_at" json:"created_at"`
 	Deleted      bool    `bson:"deleted" json:"-"`
 
 	Name           string `bson:"name"          json:"name"`

@@ -5,6 +5,8 @@ import hashlib
 import time
 import datetime
 import os
+import random
+import threading
 from pymongo import MongoClient
 
 
@@ -31,6 +33,8 @@ user_documents = []
 collection_documents = []
 gallery_documents = []
 nft_documents = []
+nonce_documents = []
+errors = []
 
 # Initialize a dictionary to keep track of collections. After we create empty collections for each user, we need to populate them with NFTs when we iterate through the NFT csv.
 # Therefore, using a dictionary with the user_id as the key will make it efficient to populate the correct user's collection.
@@ -45,65 +49,13 @@ user_collection_dict = {}
 user_dict = {}
 
 
-with open("glry-users.csv") as usersfile:
-    reader = csv.DictReader(usersfile)
-    for user in reader:
-        # load creation time as datetime
-        print("USER", user['\ufeff"id"'])
-        creation_time_unix = datetime.datetime.strptime(
-            user["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).timestamp()
-        user_id = create_id()
-
-        user_document = {
-            "version": 0,
-            "_id": user_id,
-            "creation_time": creation_time_unix,
-            "deleted": False,
-            "name": user["username"],
-            "addresses": [user["wallet_address"]],
-        }
-
-        default_col_id = create_id()
-
-        # Since there is no concept of collections on the alpha, we will put all of a user's displayed NFTs in a default unnamed collection for v1.
-        default_collection_document = {
-            "version": 0,
-            "_id": default_col_id,
-            "creation_time": time.time_ns(),
-            "deleted": False,
-            "owner_user_id": user_id,
-            "nfts": [],
-            "hidden": False,
-        }
-
-        gallery_id = create_id()
-
-        gallery_document = {
-            "version": 0,
-            "_id": gallery_id,  # TODO create id the same way as done on backend
-            "creation_time": time.time_ns(),
-            "deleted": False,
-            "owner_user_id": user_id,
-            "collections": [default_col_id],
-        }
-
-        # Append the user and gallery documents to global list.
-        user_documents.append(user_document)
-        gallery_documents.append(gallery_document)
-
-        # Add the collection documents to the collection dictionary.
-        # Use the supabase user id as the key instead of generated id, because the supabase user id is also available in the NFT csv, so it's easier to use.
-        supabase_user_id = user['\ufeff"id"']
-        user_dict[supabase_user_id] = user_document
-        user_collection_dict[supabase_user_id] = default_collection_document
-
-
-with open("glry-nfts.csv") as nftsFile:
-    reader = csv.DictReader(nftsFile)
-
-    # TODO sort these somehow
-    for nft in reader:
+def create_nft(nft):
+    try:
+        print(nft["name"])
+        if "rest" in nft:
+            return
+        if nft["contract_address"] == "" or nft["token_id"] == "":
+            return
 
         supabase_user_id = nft["user_id"]
 
@@ -113,10 +65,9 @@ with open("glry-nfts.csv") as nftsFile:
             nft["contract_address"], nft["token_id"]
         )
         print(get_url)
-        r = requests.get(get_url)
+        r = requests.get(get_url, timeout=5)
 
         opensea_asset = r.json()
-        print(opensea_asset)
 
         nft_id = create_id()
         contract_document = {"contract_address": nft["contract_address"]}
@@ -146,36 +97,130 @@ with open("glry-nfts.csv") as nftsFile:
         nft_documents.append(nft_document)
 
         supabase_user_id = nft["user_id"]
-        coll = user_collection_dict[supabase_user_id]
         # only append nfts to the default collection if they are not hidden
         # all other nfts will be considered unassigned
         if not nft["hidden"]:
-            coll["nfts"].append(nft_id)
+            user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
+    except Exception as e:
+        errors.append(e)
+
+
+with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
+    reader = csv.DictReader(usersfile)
+    for user in reader:
+        # load creation time as datetime
+        print("USER", user["username"])
+        creation_time_unix = datetime.datetime.strptime(
+            user["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
+        ).timestamp()
+        user_id = create_id()
+
+        user_document = {
+            "version": 0,
+            "_id": user_id,
+            "created_at": creation_time_unix,
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "username": user["username"],
+            "username_idempotent": user["username"].lower(),
+            "addresses": [user["wallet_address"]],
+        }
+
+        nonce_document = {
+            "version": 0,
+            "_id": create_id(),
+            "created_at": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "user_id": user_id,
+            "address": user["wallet_address"],
+            "value": random.randint(1, 1000000000),
+        }
+
+        default_col_id = create_id()
+
+        # Since there is no concept of collections on the alpha, we will put all of a user's displayed NFTs in a default unnamed collection for v1.
+        default_collection_document = {
+            "version": 0,
+            "_id": default_col_id,
+            "creation_time": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "owner_user_id": user_id,
+            "nfts": [],
+            "hidden": False,
+        }
+
+        gallery_id = create_id()
+
+        gallery_document = {
+            "version": 0,
+            "_id": gallery_id,  # TODO create id the same way as done on backend
+            "creation_time": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "owner_user_id": user_id,
+            "collections": [default_col_id],
+        }
+
+        # Append the user and gallery documents to global list.
+        user_documents.append(user_document)
+        gallery_documents.append(gallery_document)
+        nonce_documents.append(nonce_document)
+
+        # Add the collection documents to the collection dictionary.
+        # Use the supabase user id as the key instead of generated id, because the supabase user id is also available in the NFT csv, so it's easier to use.
+        supabase_user_id = user["id"]
+        user_dict[supabase_user_id] = user_document
+        user_collection_dict[supabase_user_id] = default_collection_document
+
+
+with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
+
+    reader = csv.DictReader(
+        nftsFile, restkey="rest", restval="", dialect=csv.unix_dialect
+    )
+
+    sorted_nfts = sorted(reader, key=lambda row: row["position"])
+    threads = []
+    for nft in sorted_nfts:
+        t = threading.Thread(target=create_nft, args=(nft,))
+        threads.append(t)
+        t.start()
+
     # add all colls to collection_documents
-    for coll in user_collection_dict:
+    for thread in threads:
+        thread.join()
+    for coll in user_collection_dict.values():
         collection_documents.append(coll)
+    for err in errors:
+        print(err)
 
 
 ##############
 # SAVE TO DB #
 ##############
 
-mongo_url = os.environ["MONGO_URL"]
+# mongo_url = os.environ["MONGO_URL"]
 
-client = MongoClient(mongo_url)
+client = MongoClient(
+    "mongodb+srv://gallery-dev:oUvMLIfKBjb8j0E6@gallery-dev.a4n8f.mongodb.net/gallery?retryWrites=true&w=majority"
+)
 db = client.gallery
 
 # Select database collections (equivalent to tables)
-userCollection = db.users
-galleryCollection = db.galleries
-collectionCollection = db.collections
-nftCollection = db.nfts
+user_collection = db.users
+gallery_collection = db.galleries
+collection_collection = db.collections
+nft_collection = db.nfts
+nonce_collection = db.nonces
 
 # Bulk insert into database
-userCollection.insert_many(user_documents)
-galleryCollection.insert_many(gallery_documents)
-collectionCollection.insert_many(collection_documents)
-nftCollection.insert_many(nft_documents)
+user_collection.insert_many(user_documents)
+gallery_collection.insert_many(gallery_documents)
+collection_collection.insert_many(collection_documents)
+nft_collection.insert_many(nft_documents)
+nonce_collection.insert_many(nonce_documents)
 
 
 # migration strategy
