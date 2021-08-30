@@ -93,8 +93,6 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DBID, pAuth bool,
 
 	result := []*Gallery{}
 
-	// pipeline := newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth)
-
 	if err := mp.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
