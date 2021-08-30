@@ -311,3 +311,42 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 		}}},
 	}
 }
+
+func newSortedCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
+	collectionPipeline := newCollectionPipeline(matchFilter)
+	return append(
+		collectionPipeline,
+		bson.D{{Key: "$addFields", Value: bson.M{
+			"sort": bson.M{
+				"$indexOfArray": []string{"$$childArray", "$_id"},
+			}},
+		}},
+		bson.D{{Key: "$sort", Value: bson.M{"sort": 1}}},
+		bson.D{{Key: "$addFields", Value: bson.M{"sort": "$$REMOVE"}}},
+	)
+	// return mongo.Pipeline{
+	// 	{{Key: "$match", Value: matchFilter}},
+	// 	{{Key: "$lookup", Value: bson.M{
+	// 		"from": "nfts",
+	// 		"let":  bson.M{"array": "$nfts"},
+	// 		"pipeline": mongo.Pipeline{
+	// 			{{Key: "$match", Value: bson.M{
+	// 				"$expr": bson.M{
+	// 					"$and": []bson.M{
+	// 						{"$in": []string{"$_id", "$$array"}},
+	// 						{"$eq": []interface{}{"$deleted", false}},
+	// 					},
+	// 				},
+	// 			}}},
+	// 		},
+	// 		"as": "nfts",
+	// 	}}},
+	// 	{{Key: "$addFields", Value: bson.M{
+	// 		"sort": bson.M{
+	// 			"$indexOfArray": []string{"$$childArray", "$_id"},
+	// 		}},
+	// 	}},
+	// 	{{Key: "$sort", Value: bson.M{"sort": 1}}},
+	// 	{{Key: "$addFields", Value: bson.M{"sort": "$$REMOVE"}}},
+	// }
+}

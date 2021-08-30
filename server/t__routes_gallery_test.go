@@ -13,74 +13,71 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateGalleryById_Success(t *testing.T) {
+func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	colls := []persist.DBID{}
+	initialCollectionOrder := []persist.DBID{}
 
-	for i := 0; i < 10; i++ {
-		col := &persist.CollectionDB{Name: "asdad", OwnerUserID: tc.user1.id, CollectorsNote: "yee"}
-		if i == 3 {
-			col.Hidden = true
-		}
-		id, err := persist.CollCreate(context.TODO(), col, tc.r)
-		assert.Nil(err)
-		colls = append(colls, id)
+	// SET UP
+	// Seed DB with collection
+	for i := 0; i < 4; i++ {
+		collID := createCollectionInDbForUserID(assert, fmt.Sprintf("Collection #%d", i), tc.user1.id)
+		initialCollectionOrder = append(initialCollectionOrder, collID)
 	}
-
-	t.Log(colls)
-
-	// seed DB with collection
+	// Seed DB with gallery
 	id, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{
 		OwnerUserID: tc.user1.id,
-		Collections: colls,
+		Collections: initialCollectionOrder,
 	}, tc.r)
 	assert.Nil(err)
 
+	// Validate the initial order of the gallery's collections
+	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
+
+	// UPDATE COLLECTION ORDER
 	// build update request body
-	type Update struct {
-		ID          persist.DBID   `json:"id"`
-		Collections []persist.DBID `json:"collections"`
+	updatedCollectionOrder := []persist.DBID{
+		initialCollectionOrder[3],
+		initialCollectionOrder[2],
+		initialCollectionOrder[1],
+		initialCollectionOrder[0],
 	}
+	update := galleryUpdateInput{Collections: updatedCollectionOrder, ID: id}
+	updateTestGallery(assert, update)
 
-	copy := colls
-	hold := copy[1]
-	copy[1] = copy[2]
-	copy[2] = hold
+	// Validate the updated order of the gallery's collections
+	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
+}
 
-	t.Log(copy)
+// Retrieve the user's gallery and verify that the collections are in the expected order
+func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []persist.DBID) {
+	getGalleryURL := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
+	resp, err := http.Get(getGalleryURL)
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
 
-	update := Update{Collections: copy, ID: id}
+	body := galleryGetOutput{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Galleries, 1)
+	retreivedCollections := body.Galleries[0].Collections
+
+	for index, element := range collections {
+		assert.Equal(element, retreivedCollections[index].ID)
+	}
+}
+
+func updateTestGallery(assert *assert.Assertions, update interface{}) {
 	data, err := json.Marshal(update)
 	assert.Nil(err)
 
-	// send update request
 	req, err := http.NewRequest("POST",
 		fmt.Sprintf("%s/galleries/update", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
+
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)
 	assertValidResponse(assert, resp)
-
-	// retrieve updated gallery
-	getURL := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
-	t.Log(getURL)
-	resp, err = http.Get(getURL)
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
-
-	type GalleryGetResponse struct {
-		Galleries []*persist.Gallery `json:"galleries"`
-		Error     string             `json:"error"`
-	}
-	// ensure nft was updated
-	body := GalleryGetResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
-	assert.Len(body.Galleries, 1)
-	assert.Empty(body.Error)
-	assert.Equal(update.Collections[2], body.Galleries[0].Collections[1].ID)
-	assert.Len(body.Galleries[0].Collections, 9)
 }

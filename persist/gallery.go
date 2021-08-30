@@ -93,6 +93,8 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DBID, pAuth bool,
 
 	result := []*Gallery{}
 
+	// pipeline := newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth)
+
 	if err := mp.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
@@ -141,7 +143,7 @@ func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
 		{{Key: "$lookup", Value: bson.M{
 			"from":     "collections",
 			"let":      bson.M{"childArray": "$collections"},
-			"pipeline": newCollectionPipeline(innerMatch),
+			"pipeline": newSortedCollectionPipeline(innerMatch),
 			"as":       "collections",
 		}}},
 	}

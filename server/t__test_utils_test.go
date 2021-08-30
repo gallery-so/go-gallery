@@ -84,3 +84,13 @@ func assertGalleryErrorResponse(assert *assert.Assertions, resp *http.Response) 
 	assert.True(ok, "Content-Type header should be set")
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
+
+func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        collectionName,
+		OwnerUserID: userID,
+	}, tc.r)
+	assert.Nil(err)
+
+	return collID
+}
