@@ -311,17 +311,3 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 		}}},
 	}
 }
-
-func newSortedCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
-	collectionPipeline := newCollectionPipeline(matchFilter)
-	return append(
-		collectionPipeline,
-		bson.D{{Key: "$addFields", Value: bson.M{
-			"sort": bson.M{
-				"$indexOfArray": []string{"$$childArray", "$_id"},
-			}},
-		}},
-		bson.D{{Key: "$sort", Value: bson.M{"sort": 1}}},
-		bson.D{{Key: "$addFields", Value: bson.M{"sort": "$$REMOVE"}}},
-	)
-}

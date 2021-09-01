@@ -34,7 +34,7 @@ func generateTestUser(r *runtime.Runtime) *TestUser {
 	id, _ := persist.UserCreate(ctx, user, r)
 	jwt, _ := jwtGeneratePipeline(ctx, id, r)
 	authNonceRotateDb(ctx, address, id, r)
-
+	log.Info(id, username)
 	return &TestUser{id, address, jwt, username}
 }
 
@@ -49,7 +49,7 @@ func setup() *TestConfig {
 	runtime.Router = gin.Default()
 	ts := httptest.NewServer(CoreInit(runtime))
 
-	log.Info("server connected! ✅")
+	log.Info("test server connected! ✅")
 
 	return &TestConfig{
 		server:    ts,
