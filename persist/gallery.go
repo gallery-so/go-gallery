@@ -136,12 +136,24 @@ func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
 			"$and": andExpr,
 		},
 	}
+
+	collectionPipeline := append(
+		newCollectionPipeline(innerMatch),
+		bson.D{{Key: "$addFields", Value: bson.M{
+			"sort": bson.M{
+				"$indexOfArray": []string{"$$childArray", "$_id"},
+			}},
+		}},
+		bson.D{{Key: "$sort", Value: bson.M{"sort": 1}}},
+		bson.D{{Key: "$unset", Value: []string{"sort"}}},
+	)
+
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
 			"from":     "collections",
 			"let":      bson.M{"childArray": "$collections"},
-			"pipeline": newCollectionPipeline(innerMatch),
+			"pipeline": collectionPipeline,
 			"as":       "collections",
 		}}},
 	}

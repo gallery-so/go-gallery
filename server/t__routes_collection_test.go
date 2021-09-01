@@ -161,7 +161,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 func TestDeleteCollection_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
 
 	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user1)
@@ -178,7 +178,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
 	assert := assert.New(t)
 
-	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
 
 	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, nil)
@@ -189,21 +189,11 @@ func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
 func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 	assert := assert.New(t)
 
-	collID := createCollectionInDbForUserID(assert, tc.user1.id)
+	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
 
 	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
 	assert.Equal(404, resp.StatusCode)
-}
-
-func createCollectionInDbForUserID(assert *assert.Assertions, userID persist.DBID) persist.DBID {
-	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: userID,
-	}, tc.r)
-	assert.Nil(err)
-
-	return collID
 }
 
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {

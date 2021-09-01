@@ -34,7 +34,7 @@ func generateTestUser(r *runtime.Runtime) *TestUser {
 	id, _ := persist.UserCreate(ctx, user, r)
 	jwt, _ := jwtGeneratePipeline(ctx, id, r)
 	authNonceRotateDb(ctx, address, id, r)
-
+	log.Info(id, username)
 	return &TestUser{id, address, jwt, username}
 }
 
@@ -49,7 +49,7 @@ func setup() *TestConfig {
 	runtime.Router = gin.Default()
 	ts := httptest.NewServer(CoreInit(runtime))
 
-	log.Info("server connected! ✅")
+	log.Info("test server connected! ✅")
 
 	return &TestConfig{
 		server:    ts,
@@ -83,4 +83,14 @@ func assertGalleryErrorResponse(assert *assert.Assertions, resp *http.Response) 
 	val, ok := resp.Header["Content-Type"]
 	assert.True(ok, "Content-Type header should be set")
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
+}
+
+func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        collectionName,
+		OwnerUserID: userID,
+	}, tc.r)
+	assert.Nil(err)
+
+	return collID
 }
