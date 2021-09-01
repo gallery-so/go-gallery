@@ -1,18 +1,19 @@
 import datetime
 import csv
-import json
+import requests
 import hashlib
 import time
 import datetime
+import os
+import random
+import threading
 from pymongo import MongoClient
 
 
-
 # hash function to create user id
-def create_user_id(wallet_address):
+def create_id():
     h = hashlib.md5()
-    h.update(str(time.time()).encode('ascii'))
-    h.update(wallet_address.encode('ascii'))
+    h.update(str(time.time()).encode("ascii"))
     return h.hexdigest()
 
 
@@ -32,161 +33,193 @@ user_documents = []
 collection_documents = []
 gallery_documents = []
 nft_documents = []
+nonce_documents = []
+errored_documents = []
 
 # Initialize a dictionary to keep track of collections. After we create empty collections for each user, we need to populate them with NFTs when we iterate through the NFT csv.
 # Therefore, using a dictionary with the user_id as the key will make it efficient to populate the correct user's collection.
 # The collections will be bulk inserted into Mongo at the end of the script.
 
 # {
-#    `user_id`: {
-#        default_collection: {} <- collection document representing visible NFTs
-#        hidden_collection: {} <- <- collection document representing hidden NFTs
-#    }
+#    `user_id`: default_collection
 #  }
 user_collection_dict = {}
 
+# dict to keep track of old id to new id
+user_dict = {}
 
-with open('glry-users.csv') as usersfile:
+
+def create_nft(nft):
+    try:
+        print(nft["name"])
+        if "rest" in nft:
+            return
+        if nft["contract_address"] == "" or nft["token_id"] == "":
+            return
+
+        supabase_user_id = nft["user_id"]
+
+        user = user_dict[supabase_user_id]
+
+        get_url = "https://api.opensea.io/api/v1/asset/{}/{}".format(
+            nft["contract_address"], nft["token_id"]
+        )
+        print(get_url)
+        r = requests.get(get_url, timeout=5)
+
+        opensea_asset = r.json()
+
+        nft_id = create_id()
+        contract_document = {"contract_address": nft["contract_address"]}
+        nft_document = {
+            "version": 0,
+            "_id": nft_id,
+            "deleted": False,
+            "name": nft["name"],
+            "description": nft["description"],
+            "external_url": nft["external_url"],
+            "token_metadata_url": opensea_asset["token_metadata"],
+            "creator_address": nft["creator_address"],
+            "creator_name": nft["creator_opensea_name"],
+            "owner_address": user["addresses"][0],
+            "owner_user_id": user["_id"],
+            "contract": contract_document,
+            "opensea_id": opensea_asset["id"],
+            "opensea_token_id": nft["token_id"],
+            "image_url": opensea_asset["image_url"],
+            "image_thumbnail_url": nft["image_thumbnail_url"],
+            "image_preview_url": nft["image_preview_url"],
+            "image_original_url": opensea_asset["image_original_url"],
+            "animation_url": opensea_asset["animation_url"],
+            "animation_original_url": opensea_asset["animation_original_url"],
+        }
+
+        nft_documents.append(nft_document)
+
+        supabase_user_id = nft["user_id"]
+        # only append nfts to the default collection if they are not hidden
+        # all other nfts will be considered unassigned
+        if not nft["hidden"]:
+            user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
+    except:
+        errored_documents.append(nft)
+
+
+with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
     reader = csv.DictReader(usersfile)
-    for row in reader:
+    for user in reader:
         # load creation time as datetime
-        print(row['username'])
+        print("USER", user["username"])
         creation_time_unix = datetime.datetime.strptime(
-            row['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
-        user_id = create_user_id(row['wallet_address'])
-
+            user["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
+        ).timestamp()
+        user_id = create_id()
 
         user_document = {
             "version": 0,
             "_id": user_id,
-            "creation_time": creation_time_unix,
+            "created_at": creation_time_unix,
+            "last_updated": time.time_ns(),
             "deleted": False,
-            "name": row['username'],
-            "addresses": [row['wallet_address']],
-            "bio": None,
-            "last_seen": None
+            "username": user["username"],
+            "username_idempotent": user["username"].lower(),
+            "addresses": [user["wallet_address"]],
         }
+
+        nonce_document = {
+            "version": 0,
+            "_id": create_id(),
+            "created_at": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "user_id": user_id,
+            "address": user["wallet_address"],
+            "value": str(random.randint(1000000000000000000, 9999999999999999999)),
+        }
+
+        default_col_id = create_id()
 
         # Since there is no concept of collections on the alpha, we will put all of a user's displayed NFTs in a default unnamed collection for v1.
         default_collection_document = {
-            'version': 0,
-            '_id': 0, # TODO change
-            'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
-            'deleted': False,
-            'name': None, # Default gallery will not have a name
-            'collectors_note': None, # Default gallery will not have a collectors note
-            'owner_user_id': user_id,
-            'nfts': [],
-            'hidden': False
+            "version": 0,
+            "_id": default_col_id,
+            "creation_time": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "owner_user_id": user_id,
+            "nfts": [],
+            "hidden": False,
         }
 
-        # NFTs marked as hidden in the alpha will be put in the "hidden" collection representing unassigned NFTs.
-        hidden_collection_document = {
-            'version': 0,
-            '_id': 0, # TODO change
-            'creation_time': creation_time_unix, # Is it fine if creation_time for all migrated data is just the original user's created_time?
-            'deleted': False,
-            'name': 'GLRY__RESERVED__UNASSIGNED', # TODO change name to reserved name
-            'collectors_note': None, # Hidden collection doesnt need collectors note
-            'owner_user_id': user_id,
-            'nfts': [],
-            'hidden': True
-        }
+        gallery_id = create_id()
 
         gallery_document = {
-            'version': 0,
-            '_id':  0, # TODO create id the same way as done on backend
-            'creation_time': creation_time_unix,
-            'deleted': False,
-            'owner_user_id': user_id,
-            'collections': []
+            "version": 0,
+            "_id": gallery_id,
+            "creation_time": time.time_ns(),
+            "last_updated": time.time_ns(),
+            "deleted": False,
+            "owner_user_id": user_id,
+            "collections": [default_col_id],
         }
-
 
         # Append the user and gallery documents to global list.
         user_documents.append(user_document)
         gallery_documents.append(gallery_document)
+        nonce_documents.append(nonce_document)
 
         # Add the collection documents to the collection dictionary.
         # Use the supabase user id as the key instead of generated id, because the supabase user id is also available in the NFT csv, so it's easier to use.
-        user_id = row['id']
-        user_collection_dict[user_id]['default_collection'] = default_collection_document
-        user_collection_dict[user_id]['hidden_collection'] = hidden_collection_document
+        supabase_user_id = user["id"]
+        user_dict[supabase_user_id] = user_document
+        user_collection_dict[supabase_user_id] = default_collection_document
 
 
+with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
 
-with open('glry-nfts.csv') as nftsFile:
-    reader = csv.DictReader(nftsFile)
-    # Sort the data by user_id and position. That way all nfts are already in the correct order so we can insert them into the Collections documents without accounting for position
-    sortedNfts = sorted(reader, key=lambda row:(row['user_id'], row['position']))
-    for row in sortedNfts:
-        creation_time_unix = datetime.datetime.strptime(
-            row['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
-            
-        global contract_document
-        global nft_document
+    reader = csv.DictReader(
+        nftsFile, restkey="rest", restval="", dialect=csv.unix_dialect
+    )
 
-        contract_document = {
-            contract_address: row['contract_address']
-        }
-        nft_document = {
-            'version': 0,
-            '_id':  0, #TODO generate id same way as backend,
-            'creation_time': creation_time_unix,
-            'deleted': False,
-            'name': row['name'],
-            'description': row['description'],
-            'collectors_note': None,
-            'external_url': row['external_url'],
-            'token_metadata_url': None, # Need to get from OpenSea
-            'creator_address': row['creator_address'],
-            'creator_name': None, # Need to get from OpenSea
-            'owner_address': None, # TODO do we need this field? Should we have owner_id (GLRY user id instead?)
-            'contract': contract_document, #TODO should this be a reference to the document instead?
-            'opensea_id': None, # Need to get from OpenSea. but do we need? We only need contract address and token_id to query in OpenSea
-            'opensea_token_id': row['token_id'],
-            'image_url': None, # Need to get from OpenSea
-            'image_thumbnail_url': row['image_thumbnail_url'],
-            'image_preview_url': row['image_preview_url'],
-            'image_original_url': None, # Need to get from OpenSea
-            'animation_url': None, # Need to get from OpenSea
-            'animation_original_url': None, # Need to get from OpenSea
-            'acquisition_date': None, # Need to get from OpenSea
-        }
+    sorted_nfts = sorted(reader, key=lambda row: row["position"])
+    threads = []
+    for nft in sorted_nfts:
+        t = threading.Thread(target=create_nft, args=(nft,))
+        threads.append(t)
+        t.start()
 
-        nft_documents.append(nft_document)
-        
-        # TODO: Populate collections with nft. Default and Hidden. Use row['position'] to populate default collection, and row['hidden'] to determine which collection to put it in
-        # For each nft, access the user's collections in the dictionary
-        # If not hidden, update default collection
-        # If hidden, update hidden collection
-        # Order: csv has already been sorted
-        user_id = row['user_id']
-        if row['hidden']:
-            user_collection_dict[user_id]['hidden_collection'].nfts.append(nft_document) # TODO do we append the document or the id?
-        else: 
-            user_collection_dict[user_id]['default_collection'].nfts.append(nft_document) # TODO do we append the document or the id?
+    for thread in threads:
+        thread.join()
+
+    # add all colls to collection_documents
+    for coll in user_collection_dict.values():
+        collection_documents.append(coll)
+    for err in errored_documents:
+        print(err)
 
 
 ##############
 # SAVE TO DB #
 ##############
 
-# client = MongoClient(
-#     "mongodb+srv://mike:<w6jhy5oivdMCVqzC>@cluster0.p9jwh.mongodb.net/test?retryWrites=True&w=majority")
-# testDb = client.test
+mongo_url = os.environ["MONGO_URL"]
 
-# # Select database collections (equivalent to tables)
-# userCollection = testDb.user2 # Why is this named user2?
-# galleryCollection = testDb.gallery
-# collectionCollection = testDb.collection
-# nftCollection = testDb.nft
+client = MongoClient(mongo_url)
+db = client.gallery
 
-# # Bulk insert into database
-# userCollection.bulk_write(user_documents)
-# galleryCollection.bulk_write(gallery_documents)
-# collectionCollection.bulk_write(collection_documents)
-# nftCollection.bulk_write(nft_documents)
+# Select database collections (equivalent to tables)
+user_collection = db.users
+gallery_collection = db.galleries
+collection_collection = db.collections
+nft_collection = db.nfts
+nonce_collection = db.nonces
+
+# Bulk insert into database
+user_collection.insert_many(user_documents)
+gallery_collection.insert_many(gallery_documents)
+collection_collection.insert_many(collection_documents)
+nft_collection.insert_many(nft_documents)
+nonce_collection.insert_many(nonce_documents)
 
 
 # migration strategy
