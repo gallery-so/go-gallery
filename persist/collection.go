@@ -203,7 +203,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
