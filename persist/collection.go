@@ -79,7 +79,7 @@ type CollectionUpdateDeletedInput struct {
 func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -89,8 +89,14 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 		pColl.Nfts = []DBID{}
 	} else {
 		if err := mp.pull(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
-			return "", err
+			if _, ok := err.(*DocumentNotFoundError); !ok {
+				return "", err
+			}
 		}
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pColl.OwnerUserID)); err != nil {
+		return "", err
 	}
 
 	return mp.insert(pCtx, pColl)
@@ -161,11 +167,10 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
-	err := mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
-	if err != nil {
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
-	return mp.cacheDelete(pCtx, string(pUserID))
+	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
 // CollUpdateNFTs will update a collections NFTs ensuring that the collection is owned
@@ -180,6 +185,12 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
 	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -192,8 +203,12 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	update := &CollectionUpdateDeletedInput{Deleted: true}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
 
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
 }
