@@ -214,15 +214,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, tc.user1.id),
-		nil)
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assertValidResponse(assert, resp)
+	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user1)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -259,15 +251,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, tc.user1.id),
-		nil)
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user2.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	assertValidResponse(assert, resp)
+	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user2)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -302,6 +286,26 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)
+	assertValidResponse(assert, resp)
+
+	return resp
+}
+
+func sendUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
+
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, forUserID),
+		nil)
+	assert.Nil(err)
+
+	if authenticatedUser != nil {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authenticatedUser.jwt))
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
 
 	return resp
 }
