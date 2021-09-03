@@ -228,7 +228,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 		Collections []*persist.Collection `json:"collections"`
 		Error       string                `json:"error"`
 	}
-	// ensure nft was updated
+
 	body := CollectionsResponse{}
 	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Len(body.Collections, 1)
@@ -273,7 +273,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 		Collections []*persist.Collection `json:"collections"`
 		Error       string                `json:"error"`
 	}
-	// ensure nft was updated
+
 	body := CollectionsResponse{}
 	runtime.UnmarshallBody(&body, resp.Body, tc.r)
 	assert.Len(body.Collections, 2)
