@@ -64,7 +64,7 @@ func AuthNonceGet(pCtx context.Context, pAddress string,
 	mp := newStorage(0, noncesCollName, pRuntime)
 
 	opts := options.Find()
-	opts.SetSort(bson.M{"creation_time": -1})
+	opts.SetSort(bson.M{"created_at": -1})
 	opts.SetLimit(1)
 
 	result := []*UserNonce{}
