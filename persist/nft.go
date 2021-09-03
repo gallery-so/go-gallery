@@ -56,6 +56,7 @@ type Nft struct {
 type Contract struct {
 	ContractAddress      string `bson:"contract_address"     json:"address"`
 	ContractName         string `bson:"contract_name" json:"name"`
+	ContractImage        string `bson:"contract_image_url" json:"image_url"`
 	ContractDescription  string `bson:"contract_description" json:"description"`
 	ContractExternalLink string `bson:"contract_external_link" json:"external_link"`
 	ContractSchemaName   string `bson:"contract_schema_name" json:"schema_name"`
