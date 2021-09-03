@@ -196,6 +196,74 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 	assert.Equal(404, resp.StatusCode)
 }
 
+func TestGetHiddenCollections_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	nfts := []*persist.Nft{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+
+	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		Nfts:        nftIDs,
+		Hidden:      true,
+	}, tc.r)
+	assert.Nil(err)
+
+	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user1)
+
+	type CollectionsResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+
+	body := CollectionsResponse{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Collections, 1)
+	assert.Empty(body.Error)
+}
+
+func TestGetNoHiddenCollections_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	nfts := []*persist.Nft{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+
+	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		Nfts:        nftIDs[0:1],
+		Hidden:      false,
+	}, tc.r)
+	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		Nfts:        nftIDs[1:],
+		Hidden:      true,
+	}, tc.r)
+	assert.Nil(err)
+
+	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user2)
+
+	type CollectionsResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+
+	body := CollectionsResponse{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Collections, 2)
+	assert.Empty(body.Error)
+}
+
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {
 	collectionsBeforeDelete, err := persist.CollGetByID(context.Background(), collID, false, tc.r)
 	assert.Nil(err)
@@ -218,6 +286,26 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)
+	assertValidResponse(assert, resp)
+
+	return resp
+}
+
+func sendUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
+
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, forUserID),
+		nil)
+	assert.Nil(err)
+
+	if authenticatedUser != nil {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authenticatedUser.jwt))
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
 
 	return resp
 }
