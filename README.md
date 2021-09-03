@@ -4,6 +4,7 @@
 
 1. [Install Go](https://golang.org/doc/install)
 2. [Install Docker](https://www.docker.com/products/docker-desktop)
+3. [Install Docker-Compose](https://docs.docker.com/compose/install/)
 
 ## Clone and install deps
 
@@ -25,24 +26,26 @@ This will generate a binary within `./bin/main`. To run the binary, simply:
 $ ./bin/main
 ```
 
-### Mongo
+### Mongo and Redis
 
 The app will connect to a local mongo instance and local redis instance by default. To spin it up, you can use the official docker containers:
 
 ```bash
-$ docker run -p 27017:27017 mongo
+$ docker-compose up -d
 ```
 
+To remove running mongo and redis instance:
+
 ```bash
-$ docker run -p 6379:6379 redis
+$ docker-compose down
 ```
 
 ### Healthcheck
 
-Verify that the server is running by calling the `/alive` endpoint.
+Verify that the server is running by calling the `/v1/health` endpoint.
 
 ```bash
-$ curl localhost:4000/alive
+$ curl localhost:4000/v1/health
 ```
 
 ## Testing
