@@ -156,16 +156,24 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 		if err != nil {
 			return err
 		}
+
 		asMap["last_updated"] = now
+
+		// we don't need ID because we are searching by opensea ID.
+		// this will cause update conflict if not ""
 		delete(asMap, "_id")
+
+		// set created at if this is a new insert
+		if asMap["created_at"] != float64(0) {
+			asMap["created_at"] = now
+		}
 
 		upsertModels[i] = &mongo.UpdateOneModel{
 			Upsert: boolin(true),
 			Filter: bson.M{"opensea_id": v.OpenSeaID},
 			Update: bson.M{
 				"$setOnInsert": bson.M{
-					"_id":        generateID(now),
-					"created_at": now,
+					"_id": generateID(now),
 				},
 				"$set": asMap,
 			},
