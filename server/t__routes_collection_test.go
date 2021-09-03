@@ -205,7 +205,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
 	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
-	// seed DB with collection
+
 	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
@@ -214,7 +214,6 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	// send update request
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, tc.user1.id),
 		nil)
@@ -245,7 +244,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
 	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
-	// seed DB with collection
+
 	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
@@ -260,7 +259,6 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	// send update request
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, tc.user1.id),
 		nil)
