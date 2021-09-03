@@ -18,6 +18,8 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
+const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
+
 // INPUT - USER_LOGIN
 type authUserLoginInput struct {
 	Signature string `json:"signature" binding:"required,medium_string"`
@@ -170,9 +172,8 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 	//------------------
 	// VERIFY_SIGNATURE
 
-	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
-		dataStr,
+		nonceValueStr,
 		pInput.Address,
 		pRuntime)
 	if err != nil {
@@ -258,11 +259,12 @@ func authVerifySignature(pSignatureStr string,
 
 	// DATA
 
+	nonceWithPrepend := noncePrepend + pDataStr
 	var dataStr string
 	if pUseDataHeaderBool {
-		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(fmt.Sprintf(pDataStr)), pDataStr)
+		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(nonceWithPrepend), nonceWithPrepend)
 	} else {
-		dataStr = pDataStr
+		dataStr = nonceWithPrepend
 	}
 
 	dataBytesLst := []byte(dataStr)
@@ -384,7 +386,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 			return nil, err
 		}
 	}
-	output.Nonce = nonce.Value
+	output.Nonce = noncePrepend + nonce.Value
 
 	return output, nil
 }
