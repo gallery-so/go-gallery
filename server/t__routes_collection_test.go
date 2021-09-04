@@ -264,6 +264,66 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	assert.Empty(body.Error)
 }
 
+func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	nfts := []*persist.Nft{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	assert.Nil(err)
+
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		Nfts:        nftIDs,
+	}, tc.r)
+	assert.Nil(err)
+
+	// build update request body
+	type Update struct {
+		ID   persist.DBID   `json:"id"`
+		Nfts []persist.DBID `json:"nfts"`
+	}
+
+	temp := nftIDs[1]
+	nftIDs[1] = nftIDs[2]
+	nftIDs[2] = temp
+
+	update := Update{ID: collID, Nfts: nftIDs}
+	data, err := json.Marshal(update)
+	assert.Nil(err)
+
+	// send update request
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/update/nfts", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
+
+	// retrieve updated nft
+	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	type CollectionGetResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+	// ensure nft was updated
+	body := CollectionGetResponse{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Collections, 1)
+	assert.Empty(body.Error)
+	assert.Equal(update.Nfts[1], body.Collections[0].Nfts[1].ID)
+}
+
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {
 	collectionsBeforeDelete, err := persist.CollGetByID(context.Background(), collID, false, tc.r)
 	assert.Nil(err)
