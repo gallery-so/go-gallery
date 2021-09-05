@@ -264,6 +264,50 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	assert.Empty(body.Error)
 }
 
+func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	nfts := []*persist.Nft{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+
+	preCollID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{Name: "test", Nfts: nftIDs, OwnerUserID: tc.user1.id}, tc.r)
+	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id, Collections: []persist.DBID{preCollID}}, tc.r)
+
+	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs[0:2]}
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/create", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
+
+	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, preCollID))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	type CollectionGetResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+	// ensure collection was updated
+	body := CollectionGetResponse{}
+	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	assert.Len(body.Collections, 1)
+	assert.Len(body.Collections[0].Nfts, 1)
+	assert.Empty(body.Error)
+
+}
+
 func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	assert := assert.New(t)
 
