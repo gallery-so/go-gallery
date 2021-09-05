@@ -307,6 +307,7 @@ func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 }
 
 func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
+
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
@@ -321,6 +322,13 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 						},
 					},
 				}}},
+				{{Key: "$addFields", Value: bson.M{
+					"sort": bson.M{
+						"$indexOfArray": []string{"$$array", "$_id"},
+					}},
+				}},
+				{{Key: "$sort", Value: bson.M{"sort": 1}}},
+				{{Key: "$unset", Value: []string{"sort"}}},
 			},
 			"as": "nfts",
 		}}},

@@ -22,17 +22,23 @@ type TestUser struct {
 	username string
 }
 
-func generateTestUser(r *runtime.Runtime) *TestUser {
+func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 	ctx := context.Background()
-	username := util.RandStringBytes(8)
+
 	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
 	user := &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
 		Addresses:          []string{address},
 	}
-	id, _ := persist.UserCreate(ctx, user, r)
-	jwt, _ := jwtGeneratePipeline(ctx, id, r)
+	id, err := persist.UserCreate(ctx, user, r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	jwt, err := jwtGeneratePipeline(ctx, id, r)
+	if err != nil {
+		log.Fatal(err)
+	}
 	authNonceRotateDb(ctx, address, id, r)
 	log.Info(id, username)
 	return &TestUser{id, address, jwt, username}
@@ -55,15 +61,15 @@ func setup() *TestConfig {
 		server:    ts,
 		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
 		r:         runtime,
-		user1:     generateTestUser(runtime),
-		user2:     generateTestUser(runtime),
+		user1:     generateTestUser(runtime, "bob"),
+		user2:     generateTestUser(runtime, "beb"),
 	}
 }
 
 // Should be called at the end of every integration test
-func teardown(ts *httptest.Server) {
+func teardown() {
 	log.Info("tearing down test suite...")
-	ts.Close()
+	tc.server.Close()
 	tc.r.DB.MongoDB.Drop(context.Background())
 }
 
