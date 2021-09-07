@@ -134,15 +134,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	update := userUpdateInput{
 		UserNameStr: "kaito",
 	}
-	data, err := json.Marshal(update)
-	assert.Nil(err)
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := updateUserInfoRequest(assert, update, jwt)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
@@ -170,15 +162,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	update := userUpdateInput{
 		UserNameStr: username,
 	}
-	data, err := json.Marshal(update)
-	assert.Nil(err)
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := updateUserInfoRequest(assert, update, jwt)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
@@ -202,14 +186,7 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 	update := userUpdateInput{
 		UserNameStr: "kaito",
 	}
-	data, err := json.Marshal(update)
-	assert.Nil(err)
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
-	assert.Nil(err)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := updateUserInfoNoAuthRequest(assert, update)
 	spew.Dump(resp.Body)
 	assertValidJSONResponse(assert, resp)
 }
@@ -232,7 +209,16 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	update := userUpdateInput{
 		UserNameStr: tc.user1.username,
 	}
-	data, err := json.Marshal(update)
+	resp := updateUserInfoRequest(assert, update, jwt)
+	assertGalleryErrorResponse(assert, resp)
+
+	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+	assert.Nil(err)
+	assert.NotEqual(update.UserNameStr, user.UserName)
+}
+
+func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
 	assert.Nil(err)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
@@ -241,9 +227,17 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)
-	assertGalleryErrorResponse(assert, resp)
+	return resp
+}
 
-	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+func updateUserInfoNoAuthRequest(assert *assert.Assertions, input userUpdateInput) *http.Response {
+	data, err := json.Marshal(input)
 	assert.Nil(err)
-	assert.NotEqual(update.UserNameStr, user.UserName)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
 }
