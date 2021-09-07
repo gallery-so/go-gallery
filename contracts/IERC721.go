@@ -916,3 +916,4 @@ func (_IERC721 *IERC721Filterer) ParseTransfer(log types.Log) (*IERC721Transfer,
 	event.Raw = log
 	return event, nil
 }
+

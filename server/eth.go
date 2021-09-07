@@ -77,7 +77,7 @@ func hasRedeemed(contractAddress string, id string, userAddr string) (bool, erro
 	addr := common.HexToAddress(userAddr)
 
 	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewRedeemable(contract, client)
+	instance, err := contracts.NewIRedeemable(contract, client)
 	if err != nil {
 		return false, err
 	}
