@@ -10,14 +10,14 @@ import (
 )
 
 //---------------------------------------------------
-func TestFetchAssertsForAcc(pTest *testing.T) {
-
+func TestFetchAssertsForAcc(t *testing.T) {
+	t.Cleanup(clearDB)
 	ctx := context.Background()
 
 	user := &persist.User{Addresses: []string{"0x485b8ac36535fae56b2910780245dd69dda270bc"}}
 
 	userID, err := persist.UserCreate(ctx, user, tc.r)
-	assert.Nil(pTest, err)
+	assert.Nil(t, err)
 
 	nft := &persist.Nft{
 		OwnerUserID:  userID,
@@ -34,15 +34,15 @@ func TestFetchAssertsForAcc(pTest *testing.T) {
 	}
 
 	_, err = persist.NftCreateBulk(ctx, []*persist.Nft{nft, nft2}, tc.r)
-	assert.Nil(pTest, err)
+	assert.Nil(t, err)
 
 	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", false, tc.r)
 
-	assert.Nil(pTest, err)
+	assert.Nil(t, err)
 
 	nftsByUser, err := persist.NftGetByUserID(ctx, userID, tc.r)
-	assert.Nil(pTest, err)
+	assert.Nil(t, err)
 
-	assert.Equal(pTest, len(nfts), len(nftsByUser))
+	assert.Equal(t, len(nfts), len(nftsByUser))
 
 }

@@ -10,6 +10,7 @@ import (
 )
 
 func TestAuthPreflightUserExists_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// send update request

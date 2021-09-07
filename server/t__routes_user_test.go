@@ -16,6 +16,7 @@ import (
 )
 
 func TestGetUserByID_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -38,6 +39,7 @@ func TestGetUserByID_Success(t *testing.T) {
 }
 
 func TestGetUserByAddress_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -60,6 +62,7 @@ func TestGetUserByAddress_Success(t *testing.T) {
 }
 
 func TestGetUserByUsername_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -82,6 +85,7 @@ func TestGetUserByUsername_Success(t *testing.T) {
 }
 
 func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	userID := tc.user1.id
@@ -100,6 +104,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 }
 
 func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	userID := tc.user1.id
@@ -117,6 +122,7 @@ func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
 // TODO: test creating user with DCInvestor then dCinvestor fails
 
 func TestUpdateUserAuthenticated_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -153,6 +159,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 // Updating the username to itself should not trigger an error, despite the DB
 // having a user entity with that username already
 func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -187,6 +194,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 }
 
 func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user
@@ -215,6 +223,7 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 }
 
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with user

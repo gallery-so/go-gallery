@@ -15,6 +15,7 @@ import (
 )
 
 func TestGetNftByID_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -46,6 +47,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nonexistentNftID := "12345"
@@ -60,6 +62,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -101,6 +104,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -130,6 +134,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// build update request body
@@ -157,6 +162,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NotFoundError(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// build update request body
@@ -186,6 +192,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -224,6 +231,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingSomeoneElsesNft_CantDo(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with nft
