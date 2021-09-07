@@ -2,6 +2,10 @@
 version: 2.1
 orbs:
   gcp-cli: circleci/gcp-cli@2.2.0
+workflows:
+  main:
+    jobs:
+      - build
 jobs:
   build:
     working_directory: ~/go-gallery
