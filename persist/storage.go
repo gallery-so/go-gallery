@@ -13,6 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -64,14 +65,14 @@ func (m *storage) withRedis(rdb redisDB, runtime *runtime.Runtime) *storage {
 // Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (DBID, error) {
 
-	now := float64(time.Now().UnixNano()) / 1000000000.0
+	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(insert)
 	if err != nil {
 		return "", err
 	}
-	asMap["_id"] = generateID(now)
 	asMap["created_at"] = now
 	asMap["last_updated"] = now
+	asMap["_id"] = generateID(asMap)
 
 	res, err := m.collection.InsertOne(ctx, asMap, opts...)
 	if err != nil {
@@ -86,14 +87,14 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 
 	mapsToInsert := make([]interface{}, len(insert))
 	for i, k := range insert {
-		now := float64(time.Now().UnixNano()) / 1000000000.0
+		now := primitive.NewDateTimeFromTime(time.Now())
 		asMap, err := structToBsonMap(k)
 		if err != nil {
 			return nil, err
 		}
-		asMap["_id"] = generateID(now)
 		asMap["created_at"] = now
 		asMap["last_updated"] = now
+		asMap["_id"] = generateID(asMap)
 		mapsToInsert[i] = asMap
 	}
 
@@ -114,7 +115,7 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 
 // Update updates a document in the mongo database while filling out the field LastUpdated
 func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
-	now := float64(time.Now().UnixNano()) / 1000000000.0
+	now := primitive.NewDateTimeFromTime(time.Now())
 
 	asMap, err := structToBsonMap(update)
 	if err != nil {
@@ -137,7 +138,11 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 // value must be an array
 func (m *storage) push(ctx context.Context, query bson.M, field string, value interface{}) error {
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}})
+	push := bson.E{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}
+	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
+	up := bson.D{push, lastUpdated}
+
+	result, err := m.collection.UpdateOne(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -152,7 +157,11 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 // value must be an array
 func (m *storage) pull(ctx context.Context, query bson.M, field string, value interface{}) error {
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$pull", Value: bson.M{field: bson.M{"$in": value}}}})
+	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
+	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
+	up := bson.D{pull, lastUpdated}
+
+	result, err := m.collection.UpdateOne(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -167,14 +176,17 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
 	weWantToUpsertHere := true
 	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
-	now := float64(time.Now().UnixNano()) / 1000000000.0
+	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
 	if err != nil {
 		return err
 	}
 	asMap["last_updated"] = now
+	if _, ok := asMap["created_at"]; !ok {
+		asMap["created_at"] = now
+	}
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(now), "created_at": now}, "$set": asMap}, opts...)
+	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
 	if err != nil {
 		return err
 	}
@@ -265,9 +277,9 @@ func (m *storage) cacheClose() error {
 	return m.rdbClient.Close()
 }
 
-func generateID(creationTime float64) DBID {
+func generateID(it interface{}) DBID {
 	h := md5.New()
-	h.Write([]byte(fmt.Sprint(creationTime)))
+	h.Write([]byte(fmt.Sprint(it)))
 	sum := h.Sum(nil)
 	hexStr := hex.EncodeToString(sum)
 	return DBID(hexStr)

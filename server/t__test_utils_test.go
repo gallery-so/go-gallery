@@ -70,6 +70,10 @@ func setup() *TestConfig {
 func teardown() {
 	log.Info("tearing down test suite...")
 	tc.server.Close()
+	clearDB()
+}
+
+func clearDB() {
 	tc.r.DB.MongoDB.Drop(context.Background())
 }
 

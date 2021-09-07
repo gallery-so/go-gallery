@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -16,10 +17,11 @@ const usersCollName = "users"
 
 // User represents a user in the datase and throughout the application
 type User struct {
-	Version      int64   `bson:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
-	CreationTime float64 `bson:"created_at" json:"created_at"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version"` // schema version for this model
+	ID           DBID               `bson:"_id"           json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	UserName           string   `bson:"username,omitempty"         json:"username"` // mutable
 	UserNameIdempotent string   `bson:"username_idempotent,omitempty" json:"username_idempotent"`
