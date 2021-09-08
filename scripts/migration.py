@@ -34,7 +34,7 @@ collection_documents = []
 gallery_documents = []
 nft_documents = []
 nonce_documents = []
-errored_documents = []
+errored_documents = {}
 
 # Initialize a dictionary to keep track of collections. After we create empty collections for each user, we need to populate them with NFTs when we iterate through the NFT csv.
 # Therefore, using a dictionary with the user_id as the key will make it efficient to populate the correct user's collection.
@@ -51,7 +51,6 @@ user_dict = {}
 
 def create_nft(nft):
     try:
-        print(nft["name"])
         if "rest" in nft:
             return
         if nft["contract_address"] == "" or nft["token_id"] == "":
@@ -64,7 +63,7 @@ def create_nft(nft):
         get_url = "https://api.opensea.io/api/v1/asset/{}/{}".format(
             nft["contract_address"], nft["token_id"]
         )
-        print(get_url)
+
         r = requests.get(get_url, timeout=5)
 
         opensea_asset = r.json()
@@ -101,25 +100,24 @@ def create_nft(nft):
         # all other nfts will be considered unassigned
         if not nft["hidden"]:
             user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
-    except:
-        errored_documents.append(nft)
+    except Exception as e:
+        errored_documents[e] = nft
 
 
 with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
     reader = csv.DictReader(usersfile)
     for user in reader:
         # load creation time as datetime
-        print("USER", user["username"])
         creation_time_unix = datetime.datetime.strptime(
             user["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).timestamp()
+        )
         user_id = create_id()
 
         user_document = {
             "version": 0,
             "_id": user_id,
             "created_at": creation_time_unix,
-            "last_updated": time.time_ns(),
+            "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "username": user["username"],
             "username_idempotent": user["username"].lower(),
@@ -129,8 +127,8 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
         nonce_document = {
             "version": 0,
             "_id": create_id(),
-            "created_at": time.time_ns(),
-            "last_updated": time.time_ns(),
+            "created_at": datetime.datetime.utcnow(),
+            "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "user_id": user_id,
             "address": user["wallet_address"],
@@ -143,8 +141,8 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
         default_collection_document = {
             "version": 0,
             "_id": default_col_id,
-            "creation_time": time.time_ns(),
-            "last_updated": time.time_ns(),
+            "creation_time": datetime.datetime.utcnow(),
+            "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "owner_user_id": user_id,
             "nfts": [],
@@ -156,8 +154,8 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
         gallery_document = {
             "version": 0,
             "_id": gallery_id,
-            "creation_time": time.time_ns(),
-            "last_updated": time.time_ns(),
+            "creation_time": datetime.datetime.utcnow(),
+            "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "owner_user_id": user_id,
             "collections": [default_col_id],
@@ -195,7 +193,7 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
     for coll in user_collection_dict.values():
         collection_documents.append(coll)
     for err in errored_documents:
-        print(err)
+        print("ERR", err)
 
 
 ##############
