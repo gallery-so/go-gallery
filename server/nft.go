@@ -31,6 +31,11 @@ type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
 }
 
+type updateNftByIDInput struct {
+	ID             persist.DBID `form:"id" binding:"required"`
+	CollectorsNote string       `form:"collectors_note"`
+}
+
 func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}
@@ -61,9 +66,8 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 // Must specify nft id in json input
 func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		nft := &persist.Nft{}
-		if err := c.ShouldBindJSON(nft); err != nil {
-			// TODO: think about how to log errors
+		input := &updateNftByIDInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{
 				Error: err.Error(),
 			})
@@ -76,7 +80,9 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		err := persist.NftUpdateByID(c, nft.ID, userID, nft, pRuntime)
+		update := &persist.UpdateNFTInfoInput{CollectorsNote: input.CollectorsNote}
+
+		err := persist.NftUpdateByID(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})

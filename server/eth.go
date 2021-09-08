@@ -20,7 +20,7 @@ func hasAnyNFT(contractAddress string, userAddr string) (bool, error) {
 	addr := common.HexToAddress(userAddr)
 
 	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewContracts(contract, client)
+	instance, err := contracts.NewIERC721(contract, client)
 	if err != nil {
 		return false, err
 	}
@@ -50,7 +50,7 @@ func hasNFT(contractAddress string, id string, userAddr string) (bool, error) {
 	addr := common.HexToAddress(userAddr)
 
 	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewContracts(contract, client)
+	instance, err := contracts.NewIERC721(contract, client)
 	if err != nil {
 		return false, err
 	}
@@ -64,5 +64,32 @@ func hasNFT(contractAddress string, id string, userAddr string) (bool, error) {
 	}
 
 	return call.String() == addr.String(), nil
+
+}
+
+func hasRedeemed(contractAddress string, id string, userAddr string) (bool, error) {
+	// TODO use alchemy URL
+	client, err := ethclient.Dial("https://rinkeby.infura.io")
+	if err != nil {
+		return false, err
+	}
+
+	addr := common.HexToAddress(userAddr)
+
+	contract := common.HexToAddress(contractAddress)
+	instance, err := contracts.NewIRedeemable(contract, client)
+	if err != nil {
+		return false, err
+	}
+
+	bigIntID := &big.Int{}
+	bigIntID, _ = bigIntID.SetString(id, 10)
+
+	call, err := instance.IsRedeemedBy(&bind.CallOpts{From: addr}, bigIntID, addr)
+	if err != nil {
+		return false, err
+	}
+
+	return call, nil
 
 }

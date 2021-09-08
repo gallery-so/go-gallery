@@ -24,11 +24,11 @@ type Nft struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
-	Name           string `bson:"name"                 json:"name"`
-	Description    string `bson:"description"          json:"description"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
 
+	Name             string   `bson:"name"                 json:"name"`
+	Description      string   `bson:"description"          json:"description"`
 	ExternalURL      string   `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress   string   `bson:"creator_address"      json:"creator_address"`
@@ -63,6 +63,12 @@ type Contract struct {
 	ContractSchemaName   string `bson:"contract_schema_name" json:"schema_name"`
 	ContractSymbol       string `bson:"contract_symbol" json:"symbol"`
 	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
+}
+
+// UpdateNFTInfoInput represents a MongoDB input to update the user defined info
+// associated with a given NFT in the DB
+type UpdateNFTInfoInput struct {
+	CollectorsNote string `bson:"collectors_note"`
 }
 
 // NftCreateBulk is a helper function to create multiple nfts in one call and returns
