@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"testing"
 
@@ -19,14 +18,14 @@ type TestConfig struct {
 var tc *TestConfig
 
 func TestMain(m *testing.M) {
-	tc = setup()
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println(r)
-			teardown()
-		} else {
-			teardown()
-		}
-	}()
+	// tc = setup()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		fmt.Println(r)
+	// 		teardown()
+	// 	} else {
+	// 		teardown()
+	// 	}
+	// }()
 	m.Run()
 }

@@ -15,7 +15,7 @@ import (
 )
 
 func TestGetNftByID_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -35,6 +35,7 @@ func TestGetNftByID_Success(t *testing.T) {
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
+	setupTest(t)
 	assert := assert.New(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
@@ -47,7 +48,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nonexistentNftID := "12345"
@@ -62,7 +63,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -89,7 +90,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	// seed DB with nft
@@ -110,7 +111,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note"}
@@ -123,7 +124,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NotFoundError(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nftID := persist.DBID("no exist :(")
@@ -137,7 +138,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	// seed DB with nft

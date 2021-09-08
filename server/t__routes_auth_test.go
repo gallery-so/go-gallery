@@ -10,7 +10,7 @@ import (
 )
 
 func TestAuthPreflightUserExists_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	resp := getPreflightRequest(assert, tc.user1.address, tc.user1.jwt)

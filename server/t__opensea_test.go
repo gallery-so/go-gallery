@@ -11,7 +11,7 @@ import (
 
 //---------------------------------------------------
 func TestFetchAssertsForAcc(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	ctx := context.Background()
 
 	user := &persist.User{Addresses: []string{"0x485b8ac36535fae56b2910780245dd69dda270bc"}}
@@ -36,7 +36,7 @@ func TestFetchAssertsForAcc(t *testing.T) {
 	_, err = persist.NftCreateBulk(ctx, []*persist.Nft{nft, nft2}, tc.r)
 	assert.Nil(t, err)
 
-	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", false, tc.r)
+	nfts, err := openSeaPipelineAssetsForAcc(ctx, "0x485b8ac36535fae56b2910780245dd69dda270bc", true, tc.r)
 
 	assert.Nil(t, err)
 

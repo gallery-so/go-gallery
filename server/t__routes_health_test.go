@@ -10,7 +10,7 @@ import (
 )
 
 func TestHealthcheck(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/health", tc.serverURL))

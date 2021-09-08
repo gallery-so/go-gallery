@@ -6,8 +6,8 @@ import time
 import datetime
 import os
 import random
-import threading
 from pymongo import MongoClient
+import concurrent.futures
 
 
 # hash function to create user id
@@ -50,14 +50,19 @@ user_dict = {}
 
 
 def create_nft(nft):
+    print("Creating NFT:", nft["name"])
     try:
         if "rest" in nft:
             return
         if nft["contract_address"] == "" or nft["token_id"] == "":
             return
+        if not "user_id" in nft:
+            return
 
         supabase_user_id = nft["user_id"]
 
+        if not supabase_user_id in user_dict:
+            return
         user = user_dict[supabase_user_id]
 
         get_url = "https://api.opensea.io/api/v1/asset/{}/{}".format(
@@ -67,7 +72,8 @@ def create_nft(nft):
         r = requests.get(get_url, timeout=5)
 
         opensea_asset = r.json()
-
+        if not "id" in opensea_asset:
+            return
         nft_id = create_id()
         contract_document = {"contract_address": nft["contract_address"]}
         nft_document = {
@@ -77,7 +83,6 @@ def create_nft(nft):
             "name": nft["name"],
             "description": nft["description"],
             "external_url": nft["external_url"],
-            "token_metadata_url": opensea_asset["token_metadata"],
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
             "owner_address": user["addresses"][0],
@@ -98,14 +103,15 @@ def create_nft(nft):
         supabase_user_id = nft["user_id"]
         # only append nfts to the default collection if they are not hidden
         # all other nfts will be considered unassigned
-        if not nft["hidden"]:
-            user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
+
+        user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
     except Exception as e:
+        print(e)
         errored_documents[e] = nft
 
 
 with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
-    reader = csv.DictReader(usersfile)
+    reader = csv.DictReader(usersfile, dialect=csv.unix_dialect)
     for user in reader:
         # load creation time as datetime
         creation_time_unix = datetime.datetime.strptime(
@@ -180,14 +186,9 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
     )
 
     sorted_nfts = sorted(reader, key=lambda row: row["position"])
-    threads = []
-    for nft in sorted_nfts:
-        t = threading.Thread(target=create_nft, args=(nft,))
-        threads.append(t)
-        t.start()
 
-    for thread in threads:
-        thread.join()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        executor.map(create_nft, sorted_nfts)
 
     # add all colls to collection_documents
     for coll in user_collection_dict.values():

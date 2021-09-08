@@ -11,7 +11,6 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e // indirect
 	github.com/ethereum/go-ethereum v1.10.8
-	github.com/fatih/color v1.12.0
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-playground/validator/v10 v10.8.0
 	github.com/go-redis/redis v6.15.9+incompatible

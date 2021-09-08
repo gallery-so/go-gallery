@@ -14,7 +14,7 @@ import (
 )
 
 func TestUpdateCollectionNameByID_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	// seed DB with collection
@@ -47,7 +47,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 }
 
 func TestCreateCollection_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -97,7 +97,7 @@ func TestCreateCollection_Success(t *testing.T) {
 }
 
 func TestGetUnassignedCollection_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -129,7 +129,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -147,7 +147,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -159,7 +159,7 @@ func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -170,7 +170,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 }
 
 func TestGetHiddenCollections_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -202,7 +202,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 }
 
 func TestGetNoHiddenCollections_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -240,7 +240,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 }
 
 func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -275,7 +275,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 }
 
 func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -420,4 +420,14 @@ func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpda
 	resp, err := client.Do(req)
 	assert.Nil(err)
 	return resp
+}
+
+func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
+	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        collectionName,
+		OwnerUserID: userID,
+	}, tc.r)
+	assert.Nil(err)
+
+	return collID
 }
