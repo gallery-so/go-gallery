@@ -10,17 +10,10 @@ import (
 )
 
 func TestAuthPreflightUserExists_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
-	// send update request
-	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/auth/get_preflight?address=%s", tc.serverURL, tc.user1.address),
-		nil)
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := getPreflightRequest(assert, tc.user1.address, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
@@ -28,8 +21,20 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
-	err = runtime.UnmarshallBody(output, resp.Body, tc.r)
+	err := runtime.UnmarshallBody(output, resp.Body, tc.r)
 	assert.Nil(err)
 	assert.Empty(output.Error)
 	assert.True(output.UserExists)
+}
+
+func getPreflightRequest(assert *assert.Assertions, address string, jwt string) *http.Response {
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/auth/get_preflight?address=%s", tc.serverURL, address),
+		nil)
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
 }

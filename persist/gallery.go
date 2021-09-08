@@ -6,6 +6,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,10 +18,11 @@ const galleryColName = "galleries"
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryDB struct {
-	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
-	CreationTime float64 `bson:"created_at" json:"created_at"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version"       json:"version"` // schema version for this model
+	ID           DBID               `bson:"_id"           json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []DBID `bson:"collections"          json:"collections"`
@@ -31,10 +33,11 @@ type GalleryDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type Gallery struct {
-	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
-	CreationTime float64 `bson:"creation_time" json:"creation_time"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version"       json:"version"` // schema version for this model
+	ID           DBID               `bson:"_id"           json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID          `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []*Collection `bson:"collections"          json:"collections"`

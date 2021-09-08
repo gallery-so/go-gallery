@@ -14,6 +14,7 @@ import (
 )
 
 func TestUpdateCollectionNameByID_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	// seed DB with collection
@@ -24,24 +25,8 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert.Nil(err)
 
 	// build update request body
-	type Update struct {
-		ID             persist.DBID `json:"id"`
-		Name           string       `json:"name"`
-		CollectorsNote string       `json:"collectors_note"`
-	}
-	update := Update{Name: "new coll name", ID: collID}
-	data, err := json.Marshal(update)
-	assert.Nil(err)
-
-	// send update request
-	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/collections/update/info", tc.serverURL),
-		bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
+	resp := updateCollectionInfoRequest(assert, update, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	// retrieve updated nft
@@ -62,6 +47,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 }
 
 func TestCreateCollection_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -70,21 +56,12 @@ func TestCreateCollection_Success(t *testing.T) {
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
 	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	assert.Nil(err)
 	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id}, tc.r)
+	assert.Nil(err)
 
 	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs}
-	data, err := json.Marshal(input)
-	assert.Nil(err)
-
-	// send update request
-	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/collections/create", tc.serverURL),
-		bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := createCollectionRequest(assert, input, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	type CreateResp struct {
@@ -120,6 +97,7 @@ func TestCreateCollection_Success(t *testing.T) {
 }
 
 func TestGetUnassignedCollection_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -136,15 +114,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	// send update request
-	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/nfts/get_unassigned?user_id=%s&skip_cache=false", tc.serverURL, tc.user1.id),
-		nil)
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := getUnassignedNFTsRequest(assert, tc.user1.id)
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
@@ -159,6 +129,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -176,6 +147,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -187,6 +159,7 @@ func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
@@ -197,6 +170,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 }
 
 func TestGetHiddenCollections_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -228,6 +202,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 }
 
 func TestGetNoHiddenCollections_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -265,6 +240,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 }
 
 func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -278,17 +254,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id, Collections: []persist.DBID{preCollID}}, tc.r)
 
 	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs[0:2]}
-	data, err := json.Marshal(input)
-	assert.Nil(err)
-
-	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/collections/create", tc.serverURL),
-		bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	resp := createCollectionRequest(assert, input, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, preCollID))
@@ -309,6 +275,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 }
 
 func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
+	t.Cleanup(clearDB)
 	assert := assert.New(t)
 
 	nfts := []*persist.Nft{
@@ -326,29 +293,12 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	// build update request body
-	type Update struct {
-		ID   persist.DBID   `json:"id"`
-		Nfts []persist.DBID `json:"nfts"`
-	}
-
 	temp := nftIDs[1]
 	nftIDs[1] = nftIDs[2]
 	nftIDs[2] = temp
 
-	update := Update{ID: collID, Nfts: nftIDs}
-	data, err := json.Marshal(update)
-	assert.Nil(err)
-
-	// send update request
-	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/collections/update/nfts", tc.serverURL),
-		bytes.NewBuffer(data))
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
+	update := collectionUpdateNftsByIDinput{ID: collID, Nfts: nftIDs}
+	resp := updateCollectionNftsRequest(assert, update, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	// retrieve updated nft
@@ -390,8 +340,19 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)
-	assertValidResponse(assert, resp)
 
+	return resp
+}
+
+func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID) *http.Response {
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/nfts/get_unassigned?user_id=%s&skip_cache=false", tc.serverURL, userID),
+		nil)
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
 	return resp
 }
 
@@ -411,5 +372,52 @@ func sendUserGetRequest(assert *assert.Assertions, forUserID string, authenticat
 	assert.Nil(err)
 	assertValidResponse(assert, resp)
 
+	return resp
+}
+
+func createCollectionRequest(assert *assert.Assertions, input collectionCreateInput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	// send update request
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/create", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
+}
+
+func updateCollectionInfoRequest(assert *assert.Assertions, input collectionUpdateInfoByIDInput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	// send update request
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/update/info", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
+}
+func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpdateNftsByIDinput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	// send update request
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/collections/update/nfts", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
 	return resp
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -18,16 +19,16 @@ const (
 
 // Nft represents an nft both in the database and throughout the application
 type Nft struct {
-	Version      int64   `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime float64 `bson:"created_at"        json:"created_at"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version"              json:"version"` // schema version for this model
+	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
 
-	Name           string `bson:"name"                 json:"name"`
-	Description    string `bson:"description"          json:"description"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
 
+	Name             string   `bson:"name"                 json:"name"`
+	Description      string   `bson:"description"          json:"description"`
 	ExternalURL      string   `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress   string   `bson:"creator_address"      json:"creator_address"`
@@ -62,6 +63,12 @@ type Contract struct {
 	ContractSchemaName   string `bson:"contract_schema_name" json:"schema_name"`
 	ContractSymbol       string `bson:"contract_symbol" json:"symbol"`
 	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
+}
+
+// UpdateNFTInfoInput represents a MongoDB input to update the user defined info
+// associated with a given NFT in the DB
+type UpdateNFTInfoInput struct {
+	CollectorsNote string `bson:"collectors_note"`
 }
 
 // NftCreateBulk is a helper function to create multiple nfts in one call and returns
@@ -151,7 +158,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 
 	for i, v := range pNfts {
 
-		now := float64(time.Now().UnixNano()) / 1000000000.0
+		now := primitive.NewDateTimeFromTime(time.Now())
 
 		asMap, err := structToBsonMap(v)
 		if err != nil {
@@ -165,7 +172,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 		delete(asMap, "_id")
 
 		// set created at if this is a new insert
-		if asMap["created_at"] != float64(0) {
+		if _, ok := asMap["created_at"]; !ok {
 			asMap["created_at"] = now
 		}
 
@@ -174,7 +181,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 			Filter: bson.M{"opensea_id": v.OpenSeaID},
 			Update: bson.M{
 				"$setOnInsert": bson.M{
-					"_id": generateID(now),
+					"_id": generateID(asMap),
 				},
 				"$set": asMap,
 			},
