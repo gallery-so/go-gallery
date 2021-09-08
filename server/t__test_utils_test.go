@@ -16,6 +16,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type TestConfig struct {
+	server    *httptest.Server
+	serverURL string
+	r         *runtime.Runtime
+	user1     *TestUser
+	user2     *TestUser
+}
+
+var tc *TestConfig
+
 type TestUser struct {
 	id       persist.DBID
 	address  string
