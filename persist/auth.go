@@ -6,6 +6,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -20,9 +21,10 @@ const (
 type UserNonce struct {
 	Version int64 `bson:"version" mapstructure:"version"`
 
-	ID           DBID    `bson:"_id"           json:"id"`
-	CreationTime float64 `bson:"created_at" json:"created_at"`
-	Deleted      bool    `bson:"deleted"       json:"-"`
+	ID           DBID               `bson:"_id"           json:"id"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted"       json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	Value   string `bson:"value"   json:"value"`
 	UserID  DBID   `bson:"user_id" json:"user_id"`
@@ -32,10 +34,10 @@ type UserNonce struct {
 // UserLoginAttempt represents a single attempt for a user to login despite the success
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
-	Version      int64   `bson:"version"`
-	ID           DBID    `bson:"_id"`
-	CreationTime float64 `bson:"created_at"`
-	Deleted      bool    `bson:"deleted"       json:"-"`
+	Version      int64              `bson:"version"`
+	ID           DBID               `bson:"_id"`
+	CreationTime primitive.DateTime `bson:"created_at"`
+	Deleted      bool               `bson:"deleted"       json:"-"`
 
 	Address        string `bson:"address"     json:"address"`
 	Signature      string `bson:"signature"`

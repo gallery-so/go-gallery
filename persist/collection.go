@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -21,10 +22,10 @@ const (
 // between collections and NFTS
 // This struct will only be used when updating or querying the database
 type CollectionDB struct {
-	Version      int64   `bson:"version" json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id" json:"id" binding:"required"`
-	CreationTime float64 `bson:"created_at" json:"created_at"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version" json:"version"` // schema version for this model
+	ID           DBID               `bson:"_id" json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
@@ -40,10 +41,11 @@ type CollectionDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type Collection struct {
-	Version      int64   `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID    `bson:"_id"           json:"id" binding:"required"`
-	CreationTime float64 `bson:"created_at" json:"created_at"`
-	Deleted      bool    `bson:"deleted" json:"-"`
+	Version      int64              `bson:"version"       json:"version"` // schema version for this model
+	ID           DBID               `bson:"_id"           json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
+	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
