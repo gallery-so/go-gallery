@@ -9,3 +9,5 @@
 
 *.csv
 
+node_modules/
+yarn.lock
