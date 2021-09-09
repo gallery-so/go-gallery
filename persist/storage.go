@@ -24,13 +24,16 @@ type redisDB int
 const (
 	// CollectionsUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
 	CollectionsUnassignedRDB redisDB = iota
-	// OpenseaGetRDB is a throttled cache for expensive queries finding Opensea NFTs
-	OpenseaGetRDB
+	// OpenseaAssetsRDB is a throttled cache for expensive queries finding Opensea NFTs
+	OpenseaAssetsRDB
+	// OpenseaTransfersRDB is a throttled cache for expensive queries finding Opensea Transfer Events
+	OpenseaTransfersRDB
 )
 
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
-	openseaGetTTL           time.Duration = time.Minute * 5
+	openseaAssetsTTL        time.Duration = time.Minute * 5
+	openseaTransfersTTL     time.Duration = time.Minute * 5
 )
 
 // DBID represents a mongo database ID

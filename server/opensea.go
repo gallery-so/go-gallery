@@ -1,25 +1,29 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
-	"github.com/parnurzeal/gorequest"
-	log "github.com/sirupsen/logrus"
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/mikeydub/go-gallery/util"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // persist.GLRYnft struct tags reflect the json data of an open sea response and therefore
 // can be unmarshalled from the api response
-type openSeaAPIresponse struct {
-	Assets []*openseaNFT `json:"assets"`
+type openSeaAssets struct {
+	Assets []*openseaAsset `json:"assets"`
 }
 
-type openseaNFT struct {
+type openseaAsset struct {
 	Version int64 `json:"version"` // schema version for this model
 	ID      int   `json:"id"`
 
@@ -28,7 +32,7 @@ type openseaNFT struct {
 
 	ExternalURL      string           `json:"external_url"`
 	TokenMetadataURL string           `json:"token_metadata_url"`
-	Creator          openseaCreator   `json:"creator"`
+	Creator          openseaAccount   `json:"creator"`
 	Contract         persist.Contract `json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
@@ -47,7 +51,15 @@ type openseaNFT struct {
 	AcquisitionDateStr string `json:"acquisition_date"`
 }
 
-type openseaCreator struct {
+type openseaEvents struct {
+	Events []openseaEvent `json:"asset_events"`
+}
+type openseaEvent struct {
+	ToAccount   openseaAccount `json:"to_account"`
+	CreatedDate string         `json:"created_date"`
+}
+
+type openseaAccount struct {
 	User    openseaUser `json:"user"`
 	Address string      `json:"address"`
 }
@@ -55,10 +67,6 @@ type openseaCreator struct {
 type openseaUser struct {
 	Username string `json:"username"`
 }
-
-// OPEN_SEA_PIPELINE__ASSETS_FOR_ACC
-
-// ADD!! - persist OpenSea fetched assets as well.
 
 func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress string, skipCache bool,
 	pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
@@ -70,7 +78,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		}
 	}
 
-	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pCtx, pOwnerWalletAddress)
+	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pOwnerWalletAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +102,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	return asGalleryNfts, nil
 }
 
-func openSeaFetchAssetsForAcc(pCtx context.Context, pOwnerWalletAddressStr string) ([]*openseaNFT, error) {
+func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string) ([]*openseaAsset, error) {
 
 	/*{
 	*	"id": 21976544,
@@ -264,28 +272,59 @@ func openSeaFetchAssetsForAcc(pCtx context.Context, pOwnerWalletAddressStr strin
 	qsStr := strings.Join(qsLst, "&")
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?%s", qsStr)
 
-	log.WithFields(log.Fields{
-		"url":                  urlStr,
-		"owner_wallet_address": pOwnerWalletAddressStr,
-	}).Info("making HTTP request to OpenSea API")
-	_, respBytes, errs := gorequest.New().Get(urlStr).EndBytes()
-	if len(errs) > 0 {
-		return nil, errs[0]
-	}
-
-	response := openSeaAPIresponse{}
-	err := json.Unmarshal(respBytes, &response)
+	resp, err := http.Get(urlStr)
 	if err != nil {
-
 		return nil, err
 	}
-
-	// spew.Dump(assetsForAccLst)
+	defer resp.Body.Close()
+	response := &openSeaAssets{}
+	err = util.UnmarshallBody(response, resp.Body)
 
 	return response.Assets, nil
 }
 
-func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaNFT, pWalletAddress string, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
+func openseaGetOwnershipHistory(pCtx context.Context, pTokenID string, pTokenContractAddress string, pSkipCache bool, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
+	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
+	events := &persist.OwnershipHistory{}
+	if !pSkipCache {
+		cached, err := persist.HistoryGetCached(pCtx, getURL, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		if cached != "" {
+			err = json.Unmarshal([]byte(cached), events)
+			if err != nil {
+				return nil, err
+			}
+			return events, nil
+		}
+	}
+	resp, err := http.Get(getURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return nil, err
+	}
+	openseaEvents := &openseaEvents{}
+	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
+		return nil, err
+	}
+	events, err = openseaToGalleryEvents(pCtx, openseaEvents, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	err = persist.HistorySetCache(pCtx, events, getURL, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaAsset, pWalletAddress string, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 	ownerUser, err := persist.UserGetByAddress(pCtx, pWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
@@ -297,7 +336,7 @@ func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaNFT, pWall
 	return nfts, nil
 }
 
-func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID persist.DBID) *persist.Nft {
+func openseaToGalleryNft(nft *openseaAsset, pWalletAddres string, ownerUserID persist.DBID) *persist.Nft {
 
 	result := &persist.Nft{
 		OwnerUserID:          ownerUserID,
@@ -322,4 +361,29 @@ func openseaToGalleryNft(nft *openseaNFT, pWalletAddres string, ownerUserID pers
 
 	return result
 
+}
+
+func openseaToGalleryEvents(pCtx context.Context, pEvents *openseaEvents, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
+	timeLayout := "2006-01-02T15:04:05"
+	ownershipHistory := &persist.OwnershipHistory{Owners: []*persist.Owner{}}
+	for _, event := range pEvents.Events {
+		owner := &persist.Owner{}
+		time, err := time.Parse(timeLayout, event.CreatedDate)
+		if err != nil {
+			return nil, err
+		}
+		owner.TimeObtained = primitive.NewDateTimeFromTime(time)
+		owner.Address = event.ToAccount.Address
+		user, err := persist.UserGetByAddress(pCtx, event.ToAccount.Address, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		owner.UserID = user.ID
+		owner.Username = user.UserName
+		ownershipHistory.Owners = append(ownershipHistory.Owners, owner)
+	}
+	sort.Slice(ownershipHistory.Owners, func(i, j int) bool {
+		return ownershipHistory.Owners[i].TimeObtained.Time().After(ownershipHistory.Owners[j].TimeObtained.Time())
+	})
+	return ownershipHistory, nil
 }

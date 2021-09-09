@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +40,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 	assert.Equal(update.Name, body.Collections[0].Name)
@@ -70,7 +70,7 @@ func TestCreateCollection_Success(t *testing.T) {
 	}
 
 	createResp := &CreateResp{}
-	err = runtime.UnmarshallBody(createResp, resp.Body, tc.r)
+	err = util.UnmarshallBody(createResp, resp.Body)
 	assert.Nil(err)
 	assert.Empty(createResp.Error)
 
@@ -85,7 +85,7 @@ func TestCreateCollection_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
 	assert.Len(body.Collections[0].Nfts, 3)
 	assert.Empty(body.Error)
@@ -123,7 +123,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := NftsResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Nfts, 1)
 	assert.Empty(body.Error)
 }
@@ -196,7 +196,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	}
 
 	body := CollectionsResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 }
@@ -234,7 +234,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	}
 
 	body := CollectionsResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 2)
 	assert.Empty(body.Error)
 }
@@ -267,7 +267,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	}
 	// ensure collection was updated
 	body := CollectionGetResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
 	assert.Len(body.Collections[0].Nfts, 1)
 	assert.Empty(body.Error)
@@ -312,7 +312,7 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 	assert.Equal(update.Nfts[1], body.Collections[0].Nfts[1].ID)

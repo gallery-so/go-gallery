@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ func TestHealthcheck(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := healthcheckResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal("gallery operational", body.Message)
 	assert.Equal("local", body.Env)
 }
