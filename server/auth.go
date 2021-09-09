@@ -9,12 +9,12 @@ import (
 	"time"
 
 	// log "github.com/sirupsen/logrus"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
-	log "github.com/sirupsen/logrus"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -209,32 +209,30 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 	return output, nil
 }
 
-// VERIFY_SIGNATURE_ALL_METHODS
-
 func authVerifySignatureAllMethods(pSignatureStr string,
 	pNonce string,
 	pAddressStr string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
-	// DATA_HEADER - TRUE
-	validBool, gErr := authVerifySignatureSecondary(pSignatureStr,
+	// personal_sign
+	validBool, err := authVerifySignature(pSignatureStr,
 		pNonce,
 		pAddressStr,
-		true, // pUseDataHeaderBool
+		true,
 		pRuntime)
-	if gErr != nil {
-		return false, gErr
+	if err != nil {
+		return false, err
 	}
 
-	// DATA_HEADER - FALSE
 	if !validBool {
-		validBool, gErr = authVerifySignatureSecondary(pSignatureStr,
+		// eth_sign
+		validBool, err = authVerifySignature(pSignatureStr,
 			pNonce,
 			pAddressStr,
-			false, // pUseDataHeaderBool
+			false,
 			pRuntime)
-		if gErr != nil {
-			return false, gErr
+		if err != nil {
+			return false, err
 		}
 	}
 
@@ -242,9 +240,6 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 }
 
 // VERIFY_SIGNATURE
-
-// FINISH!! - also return the reason why the signature verification failed.
-//            for persistance in the LoginAttempt.
 
 func authVerifySignature(pSignatureStr string,
 	pDataStr string,
@@ -257,8 +252,6 @@ func authVerifySignature(pSignatureStr string,
 	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
 	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
 
-	// DATA
-
 	nonceWithPrepend := noncePrepend + pDataStr
 	var dataStr string
 	if pUseDataHeaderBool {
@@ -270,131 +263,30 @@ func authVerifySignature(pSignatureStr string,
 	dataBytesLst := []byte(dataStr)
 	dataHash := crypto.Keccak256Hash(dataBytesLst)
 
-	// SIGNATURE
-	log.WithFields(log.Fields{"signature": pSignatureStr}).Debug("signature to verify")
-	log.WithFields(log.Fields{"header": pUseDataHeaderBool}).Debug("use 'Ethereum Signed Message' header in verifying")
-	log.WithFields(log.Fields{"data": pDataStr}).Debug("data that was signed")
+	sig, err := hexutil.Decode(pSignatureStr)
+	if err != nil {
+		return false, err
+	}
+	if sig[64] != 27 && sig[64] != 28 {
+		return false, errors.New("invalid signature (V is not 27 or 28)")
+	}
+	sig[64] -= 27
 
-	signature, err := hexutil.Decode(pSignatureStr)
+	sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), sig)
 	if err != nil {
 		return false, err
 	}
 
-	//------------------
-	// SIGNATURE_V_NORMALIZE
-
-	// IMPORTANT!! - 27 - "v" is the last byte of the signature, and is either 27 or 28.
-	//                    its important because with eliptic curves multiple points on the curve
-	//                    can be calculated from "r" and "s" alone. this would result in 2 different pubkeys.
-	//                    "v" indicates which of those 2 points to use.
-	//
-	// https://github.com/ethereum/go-ethereum/issues/19751
-	// @karalabe commented on Jun 24, 2019:
-	// Originally Ethereum used 27 / 28 (which internally is just 0 / 1, just some weird bitcoin legacy to add 27).
-	// Later when we needed to support chain IDs in the signatures, the V as changed to ID*2 + 35 / ID*2 + 35.
-	// However, both V's are still supported on mainnet (Homestead vs. EIP155).
-	// The code was messy to pass V's around from low level crypto primitives in 27/28 notation,
-	// and then later for EIP155 to subtract 27, then do the whole x2+35 magic.
-	// The current logic is that the low level crypto operations returns 0/1 (because that is the canonical V value),
-	// and the higher level signers (Frontier, Homestead, EIP155) convert that V to whatever Ethereum specs on top of secp256k1.
-	// Use the high level signers, don't use the secp256k1 library directly. If you use the low level crypto library directly,
-	// you need to be aware of how generic ECC relates to Ethereum signatures.
-
-	log.WithFields(log.Fields{"id": signature[len(signature)-1]}).Debug("signature last byte (recovery ID)")
-	if signature[64] == 27 || signature[64] == 28 {
-		signature[64] -= 27
-	}
-
-	signatureNoRecoverIDbytesLst := signature[:len(signature)-1] // remove recovery id
-
-	//------------------
-	// PUBLIC_KEY
-
-	// EC_RECOVER - returns the address for the account that was used to create the signature.
-	//              compatible with eth_sign and personal_sign.
-	//
-	// It is important to know that the ECDSA signature scheme allows the public key to be
-	// recovered from the signed message together with the signature.
-	// The recovery process is based on some mathematical computations
-	// (described in the SECG: SEC 1 standard).
-	// The public key recovery from the ECDSA signature is very useful in bandwidth
-	// constrained or storage constrained environments (such as blockchain systems),
-	// when transmission or storage of the public keys cannot be afforded.
-	//
-
-	publicKey, err := crypto.SigToPub(dataHash.Bytes(), signature)
-
-	// publicKey, err := crypto.Ecrecover(dataHash.Bytes(), signature)
-	if err != nil {
-		return false, err
-	}
-
-	publicKeyBytesLst := crypto.CompressPubkey(publicKey) // []byte(publicKey)
-
-	//------------------
-
-	//------------------
-	// ADDRESSES_COMPARE - compare the address derived from the pubkey (which was derived from signature/data)
-	//                     with the address supplied to this function as the one thats expected to be the address
-	//                     sending the signature.
-	//                     malicious actor could send a different address from the address derived from the pubkey
-	//                     correlating to the private key used to generate the signature.
-	pubkeyAddressHexStr := crypto.PubkeyToAddress(*publicKey).Hex()
-
-	log.WithFields(log.Fields{"address": pubkeyAddressHexStr}).Debug("derived address from sig pubkey")
-	log.WithFields(log.Fields{"address": pAddress}).Debug("registered address with the msg/nonce")
-
-	var validBool bool
-	if pubkeyAddressHexStr == pAddress {
-		validBool = true
-	}
-	if !validBool {
-		return false, errors.New("address does not match signature")
-	}
-
-	validBool = crypto.VerifySignature(publicKeyBytesLst, dataHash.Bytes(), signatureNoRecoverIDbytesLst)
-
-	return validBool, nil
-}
-
-func authVerifySignatureSecondary(pSignatureStr string,
-	pDataStr string,
-	pAddress string,
-	pUseDataHeaderBool bool,
-	pRuntime *runtime.Runtime) (bool, error) {
-	nonceWithPrepend := noncePrepend + pDataStr
-	var dataStr string
-	if pUseDataHeaderBool {
-		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(nonceWithPrepend), nonceWithPrepend)
-	} else {
-		dataStr = nonceWithPrepend
-	}
-
-	dataBytesLst := []byte(dataStr)
-	dataHash := crypto.Keccak256Hash(dataBytesLst)
-
-	hexSignature, err := hexutil.Decode(pSignatureStr)
-	if err != nil {
-		return false, err
-	}
-
-	sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), hexSignature)
-	if err != nil {
-		log.Fatal(err)
-	}
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
 	if pubkeyAddressHexStr != pAddress {
 		return false, errors.New("address does not match signature")
 	}
 
-	sigPublicKey, err := crypto.Ecrecover(dataHash.Bytes(), hexSignature)
-	if err != nil {
-		log.Fatal(err)
-	}
+	publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
 
-	signatureNoRecoverID := hexSignature[:len(hexSignature)-1]
+	signatureNoRecoverID := sig[:len(sig)-1]
 
-	return crypto.VerifySignature(sigPublicKey, dataHash.Bytes(), signatureNoRecoverID), nil
+	return crypto.VerifySignature(publicKeyBytes, dataHash.Bytes(), signatureNoRecoverID), nil
 
 }
 
