@@ -375,11 +375,10 @@ func openseaToGalleryEvents(pCtx context.Context, pEvents *openseaEvents, pRunti
 		owner.TimeObtained = primitive.NewDateTimeFromTime(time)
 		owner.Address = event.ToAccount.Address
 		user, err := persist.UserGetByAddress(pCtx, event.ToAccount.Address, pRuntime)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			owner.UserID = user.ID
+			owner.Username = user.UserName
 		}
-		owner.UserID = user.ID
-		owner.Username = user.UserName
 		ownershipHistory.Owners = append(ownershipHistory.Owners, owner)
 	}
 	sort.Slice(ownershipHistory.Owners, func(i, j int) bool {
