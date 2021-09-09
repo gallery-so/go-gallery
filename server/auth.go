@@ -217,7 +217,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
 	// DATA_HEADER - TRUE
-	validBool, gErr := authVerifySignature(pSignatureStr,
+	validBool, gErr := authVerifySignatureSecondary(pSignatureStr,
 		pNonce,
 		pAddressStr,
 		true, // pUseDataHeaderBool
@@ -228,7 +228,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 
 	// DATA_HEADER - FALSE
 	if !validBool {
-		validBool, gErr = authVerifySignature(pSignatureStr,
+		validBool, gErr = authVerifySignatureSecondary(pSignatureStr,
 			pNonce,
 			pAddressStr,
 			false, // pUseDataHeaderBool
@@ -305,7 +305,7 @@ func authVerifySignature(pSignatureStr string,
 		signature[64] -= 27
 	}
 
-	signatureNoRecoverIDbytesLst := []byte(signature[:len(signature)-1]) // remove recovery id
+	signatureNoRecoverIDbytesLst := signature[:len(signature)-1] // remove recovery id
 
 	//------------------
 	// PUBLIC_KEY
@@ -345,7 +345,7 @@ func authVerifySignature(pSignatureStr string,
 	log.WithFields(log.Fields{"address": pAddress}).Debug("registered address with the msg/nonce")
 
 	var validBool bool
-	if pubkeyAddressHexStr == string(pAddress) {
+	if pubkeyAddressHexStr == pAddress {
 		validBool = true
 	}
 	if !validBool {
@@ -355,6 +355,47 @@ func authVerifySignature(pSignatureStr string,
 	validBool = crypto.VerifySignature(publicKeyBytesLst, dataHash.Bytes(), signatureNoRecoverIDbytesLst)
 
 	return validBool, nil
+}
+
+func authVerifySignatureSecondary(pSignatureStr string,
+	pDataStr string,
+	pAddress string,
+	pUseDataHeaderBool bool,
+	pRuntime *runtime.Runtime) (bool, error) {
+	nonceWithPrepend := noncePrepend + pDataStr
+	var dataStr string
+	if pUseDataHeaderBool {
+		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(nonceWithPrepend), nonceWithPrepend)
+	} else {
+		dataStr = nonceWithPrepend
+	}
+
+	dataBytesLst := []byte(dataStr)
+	dataHash := crypto.Keccak256Hash(dataBytesLst)
+
+	hexSignature, err := hexutil.Decode(pSignatureStr)
+	if err != nil {
+		return false, err
+	}
+
+	sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), hexSignature)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	if pubkeyAddressHexStr != pAddress {
+		return false, errors.New("address does not match signature")
+	}
+
+	sigPublicKey, err := crypto.Ecrecover(dataHash.Bytes(), hexSignature)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signatureNoRecoverID := hexSignature[:len(hexSignature)-1]
+
+	return crypto.VerifySignature(sigPublicKey, dataHash.Bytes(), signatureNoRecoverID), nil
+
 }
 
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput,
