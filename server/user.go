@@ -11,6 +11,13 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+var bannedUsernames = map[string]bool{
+	"password": true,
+	"auth":     true,
+	"welcome":  true,
+	"edit":     true,
+}
+
 type userUpdateInput struct {
 	UserNameStr string `json:"username" binding:"username"`
 	BioStr      string `json:"bio"`
@@ -61,6 +68,12 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
+
+		if _, ok := bannedUsernames[up.UserNameStr]; ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
+			return
+		}
+
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
