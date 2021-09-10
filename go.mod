@@ -7,7 +7,6 @@ go 1.16
 require (
 	cloud.google.com/go v0.81.0
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e // indirect
 	github.com/ethereum/go-ethereum v1.10.8

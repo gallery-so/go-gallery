@@ -14,6 +14,20 @@ const main = async () => {
 
   fs.writeFile("glry-nfts.csv", nfts, err => {
     if (err) {
+      console.error(err)
+      throw err
+    }
+  })
+
+  let { data: users } = await supabase
+    .from("users")
+    .select("*")
+    .neq("username", "")
+    .csv()
+
+  fs.writeFile("glry-users.csv", users, err => {
+    if (err) {
+      console.error(err)
       throw err
     }
   })
