@@ -6,51 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetUserByID_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
+
 	assert := assert.New(t)
 
-	// seed DB with user
-	username := "BingBong"
-	userID, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
-
-	resp, err := http.Get(fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, userID))
+	resp, err := http.Get(fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, tc.user1.id))
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
 	runtime.UnmarshallBody(&body, resp.Body, tc.r)
-	assert.Equal(username, body.UserName)
+	assert.Equal(tc.user1.username, body.UserName)
 }
 
 func TestGetUserByAddress_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
-
-	// seed DB with user
-	username := "BongBing"
-	_, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user2.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
 
 	resp, err := http.Get(fmt.Sprintf("%s/users/get?address=%s", tc.serverURL, tc.user2.address))
 	assert.Nil(err)
@@ -58,34 +37,24 @@ func TestGetUserByAddress_Success(t *testing.T) {
 
 	body := persist.User{}
 	runtime.UnmarshallBody(&body, resp.Body, tc.r)
-	assert.Equal(username, body.UserName)
+	assert.Equal(tc.user2.username, body.UserName)
 }
 
 func TestGetUserByUsername_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
-	// seed DB with user
-	username := "BingBongBing"
-	_, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
-
-	resp, err := http.Get(fmt.Sprintf("%s/users/get?username=%s", tc.serverURL, username))
+	resp, err := http.Get(fmt.Sprintf("%s/users/get?username=%s", tc.serverURL, tc.user1.username))
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
 	runtime.UnmarshallBody(&body, resp.Body, tc.r)
-	assert.Equal(username, body.UserName)
+	assert.Equal(tc.user1.username, body.UserName)
 }
 
 func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	userID := tc.user1.id
@@ -104,7 +73,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 }
 
 func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
 	userID := tc.user1.id
@@ -118,32 +87,17 @@ func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
 	assert.Empty(body.Addresses)
 }
 
-// TODO: test user creation
-// TODO: test creating user with DCInvestor then dCinvestor fails
-
 func TestUpdateUserAuthenticated_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
-
-	// seed DB with user
-	username := "BingBongBingBong"
-	userID, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
-	assert.Nil(err)
 
 	update := userUpdateInput{
 		UserNameStr: "kaito",
 	}
-	resp := updateUserInfoRequest(assert, update, jwt)
+	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
 	assert.Equal(update.UserNameStr, user.UserName)
 }
@@ -151,77 +105,42 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 // Updating the username to itself should not trigger an error, despite the DB
 // having a user entity with that username already
 func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
-	// seed DB with user
-	username := "BingBongBingBong"
-	userID, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
-	assert.Nil(err)
-
 	update := userUpdateInput{
-		UserNameStr: username,
+		UserNameStr: "bob",
 	}
-	resp := updateUserInfoRequest(assert, update, jwt)
+	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
 	assert.Equal(update.UserNameStr, user.UserName)
 }
 
 func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
-
-	// seed DB with user
-	username := "BingBongBingBing"
-	_, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
 
 	update := userUpdateInput{
 		UserNameStr: "kaito",
 	}
 	resp := updateUserInfoNoAuthRequest(assert, update)
-	spew.Dump(resp.Body)
-	assertValidJSONResponse(assert, resp)
+	assertGalleryErrorResponse(assert, resp)
 }
 
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
-	t.Cleanup(clearDB)
+	setupTest(t)
 	assert := assert.New(t)
 
-	// seed DB with user
-	username := "BingBongBingBong"
-	userID, err := persist.UserCreate(context.Background(), &persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{tc.user1.address},
-		Bio:                "punk",
-	}, tc.r)
-	assert.Nil(err)
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
-	assert.Nil(err)
-
 	update := userUpdateInput{
-		UserNameStr: tc.user1.username,
+		UserNameStr: tc.user2.username,
 	}
-	resp := updateUserInfoRequest(assert, update, jwt)
+	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertGalleryErrorResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), userID, tc.r)
+	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
 	assert.NotEqual(update.UserNameStr, user.UserName)
 }
@@ -230,7 +149,7 @@ func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/info", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 	client := &http.Client{}
@@ -243,7 +162,7 @@ func updateUserInfoNoAuthRequest(assert *assert.Assertions, input userUpdateInpu
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update", tc.serverURL), bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/info", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
 	client := &http.Client{}
 	resp, err := client.Do(req)

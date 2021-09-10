@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -14,6 +15,16 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+type TestConfig struct {
+	server    *httptest.Server
+	serverURL string
+	r         *runtime.Runtime
+	user1     *TestUser
+	user2     *TestUser
+}
+
+var tc *TestConfig
 
 type TestUser struct {
 	id       persist.DBID
@@ -62,7 +73,7 @@ func setup() *TestConfig {
 		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
 		r:         runtime,
 		user1:     generateTestUser(runtime, "bob"),
-		user2:     generateTestUser(runtime, "beb"),
+		user2:     generateTestUser(runtime, "john"),
 	}
 }
 
@@ -95,12 +106,7 @@ func assertGalleryErrorResponse(assert *assert.Assertions, resp *http.Response) 
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
-func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
-	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
-		Name:        collectionName,
-		OwnerUserID: userID,
-	}, tc.r)
-	assert.Nil(err)
-
-	return collID
+func setupTest(t *testing.T) {
+	tc = setup()
+	t.Cleanup(teardown)
 }

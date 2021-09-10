@@ -87,7 +87,11 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := false
+		userID, _ := getUserIDfromCtx(c)
+		if userID == input.UserID {
+			auth = true
+		}
 
 		output, err := userGetDb(
 			c,
@@ -96,7 +100,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			pRuntime,
 		)
 		if err != nil {
-			c.JSON(http.StatusNoContent, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
 			return
 		}
 
