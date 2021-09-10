@@ -158,27 +158,3 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
 }
-
-func getOwnershipHistory(pRuntime *runtime.Runtime) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		input := &getOwnershipHistoryInput{}
-		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
-			return
-		}
-		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
-		if err != nil || len(nfts) == 0 {
-			c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
-			return
-		}
-		nft := nfts[0]
-
-		history, err := openseaGetOwnershipHistory(c, nft.OpenSeaTokenID, nft.Contract.ContractAddress, input.SkipCache, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, getOwnershipHistoryOutput{OwnershipHistory: history})
-	}
-}

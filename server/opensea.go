@@ -97,9 +97,48 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		return nil, err
 	}
 
+	// if this is not necessary information to be returned, this could be made an async process
+	for _, nft := range asGalleryNfts {
+		history, err := openseaSyncHistory(pCtx, nft.ID, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		// will this modify the underlying NFT in the array, I sure hope so
+		nft.OwnershipHistory = history
+	}
+
 	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
 
 	return asGalleryNfts, nil
+}
+
+func openseaSyncHistory(pCtx context.Context, pNFTID persist.DBID, pTokenID string, pTokenContractAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
+	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
+	events := &persist.OwnershipHistory{}
+	resp, err := http.Get(getURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return nil, err
+	}
+	openseaEvents := &openseaEvents{}
+	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
+		return nil, err
+	}
+	events, err = openseaToGalleryEvents(pCtx, openseaEvents, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	err = persist.HistoryUpsert(pCtx, pNFTID, events, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string) ([]*openseaAsset, error) {
@@ -281,47 +320,6 @@ func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string) ([]*openseaAsset, e
 	err = util.UnmarshallBody(response, resp.Body)
 
 	return response.Assets, nil
-}
-
-func openseaGetOwnershipHistory(pCtx context.Context, pTokenID string, pTokenContractAddress string, pSkipCache bool, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
-	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
-	events := &persist.OwnershipHistory{}
-	if !pSkipCache {
-		cached, err := persist.HistoryGetCached(pCtx, getURL, pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		if cached != "" {
-			err = json.Unmarshal([]byte(cached), events)
-			if err != nil {
-				return nil, err
-			}
-			return events, nil
-		}
-	}
-	resp, err := http.Get(getURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, resp.Body); err != nil {
-		return nil, err
-	}
-	openseaEvents := &openseaEvents{}
-	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
-		return nil, err
-	}
-	events, err = openseaToGalleryEvents(pCtx, openseaEvents, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-
-	err = persist.HistorySetCache(pCtx, events, getURL, pRuntime)
-	if err != nil {
-		return nil, err
-	}
-	return events, nil
 }
 
 func openseaToGalleryNfts(pCtx context.Context, openseaNfts []*openseaAsset, pWalletAddress string, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {

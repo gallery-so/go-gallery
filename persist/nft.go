@@ -27,6 +27,8 @@ type Nft struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
 
+	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
+
 	Name             string   `bson:"name"                 json:"name"`
 	Description      string   `bson:"description"          json:"description"`
 	ExternalURL      string   `bson:"external_url"         json:"external_url"`
@@ -104,7 +106,7 @@ func NftCreate(pCtx context.Context, pNFT *Nft,
 // NftGetByUserID finds an nft by its owner user id
 func NftGetByUserID(pCtx context.Context, pUserID DBID,
 	pRuntime *runtime.Runtime) ([]*Nft, error) {
-	opts := options.Find()
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
@@ -112,7 +114,7 @@ func NftGetByUserID(pCtx context.Context, pUserID DBID,
 	mp := newStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.find(pCtx, bson.M{"owner_user_id": pUserID}, &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_user_id": pUserID}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -122,7 +124,7 @@ func NftGetByUserID(pCtx context.Context, pUserID DBID,
 // NftGetByID finds an nft by its id
 func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
-	opts := options.Find()
+	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
@@ -131,7 +133,7 @@ func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*N
 	mp := newStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.find(pCtx, bson.M{"_id": pID}, &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"_id": pID}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -279,4 +281,18 @@ func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
 	}
 
 	return diff, nil
+}
+
+func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {
+
+	return mongo.Pipeline{
+		{{Key: "$match", Value: matchFilter}},
+		{{Key: "$lookup", Value: bson.M{
+			"from":         "history",
+			"localField":   "_id",
+			"foreignField": "nft_id",
+			"as":           "ownership_history",
+		}}},
+		{{Key: "$set", Value: bson.M{"ownership_history": bson.M{"$arrayElemAt": []interface{}{"$ownership_history", 0}}}}},
+	}
 }
