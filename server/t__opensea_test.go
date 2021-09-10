@@ -6,7 +6,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/stretchr/testify/assert"
-	// gfcore "github.com/gloflow/gloflow/go/gf_core"
 )
 
 //---------------------------------------------------

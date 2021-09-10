@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -90,7 +91,7 @@ func dbInit(pMongoURLstr string,
 
 	var tlsConf *tls.Config
 	if pConfig.MongoUseTLS {
-		tlsCerts, err := accessSecret(context.Background(), mongoTLSSecretName)
+		tlsCerts, err := accessSecret(context.Background(), viper.GetString(mongoTLSSecretName))
 		if err != nil {
 			return nil, err
 		}
