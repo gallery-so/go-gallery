@@ -47,10 +47,10 @@ type Collection struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	Name           string `bson:"name"          json:"name"`
-	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    string `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []*Nft `bson:"nfts"          json:"nfts"`
+	Name           string           `bson:"name"          json:"name"`
+	CollectorsNote string           `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    string           `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []*CollectionNft `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -250,7 +250,12 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 		if err != nil {
 			return nil, err
 		}
-		result = []*Collection{{Nfts: nfts}}
+		collNfts := []*CollectionNft{}
+		for _, nft := range nfts {
+			collNfts = append(collNfts, nftToCollectionNft(nft))
+		}
+
+		result = []*Collection{{Nfts: collNfts}}
 	} else {
 		if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
 			return nil, err
@@ -334,5 +339,17 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 			},
 			"as": "nfts",
 		}}},
+	}
+}
+
+func nftToCollectionNft(nft *Nft) *CollectionNft {
+	return &CollectionNft{
+		ID:                nft.ID,
+		Name:              nft.Name,
+		CreationTime:      nft.CreationTime,
+		ImageURL:          nft.ImageURL,
+		ImageThumbnailURL: nft.ImageThumbnailURL,
+		ImagePreviewURL:   nft.ImagePreviewURL,
+		OwnerUserID:       nft.OwnerUserID,
 	}
 }

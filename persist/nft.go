@@ -53,6 +53,21 @@ type Nft struct {
 	AcquisitionDateStr string `bson:"acquisition_date" json:"acquisition_date"`
 }
 
+// CollectionNft represents and NFT in a collection of NFTs
+type CollectionNft struct {
+	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
+
+	OwnerUserID DBID `bson:"owner_user_id" json:"user_id"`
+
+	Name string `bson:"name"                 json:"name"`
+
+	// IMAGES - OPENSEA
+	ImageURL          string `bson:"image_url"           json:"image_url"`
+	ImageThumbnailURL string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
+	ImagePreviewURL   string `bson:"image_preview_url"   json:"image_preview_url"`
+}
+
 // Contract represents a smart contract's information for a given NFT
 type Contract struct {
 	ContractAddress      string `bson:"contract_address"     json:"address"`
