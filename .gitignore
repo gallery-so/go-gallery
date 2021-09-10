@@ -1,11 +1,9 @@
-
-
 # IDE
 .idea/gallery.iml
 
 # Misc
 .DS_Store
-
-
 *.csv
 
+# SECRITS
+decrypted-secrits*
