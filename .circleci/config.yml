@@ -1,14 +1,9 @@
 version: 2.1
-orbs:
-  gcp-cli: circleci/gcp-cli@2.2.0
 workflows:
   main:
     jobs:
       - build
-      - gcp-cli/install_and_initialize_cli
-      - keybase:
-          requires:
-            - gcp-cli/install_and_initialize_cli
+      - keybase
           # filters:
           #   branches:
           #     only:
@@ -63,6 +58,48 @@ jobs:
       - run:
           name: "Copy app.yamls"
           command: cp -R decrypted/* ./
+      - run:
+          command: |
+              install () {
+                # Set sudo to work whether logged in as root user or non-root user
+                if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+                cd ~/
+                curl -Ss --retry 5 https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-<<parameters.version>>-linux-x86_64.tar.gz | tar xz
+                echo 'source ~/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
+              }
+
+              if grep 'docker\|lxc' /proc/1/cgroup > /dev/null 2>&1; then
+                if [[ $(command -v gcloud) == "" ]]; then
+                  install
+                else
+                  echo "gcloud CLI is already installed."
+                fi
+              else
+                echo "----------------------------------------------------------------------------------------------------"
+                echo "this is a machine executor job, replacing default installation of gcloud CLI"
+                echo "----------------------------------------------------------------------------------------------------"
+                sudo rm -rf /opt/google-cloud-sdk
+                install
+              fi
+          name: Install latest gcloud CLI version, if not available
+      - run:
+          command: |
+              # Store service account
+              echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+
+              # Initialize gcloud CLI
+              gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+              gcloud --quiet config set project $GOOGLE_PROJECT_ID
+
+              if [[ -n $GOOGLE_COMPUTE_ZONE ]]; then
+                gcloud --quiet config set compute/zone $GOOGLE_COMPUTE_ZONE
+              elif [[ -n $GOOGLE_COMPUTE_REGION ]]; then
+                gcloud --quiet config set compute/region $GOOGLE_COMPUTE_REGION
+              else
+                echo "ERROR: Set GOOGLE_COMPUTE_ZONE or GOOGLE_COMPUTE_REGION env variable" >&2
+                exit 1
+              fi
+          name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy gcp"
           command: gcloud app deploy
