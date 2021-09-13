@@ -102,4 +102,4 @@ jobs:
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy gcp"
-          command: gcloud app deploy -y
+          command: gcloud app deploy
