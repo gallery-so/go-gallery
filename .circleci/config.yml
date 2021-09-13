@@ -47,7 +47,7 @@ jobs:
       - checkout
       - run:
           name: "Login keybase"
-          command: "keybase login gallerycibot <<< $'4'"
+          command: "keybase login gallerycibot \<< $'4'"
       - run:
           name: "Decrypt secrets"
           command: "keybase decrypt --paperkey -i secrits -o decrypted.zip"
