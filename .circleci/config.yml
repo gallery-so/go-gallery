@@ -44,6 +44,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: "Login to keybase"
+          command: "keybase login"
+      - run:
           name: "Decrypt secrets"
           command: "keybase decrypt -i secrits -o decrypted.zip"
       - run:
