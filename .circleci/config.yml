@@ -6,7 +6,12 @@ workflows:
   main:
     jobs:
       - build
-      - keybase
+      - gcp-cli/install_and_initialize_cli:
+          requires:
+            - build
+      - keybase:
+          requires:
+            - gcp-cli/install_and_initialize_cli
           # filters:
           #   branches:
           #     only:
@@ -55,7 +60,6 @@ jobs:
       - run:
           name: "Copy app.yamls"
           command: "cp -R decrypted/* ./"
-      - gcp-cli/install_and_initialize_cli
       - run:
           name: "Deploy gcp"
           command: "gcloud app deploy"
