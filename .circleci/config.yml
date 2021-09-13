@@ -46,11 +46,11 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "Login Keybase"
+          name: "Oneshot Keybase"
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: "keybase decrypt --paperkey -i secrits -o decrypted.zip"
+          command: "keybase decrypt -i secrits -o decrypted.zip"
       - run:
           name: "Unzip secrets file"
           command: "unzip decrypted.zip"
