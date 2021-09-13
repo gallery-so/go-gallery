@@ -40,6 +40,15 @@ type updateNftByIDInput struct {
 	CollectorsNote string       `form:"collectors_note"`
 }
 
+type getOwnershipHistoryInput struct {
+	NftID     persist.DBID `json:"id" form:"id" binding:"required"`
+	SkipCache bool         `json:"skip_cache" form:"skip_cache"`
+}
+
+type getOwnershipHistoryOutput struct {
+	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
+}
+
 func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}

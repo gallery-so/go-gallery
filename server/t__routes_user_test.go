@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestGetUserByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(tc.user1.username, body.UserName)
 }
 
@@ -36,7 +36,7 @@ func TestGetUserByAddress_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(tc.user2.username, body.UserName)
 }
 
@@ -49,7 +49,7 @@ func TestGetUserByUsername_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(tc.user1.username, body.UserName)
 }
 
@@ -67,7 +67,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(userID, body.ID)
 	assert.NotEmpty(body.Addresses)
 }
@@ -82,7 +82,7 @@ func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.User{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(userID, body.ID)
 	assert.Empty(body.Addresses)
 }

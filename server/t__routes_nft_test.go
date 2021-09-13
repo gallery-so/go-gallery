@@ -10,7 +10,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +30,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	body := persist.Nft{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(name, body.Name)
 }
 
@@ -43,7 +43,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.NftIDQueryNotProvided, body.Error)
 }
 
@@ -58,7 +58,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(fmt.Sprintf("no nfts found with id: %s", nonexistentNftID), body.Error)
 }
 
@@ -85,7 +85,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 
 	// ensure nft was updated
 	body := persist.Nft{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(update.CollectorsNote, body.CollectorsNote)
 }
 
@@ -106,7 +106,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.InvalidAuthHeader, body.Error)
 }
 
@@ -119,7 +119,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.NotEmpty(body.Error)
 }
 
@@ -133,7 +133,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 	assertGalleryErrorResponse(assert, resp)
 
 	body := errorResponse{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.CouldNotFindDocument, body.Error)
 }
 

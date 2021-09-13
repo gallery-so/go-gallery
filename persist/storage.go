@@ -24,13 +24,16 @@ type redisDB int
 const (
 	// CollectionsUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
 	CollectionsUnassignedRDB redisDB = iota
-	// OpenseaGetRDB is a throttled cache for expensive queries finding Opensea NFTs
-	OpenseaGetRDB
+	// OpenseaAssetsRDB is a throttled cache for expensive queries finding Opensea NFTs
+	OpenseaAssetsRDB
+	// OpenseaTransfersRDB is a throttled cache for expensive queries finding Opensea Transfer Events
+	OpenseaTransfersRDB
 )
 
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
-	openseaGetTTL           time.Duration = time.Minute * 5
+	openseaAssetsTTL        time.Duration = time.Minute * 5
+	openseaTransfersTTL     time.Duration = time.Minute * 5
 )
 
 // DBID represents a mongo database ID
@@ -174,8 +177,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
-	weWantToUpsertHere := true
-	opts = append(opts, &options.UpdateOptions{Upsert: &weWantToUpsertHere})
+	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
 	if err != nil {
@@ -185,13 +187,14 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	if _, ok := asMap["created_at"]; !ok {
 		asMap["created_at"] = now
 	}
+	delete(asMap, "_id")
+	for k := range query {
+		delete(asMap, k)
+	}
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
+	_, err = m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, &options.UpdateOptions{Upsert: boolin(true)})
 	if err != nil {
 		return err
-	}
-	if result.MatchedCount == 0 {
-		return &DocumentNotFoundError{}
 	}
 
 	return nil
@@ -310,7 +313,13 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 					if isValueEmpty(field) {
 						continue
 					}
+				case "only_get":
+					continue
 				}
+
+			}
+			if tag == "-" {
+				continue
 			}
 			if field.CanInterface() {
 				bsonMap[spl[0]] = field.Interface()

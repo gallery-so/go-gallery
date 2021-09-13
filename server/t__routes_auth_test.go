@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
-	err := runtime.UnmarshallBody(output, resp.Body, tc.r)
+	err := util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.Empty(output.Error)
 	assert.True(output.UserExists)

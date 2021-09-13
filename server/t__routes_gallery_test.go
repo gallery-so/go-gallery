@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,7 +58,7 @@ func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []
 	assertValidJSONResponse(assert, resp)
 
 	body := galleryGetOutput{}
-	runtime.UnmarshallBody(&body, resp.Body, tc.r)
+	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Galleries, 1)
 	retreivedCollections := body.Galleries[0].Collections
 
