@@ -57,7 +57,7 @@ jobs:
           command: unzip decrypted.zip
       - run:
           name: "Copy app.yamls"
-          command: cp -R decrypted/* ./
+          command: cp -R decrypted/app-dev.yaml ./app.yaml
       - run:
           command: |
               install () {
