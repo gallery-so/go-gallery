@@ -47,7 +47,7 @@ jobs:
       - checkout
       - run:
           name: "Update apt"
-          command: sudo apt-get update
+          command: apt-get update
       - run:
           name: "Oneshot Keybase"
           command: "keybase oneshot"
