@@ -50,8 +50,8 @@ jobs:
           name: "Decrypt secrets"
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
-          name: "Get unzip"
-          command: apt-get -y install unzip curl sudo
+          name: "Install cli dependencies"
+          command: apt-get -y install unzip curl sudo python3 
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
