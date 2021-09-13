@@ -3,11 +3,11 @@ workflows:
   main:
     jobs:
       - build
-      - deploy
-          # filters:
-          #   branches:
-          #     only:
-          #       - "main"
+      - deploy:
+          filters:
+            branches:
+              only:
+                - "main"
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -100,9 +100,6 @@ jobs:
                 exit 1
               fi
           name: Initialize gcloud CLI to connect to Google Cloud
-      - run:
-          name: "Update GCP components"
-          command: gcloud components update
       - run:
           name: "Deploy App Engine"
           command: gcloud app deploy
