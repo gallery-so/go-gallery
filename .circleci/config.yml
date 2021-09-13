@@ -51,7 +51,7 @@ jobs:
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
           name: "Get unzip"
-          command: apt-get install unzip curl sudo
+          command: apt-get -y install unzip curl sudo
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
