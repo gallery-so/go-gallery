@@ -1,11 +1,13 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
-orbs:
-  gcp-cli: circleci/gcp-cli@2.2.0
 workflows:
   main:
     jobs:
       - build
+      - deploy:
+          filters:
+            branches:
+              only:
+                - "main"
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -32,3 +34,72 @@ jobs:
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports
+  deploy:
+    working_directory: ~/go-gallery
+    docker:
+      - image: keybaseio/client
+    steps:
+      - checkout
+      - run:
+          name: "Update apt"
+          command: apt-get update
+      - run:
+          name: "Oneshot Keybase"
+          command: "keybase oneshot"
+      - run:
+          name: "Decrypt secrets"
+          command: keybase decrypt -i secrits -o decrypted.zip
+      - run:
+          name: "Install cli dependencies"
+          command: apt-get -y install unzip curl sudo python3 
+      - run:
+          name: "Unzip secrets file"
+          command: unzip decrypted.zip
+      - run:
+          name: "Copy app.yamls"
+          command: cp -R decrypted/app-dev.yaml ./app.yaml
+      - run:
+          command: |
+              install () {
+                # Set sudo to work whether logged in as root user or non-root user
+                if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+                cd ~/
+                curl -Ss --retry 5 https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-283.0.0-linux-x86_64.tar.gz | tar xz
+                echo 'source ~/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
+              }
+
+              if grep 'docker\|lxc' /proc/1/cgroup > /dev/null 2>&1; then
+                if [[ $(command -v gcloud) == "" ]]; then
+                  install
+                else
+                  echo "gcloud CLI is already installed."
+                fi
+              else
+                echo "----------------------------------------------------------------------------------------------------"
+                echo "this is a machine executor job, replacing default installation of gcloud CLI"
+                echo "----------------------------------------------------------------------------------------------------"
+                sudo rm -rf /opt/google-cloud-sdk
+                install
+              fi
+          name: Install latest gcloud CLI version, if not available
+      - run:
+          command: |
+              # Store service account
+              echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+
+              # Initialize gcloud CLI
+              gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+              gcloud --quiet config set project $GOOGLE_PROJECT_ID
+
+              if [[ -n $GOOGLE_COMPUTE_ZONE ]]; then
+                gcloud --quiet config set compute/zone $GOOGLE_COMPUTE_ZONE
+              elif [[ -n $GOOGLE_COMPUTE_REGION ]]; then
+                gcloud --quiet config set compute/region $GOOGLE_COMPUTE_REGION
+              else
+                echo "ERROR: Set GOOGLE_COMPUTE_ZONE or GOOGLE_COMPUTE_REGION env variable" >&2
+                exit 1
+              fi
+          name: Initialize gcloud CLI to connect to Google Cloud
+      - run:
+          name: "Deploy App Engine"
+          command: gcloud app deploy
