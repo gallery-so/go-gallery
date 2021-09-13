@@ -6,8 +6,6 @@ workflows:
   main:
     jobs:
       - build
-  deploy:
-    jobs:
       - keybase:
           filters:
             branches:
