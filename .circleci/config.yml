@@ -6,6 +6,7 @@ workflows:
   main:
     jobs:
       - build
+      - keybase
 jobs:
   build:
     working_directory: ~/go-gallery
