@@ -52,6 +52,9 @@ jobs:
           name: "Decrypt secrets"
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
+          name: "Get unzip"
+          command: "sudo apt-get install unzip"
+      - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
       - run:
