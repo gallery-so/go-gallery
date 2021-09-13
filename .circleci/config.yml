@@ -6,7 +6,23 @@ workflows:
   main:
     jobs:
       - build
-      - keybase
+  deploy:
+    jobs:
+      - keybase:
+          filters:
+            branches:
+              only:
+                - "main"
+      - gcp-cli/install_and_initialize_cli:
+          filters:
+            branches:
+              only:
+                - "main"
+      - gcp:
+          filters:
+            branches:
+              only:
+                - "main"
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -44,3 +60,11 @@ jobs:
       - run:
           name: "Unzip secrets file"
           command: "unzip decrypted.zip"
+  gcp:
+    working_directory: ~/go-gallery
+    docker:
+      - image: google/cloud-sdk
+    steps:
+      - run:
+          name: "Deploy gcp"
+          command: "gcloud app deploy"
