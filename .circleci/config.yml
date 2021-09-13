@@ -50,13 +50,13 @@ jobs:
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: "keybase decrypt -i secrits -o decrypted.zip"
+          command: keybase decrypt -i secrits -o decrypted.zip
       - run:
           name: "Unzip secrets file"
-          command: "unzip decrypted.zip"
+          command: unzip decrypted.zip
       - run:
           name: "Copy app.yamls"
-          command: "cp -R decrypted/* ./"
+          command: cp -R decrypted/* ./
       - run:
           name: "Deploy gcp"
-          command: "gcloud app deploy"
+          command: gcloud app deploy
