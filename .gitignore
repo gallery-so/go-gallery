@@ -1,11 +1,11 @@
-
-
 # IDE
 .idea/gallery.iml
 
 # Misc
 .DS_Store
-
-
 *.csv
 
+node_modules/
+yarn.lock
+# SECRITS
+decrypted*

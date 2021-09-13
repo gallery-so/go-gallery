@@ -31,6 +31,10 @@ type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
 }
 
+type getUnassignedNftsOutput struct {
+	Nfts []*persist.CollectionNft `json:"nfts"`
+}
+
 type updateNftByIDInput struct {
 	ID             persist.DBID `form:"id" binding:"required"`
 	CollectorsNote string       `form:"collectors_note"`
@@ -136,10 +140,10 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		coll, err := persist.CollGetUnassigned(c, userID, input.SkipCache, pRuntime)
 		if coll == nil || err != nil {
-			coll = &persist.Collection{Nfts: []*persist.Nft{}}
+			coll = &persist.Collection{Nfts: []*persist.CollectionNft{}}
 		}
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: coll.Nfts})
+		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
 	}
 }
 

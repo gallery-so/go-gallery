@@ -92,6 +92,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	if err != nil {
 		return nil, err
 	}
+
 	err = persist.NftRemoveDifference(pCtx, asGalleryNfts, pOwnerWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
@@ -108,6 +109,9 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	}
 
 	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
+	if err != nil {
+		return nil, err
+	}
 
 	return asGalleryNfts, nil
 }

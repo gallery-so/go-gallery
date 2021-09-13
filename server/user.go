@@ -11,6 +11,15 @@ import (
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
+var bannedUsernames = map[string]bool{
+	"password": true,
+	"auth":     true,
+	"welcome":  true,
+	"edit":     true,
+	"404":      true,
+	"nuke":     true,
+}
+
 type userUpdateInput struct {
 	UserNameStr string `json:"username" binding:"username"`
 	BioStr      string `json:"bio"`
@@ -61,6 +70,12 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
+
+		if _, ok := bannedUsernames[up.UserNameStr]; ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
+			return
+		}
+
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
@@ -87,7 +102,11 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := false
+		userID, _ := getUserIDfromCtx(c)
+		if userID == input.UserID {
+			auth = true
+		}
 
 		output, err := userGetDb(
 			c,
@@ -96,7 +115,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			pRuntime,
 		)
 		if err != nil {
-			c.JSON(http.StatusNoContent, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
 			return
 		}
 
