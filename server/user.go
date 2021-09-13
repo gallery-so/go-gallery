@@ -16,6 +16,8 @@ var bannedUsernames = map[string]bool{
 	"auth":     true,
 	"welcome":  true,
 	"edit":     true,
+	"404":      true,
+	"nuke":     true,
 }
 
 type userUpdateInput struct {
