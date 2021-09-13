@@ -101,5 +101,8 @@ jobs:
               fi
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
-          name: "Deploy gcp"
+          name: "Update GCP components"
+          command: gcloud components update
+      - run:
+          name: "Deploy App Engine"
           command: gcloud app deploy
