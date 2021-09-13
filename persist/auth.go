@@ -53,7 +53,7 @@ type UserLoginAttempt struct {
 func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAttempt,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, loginAttemptCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, loginAttemptCollName, pRuntime)
 
 	return mp.insert(pCtx, pLoginAttempt)
 
@@ -63,7 +63,7 @@ func AuthUserLoginAttemptCreate(pCtx context.Context, pLoginAttempt *UserLoginAt
 func AuthNonceGet(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (*UserNonce, error) {
 
-	mp := newStorage(0, noncesCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, noncesCollName, pRuntime)
 
 	opts := options.Find()
 	opts.SetSort(bson.M{"created_at": -1})
@@ -87,7 +87,7 @@ func AuthNonceGet(pCtx context.Context, pAddress string,
 func AuthNonceCreate(pCtx context.Context, pNonce *UserNonce,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, noncesCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, noncesCollName, pRuntime)
 
 	return mp.insert(pCtx, pNonce)
 

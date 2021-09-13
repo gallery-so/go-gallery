@@ -41,7 +41,7 @@ type UserUpdateInfoInput struct {
 func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	err := mp.update(pCtx, bson.M{
 		"_id": pID,
@@ -60,7 +60,7 @@ func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 func UserExistsByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (bool, error) {
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	countInt, err := mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}})
 
@@ -75,7 +75,7 @@ func UserExistsByAddress(pCtx context.Context, pAddress string,
 func UserCreate(pCtx context.Context, pUser *User,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	return mp.insert(pCtx, pUser)
 
@@ -85,7 +85,7 @@ func UserCreate(pCtx context.Context, pUser *User,
 func UserDelete(pCtx context.Context, pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 
@@ -101,7 +101,7 @@ func UserGetByID(pCtx context.Context, userID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	result := []*User{}
 	err := mp.find(pCtx, bson.M{"_id": userID}, &result, opts)
@@ -130,7 +130,7 @@ func UserGetByAddress(pCtx context.Context, pAddress string,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	result := []*User{}
 	err := mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
@@ -159,7 +159,7 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	result := []*User{}
 	err := mp.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result, opts)
@@ -180,7 +180,7 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 
 // UserAddAddresses pushes addresses into a user's address list
 func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
-	mp := newStorage(0, usersCollName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
 
 	return mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

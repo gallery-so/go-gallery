@@ -101,7 +101,7 @@ type UpdateNFTInfoInput struct {
 func NftCreateBulk(pCtx context.Context, pNfts []*Nft,
 	pRuntime *runtime.Runtime) ([]DBID, error) {
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 
 	nfts := make([]interface{}, len(pNfts))
 
@@ -121,7 +121,7 @@ func NftCreateBulk(pCtx context.Context, pNfts []*Nft,
 func NftCreate(pCtx context.Context, pNFT *Nft,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 
 	return mp.insert(pCtx, pNFT)
 }
@@ -134,7 +134,7 @@ func NftGetByUserID(pCtx context.Context, pUserID DBID,
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 	result := []*Nft{}
 
 	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_user_id": pUserID}), &result, opts); err != nil {
@@ -153,7 +153,7 @@ func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*N
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 	result := []*Nft{}
 
 	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"_id": pID}), &result, opts); err != nil {
@@ -168,7 +168,7 @@ func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*N
 // pUpdate is a struct that has bson tags representing the fields to be updated
 func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interface{}, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
 }
@@ -177,7 +177,7 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
 func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 
 	upsertModels := make([]mongo.WriteModel, len(pNfts))
 
@@ -224,7 +224,7 @@ func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRu
 // empty owner id and address
 func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress string, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 	// FIND DIFFERENCE AND DELETE OUTLIERS
 	// -------------------------------------------------------
 	opts := options.Find()
@@ -261,7 +261,7 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
 func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
 	defer mp.cacheClose()
 
 	toCache, err := json.Marshal(pNfts)
@@ -274,7 +274,7 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nf
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
 func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
 	defer mp.cacheClose()
 
 	result, err := mp.cacheGet(pCtx, string(pWalletAddress))

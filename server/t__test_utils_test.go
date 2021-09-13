@@ -85,7 +85,7 @@ func teardown() {
 }
 
 func clearDB() {
-	tc.r.DB.MongoDB.Drop(context.Background())
+	tc.r.DB.MongoClient.Database(runtime.GalleryDBName).Drop(context.Background())
 }
 
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {

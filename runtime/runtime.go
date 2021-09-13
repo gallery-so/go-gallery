@@ -19,6 +19,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	// GalleryDBName represents the database name for gallery related information
+	GalleryDBName = "gallery"
+	// InfraDBName represents the database name for eth infrastructure related information
+	InfraDBName = "infra"
+)
+
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
 	Config *Config
@@ -29,7 +36,6 @@ type Runtime struct {
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
 type DB struct {
 	MongoClient *mongo.Client
-	MongoDB     *mongo.Database
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -48,17 +54,13 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	mongoURLstr := pConfig.MongoURL
 
-	mongoDBnameStr := pConfig.MongoDBName
-
-	db, err := dbInit(mongoURLstr,
-		mongoDBnameStr,
-		pConfig)
+	db, err := dbInit(mongoURLstr, pConfig)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = setupMongoIndexes(db.MongoDB)
+	err = setupMongoIndexes(db.MongoClient.Database(GalleryDBName))
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +86,6 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 }
 
 func dbInit(pMongoURLstr string,
-	pMongoDBNamestr string,
 	pConfig *Config) (*DB, error) {
 
 	log.WithFields(log.Fields{}).Info("connecting to mongo...")
@@ -100,9 +101,7 @@ func dbInit(pMongoURLstr string,
 			return nil, err
 		}
 	}
-	mongoDB, mongoClient, err := connectMongo(pMongoURLstr,
-		pMongoDBNamestr,
-		tlsConf)
+	mongoClient, err := connectMongo(pMongoURLstr, tlsConf)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +109,6 @@ func dbInit(pMongoURLstr string,
 
 	db := &DB{
 		MongoClient: mongoClient,
-		MongoDB:     mongoDB,
 	}
 
 	return db, nil
@@ -142,9 +140,8 @@ func setupMongoIndexes(db *mongo.Database) error {
 }
 
 func connectMongo(pMongoURL string,
-	pDbName string,
 	pTLS *tls.Config,
-) (*mongo.Database, *mongo.Client, error) {
+) (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 	defer cancel()
@@ -158,15 +155,13 @@ func connectMongo(pMongoURL string,
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	err = mClient.Ping(ctx, readpref.Primary())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	db := mClient.Database(pDbName)
-
-	return db, mClient, nil
+	return mClient, nil
 }

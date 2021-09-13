@@ -48,8 +48,8 @@ type storage struct {
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
 // and the specified version
-func newStorage(version int64, collName string, runtime *runtime.Runtime) *storage {
-	coll := runtime.DB.MongoDB.Collection(collName)
+func newStorage(version int64, dbName, collName string, runtime *runtime.Runtime) *storage {
+	coll := runtime.DB.MongoClient.Database(dbName).Collection(collName)
 
 	return &storage{version: version, collection: coll}
 }

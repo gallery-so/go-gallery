@@ -24,7 +24,7 @@ func healthcheck(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 func nuke(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := pRuntime.DB.MongoDB.Drop(context.Background())
+		err := pRuntime.DB.MongoClient.Database(runtime.GalleryDBName).Drop(context.Background())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{
 				Error: err.Error(),

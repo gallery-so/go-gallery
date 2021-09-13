@@ -81,7 +81,7 @@ type CollectionUpdateDeletedInput struct {
 func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -117,7 +117,7 @@ func CollGetByUserID(pCtx context.Context, pUserID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime)
 
 	result := []*Collection{}
 
@@ -144,7 +144,7 @@ func CollGetByID(pCtx context.Context, pID DBID,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, collectionColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime)
 
 	result := []*Collection{}
 
@@ -167,7 +167,7 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
@@ -184,7 +184,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
 	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -205,7 +205,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
@@ -225,7 +225,7 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	defer mp.cacheClose()
 
 	result := []*Collection{}

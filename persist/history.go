@@ -41,7 +41,7 @@ func HistoryUpsert(pCtx context.Context, pNFTID DBID, pHistory *OwnershipHistory
 	if err != nil {
 		return err
 	}
-	mp := newStorage(0, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
 	err = mp.cacheSet(pCtx, string(pNFTID), string(history), openseaTransfersTTL)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func HistoryUpsert(pCtx context.Context, pNFTID DBID, pHistory *OwnershipHistory
 
 // HistoryGet retrieves a transfer from the memory storage
 func HistoryGet(pCtx context.Context, pNFTID DBID, skipCache bool, pRuntime *runtime.Runtime) (*OwnershipHistory, error) {
-	mp := newStorage(0, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
 	if !skipCache {
 		history := &OwnershipHistory{}
 		val, err := mp.cacheGet(pCtx, string(pNFTID))

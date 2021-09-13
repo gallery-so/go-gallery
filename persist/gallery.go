@@ -52,7 +52,7 @@ type GalleryUpdateInput struct {
 func GalleryCreate(pCtx context.Context, pGallery *GalleryDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
 	if pGallery.Collections == nil {
 		pGallery.Collections = []DBID{}
@@ -69,14 +69,14 @@ func GalleryUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
 }
 
 // GalleryAddCollections adds collections to the specified gallery
 func GalleryAddCollections(pCtx context.Context, pID DBID, pUserID DBID, pCollectionIDs []DBID, pRuntime *runtime.Runtime) error {
-	mp := newStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
 	return mp.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
 }
@@ -92,7 +92,7 @@ func GalleryGetByUserID(pCtx context.Context, pUserID DBID, pAuth bool,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
@@ -113,7 +113,7 @@ func GalleryGetByID(pCtx context.Context, pID DBID, pAuth bool,
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, galleryColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
 	result := []*Gallery{}
 
