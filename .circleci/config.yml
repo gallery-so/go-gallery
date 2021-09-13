@@ -47,7 +47,7 @@ jobs:
       - checkout
       - run:
           name: "Decrypt secrets"
-          command: "keybase decrypt --paperkey $KEYBASE_PAPERKEY -i secrits -o decrypted.zip"
+          command: "keybase decrypt -i secrits -o decrypted.zip"
       - run:
           name: "Unzip secrets file"
           command: "unzip decrypted.zip"
