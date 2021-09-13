@@ -3,7 +3,7 @@ workflows:
   main:
     jobs:
       - build
-      - keybase
+      - deploy
           # filters:
           #   branches:
           #     only:
@@ -34,7 +34,7 @@ jobs:
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports
-  keybase:
+  deploy:
     working_directory: ~/go-gallery
     docker:
       - image: keybaseio/client
@@ -102,4 +102,4 @@ jobs:
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy gcp"
-          command: gcloud app deploy
+          command: gcloud app deploy -y
