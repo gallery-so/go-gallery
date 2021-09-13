@@ -47,7 +47,7 @@ jobs:
       - checkout
       - run:
           name: "Login Keybase"
-          command: "keybase login $KEYBASE_USERNAME --paperkey $KEYBASE_PAPERKEY"
+          command: "keybase login $KEYBASE_USERNAME"
       - run:
           name: "Decrypt secrets"
           command: "keybase decrypt -f -i secrits -o decrypted.zip"
