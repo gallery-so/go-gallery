@@ -1,21 +1,9 @@
 # Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
-orbs:
-  gcp-cli: circleci/gcp-cli@2.2.0
 workflows:
   main:
     jobs:
       - build
-      - keybase
-          # filters:
-          #   branches:
-          #     only:
-          #       - "main"
-      - gcp-cli/install_and_initialize_cli
-          # filters:
-          #   branches:
-          #     only:
-          #       - "main"
       - gcp
           # filters:
           #   branches:
@@ -47,22 +35,19 @@ jobs:
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports
-  keybase:
+  gcp:
     working_directory: ~/go-gallery
     docker:
+      - image: google/cloud-sdk
       - image: "keybaseio/client"
     steps:
+      - checkout
       - run:
           name: "Decrypt secrets"
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
           name: "Unzip secrets file"
           command: "unzip decrypted.zip"
-  gcp:
-    working_directory: ~/go-gallery
-    docker:
-      - image: google/cloud-sdk
-    steps:
       - run:
           name: "Deploy gcp"
           command: "gcloud app deploy"
