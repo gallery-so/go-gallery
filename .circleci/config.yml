@@ -46,6 +46,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: "Login keybase"
+          command: "keybase login gallerycibot --paperkey $KEYBASE_PAPERKEY"
+      - run:
           name: "Decrypt secrets"
           command: "keybase decrypt -i secrits -o decrypted.zip"
       - run:
