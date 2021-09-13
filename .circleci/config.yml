@@ -4,6 +4,11 @@ workflows:
   main:
     jobs:
       - build
+      - keybase
+          # filters:
+          #   branches:
+          #     only:
+          #       - "main"
       - gcp
           # filters:
           #   branches:
@@ -35,11 +40,10 @@ jobs:
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - store_test_results:
           path: /tmp/test-reports
-  gcp:
+  keybase:
     working_directory: ~/go-gallery
     docker:
-      - image: google/cloud-sdk
-      - image: "keybaseio/client"
+      - image: keybaseio/client
     steps:
       - checkout
       - run:
@@ -48,6 +52,12 @@ jobs:
       - run:
           name: "Unzip secrets file"
           command: "unzip decrypted.zip"
+  gcp:
+    working_directory: ~/go-gallery
+    docker:
+      - image: google/cloud-sdk
+    steps:
+      - checkout
       - run:
           name: "Deploy gcp"
           command: "gcloud app deploy"
