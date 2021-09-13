@@ -62,6 +62,8 @@ type CollectionNft struct {
 
 	Name string `bson:"name"                 json:"name"`
 
+	Contract ContractCollectionNft `bson:"contract"     json:"asset_contract"`
+
 	// IMAGES - OPENSEA
 	ImageURL          string `bson:"image_url"           json:"image_url"`
 	ImageThumbnailURL string `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
@@ -78,6 +80,12 @@ type Contract struct {
 	ContractSchemaName   string `bson:"contract_schema_name" json:"schema_name"`
 	ContractSymbol       string `bson:"contract_symbol" json:"symbol"`
 	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
+}
+
+// ContractCollectionNft represents a contract within a collection nft
+type ContractCollectionNft struct {
+	ContractName  string `bson:"contract_name" json:"name"`
+	ContractImage string `bson:"contract_image_url" json:"image_url"`
 }
 
 // UpdateNFTInfoInput represents a MongoDB input to update the user defined info
