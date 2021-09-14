@@ -9,6 +9,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type collectionGetByUserIDInput struct {
@@ -61,7 +62,7 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &collectionGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -85,7 +86,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &collectionGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -94,7 +95,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		auth := c.GetBool(authContextKey)
 		colls, err := persist.CollGetByID(c, input.ID, auth, pRuntime)
 		if len(colls) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{
+			c.JSON(http.StatusNotFound, util.ErrorResponse{
 				Error: fmt.Sprintf("no collections found with id: %s", input.ID),
 			})
 			return
@@ -117,7 +118,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -125,7 +126,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -134,7 +135,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		id, err := collectionCreateDb(c, input, userID, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -148,13 +149,13 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateInfoByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -162,11 +163,11 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -174,13 +175,13 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateHiddenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -188,11 +189,11 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -200,13 +201,13 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateNftsByIDinput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -214,11 +215,11 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		err := persist.CollUpdateNFTs(c, input.ID, userID, update, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -226,7 +227,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -234,7 +235,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -242,20 +243,20 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		if err != nil {
 			switch err.(type) {
 			case *persist.DocumentNotFoundError:
-				c.JSON(http.StatusNotFound, errorResponse{
+				c.JSON(http.StatusNotFound, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
 
 			default:
-				c.JSON(http.StatusInternalServerError, errorResponse{
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
 			}
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 

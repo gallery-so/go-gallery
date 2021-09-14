@@ -9,8 +9,11 @@ import (
 
 const (
 	env            = "GLRY_ENV"
+	infraEnv       = "INFRA_ENV"
 	baseURL        = "GLRY_BASE_URL"
+	infraBaseURL   = "INFRA_BASE_URL"
 	port           = "GLRY_PORT"
+	infraPort      = "INFRA_PORT"
 	portMetrics    = "GLRY_PORT_METRIM"
 	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
@@ -27,9 +30,12 @@ const (
 
 // Config represents an application configuration that is determined at runtime start
 type Config struct {
-	EnvStr         string
+	Env            string
+	InfraEnv       string
 	BaseURL        string
+	InfraBaseURL   string
 	Port           int
+	InfraPort      int
 	PortMetrics    int
 	AllowedOrigins string
 
@@ -50,8 +56,11 @@ func ConfigLoad() *Config {
 	//------------------
 	// DEFAULTS
 	viper.SetDefault(env, "local")
+	viper.SetDefault(infraEnv, "local")
 	viper.SetDefault(baseURL, "http://localhost:4000")
+	viper.SetDefault(infraBaseURL, "http://localhost:5000")
 	viper.SetDefault(port, 4000)
+	viper.SetDefault(infraPort, 5000)
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 
@@ -83,9 +92,12 @@ func ConfigLoad() *Config {
 	}
 
 	config := &Config{
-		EnvStr:         viper.GetString(env),
+		Env:            viper.GetString(env),
+		InfraEnv:       viper.GetString(infraEnv),
 		BaseURL:        viper.GetString(baseURL),
+		InfraBaseURL:   viper.GetString(infraBaseURL),
 		Port:           viper.GetInt(port),
+		InfraPort:      viper.GetInt(infraPort),
 		PortMetrics:    viper.GetInt(portMetrics),
 		AllowedOrigins: viper.GetString(allowedOrigins),
 
@@ -97,7 +109,7 @@ func ConfigLoad() *Config {
 		JWTtokenTTLsecInt: int64(viper.GetInt(jwtTokenTTLsecInt)),
 	}
 
-	if config.EnvStr == "local" {
+	if config.Env == "local" {
 		config.MongoURL = "mongodb://localhost:27017/"
 		config.RedisPassword = ""
 	} else {

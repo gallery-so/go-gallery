@@ -239,7 +239,7 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 	}
 
 	if len(dbNfts) > len(pNfts) {
-		diff, err := findDifference(pNfts, dbNfts)
+		diff, err := findDifferenceOfNFTs(pNfts, dbNfts)
 		if err != nil {
 			return err
 		}
@@ -289,7 +289,7 @@ func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *r
 	return nfts, nil
 }
 
-func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
+func findDifferenceOfNFTs(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
 	currOpenseaIds := map[int]bool{}
 
 	for _, v := range nfts {

@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -53,7 +54,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &authUserGetPreflightInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -61,7 +62,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		output, err := authUserGetPreflightDb(c, input, pRuntime)
 		if err != nil {
 			// TODO: log specific error and return user friendly error message instead
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 
 			return
 		}
@@ -75,7 +76,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			// TODO this should be Bad Request I think
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -89,7 +90,7 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			pRuntime,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 

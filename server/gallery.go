@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type galleryGetByUserIDInput struct {
@@ -16,7 +17,6 @@ type galleryGetByUserIDInput struct {
 type galleryGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
-
 
 type galleryUpdateInput struct {
 	ID          persist.DBID   `form:"id" json:"id" binding:"required"`
@@ -36,7 +36,7 @@ func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &galleryGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -60,7 +60,7 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		input := &galleryGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -69,7 +69,7 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		auth := c.GetBool(authContextKey)
 		galleries, err := persist.GalleryGetByID(c, input.ID, auth, pRuntime)
 		if len(galleries) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{
+			c.JSON(http.StatusNotFound, util.ErrorResponse{
 				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
 			})
 			return
@@ -89,13 +89,13 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -103,10 +103,10 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		err := persist.GalleryUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

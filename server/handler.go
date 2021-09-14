@@ -44,7 +44,7 @@ func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	// HEALTH
 	apiGroupV1.GET("/health", healthcheck(pRuntime))
-	if pRuntime.Config.EnvStr == "development" || pRuntime.Config.EnvStr == "local" {
+	if pRuntime.Config.Env == "development" || pRuntime.Config.Env == "local" {
 		apiGroupV1.GET("/nuke", nuke(pRuntime))
 	}
 

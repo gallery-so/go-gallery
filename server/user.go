@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var bannedUsernames = map[string]bool{
@@ -67,28 +68,28 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		up := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(up); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		if _, ok := bannedUsernames[up.UserNameStr]; ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "username is banned/invalid"})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		err := userUpdateInfoDB(c, userID, up, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -98,7 +99,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -115,7 +116,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			pRuntime,
 		)
 		if err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -130,13 +131,13 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		output, err := userCreateDb(c, input, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -150,19 +151,19 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		output, err := addAddressToUserDB(c, userID, input, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 

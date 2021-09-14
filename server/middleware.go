@@ -21,13 +21,13 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 				return
 			}
 			// get string after "Bearer"
@@ -36,7 +36,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 			// database that is unique to every user and session
 			valid, userID, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
 			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 
@@ -47,7 +47,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 
 			c.Set(userIDcontextKey, userID)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		c.Next()
@@ -76,7 +76,7 @@ func handleCORS(runtimeConfig *runtime.Config) gin.HandlerFunc {
 		requestOrigin := c.Request.Header.Get("Origin")
 		allowedOrigins := strings.Split(runtimeConfig.AllowedOrigins, ",")
 
-		if (util.Contains(allowedOrigins, requestOrigin)) {
+		if util.Contains(allowedOrigins, requestOrigin) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 
