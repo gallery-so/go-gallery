@@ -192,16 +192,16 @@ func ERC721RemoveDifference(pCtx context.Context, pERC721s []*ERC721, pWalletAdd
 	return nil
 }
 
-func erc721FindDifference(nfts []*ERC721, dbNfts []*ERC721) ([]DBID, error) {
-	currOpenseaIds := map[string]bool{}
+func erc721FindDifference(erc721s []*ERC721, dbErc721s []*ERC721) ([]DBID, error) {
+	currTokenIDs := map[string]bool{}
 
-	for _, v := range nfts {
-		currOpenseaIds[v.TokenID.String()] = true
+	for _, v := range erc721s {
+		currTokenIDs[v.TokenID.String()] = true
 	}
 
 	diff := []DBID{}
-	for _, v := range dbNfts {
-		if !currOpenseaIds[v.TokenID.String()] {
+	for _, v := range dbErc721s {
+		if !currTokenIDs[v.TokenID.String()] {
 			diff = append(diff, v.ID)
 		}
 	}
