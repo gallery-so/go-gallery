@@ -34,14 +34,25 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		tokens := []*persist.ERC721{}
 
 		if input.Address != "" {
-			result, err := persist.ERC721GetByAddress(c, input.Address, pRuntime)
-			if len(tokens) == 0 || err != nil {
-				tokens = []*persist.ERC721{}
+			result, err := persist.ERC721GetByWallet(c, input.Address, pRuntime)
+			if len(result) == 0 || err != nil {
+				result, err = NewRPC().GetERC721TokensForWallet(input.Address)
+				if len(result) == 0 || err != nil {
+					tokens = []*persist.ERC721{}
+				}
 			} else {
 				tokens = result
 			}
 		} else if input.ContractAddress != "" {
-			// TODO get for contract
+			result, err := persist.ERC721GetByContract(c, input.ContractAddress, pRuntime)
+			if len(result) == 0 || err != nil {
+				result, err = NewRPC().GetERC721TokensForContract(input.ContractAddress)
+				if len(result) == 0 || err != nil {
+					tokens = []*persist.ERC721{}
+				}
+			} else {
+				tokens = result
+			}
 		} else {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "wallet address or contract address required"})
 			return

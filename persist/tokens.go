@@ -42,7 +42,7 @@ type TokenContract struct {
 func ERC721CreateBulk(pCtx context.Context, pERC721s []*ERC721,
 	pRuntime *runtime.Runtime) ([]DBID, error) {
 
-	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
 	nfts := make([]interface{}, len(pERC721s))
 
@@ -62,20 +62,20 @@ func ERC721CreateBulk(pCtx context.Context, pERC721s []*ERC721,
 func ERC721Create(pCtx context.Context, pERC721 *ERC721,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
 	return mp.insert(pCtx, pERC721)
 }
 
-// ERC721GetByAddress inserts an ERC721 into the database
-func ERC721GetByAddress(pCtx context.Context, pAddress string,
+// ERC721GetByWallet gets ERC721 tokens for a given wallet address
+func ERC721GetByWallet(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) ([]*ERC721, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
 	result := []*ERC721{}
 
@@ -87,11 +87,31 @@ func ERC721GetByAddress(pCtx context.Context, pAddress string,
 	return result, nil
 }
 
+// ERC721GetByContract gets ERC721 tokens for a given contract
+func ERC721GetByContract(pCtx context.Context, pAddress string,
+	pRuntime *runtime.Runtime) ([]*ERC721, error) {
+	opts := options.Find()
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.SetMaxTime(dur)
+	}
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+
+	result := []*ERC721{}
+
+	err := mp.find(pCtx, bson.M{"token_contract.contract_address": pAddress}, result, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // ERC721BulkUpsert will create a bulk operation on the database to upsert many erc721s for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func ERC721BulkUpsert(pCtx context.Context, walletAddress string, pERC721s []*ERC721, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
 	upsertModels := make([]mongo.WriteModel, len(pERC721s))
 
@@ -136,9 +156,9 @@ func ERC721BulkUpsert(pCtx context.Context, walletAddress string, pERC721s []*ER
 
 // ERC721RemoveDifference will update all nfts that are not in the given slice of erc721s with having an
 // empty owner address
-func ERC721RemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress string, pRuntime *runtime.Runtime) error {
+func ERC721RemoveDifference(pCtx context.Context, pERC721s []*ERC721, pWalletAddress string, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 	// FIND DIFFERENCE AND DELETE OUTLIERS
 	// -------------------------------------------------------
 	opts := options.Find()
@@ -147,13 +167,13 @@ func ERC721RemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress s
 		opts.SetMaxTime(dur)
 	}
 
-	dbNfts := []*Nft{}
-	if err := mp.find(pCtx, bson.M{"owner_address": pWalletAddress}, &dbNfts, opts); err != nil {
+	dbERC721s := []*ERC721{}
+	if err := mp.find(pCtx, bson.M{"owner_address": pWalletAddress}, &dbERC721s, opts); err != nil {
 		return err
 	}
 
-	if len(dbNfts) > len(pNfts) {
-		diff, err := findDifferenceOfNFTs(pNfts, dbNfts)
+	if len(dbERC721s) > len(pERC721s) {
+		diff, err := erc721FindDifference(pERC721s, dbERC721s)
 		if err != nil {
 			return err
 		}
@@ -172,7 +192,7 @@ func ERC721RemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress s
 	return nil
 }
 
-func findDifference(nfts []*ERC721, dbNfts []*ERC721) ([]DBID, error) {
+func erc721FindDifference(nfts []*ERC721, dbNfts []*ERC721) ([]DBID, error) {
 	currOpenseaIds := map[string]bool{}
 
 	for _, v := range nfts {

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/persist"
 )
 
 // Clients is a wrapper for the alchemy clients necessary for json RPC and contract interaction
@@ -61,16 +62,6 @@ type TokenMetadata struct {
 	Logo   string `json:"logo"`
 }
 
-// ERC721 represents an ERC721 token
-type ERC721 struct {
-	Address  string `json:"address"`
-	Name     string `json:"name"`
-	Symbol   string `json:"symbol"`
-	TokenID  string `json:"tokenId"`
-	TokenURI string `json:"tokenURI"`
-	Owner    string `json:"owner"`
-}
-
 // NewRPC creates a new RPC client
 func NewRPC() *Clients {
 	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
@@ -119,6 +110,22 @@ func (r *Clients) GetTransfersTo(address string) ([]*Transfer, error) {
 	return result.Result.Transfers, nil
 }
 
+// GetContractTransfers returns the transfers for a given contract
+func (r *Clients) GetContractTransfers(address string) ([]*Transfer, error) {
+	result := &GetTransfersResponse{}
+
+	opts := map[string]interface{}{}
+	opts["contractAddresses"] = []string{address}
+	opts["category"] = []string{"token"}
+	opts["excludeZeroValue"] = false
+	err := r.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Result.Transfers, nil
+}
+
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
 func (r *Clients) GetTokenContractMetadata(address string) (*TokenMetadata, error) {
 	result := &GetMetadataResponse{}
@@ -154,8 +161,8 @@ func (r *Clients) GetTokenURI(address string, tokenID string) (string, error) {
 
 }
 
-// GetERC721Tokens returns the ERC721 token for the given
-func (r *Clients) GetERC721Tokens(address string) ([]*ERC721, error) {
+// GetERC721TokensForWallet returns the ERC721 token for the given wallet address
+func (r *Clients) GetERC721TokensForWallet(address string) ([]*persist.ERC721, error) {
 	from, err := r.GetTransfersFrom(address)
 	if err != nil {
 		return nil, err
@@ -170,7 +177,7 @@ func (r *Clients) GetERC721Tokens(address string) ([]*ERC721, error) {
 		return allTransfers[i].BlockNumber < allTransfers[j].BlockNumber
 	})
 
-	tokens := map[string]*ERC721{}
+	tokens := map[string]*persist.ERC721{}
 	uris := map[string]string{}
 	metadatas := map[string]*TokenMetadata{}
 	for _, t := range allTransfers {
@@ -193,20 +200,72 @@ func (r *Clients) GetERC721Tokens(address string) ([]*ERC721, error) {
 					}
 					uris[t.RawContract.Address+t.ERC721TokenID] = uri
 				}
-				tokens[t.RawContract.Address+t.ERC721TokenID] = &ERC721{
-					Address:  t.RawContract.Address,
-					Name:     metadatas[t.RawContract.Address].Name,
-					Symbol:   metadatas[t.RawContract.Address].Symbol,
-					TokenID:  t.ERC721TokenID,
-					TokenURI: uris[t.RawContract.Address+t.ERC721TokenID],
-					Owner:    t.To,
+				id := new(big.Int)
+				id.SetString(t.ERC721TokenID, 10)
+				tokens[t.RawContract.Address+t.ERC721TokenID] = &persist.ERC721{
+					TokenContract: persist.TokenContract{
+						Address:   t.RawContract.Address,
+						TokenName: metadatas[t.RawContract.Address].Name,
+						Symbol:    metadatas[t.RawContract.Address].Symbol,
+					},
+					TokenID:      id,
+					TokenURI:     uris[t.RawContract.Address+t.ERC721TokenID],
+					OwnerAddress: t.To,
 				}
 			} else {
 				delete(tokens, t.RawContract.Address+t.ERC721TokenID)
 			}
 		}
 	}
-	result := []*ERC721{}
+	result := []*persist.ERC721{}
+	for _, v := range tokens {
+		result = append(result, v)
+	}
+
+	return result, nil
+}
+
+// GetERC721TokensForContract returns the ERC721 token for the given contract address
+func (r *Clients) GetERC721TokensForContract(address string) ([]*persist.ERC721, error) {
+
+	allTransfers, err := r.GetContractTransfers(address)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(allTransfers, func(i, j int) bool {
+		return allTransfers[i].BlockNumber < allTransfers[j].BlockNumber
+	})
+
+	contractMetadata, err := r.GetTokenContractMetadata(address)
+
+	tokens := map[string]*persist.ERC721{}
+	uris := map[string]string{}
+	for _, t := range allTransfers {
+		if t.ERC721TokenID != "" {
+			if _, ok := uris[t.RawContract.Address+t.ERC721TokenID]; !ok {
+				uri, err := r.GetTokenURI(t.RawContract.Address, t.ERC721TokenID)
+				if err != nil {
+					return nil, err
+				}
+				uris[t.RawContract.Address+t.ERC721TokenID] = uri
+			}
+			id := new(big.Int)
+			id.SetString(t.ERC721TokenID, 10)
+			tokens[t.RawContract.Address+t.ERC721TokenID] = &persist.ERC721{
+				TokenContract: persist.TokenContract{
+					Address:   t.RawContract.Address,
+					TokenName: contractMetadata.Name,
+					Symbol:    contractMetadata.Symbol,
+				},
+				TokenID:      id,
+				TokenURI:     uris[t.RawContract.Address+t.ERC721TokenID],
+				OwnerAddress: t.To,
+			}
+
+		}
+	}
+	result := []*persist.ERC721{}
 	for _, v := range tokens {
 		result = append(result, v)
 	}

@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	nftColName           = "nfts"
-	nftCollectionColName = "nft_collections"
+	nftColName = "nfts"
 )
 
 // Nft represents an nft both in the database and throughout the application
@@ -239,7 +238,7 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 	}
 
 	if len(dbNfts) > len(pNfts) {
-		diff, err := findDifferenceOfNFTs(pNfts, dbNfts)
+		diff, err := nftFindDifference(pNfts, dbNfts)
 		if err != nil {
 			return err
 		}
@@ -289,7 +288,7 @@ func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *r
 	return nfts, nil
 }
 
-func findDifferenceOfNFTs(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
+func nftFindDifference(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
 	currOpenseaIds := map[int]bool{}
 
 	for _, v := range nfts {
