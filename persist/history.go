@@ -2,7 +2,6 @@ package persist
 
 import (
 	"context"
-	"log"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
@@ -34,7 +33,6 @@ type Owner struct {
 // HistoryUpsert caches a transfer in the memory storage
 func HistoryUpsert(pCtx context.Context, pNFTID DBID, pHistory *OwnershipHistory, pRuntime *runtime.Runtime) error {
 
-	log.Println("NFTID", pNFTID)
 	pHistory.NFTID = pNFTID
 	mp := newStorage(0, historyColName, pRuntime)
 
