@@ -193,3 +193,16 @@ func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, p
 
 	return mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
+
+func hasRecentUserEvent(pCtx context.Context, pEventType int, pUserID DBID, pRuntime *runtime.Runtime) (bool, error) {
+	mp := newStorage(0, eventColName, pRuntime)
+
+	query := bson.M{"type": pEventType, "created_at": bson.M{"$gte": time.Now().Add(-eventRecencyThreshold)}}
+	query["data"] = bson.M{"$elemMatch": bson.M{"type": EventItemTypeUser, "value": pUserID}}
+	count, err := mp.count(pCtx, query)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 1, nil
+}

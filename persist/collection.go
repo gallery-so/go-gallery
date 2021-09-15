@@ -101,14 +101,9 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 		return "", err
 	}
 
-	id, err := mp.insert(pCtx, pColl)
-	if err != nil {
-		return "", err
-	}
+	go createCollectionCreateEvent(pCtx, pColl.OwnerUserID, pRuntime)
 
-	go createCollectionCreateEvent(pCtx, id, pColl.OwnerUserID, pRuntime)
-
-	return id, nil
+	return mp.insert(pCtx, pColl)
 
 }
 
@@ -352,12 +347,11 @@ func createUpdateCollectionInfoEvent(ctx context.Context, coll, user DBID, runti
 	}
 }
 
-func createCollectionCreateEvent(ctx context.Context, coll, user DBID, runtime *runtime.Runtime) {
-	if has, err := hasRecentCollectionEvent(ctx, EventTypeCreateCollection, coll, runtime); !has && err == nil {
+func createCollectionCreateEvent(ctx context.Context, user DBID, runtime *runtime.Runtime) {
+	if has, err := hasRecentUserEvent(ctx, EventTypeCreateCollection, user, runtime); !has && err == nil {
 		eventCreate(ctx, &Event{
 			Type: EventTypeCreateCollection,
 			Data: []EventItem{
-				{Type: EventItemTypeCollection, Value: coll},
 				{Type: EventItemTypeUser, Value: user},
 			},
 		}, runtime)
