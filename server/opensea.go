@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -55,6 +56,7 @@ type openseaEvents struct {
 	Events []openseaEvent `json:"asset_events"`
 }
 type openseaEvent struct {
+	Asset       openseaAsset   `json:"asset"`
 	ToAccount   openseaAccount `json:"to_account"`
 	CreatedDate string         `json:"created_date"`
 }
@@ -88,7 +90,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		return nil, err
 	}
 
-	err = persist.NftBulkUpsert(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
+	_, err = persist.NftBulkUpsert(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -98,17 +100,12 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		return nil, err
 	}
 
-	// if this is not necessary information to be returned, this could be made an async process
-	for _, nft := range asGalleryNfts {
-		history, err := openseaSyncHistory(pCtx, nft.ID, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		// will this modify the underlying NFT in the array, I sure hope so
-		nft.OwnershipHistory = history
+	updatedNfts, err := openseaSyncHistories(pCtx, asGalleryNfts, pRuntime)
+	if err != nil {
+		return nil, err
 	}
 
-	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
+	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, updatedNfts, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +113,44 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 	return asGalleryNfts, nil
 }
 
-func openseaSyncHistory(pCtx context.Context, pNFTID persist.DBID, pTokenID string, pTokenContractAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
+func openseaSyncHistories(pCtx context.Context, pNfts []*persist.Nft, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
+	resultChan := make(chan *persist.Nft)
+	errorChan := make(chan error)
+	updatedNfts := []*persist.Nft{}
+	// atomic counter to track number of goroutines until all are done
+	left := int64(len(pNfts))
+	// create a goroutine for each nft and sync history
+	for _, nft := range pNfts {
+		go func(nft *persist.Nft) {
+			defer atomic.AddInt64(&left, -1)
+			history, err := openseaSyncHistory(pCtx, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
+			if err != nil {
+				errorChan <- err
+				return
+			}
+
+			nft.OwnershipHistory = history
+			resultChan <- nft
+		}(nft)
+	}
+
+	// wait for all goroutines to finish and collect results from chan
+	for {
+		select {
+		case nft := <-resultChan:
+			updatedNfts = append(updatedNfts, nft)
+		case err := <-errorChan:
+			return nil, err
+		default:
+		}
+		if atomic.LoadInt64(&left) == 0 {
+			break
+		}
+	}
+	return updatedNfts, nil
+}
+
+func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
 	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
 	events := &persist.OwnershipHistory{}
 	resp, err := http.Get(getURL)
@@ -132,12 +166,26 @@ func openseaSyncHistory(pCtx context.Context, pNFTID persist.DBID, pTokenID stri
 	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
 		return nil, err
 	}
+	var openseaID int
+	if len(openseaEvents.Events) > 0 {
+		openseaID = openseaEvents.Events[0].Asset.ID
+	}
+
 	events, err = openseaToGalleryEvents(pCtx, openseaEvents, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	err = persist.HistoryUpsert(pCtx, pNFTID, events, pRuntime)
+	nfts, err := persist.NftGetByOpenseaID(pCtx, openseaID, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	if len(nfts) == 0 {
+		return nil, fmt.Errorf("no NFT found for opensea id %d", openseaID)
+	}
+	nft := nfts[0]
+
+	err = persist.HistoryUpsert(pCtx, nft.ID, events, pRuntime)
 	if err != nil {
 		return nil, err
 	}
