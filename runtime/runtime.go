@@ -36,6 +36,8 @@ type Runtime struct {
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
 type DB struct {
 	MongoClient *mongo.Client
+	GalleryDB   *mongo.Database
+	InfraDB     *mongo.Database
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -109,6 +111,8 @@ func dbInit(pMongoURLstr string,
 
 	db := &DB{
 		MongoClient: mongoClient,
+		GalleryDB:   mongoClient.Database(GalleryDBName),
+		InfraDB:     mongoClient.Database(InfraDBName),
 	}
 
 	return db, nil

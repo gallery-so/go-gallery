@@ -16,6 +16,9 @@ const (
 	tokenColName = "tokens"
 )
 
+// TTB represents time til blockchain so that data isn't old in DB
+var TTB = time.Minute * 10
+
 // ERC721 represents an individual ERC721 token
 type ERC721 struct {
 	Version      int64              `bson:"version"              json:"version"` // schema version for this model
@@ -23,9 +26,10 @@ type ERC721 struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
-	TokenURI     string   `bson:"token_uri" json:"token_uri"`
-	TokenID      *big.Int `bson:"token_id" json:"token_id"`
-	OwnerAddress string   `bson:"owner_address" json:"owner_address"`
+	TokenURI       string   `bson:"token_uri" json:"token_uri"`
+	TokenID        *big.Int `bson:"token_id" json:"token_id"`
+	OwnerAddress   string   `bson:"owner_address" json:"owner_address"`
+	PreviousOwners []string `bson:"previous_owners" json:"previous_owners"`
 
 	TokenContract TokenContract `bson:"token_contract"`
 }
@@ -79,7 +83,7 @@ func ERC721GetByWallet(pCtx context.Context, pAddress string,
 
 	result := []*ERC721{}
 
-	err := mp.find(pCtx, bson.M{"owner_address": pAddress}, result, opts)
+	err := mp.find(pCtx, bson.M{"owner_address": pAddress, "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +103,7 @@ func ERC721GetByContract(pCtx context.Context, pAddress string,
 
 	result := []*ERC721{}
 
-	err := mp.find(pCtx, bson.M{"token_contract.contract_address": pAddress}, result, opts)
+	err := mp.find(pCtx, bson.M{"token_contract.contract_address": pAddress, "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +113,7 @@ func ERC721GetByContract(pCtx context.Context, pAddress string,
 
 // ERC721BulkUpsert will create a bulk operation on the database to upsert many erc721s for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func ERC721BulkUpsert(pCtx context.Context, walletAddress string, pERC721s []*ERC721, pRuntime *runtime.Runtime) error {
+func ERC721BulkUpsert(pCtx context.Context, pERC721s []*ERC721, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 

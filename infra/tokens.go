@@ -12,6 +12,7 @@ import (
 type getERC721TokensInput struct {
 	Address         string `form:"address"`
 	ContractAddress string `form:"contract_address"`
+	SkipDB          bool   `form:"skip_db"`
 }
 
 type getERC721TokensOutput struct {
@@ -34,24 +35,47 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		tokens := []*persist.ERC721{}
 
 		if input.Address != "" {
-			result, err := persist.ERC721GetByWallet(c, input.Address, pRuntime)
-			if len(result) == 0 || err != nil {
-				result, err = NewRPC().GetERC721TokensForWallet(input.Address)
+			if !input.SkipDB {
+				result, err := persist.ERC721GetByWallet(c, input.Address, pRuntime)
 				if len(result) == 0 || err != nil {
-					tokens = []*persist.ERC721{}
+					result, err = NewRPC().GetERC721TokensForWallet(c, input.Address, pRuntime)
+					if len(result) == 0 || err != nil {
+						tokens = []*persist.ERC721{}
+					} else {
+						tokens = result
+					}
+				} else {
+					tokens = result
 				}
 			} else {
-				tokens = result
+				result, err := NewRPC().GetERC721TokensForWallet(c, input.Address, pRuntime)
+				if len(result) == 0 || err != nil {
+					tokens = []*persist.ERC721{}
+				} else {
+					tokens = result
+				}
 			}
+
 		} else if input.ContractAddress != "" {
-			result, err := persist.ERC721GetByContract(c, input.ContractAddress, pRuntime)
-			if len(result) == 0 || err != nil {
-				result, err = NewRPC().GetERC721TokensForContract(input.ContractAddress)
+			if !input.SkipDB {
+				result, err := persist.ERC721GetByContract(c, input.ContractAddress, pRuntime)
 				if len(result) == 0 || err != nil {
-					tokens = []*persist.ERC721{}
+					result, err = NewRPC().GetERC721TokensForContract(c, input.ContractAddress, pRuntime)
+					if len(result) == 0 || err != nil {
+						tokens = []*persist.ERC721{}
+					} else {
+						tokens = result
+					}
+				} else {
+					tokens = result
 				}
 			} else {
-				tokens = result
+				result, err := NewRPC().GetERC721TokensForContract(c, input.ContractAddress, pRuntime)
+				if len(result) == 0 || err != nil {
+					tokens = []*persist.ERC721{}
+				} else {
+					tokens = result
+				}
 			}
 		} else {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "wallet address or contract address required"})
