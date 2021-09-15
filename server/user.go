@@ -12,12 +12,24 @@ import (
 )
 
 var bannedUsernames = map[string]bool{
-	"password": true,
-	"auth":     true,
-	"welcome":  true,
-	"edit":     true,
-	"404":      true,
-	"nuke":     true,
+	"password":      true,
+	"auth":          true,
+	"welcome":       true,
+	"edit":          true,
+	"404":           true,
+	"nuke":          true,
+	"account":       true,
+	"settings":      true,
+	"artists":       true,
+	"collections":   true,
+	"bookmarks":     true,
+	"notifications": true,
+	"explore":       true,
+	"gallery":       true,
+	"investors":     true,
+	"team":          true,
+	"feed":          true,
+	"curated":       true,
 }
 
 type userUpdateInput struct {
@@ -72,7 +84,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		if _, ok := bannedUsernames[up.UserNameStr]; ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is taken"})
 			return
 		}
 
