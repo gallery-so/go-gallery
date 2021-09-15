@@ -198,7 +198,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	}
 
 	user := &persist.User{
-		Addresses: []string{pInput.Address},
+		Addresses: []string{strings.ToLower(pInput.Address)},
 	}
 
 	userID, err := persist.UserCreate(pCtx, user, pRuntime)
