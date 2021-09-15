@@ -347,3 +347,18 @@ func isValueEmpty(v reflect.Value) bool {
 	}
 	return false
 }
+
+// function that returns the DBIDs that are in one array but not in the other
+func idDiff(a, b []DBID) []DBID {
+	m := make(map[DBID]bool)
+	for _, item := range b {
+		m[item] = true
+	}
+	var diff []DBID
+	for _, item := range a {
+		if _, ok := m[item]; !ok {
+			diff = append(diff, item)
+		}
+	}
+	return diff
+}

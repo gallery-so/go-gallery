@@ -77,7 +77,16 @@ func UserCreate(pCtx context.Context, pUser *User,
 
 	mp := newStorage(0, usersCollName, pRuntime)
 
-	return mp.insert(pCtx, pUser)
+	id, err := mp.insert(pCtx, pUser)
+
+	if err != nil {
+		return "", err
+	}
+
+	// create a feed for the user in the background
+	go feedCreate(pCtx, id, pRuntime)
+
+	return id, nil
 
 }
 

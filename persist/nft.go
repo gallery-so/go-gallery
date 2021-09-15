@@ -170,6 +170,10 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 
 	mp := newStorage(0, nftColName, pRuntime)
 
+	if _, ok := pUpdate.(*UpdateNFTInfoInput); ok {
+		go createNFTUpdateInfoEvent(pCtx, pID, pUserID, pRuntime)
+	}
+
 	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
 }
 
@@ -304,6 +308,30 @@ func findDifference(nfts []*Nft, dbNfts []*Nft) ([]DBID, error) {
 	}
 
 	return diff, nil
+}
+
+func hasRecentNFTEvent(pCtx context.Context, pEventType int, pNFTID DBID, pRuntime *runtime.Runtime) (bool, error) {
+	mp := newStorage(0, eventColName, pRuntime)
+
+	query := bson.M{"type": pEventType, "created_at": bson.M{"$gte": time.Now().Add(-eventRecencyThreshold)}}
+	query["data"] = bson.M{"$elemMatch": bson.M{"type": EventItemTypeNFT, "value": pNFTID}}
+	count, err := mp.count(pCtx, query)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 1, nil
+}
+func createNFTUpdateInfoEvent(ctx context.Context, nft, user DBID, runtime *runtime.Runtime) {
+	if has, err := hasRecentNFTEvent(ctx, EventTypeUpdateInfoNFT, nft, runtime); !has && err == nil {
+		eventCreate(ctx, &Event{
+			Type: EventTypeUpdateInfoNFT,
+			Data: []EventItem{
+				{Type: EventItemTypeNFT, Value: nft},
+				{Type: EventItemTypeUser, Value: user},
+			},
+		}, runtime)
+	}
 }
 
 func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {

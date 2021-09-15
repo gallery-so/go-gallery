@@ -101,7 +101,14 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 		return "", err
 	}
 
-	return mp.insert(pCtx, pColl)
+	id, err := mp.insert(pCtx, pColl)
+	if err != nil {
+		return "", err
+	}
+
+	go createCollectionCreateEvent(pCtx, id, pColl.OwnerUserID, pRuntime)
+
+	return id, nil
 
 }
 
@@ -162,7 +169,7 @@ func CollGetByID(pCtx context.Context, pID DBID,
 // CollUpdate will update a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 // pUpdate will be a struct with bson tags that represent the fields to be updated
-func CollUpdate(pCtx context.Context, pIDstr DBID,
+func CollUpdate(pCtx context.Context, pID DBID,
 	pUserID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
@@ -172,7 +179,12 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+
+	if _, ok := pUpdate.(*CollectionUpdateInfoInput); ok {
+		go createUpdateCollectionInfoEvent(pCtx, pID, pUserID, pRuntime)
+	}
+
+	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
 }
 
 // CollUpdateNFTs will update a collections NFTs ensuring that the collection is owned
@@ -185,6 +197,10 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+
+	// check if the collection has recently added nfts and if not and if the update is adding nfts
+	// then create an event
+	go createUpdateCollectionNFTsEvent(pCtx, pIDstr, pUserID, pUpdate.Nfts, pRuntime)
 
 	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -276,6 +292,76 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 
 	return result[0], nil
 
+}
+
+func hasRecentCollectionEvent(pCtx context.Context, pEventType int, pCollectionID DBID, pRuntime *runtime.Runtime) (bool, error) {
+	mp := newStorage(0, eventColName, pRuntime)
+
+	query := bson.M{"type": pEventType, "created_at": bson.M{"$gte": time.Now().Add(-eventRecencyThreshold)}}
+	query["data"] = bson.M{"$elemMatch": bson.M{"type": EventItemTypeCollection, "value": pCollectionID}}
+	count, err := mp.count(pCtx, query)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 1, nil
+}
+
+func createUpdateCollectionNFTsEvent(ctx context.Context, coll, user DBID, updatedNfts []DBID, runtime *runtime.Runtime) {
+	if has, err := hasRecentCollectionEvent(ctx, EventTypeAddNFTsToCollection, coll, runtime); !has && err == nil {
+		curCol, err := CollGetByID(ctx, coll, true, runtime)
+		if err != nil {
+			return
+		}
+		if len(curCol) == 0 {
+			return
+		}
+		if len(updatedNfts) > len(curCol[0].Nfts) {
+			items := []EventItem{
+				{Type: EventItemTypeCollection, Value: coll},
+				{Type: EventItemTypeUser, Value: user},
+			}
+			curIds := []DBID{}
+			for _, nft := range curCol[0].Nfts {
+				curIds = append(curIds, nft.ID)
+			}
+
+			dif := idDiff(curIds, updatedNfts)
+			for _, id := range dif {
+				items = append(items, EventItem{Type: EventItemTypeNFT, Value: id})
+			}
+			event := &Event{
+				Type: EventTypeAddNFTsToCollection,
+				Data: items,
+			}
+			eventCreate(ctx, event, runtime)
+		}
+	}
+}
+
+func createUpdateCollectionInfoEvent(ctx context.Context, coll, user DBID, runtime *runtime.Runtime) {
+	if has, err := hasRecentCollectionEvent(ctx, EventTypeUpdateInfoCollection, coll, runtime); !has && err == nil {
+		event := &Event{
+			Type: EventTypeUpdateInfoCollection,
+			Data: []EventItem{
+				{Type: EventItemTypeCollection, Value: coll},
+				{Type: EventItemTypeUser, Value: user},
+			},
+		}
+		eventCreate(ctx, event, runtime)
+	}
+}
+
+func createCollectionCreateEvent(ctx context.Context, coll, user DBID, runtime *runtime.Runtime) {
+	if has, err := hasRecentCollectionEvent(ctx, EventTypeCreateCollection, coll, runtime); !has && err == nil {
+		eventCreate(ctx, &Event{
+			Type: EventTypeCreateCollection,
+			Data: []EventItem{
+				{Type: EventItemTypeCollection, Value: coll},
+				{Type: EventItemTypeUser, Value: user},
+			},
+		}, runtime)
+	}
 }
 
 func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
