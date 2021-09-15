@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -92,7 +93,9 @@ func eventCreate(pCtx context.Context, pEvent *Event, pRuntime *runtime.Runtime)
 func eventBroadcast(pCtx context.Context, pEventID DBID, pRuntime *runtime.Runtime) error {
 	mp := newStorage(0, eventColName, pRuntime)
 	query := bson.M{"last_updated": bson.M{"$lt": time.Now().Add(-feedInactive)}}
-	return mp.push(pCtx, query, "events", pEventID)
+	err := mp.push(pCtx, query, "events", pEventID)
+	logrus.WithField("events", "broadcast").Error(err)
+	return err
 }
 
 func feedCreate(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) (DBID, error) {

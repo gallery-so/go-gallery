@@ -35,7 +35,7 @@ func getFeedByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		if len(feeds) == 0 {
 			c.JSON(http.StatusNotFound, errorResponse{
-				Error: "Feed not found",
+				Error: "no feed found",
 			})
 			return
 		}

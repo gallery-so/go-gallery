@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -329,7 +330,10 @@ func createUpdateCollectionNFTsEvent(ctx context.Context, coll, user DBID, updat
 				Type: EventTypeAddNFTsToCollection,
 				Data: items,
 			}
-			eventCreate(ctx, event, runtime)
+			_, err := eventCreate(ctx, event, runtime)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"event": "create", "type": EventTypeAddNFTsToCollection}).Error(err)
+			}
 		}
 	}
 }
@@ -343,18 +347,24 @@ func createUpdateCollectionInfoEvent(ctx context.Context, coll, user DBID, runti
 				{Type: EventItemTypeUser, Value: user},
 			},
 		}
-		eventCreate(ctx, event, runtime)
+		_, err := eventCreate(ctx, event, runtime)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"event": "create", "type": EventTypeUpdateInfoCollection}).Error(err)
+		}
 	}
 }
 
 func createCollectionCreateEvent(ctx context.Context, user DBID, runtime *runtime.Runtime) {
 	if has, err := hasRecentUserEvent(ctx, EventTypeCreateCollection, user, runtime); !has && err == nil {
-		eventCreate(ctx, &Event{
+		_, err := eventCreate(ctx, &Event{
 			Type: EventTypeCreateCollection,
 			Data: []EventItem{
 				{Type: EventItemTypeUser, Value: user},
 			},
 		}, runtime)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"event": "create", "type": EventTypeCreateCollection}).Error(err)
+		}
 	}
 }
 

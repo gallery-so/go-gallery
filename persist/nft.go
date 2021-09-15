@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -324,13 +325,16 @@ func hasRecentNFTEvent(pCtx context.Context, pEventType int, pNFTID DBID, pRunti
 }
 func createNFTUpdateInfoEvent(ctx context.Context, nft, user DBID, runtime *runtime.Runtime) {
 	if has, err := hasRecentNFTEvent(ctx, EventTypeUpdateInfoNFT, nft, runtime); !has && err == nil {
-		eventCreate(ctx, &Event{
+		_, err := eventCreate(ctx, &Event{
 			Type: EventTypeUpdateInfoNFT,
 			Data: []EventItem{
 				{Type: EventItemTypeNFT, Value: nft},
 				{Type: EventItemTypeUser, Value: user},
 			},
 		}, runtime)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"event": "create", "type": EventTypeUpdateInfoNFT}).Error(err)
+		}
 	}
 }
 
