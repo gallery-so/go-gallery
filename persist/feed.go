@@ -2,7 +2,6 @@ package persist
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -103,7 +102,7 @@ func feedCreate(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) (
 }
 
 // FeedGetByUserID gets a feed from the DB by user ID
-func FeedGetByUserID(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) (*Feed, error) {
+func FeedGetByUserID(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runtime) ([]*Feed, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -118,13 +117,7 @@ func FeedGetByUserID(pCtx context.Context, pUserID DBID, pRuntime *runtime.Runti
 	if err != nil {
 		return nil, err
 	}
-	if len(feeds) == 0 {
-		return nil, errors.New("no feed found")
-	}
-	if len(feeds) > 1 {
-		return nil, errors.New("more than one feed found")
-	}
-	return feeds[0], nil
+	return feeds, nil
 }
 
 func newFeedPipeline(matchFilter bson.M) mongo.Pipeline {
