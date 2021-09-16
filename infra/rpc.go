@@ -63,7 +63,7 @@ func NewRPC() *Clients {
 	if err != nil {
 		panic(err)
 	}
-	ethClient, err := ethclient.Dial("ALCHEMY_URL")
+	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
 	if err != nil {
 		panic(err)
 	}
