@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
@@ -70,7 +71,7 @@ func AuthNonceGet(pCtx context.Context, pAddress string,
 	opts.SetLimit(1)
 
 	result := []*UserNonce{}
-	err := mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
+	err := mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
 
 	if err != nil {
 		return nil, err

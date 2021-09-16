@@ -44,4 +44,7 @@ func TestFetchAssertsForAcc(t *testing.T) {
 
 	assert.Equal(t, len(nfts), len(nftsByUser))
 
+	// process is async so this may not work
+	assert.NotNil(t, nftsByUser[0].OwnershipHistory)
+
 }

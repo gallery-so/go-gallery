@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	// log "github.com/sirupsen/logrus"
@@ -279,7 +280,7 @@ func authVerifySignature(pSignatureStr string,
 	}
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-	if pubkeyAddressHexStr != pAddress {
+	if strings.ToLower(pubkeyAddressHexStr) != strings.ToLower(pAddress) {
 		return false, errors.New("address does not match signature")
 	}
 
@@ -305,7 +306,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	if !userExistsBool {
 
 		nonce = &persist.UserNonce{
-			Address: pInput.Address,
+			Address: strings.ToLower(pInput.Address),
 			Value:   generateNonce(),
 		}
 
@@ -329,7 +330,7 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
-		Address: pAddress,
+		Address: strings.ToLower(pAddress),
 		UserID:  pUserID,
 	}
 
