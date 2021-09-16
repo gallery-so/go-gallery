@@ -147,7 +147,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "deleted": False,
             "username": user["username"],
             "username_idempotent": user["username"].lower(),
-            "addresses": [user["wallet_address"]],
+            "addresses": [user["wallet_address"].lower()],
         }
 
         if user["id"] in creation_dict:
@@ -162,7 +162,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "user_id": user_id,
-            "address": user["wallet_address"],
+            "address": user["wallet_address"].lower(),
             "value": str(random.randint(1000000000000000000, 9999999999999999999)),
         }
 
