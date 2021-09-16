@@ -279,7 +279,7 @@ func authVerifySignature(pSignatureStr string,
 	}
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-	if strings.ToLower(pubkeyAddressHexStr) != strings.ToLower(pAddress) {
+	if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
 		return false, errors.New("address does not match signature")
 	}
 
