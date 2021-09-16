@@ -38,7 +38,7 @@ func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	nftsGroup.GET("/get", jwtOptional(pRuntime), getNftByID(pRuntime))
 	nftsGroup.GET("/user_get", jwtOptional(pRuntime), getNftsForUser(pRuntime))
-	nftsGroup.GET("/opensea_get", jwtOptional(pRuntime), getNftsFromOpensea(pRuntime))
+	nftsGroup.GET("/opensea_get", rateLimited(pRuntime), jwtRequired(pRuntime), getNftsFromOpensea(pRuntime))
 	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftByID(pRuntime))
 	nftsGroup.GET("/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
 
