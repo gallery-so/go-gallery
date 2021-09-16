@@ -90,12 +90,12 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		return nil, err
 	}
 
-	_, err = persist.NftBulkUpsert(pCtx, asGalleryNfts, pRuntime)
+	err = persist.NftBulkUpsert(pCtx, asGalleryNfts, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	err = persist.NftRemoveDifference(pCtx, asGalleryNfts, pOwnerWalletAddress, pRuntime)
+	_, err = persist.NftRemoveDifference(pCtx, asGalleryNfts, pOwnerWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +116,13 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 func openseaSyncHistories(pCtx context.Context, pNfts []*persist.Nft, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 	resultChan := make(chan *persist.Nft)
 	errorChan := make(chan error)
-	updatedNfts := []*persist.Nft{}
-	// atomic counter to track number of goroutines until all are done
-	left := int64(len(pNfts))
+	updatedNfts := make([]*persist.Nft, len(pNfts))
+	counter := int64(len(pNfts))
+
 	// create a goroutine for each nft and sync history
 	for _, nft := range pNfts {
 		go func(nft *persist.Nft) {
-			defer atomic.AddInt64(&left, -1)
+			defer atomic.AddInt64(&counter, -1)
 			history, err := openseaSyncHistory(pCtx, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
 			if err != nil {
 				errorChan <- err
@@ -134,16 +134,18 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.Nft, pRuntime *
 		}(nft)
 	}
 
+	i := 0
 	// wait for all goroutines to finish and collect results from chan
 	for {
 		select {
 		case nft := <-resultChan:
-			updatedNfts = append(updatedNfts, nft)
+			updatedNfts[i] = nft
+			i++
 		case err := <-errorChan:
 			return nil, err
 		default:
 		}
-		if atomic.LoadInt64(&left) == 0 {
+		if atomic.LoadInt64(&counter) == 0 {
 			break
 		}
 	}
@@ -390,12 +392,12 @@ func openseaToGalleryNft(nft *openseaAsset, pWalletAddres string, ownerUserID pe
 
 	result := &persist.Nft{
 		OwnerUserID:          ownerUserID,
-		OwnerAddress:         pWalletAddres,
+		OwnerAddress:         strings.ToLower(pWalletAddres),
 		Name:                 nft.Name,
 		Description:          nft.Description,
 		ExternalURL:          nft.ExternalURL,
 		ImageURL:             nft.ImageURL,
-		CreatorAddress:       nft.Creator.Address,
+		CreatorAddress:       strings.ToLower(nft.Creator.Address),
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
 		OpenSeaID:            nft.ID,
