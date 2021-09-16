@@ -234,12 +234,13 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 	}
 	allResult := []*persist.ERC721{}
 	for _, v := range allTokens {
+		go r.GetERC721TokensForContract(pCtx, v.TokenContract.Address, pRuntime)
 		allResult = append(allResult, v)
 	}
 
-	if err = persist.ERC721BulkUpsert(pCtx, allResult, pRuntime); err != nil {
-		return nil, err
-	}
+	// if err = persist.ERC721BulkUpsert(pCtx, allResult, pRuntime); err != nil {
+	// 	return nil, err
+	// }
 
 	result := []*persist.ERC721{}
 	for _, v := range tokens {
