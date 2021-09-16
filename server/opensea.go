@@ -88,7 +88,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pOwnerWalletAddress strin
 		return nil, err
 	}
 
-	err = persist.NftBulkUpsert(pCtx, pOwnerWalletAddress, asGalleryNfts, pRuntime)
+	err = persist.NftBulkUpsert(pCtx, asGalleryNfts, pRuntime)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -175,7 +176,7 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 
 // NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func NftBulkUpsert(pCtx context.Context, walletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
+func NftBulkUpsert(pCtx context.Context, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, nftColName, pRuntime)
 
@@ -234,7 +235,7 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 	}
 
 	dbNfts := []*Nft{}
-	if err := mp.find(pCtx, bson.M{"owner_address": pWalletAddress}, &dbNfts, opts); err != nil {
+	if err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pWalletAddress)}, &dbNfts, opts); err != nil {
 		return err
 	}
 
@@ -268,7 +269,7 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nf
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(pCtx, string(pWalletAddress), toCache, openseaAssetsTTL)
+	return mp.cacheSet(pCtx, strings.ToLower(pWalletAddress), toCache, openseaAssetsTTL)
 }
 
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
@@ -277,7 +278,7 @@ func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *r
 	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
 	defer mp.cacheClose()
 
-	result, err := mp.cacheGet(pCtx, string(pWalletAddress))
+	result, err := mp.cacheGet(pCtx, strings.ToLower(pWalletAddress))
 	if err != nil {
 		return nil, err
 	}
