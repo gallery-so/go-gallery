@@ -239,7 +239,7 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 	allResult := make([]*persist.ERC721, len(allTokens))
 	i := 0
 	for _, v := range allTokens {
-		go r.GetERC721TokensForContract(pCtx, v.TokenContract.Address, "0x0", pRuntime)
+		go r.GetERC721TokensForContract(pCtx, v.TokenContract.Address, fromBlock, pRuntime)
 		allResult[i] = v
 		if strings.EqualFold(v.OwnerAddress, address) {
 			ownedTokens = append(ownedTokens, v)
