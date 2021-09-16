@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -58,11 +59,11 @@ type TokenMetadata struct {
 
 // NewRPC creates a new RPC client
 func NewRPC() *Clients {
-	client, err := rpc.Dial("wss://eth-mainnet.alchemyapi.io/v2/9jnT6CWDSYJGpQGMgG0tzJie829ChJjU")
+	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
 	if err != nil {
 		panic(err)
 	}
-	ethClient, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/9jnT6CWDSYJGpQGMgG0tzJie829ChJjU")
+	ethClient, err := ethclient.Dial("ALCHEMY_URL")
 	if err != nil {
 		panic(err)
 	}
