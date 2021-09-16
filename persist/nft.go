@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -193,65 +194,39 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 
 // NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func NftBulkUpsert(pCtx context.Context, pNfts []*Nft, pRuntime *runtime.Runtime) ([]DBID, error) {
+func NftBulkUpsert(pCtx context.Context, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 
-	upsertModels := make([]mongo.WriteModel, len(pNfts))
+	wg := &sync.WaitGroup{}
+	mu := &sync.Mutex{}
+	errs := []error{}
+	wg.Add(len(pNfts))
 
-	allIDS := []DBID{}
+	for _, v := range pNfts {
 
-	for i, v := range pNfts {
-
-		if v.ID != "" {
-			allIDS = append(allIDS, v.ID)
-		}
-
-		now := primitive.NewDateTimeFromTime(time.Now())
-
-		asMap, err := structToBsonMap(v)
-		if err != nil {
-			return nil, err
-		}
-
-		asMap["last_updated"] = now
-
-		// we don't need ID because we are searching by opensea ID.
-		// this will cause update conflict if not ""
-		delete(asMap, "_id")
-
-		// set created at if this is a new insert
-		if _, ok := asMap["created_at"]; !ok {
-			asMap["created_at"] = now
-		}
-
-		upsertModels[i] = &mongo.UpdateOneModel{
-			Upsert: boolin(true),
-			Filter: bson.M{"opensea_id": v.OpenSeaID},
-			Update: bson.M{
-				"$setOnInsert": bson.M{
-					"_id": generateID(asMap),
-				},
-				"$set": asMap,
-			},
-		}
+		go func(nft *Nft) {
+			defer wg.Done()
+			_, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			}
+		}(v)
 	}
+	wg.Wait()
 
-	res, err := mp.collection.BulkWrite(pCtx, upsertModels)
-	if err != nil {
-		return nil, err
+	if len(errs) > 0 {
+		return errs[0]
 	}
+	return nil
 
-	for _, v := range res.UpsertedIDs {
-		allIDS = append(allIDS, DBID(v.(string)))
-	}
-
-	return allIDS, nil
 }
 
 // NftRemoveDifference will update all nfts that are not in the given slice of nfts with having an
 // empty owner id and address
-func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress string, pRuntime *runtime.Runtime) error {
+func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress string, pRuntime *runtime.Runtime) (int, error) {
 
 	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 	// FIND DIFFERENCE AND DELETE OUTLIERS
@@ -264,27 +239,29 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*Nft, pWalletAddress stri
 
 	dbNfts := []*Nft{}
 	if err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pWalletAddress)}, &dbNfts, opts); err != nil {
-		return err
+		return 0, err
 	}
 
 	if len(dbNfts) > len(pNfts) {
 		diff, err := nftFindDifference(pNfts, dbNfts)
 		if err != nil {
-			return err
+			return 0, err
 		}
 
-		deleteModels := make([]mongo.WriteModel, len(diff))
+		updateModels := make([]mongo.WriteModel, len(diff))
 
 		for i, v := range diff {
-			deleteModels[i] = &mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"owner_user_id": "", "owner_address": ""}}}
+			updateModels[i] = &mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"owner_user_id": "", "owner_address": ""}}}
 		}
 
-		if _, err := mp.collection.BulkWrite(pCtx, deleteModels); err != nil {
-			return err
+		res, err := mp.collection.BulkWrite(pCtx, updateModels)
+		if err != nil {
+			return 0, err
 		}
+		return int(res.ModifiedCount), nil
 	}
 
-	return nil
+	return 0, nil
 }
 
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address

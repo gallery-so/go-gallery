@@ -17,6 +17,8 @@ const (
 	authContextKey   = "authenticated"
 )
 
+var rateLimiter = NewIPRateLimiter(1, 5)
+
 func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -66,6 +68,17 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 				c.Set(authContextKey, valid)
 				c.Set(userIDcontextKey, userID)
 			}
+		}
+		c.Next()
+	}
+}
+
+func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		limiter := rateLimiter.GetLimiter(c.ClientIP())
+		if !limiter.Allow() {
+			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "rate limited"})
+			return
 		}
 		c.Next()
 	}

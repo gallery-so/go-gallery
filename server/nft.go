@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -155,6 +156,22 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+		ownsWallet, err := doesUserOwnWallet(c, userID, input.WalletAddress, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+		if !ownsWallet {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user does not own wallet"})
+			return
+		}
+
 		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
@@ -162,4 +179,12 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
+}
+
+func doesUserOwnWallet(pCtx context.Context, userID persist.DBID, walletAddress string, pRuntime *runtime.Runtime) (bool, error) {
+	user, err := persist.UserGetByID(pCtx, userID, pRuntime)
+	if err != nil {
+		return false, err
+	}
+	return util.Contains(user.Addresses, walletAddress), nil
 }

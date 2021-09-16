@@ -179,12 +179,12 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 }
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
-func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
+func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (DBID, error) {
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
 	if err != nil {
-		return err
+		return "", err
 	}
 	asMap["last_updated"] = now
 	if _, ok := asMap["created_at"]; !ok {
@@ -195,12 +195,12 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 		delete(asMap, k)
 	}
 
-	_, err = m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, &options.UpdateOptions{Upsert: boolin(true)})
+	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return DBID(res.UpsertedID.(string)), nil
 }
 
 // find finds documents in the mongo database which is not deleted
