@@ -21,14 +21,14 @@ func TestFetchAssertsForAcc(t *testing.T) {
 	nft := &persist.Nft{
 		OwnerUserID:  userID,
 		OwnerAddress: "0x485b8ac36535fae56b2910780245dd69dda270bc",
-		Name:         "test",
+		Name:         "kks",
 		OpenSeaID:    0,
 	}
 
 	nft2 := &persist.Nft{
 		OwnerUserID:  userID,
 		OwnerAddress: "0x485b8ac36535fae56b2910780245dd69dda270bc",
-		Name:         "test2",
+		Name:         "malsjdlaksjd",
 		OpenSeaID:    32087758,
 	}
 
