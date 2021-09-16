@@ -129,16 +129,12 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := false
 		userID, _ := getUserIDfromCtx(c)
-		if userID == input.UserID {
-			auth = true
-		}
 
 		output, err := userGetDb(
 			c,
 			input,
-			auth,
+			userID,
 			pRuntime,
 		)
 		if err != nil {
@@ -300,7 +296,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 }
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
-	pAuthenticatedBool bool,
+	pAuthedUserID persist.DBID,
 	pRuntime *runtime.Runtime) (*userGetOutput, error) {
 
 	//------------------
@@ -338,7 +334,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		BioStr:      user.Bio,
 	}
 
-	if pAuthenticatedBool {
+	if pAuthedUserID == user.ID {
 		output.Addresses = user.Addresses
 	}
 
