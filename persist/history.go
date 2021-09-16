@@ -2,14 +2,10 @@ package persist
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var historyColName = "history"
@@ -36,57 +32,9 @@ type Owner struct {
 
 // HistoryUpsert caches a transfer in the memory storage
 func HistoryUpsert(pCtx context.Context, pNFTID DBID, pHistory *OwnershipHistory, pRuntime *runtime.Runtime) error {
+
 	pHistory.NFTID = pNFTID
-	history, err := json.Marshal(pHistory)
-	if err != nil {
-		return err
-	}
-	mp := newStorage(0, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
-	err = mp.cacheSet(pCtx, string(pNFTID), string(history), openseaTransfersTTL)
-	if err != nil {
-		return err
-	}
+	mp := newStorage(0, historyColName, pRuntime)
 
 	return mp.upsert(pCtx, bson.M{"nft_id": pNFTID}, pHistory)
-}
-
-// HistoryGet retrieves a transfer from the memory storage
-func HistoryGet(pCtx context.Context, pNFTID DBID, skipCache bool, pRuntime *runtime.Runtime) (*OwnershipHistory, error) {
-	mp := newStorage(0, historyColName, pRuntime).withRedis(OpenseaTransfersRDB, pRuntime)
-	if !skipCache {
-		history := &OwnershipHistory{}
-		val, err := mp.cacheGet(pCtx, string(pNFTID))
-		if err == nil {
-			err = json.Unmarshal([]byte(val), history)
-			if err == nil {
-				return history, nil
-			}
-		}
-	}
-
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
-	histories := []*OwnershipHistory{}
-	err := mp.find(pCtx, bson.M{"nft_id": pNFTID}, histories, opts)
-	if err != nil {
-		return nil, err
-	}
-	if len(histories) == 0 {
-		return nil, errors.New("no history found")
-	}
-
-	toCache, err := json.Marshal(histories[0])
-	if err != nil {
-		return nil, err
-	}
-	err = mp.cacheSet(pCtx, string(pNFTID), string(toCache), openseaTransfersTTL)
-	if err != nil {
-		return nil, err
-	}
-
-	return histories[0], nil
 }
