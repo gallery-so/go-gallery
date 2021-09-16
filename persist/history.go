@@ -35,7 +35,7 @@ func HistoryUpsert(pCtx context.Context, pNFTID DBID, pHistory *OwnershipHistory
 
 	pHistory.NFTID = pNFTID
 
-	mp := newStorage(0, historyColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, historyColName, pRuntime)
 
 	return mp.upsert(pCtx, bson.M{"nft_id": pNFTID}, pHistory)
 }

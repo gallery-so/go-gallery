@@ -171,7 +171,7 @@ func NftGetByOpenseaID(pCtx context.Context, pOpenseaID int,
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, nftColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, nftColName, pRuntime)
 	result := []*Nft{}
 
 	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_id": pOpenseaID}), &result, opts); err != nil {
