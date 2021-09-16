@@ -1,7 +1,10 @@
 package infra
 
 import (
+	"context"
+	"math/big"
 	"net/http"
+	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -35,48 +38,23 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		tokens := []*persist.ERC721{}
 
 		if input.Address != "" {
-			if !input.SkipDB {
-				result, err := persist.ERC721GetByWallet(c, input.Address, pRuntime)
-				if len(result) == 0 || err != nil {
-					result, err = NewRPC().GetERC721TokensForWallet(c, input.Address, pRuntime)
-					if len(result) == 0 || err != nil {
-						tokens = []*persist.ERC721{}
-					} else {
-						tokens = result
-					}
-				} else {
-					tokens = result
-				}
-			} else {
-				result, err := NewRPC().GetERC721TokensForWallet(c, input.Address, pRuntime)
-				if len(result) == 0 || err != nil {
-					tokens = []*persist.ERC721{}
-				} else {
-					tokens = result
-				}
+			result, err := getTokensForWallet(c, input.Address, input.SkipDB, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+					Error: err.Error(),
+				})
+				return
 			}
-
+			tokens = result
 		} else if input.ContractAddress != "" {
-			if !input.SkipDB {
-				result, err := persist.ERC721GetByContract(c, input.ContractAddress, pRuntime)
-				if len(result) == 0 || err != nil {
-					result, err = NewRPC().GetERC721TokensForContract(c, input.ContractAddress, pRuntime)
-					if len(result) == 0 || err != nil {
-						tokens = []*persist.ERC721{}
-					} else {
-						tokens = result
-					}
-				} else {
-					tokens = result
-				}
-			} else {
-				result, err := NewRPC().GetERC721TokensForContract(c, input.ContractAddress, pRuntime)
-				if len(result) == 0 || err != nil {
-					tokens = []*persist.ERC721{}
-				} else {
-					tokens = result
-				}
+			result, err := getTokensForContract(c, input.ContractAddress, input.SkipDB, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+					Error: err.Error(),
+				})
+				return
 			}
+			tokens = result
 		} else {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "wallet address or contract address required"})
 			return
@@ -85,4 +63,78 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		c.JSON(http.StatusOK, getERC721TokensOutput{Tokens: tokens})
 
 	}
+}
+
+func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
+	tokens := []*persist.ERC721{}
+	if !pSkipDB {
+		result, err := persist.ERC721GetByWallet(pCtx, pWalletAddress, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		if len(result) > 0 {
+			go func() {
+				sort.Slice(result, func(i, j int) bool {
+					b1, ok := new(big.Int).SetString(result[i].LastBlockNum[2:], 16)
+					if !ok || b1.IsUint64() {
+						return false
+					}
+					b2, ok := new(big.Int).SetString(result[j].LastBlockNum[2:], 16)
+					if !ok || !b2.IsUint64() {
+						return false
+					}
+					return b1.Uint64() < b2.Uint64()
+				})
+				go NewRPC().GetERC721TokensForWallet(pCtx, pWalletAddress, result[0].LastBlockNum, pRuntime)
+			}()
+		} else {
+			go NewRPC().GetERC721TokensForWallet(pCtx, pWalletAddress, "0x0", pRuntime)
+		}
+
+		tokens = result
+	} else {
+		result, err := NewRPC().GetERC721TokensForWallet(pCtx, pWalletAddress, "0x0", pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		tokens = result
+	}
+	return tokens, nil
+}
+func getTokensForContract(pCtx context.Context, pContractAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
+	tokens := []*persist.ERC721{}
+	if !pSkipDB {
+		result, err := persist.ERC721GetByContract(pCtx, pContractAddress, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(result) > 0 {
+			go func() {
+				sort.Slice(result, func(i, j int) bool {
+					b1, ok := new(big.Int).SetString(result[i].LastBlockNum[2:], 16)
+					if !ok || b1.IsUint64() {
+						return false
+					}
+					b2, ok := new(big.Int).SetString(result[j].LastBlockNum[2:], 16)
+					if !ok || !b2.IsUint64() {
+						return false
+					}
+					return b1.Uint64() < b2.Uint64()
+				})
+				go NewRPC().GetERC721TokensForContract(pCtx, pContractAddress, result[0].LastBlockNum, pRuntime)
+			}()
+		} else {
+			go NewRPC().GetERC721TokensForContract(pCtx, pContractAddress, "0x0", pRuntime)
+		}
+
+		tokens = result
+	} else {
+		result, err := NewRPC().GetERC721TokensForContract(pCtx, pContractAddress, "0x0", pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		tokens = result
+	}
+	return tokens, nil
 }

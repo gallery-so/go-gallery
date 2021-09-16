@@ -199,8 +199,10 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	if err != nil {
 		return "", err
 	}
-
-	return DBID(res.UpsertedID.(string)), nil
+	if _, ok := res.UpsertedID.(string); ok {
+		return DBID(res.UpsertedID.(string)), nil
+	}
+	return "", nil
 }
 
 // find finds documents in the mongo database which is not deleted

@@ -77,7 +77,7 @@ func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limiter := rateLimiter.GetLimiter(c.ClientIP())
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "rate limited"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: "rate limited"})
 			return
 		}
 		c.Next()

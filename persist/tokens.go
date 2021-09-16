@@ -2,13 +2,13 @@ package persist
 
 import (
 	"context"
-	"math/big"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -27,9 +27,10 @@ type ERC721 struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 
 	TokenURI       string   `bson:"token_uri" json:"token_uri"`
-	TokenID        *big.Int `bson:"token_id" json:"token_id"`
+	TokenID        string   `bson:"token_id" json:"token_id"`
 	OwnerAddress   string   `bson:"owner_address" json:"owner_address"`
 	PreviousOwners []string `bson:"previous_owners" json:"previous_owners"`
+	LastBlockNum   string   `bson:"last_block_num" json:"last_block_num"`
 
 	TokenContract TokenContract `bson:"token_contract"`
 }
@@ -83,7 +84,7 @@ func ERC721GetByWallet(pCtx context.Context, pAddress string,
 
 	result := []*ERC721{}
 
-	err := mp.find(pCtx, bson.M{"owner_address": pAddress, "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, result, opts)
+	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress)}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func ERC721GetByContract(pCtx context.Context, pAddress string,
 
 	result := []*ERC721{}
 
-	err := mp.find(pCtx, bson.M{"token_contract.contract_address": pAddress, "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, result, opts)
+	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -117,98 +118,27 @@ func ERC721BulkUpsert(pCtx context.Context, pERC721s []*ERC721, pRuntime *runtim
 
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
-	upsertModels := make([]mongo.WriteModel, len(pERC721s))
+	wg := &sync.WaitGroup{}
+	mu := &sync.Mutex{}
+	errs := []error{}
+	wg.Add(len(pERC721s))
 
-	for i, v := range pERC721s {
+	for _, v := range pERC721s {
 
-		now := primitive.NewDateTimeFromTime(time.Now())
-
-		asMap, err := structToBsonMap(v)
-		if err != nil {
-			return err
-		}
-
-		asMap["last_updated"] = now
-
-		// we don't need ID because we are searching by opensea ID.
-		// this will cause update conflict if not ""
-		delete(asMap, "_id")
-
-		// set created at if this is a new insert
-		if _, ok := asMap["created_at"]; !ok {
-			asMap["created_at"] = now
-		}
-
-		upsertModels[i] = &mongo.UpdateOneModel{
-			Upsert: boolin(true),
-			Filter: bson.M{"token_id": v.TokenID},
-			Update: bson.M{
-				"$setOnInsert": bson.M{
-					"_id": generateID(asMap),
-				},
-				"$set": asMap,
-			},
-		}
+		go func(erc721 *ERC721) {
+			defer wg.Done()
+			_, err := mp.upsert(pCtx, bson.M{"token_id": erc721.TokenID, "token_contract.contract_address": strings.ToLower(erc721.TokenContract.Address)}, erc721)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			}
+		}(v)
 	}
+	wg.Wait()
 
-	if _, err := mp.collection.BulkWrite(pCtx, upsertModels); err != nil {
-		return err
+	if len(errs) > 0 {
+		return errs[0]
 	}
-
 	return nil
-}
-
-// ERC721RemoveDifference will update all nfts that are not in the given slice of erc721s with having an
-// empty owner address
-func ERC721RemoveDifference(pCtx context.Context, pERC721s []*ERC721, pWalletAddress string, pRuntime *runtime.Runtime) error {
-
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
-	// FIND DIFFERENCE AND DELETE OUTLIERS
-	// -------------------------------------------------------
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
-	dbERC721s := []*ERC721{}
-	if err := mp.find(pCtx, bson.M{"owner_address": pWalletAddress}, &dbERC721s, opts); err != nil {
-		return err
-	}
-
-	if len(dbERC721s) > len(pERC721s) {
-		diff, err := erc721FindDifference(pERC721s, dbERC721s)
-		if err != nil {
-			return err
-		}
-
-		deleteModels := make([]mongo.WriteModel, len(diff))
-
-		for i, v := range diff {
-			deleteModels[i] = &mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"owner_address": ""}}}
-		}
-
-		if _, err := mp.collection.BulkWrite(pCtx, deleteModels); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func erc721FindDifference(erc721s []*ERC721, dbErc721s []*ERC721) ([]DBID, error) {
-	currTokenIDs := map[string]bool{}
-
-	for _, v := range erc721s {
-		currTokenIDs[v.TokenID.String()] = true
-	}
-
-	diff := []DBID{}
-	for _, v := range dbErc721s {
-		if !currTokenIDs[v.TokenID.String()] {
-			diff = append(diff, v.ID)
-		}
-	}
-
-	return diff, nil
 }

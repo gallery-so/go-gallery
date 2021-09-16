@@ -159,16 +159,16 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 		ownsWallet, err := doesUserOwnWallet(c, userID, input.WalletAddress, pRuntime)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 		if !ownsWallet {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user does not own wallet"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user does not own wallet"})
 			return
 		}
 
