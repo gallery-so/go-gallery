@@ -199,8 +199,9 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	if err != nil {
 		return "", err
 	}
-	if _, ok := res.UpsertedID.(string); ok {
-		return DBID(res.UpsertedID.(string)), nil
+
+	if it, ok := res.UpsertedID.(string); ok {
+		return DBID(it), nil
 	}
 	return "", nil
 }
