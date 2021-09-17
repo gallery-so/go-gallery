@@ -4,26 +4,18 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"os"
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 )
-
-// Clients is a wrapper for the alchemy clients necessary for json RPC and contract interaction
-type Clients struct {
-	RPCClient *rpc.Client
-	ETHClient *ethclient.Client
-}
 
 // Transfers represents the transfers for a given rpc response
 type Transfers struct {
@@ -57,24 +49,8 @@ type TokenMetadata struct {
 	Logo   string `json:"logo"`
 }
 
-// NewRPC creates a new RPC client
-func NewRPC() *Clients {
-	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
-	if err != nil {
-		panic(err)
-	}
-	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
-	if err != nil {
-		panic(err)
-	}
-	return &Clients{
-		RPCClient: client,
-		ETHClient: ethClient,
-	}
-}
-
 // GetTransfersFrom returns the transfers from the given address
-func (r *Clients) GetTransfersFrom(address string, fromBlock string) ([]Transfer, error) {
+func GetTransfersFrom(address string, fromBlock string, pRuntime *runtime.Runtime) ([]Transfer, error) {
 	result := &Transfers{}
 
 	opts := map[string]interface{}{}
@@ -82,7 +58,7 @@ func (r *Clients) GetTransfersFrom(address string, fromBlock string) ([]Transfer
 	opts["fromAddress"] = address
 	opts["category"] = []string{"token"}
 	opts["excludeZeroValue"] = false
-	err := r.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
+	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +67,7 @@ func (r *Clients) GetTransfersFrom(address string, fromBlock string) ([]Transfer
 }
 
 // GetTransfersTo returns the transfers to the given address
-func (r *Clients) GetTransfersTo(address string, fromBlock string) ([]Transfer, error) {
+func GetTransfersTo(address string, fromBlock string, pRuntime *runtime.Runtime) ([]Transfer, error) {
 	result := &Transfers{}
 
 	opts := map[string]interface{}{}
@@ -99,7 +75,7 @@ func (r *Clients) GetTransfersTo(address string, fromBlock string) ([]Transfer, 
 	opts["toAddress"] = address
 	opts["category"] = []string{"token"}
 	opts["excludeZeroValue"] = false
-	err := r.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
+	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +84,7 @@ func (r *Clients) GetTransfersTo(address string, fromBlock string) ([]Transfer, 
 }
 
 // GetContractTransfers returns the transfers for a given contract
-func (r *Clients) GetContractTransfers(address string, fromBlock string) ([]Transfer, error) {
+func GetContractTransfers(address string, fromBlock string, pRuntime *runtime.Runtime) ([]Transfer, error) {
 	result := &Transfers{}
 
 	opts := map[string]interface{}{}
@@ -116,7 +92,7 @@ func (r *Clients) GetContractTransfers(address string, fromBlock string) ([]Tran
 	opts["contractAddresses"] = []string{address}
 	opts["category"] = []string{"token"}
 	opts["excludeZeroValue"] = false
-	err := r.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
+	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getAssetTransfers", opts)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +101,10 @@ func (r *Clients) GetContractTransfers(address string, fromBlock string) ([]Tran
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func (r *Clients) GetTokenContractMetadata(address string) (TokenMetadata, error) {
+func GetTokenContractMetadata(address string, pRuntime *runtime.Runtime) (TokenMetadata, error) {
 	result := &TokenMetadata{}
 
-	err := r.RPCClient.Call(result, "alchemy_getTokenMetadata", address)
+	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getTokenMetadata", address)
 	if err != nil {
 		return TokenMetadata{}, err
 	}
@@ -137,10 +113,10 @@ func (r *Clients) GetTokenContractMetadata(address string) (TokenMetadata, error
 }
 
 // GetTokenURI returns metadata URI for a given token address
-func (r *Clients) GetTokenURI(address string, tokenID string) (string, error) {
+func GetTokenURI(address string, tokenID string, pRuntime *runtime.Runtime) (string, error) {
 
 	contract := common.HexToAddress(address)
-	instance, err := contracts.NewIERC721Metadata(contract, r.ETHClient)
+	instance, err := contracts.NewIERC721Metadata(contract, pRuntime.InfraClients.ETHClient)
 	if err != nil {
 		return "", err
 	}
@@ -161,8 +137,8 @@ func (r *Clients) GetTokenURI(address string, tokenID string) (string, error) {
 }
 
 // GetERC721TokensForWallet returns the ERC721 token for the given wallet address
-func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
-	allTransfers, err := getAllTransfersForWallet(pCtx, address, fromBlock, r, pRuntime)
+func GetERC721TokensForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
+	allTransfers, err := getAllTransfersForWallet(pCtx, address, fromBlock, pRuntime)
 
 	allTokens := map[string]*persist.ERC721{}
 	ownedTokens := []*persist.ERC721{}
@@ -172,11 +148,8 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 	uris := &sync.Map{}
 	metadatas := &sync.Map{}
 
-	counter := int64(len(allTransfers))
-
 	for _, t := range allTransfers {
 		go func(transfer Transfer) {
-			defer atomic.AddInt64(&counter, -1)
 			if transfer.ERC721TokenID == "" {
 				return
 			}
@@ -185,14 +158,14 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 			}
 
 			if _, ok := metadatas.Load(transfer.RawContract.Address); !ok {
-				metadata, err := r.GetTokenContractMetadata(transfer.RawContract.Address)
+				metadata, err := GetTokenContractMetadata(transfer.RawContract.Address, pRuntime)
 				if err != nil {
 					return // nil, err
 				}
 				metadatas.Store(transfer.RawContract.Address, metadata)
 			}
 			if _, ok := uris.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
-				uri, err := r.GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID)
+				uri, err := GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID, pRuntime)
 				if err != nil {
 					return // nil, err
 				}
@@ -219,7 +192,7 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 		}(t)
 	}
 
-	for {
+	for i := 0; i < len(allTransfers); i++ {
 		select {
 		case all := <-allChan:
 			if it, ok := allTokens[all.TokenContract.Address+all.TokenID]; ok {
@@ -230,17 +203,13 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 			} else {
 				allTokens[all.TokenContract.Address+all.TokenID] = all
 			}
-		default:
-		}
-		if atomic.LoadInt64(&counter) == 0 {
-			break
 		}
 	}
 
 	allResult := make([]*persist.ERC721, len(allTokens))
 	i := 0
 	for _, v := range allTokens {
-		go r.GetERC721TokensForContract(pCtx, v.TokenContract.Address, fromBlock, pRuntime)
+		go GetERC721TokensForContract(pCtx, v.TokenContract.Address, fromBlock, pRuntime)
 		allResult[i] = v
 		if strings.EqualFold(v.OwnerAddress, address) {
 			ownedTokens = append(ownedTokens, v)
@@ -256,18 +225,28 @@ func (r *Clients) GetERC721TokensForWallet(pCtx context.Context, address string,
 }
 
 // GetERC721TokensForContract returns the ERC721 token for the given contract address
-func (r *Clients) GetERC721TokensForContract(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
+func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
 
-	allTransfers, err := r.GetContractTransfers(address, fromBlock)
+	allTransfers, err := GetContractTransfers(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
 	sort.Slice(allTransfers, func(i, j int) bool {
-		return allTransfers[i].BlockNumber < allTransfers[j].BlockNumber
+		b1, ok := new(big.Int).SetString(allTransfers[i].BlockNumber[2:], 16)
+		if !ok || b1.IsUint64() {
+			panic("invalid block number")
+			return false
+		}
+		b2, ok := new(big.Int).SetString(allTransfers[j].BlockNumber[2:], 16)
+		if !ok || !b2.IsUint64() {
+			panic("invalid block number")
+			return false
+		}
+		return b1.Uint64() < b2.Uint64()
 	})
 
-	contractMetadata, err := r.GetTokenContractMetadata(address)
+	contractMetadata, err := GetTokenContractMetadata(address, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -276,17 +255,15 @@ func (r *Clients) GetERC721TokensForContract(pCtx context.Context, address strin
 
 	tokenChan := make(chan *persist.ERC721)
 
-	counter := int64(len(allTransfers))
-
 	uris := &sync.Map{}
 	for _, t := range allTransfers {
 		go func(transfer Transfer) {
-			defer atomic.AddInt64(&counter, -1)
+
 			if transfer.ERC721TokenID == "" {
 				return
 			}
 			if _, ok := uris.Load(transfer.ERC721TokenID); !ok {
-				uri, err := r.GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID)
+				uri, err := GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID, pRuntime)
 				if err != nil {
 					return // nil, err
 				}
@@ -312,7 +289,7 @@ func (r *Clients) GetERC721TokensForContract(pCtx context.Context, address strin
 
 	}
 
-	for {
+	for i := 0; i < len(allTransfers); i++ {
 		select {
 		case token := <-tokenChan:
 			if it, ok := tokens[token.TokenID]; ok {
@@ -323,10 +300,6 @@ func (r *Clients) GetERC721TokensForContract(pCtx context.Context, address strin
 			} else {
 				tokens[token.TokenID] = token
 			}
-		default:
-		}
-		if atomic.LoadInt64(&counter) == 0 {
-			break
 		}
 	}
 
@@ -344,19 +317,52 @@ func (r *Clients) GetERC721TokensForContract(pCtx context.Context, address strin
 	return result, nil
 }
 
-func getAllTransfersForWallet(pCtx context.Context, address string, fromBlock string, r *Clients, pRuntime *runtime.Runtime) ([]Transfer, error) {
-	from, err := r.GetTransfersFrom(address, fromBlock)
+func getAllTransfersForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]Transfer, error) {
+	from, err := GetTransfersFrom(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	to, err := r.GetTransfersTo(address, fromBlock)
+	to, err := GetTransfersTo(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 	allTransfers := append(from, to...)
 	sort.Slice(allTransfers, func(i, j int) bool {
-		return allTransfers[i].BlockNumber < allTransfers[j].BlockNumber
+		b1, ok := new(big.Int).SetString(allTransfers[i].BlockNumber[2:], 16)
+		if !ok || b1.IsUint64() {
+			panic("invalid block number")
+			return false
+		}
+		b2, ok := new(big.Int).SetString(allTransfers[j].BlockNumber[2:], 16)
+		if !ok || !b2.IsUint64() {
+			panic("invalid block number")
+			return false
+		}
+		return b1.Uint64() < b2.Uint64()
 	})
 	return allTransfers, nil
+}
+
+// NewSubscription sets up a new subscription for a set of addresses from a given block with the given topics
+func NewSubscription(pCtx context.Context, fromBlock string, addresses []common.Address, topics [][]common.Hash, pRuntime *runtime.Runtime) error {
+	i := new(big.Int)
+	_, ok := i.SetString(fromBlock[2:], 16)
+	if !ok {
+		return errors.New("invalid block number")
+	}
+	sub, err := pRuntime.InfraClients.ETHClient.SubscribeFilterLogs(pCtx, ethereum.FilterQuery{FromBlock: i, Addresses: addresses, Topics: topics}, pRuntime.InfraClients.SubLogs)
+	if err != nil {
+		return err
+	}
+	go func() {
+		select {
+		case err := <-sub.Err():
+			if err != nil {
+				log.Error(err.Error())
+				sub.Unsubscribe()
+			}
+		}
+	}()
+	return nil
 }

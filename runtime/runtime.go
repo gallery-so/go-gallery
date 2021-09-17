@@ -8,6 +8,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -28,9 +32,10 @@ const (
 
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
-	Config *Config
-	DB     *DB
-	Router *gin.Engine
+	Config       *Config
+	DB           *DB
+	Router       *gin.Engine
+	InfraClients *InfraClients
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -38,6 +43,13 @@ type DB struct {
 	MongoClient *mongo.Client
 	GalleryDB   *mongo.Database
 	InfraDB     *mongo.Database
+}
+
+// InfraClients is a wrapper for the alchemy clients necessary for json RPC and contract interaction
+type InfraClients struct {
+	RPCClient *rpc.Client
+	ETHClient *ethclient.Client
+	SubLogs   chan types.Log
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -69,8 +81,9 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	// RUNTIME
 	runtime := &Runtime{
-		Config: pConfig,
-		DB:     db,
+		Config:       pConfig,
+		DB:           db,
+		InfraClients: newInfraClients(),
 	}
 
 	// TEST REDIS CONNECTION
@@ -168,4 +181,22 @@ func connectMongo(pMongoURL string,
 	}
 
 	return mClient, nil
+}
+
+func newInfraClients() *InfraClients {
+	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
+	if err != nil {
+		panic(err)
+	}
+
+	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
+	if err != nil {
+		panic(err)
+	}
+
+	return &InfraClients{
+		RPCClient: client,
+		ETHClient: ethClient,
+		SubLogs:   make(chan types.Log),
+	}
 }

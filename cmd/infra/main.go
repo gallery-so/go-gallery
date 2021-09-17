@@ -8,7 +8,7 @@ import (
 func main() {
 
 	config := runtime.ConfigLoad()
-	portStr := config.Port
+	portStr := config.InfraPort
 
 	// RUNTIME
 	runtime, err := runtime.GetRuntime(config)
