@@ -95,10 +95,18 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 		return nil, err
 	}
 
+	// update other user's collections and this user's collection so that they and ONLY they can display these
+	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
+	// TODO we don't necessarily need to NftRemoveDifference seeing as if someone owns that NFT it will
+	// sync with them when they claim it for their own collection
 	go func() {
 		err = persist.CollClaimNFTs(pCtx, pUserID, &persist.CollectionUpdateNftsInput{Nfts: ids}, pRuntime)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to claim nfts: %v", err)
+		}
+		_, err := persist.NftRemoveDifference(pCtx, asGalleryNfts, pOwnerWalletAddress, pRuntime)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to remove difference: %v", err)
 		}
 	}()
 
