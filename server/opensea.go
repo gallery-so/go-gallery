@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -117,12 +116,10 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.Nft, pRuntime *
 	resultChan := make(chan *persist.Nft)
 	errorChan := make(chan error)
 	updatedNfts := make([]*persist.Nft, len(pNfts))
-	counter := int64(len(pNfts))
 
 	// create a goroutine for each nft and sync history
 	for _, nft := range pNfts {
 		go func(nft *persist.Nft) {
-			defer atomic.AddInt64(&counter, -1)
 			history, err := openseaSyncHistory(pCtx, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
 			if err != nil {
 				errorChan <- err
@@ -134,19 +131,14 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.Nft, pRuntime *
 		}(nft)
 	}
 
-	i := 0
 	// wait for all goroutines to finish and collect results from chan
-	for {
+	for i := 0; i < len(pNfts); i++ {
 		select {
 		case nft := <-resultChan:
 			updatedNfts[i] = nft
-			i++
 		case err := <-errorChan:
 			return nil, err
-		default:
-		}
-		if atomic.LoadInt64(&counter) == 0 {
-			break
+
 		}
 	}
 	return updatedNfts, nil
