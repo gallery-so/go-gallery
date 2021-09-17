@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -195,33 +194,35 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 
 // NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func NftBulkUpsert(pCtx context.Context, pNfts []*Nft, pRuntime *runtime.Runtime) error {
+func NftBulkUpsert(pCtx context.Context, pNfts []*Nft, pRuntime *runtime.Runtime) ([]DBID, error) {
 
 	mp := newStorage(0, nftColName, pRuntime)
 
-	wg := &sync.WaitGroup{}
-	mu := &sync.Mutex{}
-	errs := []error{}
-	wg.Add(len(pNfts))
+	ids := make(chan DBID)
+	errs := make(chan error)
 
 	for _, v := range pNfts {
 
 		go func(nft *Nft) {
-			defer wg.Done()
-			_, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
+			id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
 			if err != nil {
-				mu.Lock()
-				errs = append(errs, err)
-				mu.Unlock()
+				errs <- err
 			}
+			ids <- id
 		}(v)
 	}
-	wg.Wait()
 
-	if len(errs) > 0 {
-		return errs[0]
+	result := make([]DBID, len(pNfts))
+	for i := 0; i < len(pNfts); i++ {
+		select {
+		case id := <-ids:
+			result[i] = id
+		case err := <-errs:
+			return nil, err
+		}
 	}
-	return nil
+
+	return result, nil
 
 }
 
