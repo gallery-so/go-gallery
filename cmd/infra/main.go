@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/mikeydub/go-gallery/infra"
 	"github.com/mikeydub/go-gallery/runtime"
 )
@@ -18,6 +20,6 @@ func main() {
 
 	//-------------
 	// SERVER_INIT
-	infra.Init(portStr, runtime)
+	log.Fatal(infra.Init(portStr, runtime))
 
 }

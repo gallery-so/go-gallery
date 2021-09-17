@@ -26,11 +26,12 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 // Init initializes the server
 func Init(pPortInt int,
-	pRuntime *runtime.Runtime) {
+	pRuntime *runtime.Runtime) error {
 
 	CoreInit(pRuntime)
 
 	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }

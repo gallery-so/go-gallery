@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/mikeydub/go-gallery/contracts"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
@@ -47,9 +47,9 @@ type DB struct {
 
 // InfraClients is a wrapper for the alchemy clients necessary for json RPC and contract interaction
 type InfraClients struct {
-	RPCClient *rpc.Client
-	ETHClient *ethclient.Client
-	SubLogs   chan types.Log
+	RPCClient    *rpc.Client
+	ETHClient    *ethclient.Client
+	TransferLogs map[string]chan *contracts.IERC721Transfer
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -184,19 +184,19 @@ func connectMongo(pMongoURL string,
 }
 
 func newInfraClients() *InfraClients {
-	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
+	client, err := rpc.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	if err != nil {
 		panic(err)
 	}
 
-	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
+	ethClient, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	if err != nil {
 		panic(err)
 	}
 
 	return &InfraClients{
-		RPCClient: client,
-		ETHClient: ethClient,
-		SubLogs:   make(chan types.Log),
+		RPCClient:    client,
+		ETHClient:    ethClient,
+		TransferLogs: make(map[string]chan *contracts.IERC721Transfer),
 	}
 }

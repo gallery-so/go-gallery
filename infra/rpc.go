@@ -3,18 +3,20 @@ package infra
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Transfers represents the transfers for a given rpc response
@@ -137,37 +139,59 @@ func GetTokenURI(address string, tokenID string, pRuntime *runtime.Runtime) (str
 }
 
 // GetERC721TokensForWallet returns the ERC721 token for the given wallet address
-func GetERC721TokensForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
-	allTransfers, err := getAllTransfersForWallet(pCtx, address, fromBlock, pRuntime)
+func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	logger := logrus.WithFields(logrus.Fields{"method": "GetERC721TokensForWallet"})
+	allTransfers, err := getAllTransfersForWallet(pCtx, pAddress, pFromBlock, pRuntime)
 
-	allTokens := map[string]*persist.ERC721{}
-	ownedTokens := []*persist.ERC721{}
+	// map of token contract address + token ID => token to keep track of ownership seeing as
+	// tokens will appear more than once in the transfers
+	allTokens := map[string]*persist.Token{}
+	// all the tokens owned by `address`
+	ownedTokens := []*persist.Token{}
 
-	allChan := make(chan *persist.ERC721)
+	// channel that will receive complete tokens from goroutines that will fill out token data
+	tokenChan := make(chan *persist.Token)
+	// channel that will receive errors from goroutines that will fill out token data
+	errChan := make(chan error)
 
+	// map of token contract address + token ID => token URI to prevent duplicate calls to the
+	// blockchain for retrieving token URI
 	uris := &sync.Map{}
+	// map of token contract address => token metadata to prevent duplicate calls to the
+	// blockchain for retrieving token metadata
 	metadatas := &sync.Map{}
 
+	// spin up a goroutine for each transfer
 	for _, t := range allTransfers {
 		go func(transfer Transfer) {
+			// required data for a token
 			if transfer.ERC721TokenID == "" {
+				errChan <- errors.New("no token ID found for token")
 				return
 			}
 			if transfer.RawContract.Address == "" {
+				errChan <- errors.New("no contract address found for token")
 				return
 			}
 
 			if _, ok := metadatas.Load(transfer.RawContract.Address); !ok {
 				metadata, err := GetTokenContractMetadata(transfer.RawContract.Address, pRuntime)
 				if err != nil {
-					return // nil, err
+					logger.WithFields(logrus.Fields{"section": "GetTokenContractMetadata", "contract": transfer.RawContract.Address}).Error(err)
+					errChan <- err
+					return
 				}
+				// spin up a goroutine for each contract to retrieve all other tokens from that contract
+				// and store them in the db
+				go GetERC721TokensForContract(pCtx, transfer.RawContract.Address, pFromBlock, pRuntime)
 				metadatas.Store(transfer.RawContract.Address, metadata)
 			}
 			if _, ok := uris.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
 				uri, err := GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID, pRuntime)
 				if err != nil {
-					return // nil, err
+					logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": transfer.RawContract.Address, "tokenID": transfer.ERC721TokenID}).Error(err)
+					errChan <- err
+					return
 				}
 				uris.Store(transfer.RawContract.Address+transfer.ERC721TokenID, uri)
 			}
@@ -176,48 +200,61 @@ func GetERC721TokensForWallet(pCtx context.Context, address string, fromBlock st
 			metadata := genericMetadata.(TokenMetadata)
 			genericURI, _ := uris.Load(transfer.RawContract.Address + transfer.ERC721TokenID)
 			uri := genericURI.(string)
-			token := &persist.ERC721{
+
+			// get token ID in non-prefixed hex format from big int
+			tokenID, err := util.NormalizeHex(transfer.ERC721TokenID)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			token := &persist.Token{
 				TokenContract: persist.TokenContract{
 					Address:   strings.ToLower(transfer.RawContract.Address),
 					TokenName: metadata.Name,
 					Symbol:    metadata.Symbol,
 				},
-				TokenID:        transfer.ERC721TokenID,
+				TokenID:        tokenID,
 				TokenURI:       uri,
 				OwnerAddress:   strings.ToLower(transfer.To),
 				PreviousOwners: []string{strings.ToLower(transfer.From)},
 				LastBlockNum:   transfer.BlockNumber,
 			}
-			allChan <- token
+			tokenChan <- token
 		}(t)
 	}
 
 	for i := 0; i < len(allTransfers); i++ {
 		select {
-		case all := <-allChan:
-			if it, ok := allTokens[all.TokenContract.Address+all.TokenID]; ok {
-				ownerHistory := append(all.PreviousOwners, it.PreviousOwners...)
+		case t := <-tokenChan:
+			// add token to map of tokens if not there, otherwise update owner history, last block num,
+			// and current owner
+			if it, ok := allTokens[t.TokenContract.Address+t.TokenID]; ok {
+				ownerHistory := append(t.PreviousOwners, it.PreviousOwners...)
 				it.PreviousOwners = ownerHistory
-				it.OwnerAddress = all.OwnerAddress
-				it.LastBlockNum = all.LastBlockNum
+				it.OwnerAddress = t.OwnerAddress
+				it.LastBlockNum = t.LastBlockNum
 			} else {
-				allTokens[all.TokenContract.Address+all.TokenID] = all
+				allTokens[t.TokenContract.Address+t.TokenID] = t
 			}
+		case err := <-errChan:
+			logger.Error(err)
 		}
 	}
 
-	allResult := make([]*persist.ERC721, len(allTokens))
+	allResult := make([]*persist.Token, len(allTokens))
 	i := 0
 	for _, v := range allTokens {
-		go GetERC721TokensForContract(pCtx, v.TokenContract.Address, fromBlock, pRuntime)
+		// add every token to the result to be upserted in db
 		allResult[i] = v
-		if strings.EqualFold(v.OwnerAddress, address) {
+		// only add token to owned tokens if it is owned by the wallet
+		if strings.EqualFold(v.OwnerAddress, pAddress) {
 			ownedTokens = append(ownedTokens, v)
 		}
 		i++
 	}
 
-	if err = persist.ERC721BulkUpsert(pCtx, allResult, pRuntime); err != nil {
+	if err = persist.TokenBulkUpsert(pCtx, allResult, pRuntime); err != nil {
 		return nil, err
 	}
 
@@ -225,60 +262,64 @@ func GetERC721TokensForWallet(pCtx context.Context, address string, fromBlock st
 }
 
 // GetERC721TokensForContract returns the ERC721 token for the given contract address
-func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
-
+func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	logger := logrus.WithFields(logrus.Fields{"method": "GetERC721TokensForContract"})
 	allTransfers, err := GetContractTransfers(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	sort.Slice(allTransfers, func(i, j int) bool {
-		b1, ok := new(big.Int).SetString(allTransfers[i].BlockNumber[2:], 16)
-		if !ok || b1.IsUint64() {
-			panic("invalid block number")
-			return false
-		}
-		b2, ok := new(big.Int).SetString(allTransfers[j].BlockNumber[2:], 16)
-		if !ok || !b2.IsUint64() {
-			panic("invalid block number")
-			return false
-		}
-		return b1.Uint64() < b2.Uint64()
-	})
+	sortByBlockNumber(allTransfers)
 
 	contractMetadata, err := GetTokenContractMetadata(address, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := map[string]*persist.ERC721{}
+	// map of tokenID => token
+	tokens := map[string]*persist.Token{}
 
-	tokenChan := make(chan *persist.ERC721)
+	// channel receiving fully filled tokens from goroutines
+	tokenChan := make(chan *persist.Token)
+	// channel receiving errors from goroutines
+	errChan := make(chan error)
 
+	// map of tokenID => tokenURI to prevent duplicate queries
 	uris := &sync.Map{}
+
 	for _, t := range allTransfers {
 		go func(transfer Transfer) {
 
 			if transfer.ERC721TokenID == "" {
+				errChan <- errors.New("no token ID found for token")
 				return
 			}
 			if _, ok := uris.Load(transfer.ERC721TokenID); !ok {
 				uri, err := GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID, pRuntime)
 				if err != nil {
-					return // nil, err
+					logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": transfer.RawContract.Address, "tokenID": transfer.ERC721TokenID}).Error(err)
+					errChan <- err
+					return
 				}
 				uris.Store(transfer.ERC721TokenID, uri)
 			}
 
+			tokenID, err := util.NormalizeHex(transfer.ERC721TokenID)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
 			genericURI, _ := uris.Load(transfer.ERC721TokenID)
 			uri := genericURI.(string)
-			token := &persist.ERC721{
+
+			token := &persist.Token{
 				TokenContract: persist.TokenContract{
 					Address:   strings.ToLower(transfer.RawContract.Address),
 					TokenName: contractMetadata.Name,
 					Symbol:    contractMetadata.Symbol,
 				},
-				TokenID:        transfer.ERC721TokenID,
+				TokenID:        tokenID,
 				TokenURI:       uri,
 				OwnerAddress:   strings.ToLower(transfer.To),
 				PreviousOwners: []string{strings.ToLower(transfer.From)},
@@ -293,6 +334,8 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 		select {
 		case token := <-tokenChan:
 			if it, ok := tokens[token.TokenID]; ok {
+				// add token to map of tokens if not there, otherwise update owner history, last block num,
+				// and current owner
 				owners := append(token.PreviousOwners, it.PreviousOwners...)
 				it.OwnerAddress = token.OwnerAddress
 				it.PreviousOwners = owners
@@ -300,17 +343,25 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 			} else {
 				tokens[token.TokenID] = token
 			}
+		case err := <-errChan:
+			logger.Error(err)
 		}
 	}
 
-	result := make([]*persist.ERC721, len(tokens))
+	// add every token to the result to be upserted in db
+	result := make([]*persist.Token, len(tokens))
 	i := 0
 	for _, v := range tokens {
 		result[i] = v
 		i++
 	}
 
-	if err = persist.ERC721BulkUpsert(pCtx, result, pRuntime); err != nil {
+	if err = persist.TokenBulkUpsert(pCtx, result, pRuntime); err != nil {
+		return nil, err
+	}
+
+	// spin up a subscription to listen for new transfers
+	if err = WatchTransfers(pCtx, address, pRuntime); err != nil {
 		return nil, err
 	}
 
@@ -328,41 +379,89 @@ func getAllTransfersForWallet(pCtx context.Context, address string, fromBlock st
 		return nil, err
 	}
 	allTransfers := append(from, to...)
-	sort.Slice(allTransfers, func(i, j int) bool {
-		b1, ok := new(big.Int).SetString(allTransfers[i].BlockNumber[2:], 16)
-		if !ok || b1.IsUint64() {
-			panic("invalid block number")
+	sortByBlockNumber(allTransfers)
+	return allTransfers, nil
+}
+
+// WatchTransfers watches for transfers from the given contract address with an optional list of tokenIDs
+func WatchTransfers(pCtx context.Context, pContractAddress string, pRuntime *runtime.Runtime) error {
+
+	// already subscribed, no need to error though
+	if _, ok := pRuntime.InfraClients.TransferLogs[pContractAddress]; ok {
+		return nil
+	}
+
+	contract := common.HexToAddress(pContractAddress)
+	instance, err := contracts.NewIERC721(contract, pRuntime.InfraClients.ETHClient)
+	if err != nil {
+		return err
+	}
+
+	sub, err := instance.WatchTransfer(&bind.WatchOpts{Context: pCtx}, pRuntime.InfraClients.TransferLogs[pContractAddress], nil, nil, nil)
+	if err != nil {
+		return err
+	}
+	go HandleFutureTransfers(pCtx, pContractAddress, sub, pRuntime)
+	return nil
+}
+
+// HandleFutureTransfers continually updates the database with new transfers from the given contract address
+// with the given subscription
+func HandleFutureTransfers(pCtx context.Context, pContractAddress string, pSub event.Subscription, pRuntime *runtime.Runtime) error {
+	logger := logrus.WithFields(logrus.Fields{"event": "transfer", "contract": pContractAddress})
+	for {
+		select {
+		case event := <-pRuntime.InfraClients.TransferLogs[pContractAddress]:
+			logger.Debug(event)
+			tokens, err := persist.TokenGetByTokenID(pCtx, pContractAddress, event.TokenId.Text(16), pRuntime)
+			if err != nil {
+				logger.Error(err)
+				pSub.Unsubscribe()
+				return err
+			}
+			if len(tokens) > 1 {
+				err := fmt.Errorf("multiple tokens found for tokenID %s", event.TokenId.Text(16))
+				logger.Error(err)
+				pSub.Unsubscribe()
+				return err
+			}
+			if len(tokens) == 0 {
+				err := fmt.Errorf("no tokens found for tokenID %s", event.TokenId.Text(16))
+				logger.Error(err)
+				pSub.Unsubscribe()
+				return err
+			}
+			token := tokens[0]
+			update := &persist.TokenUpdateWithTransfer{
+				OwnerAddress:   strings.ToLower(event.To.Hex()),
+				PreviousOwners: append(token.PreviousOwners, token.OwnerAddress),
+				LastBlockNum:   fmt.Sprintf("0x%x", event.Raw.BlockNumber),
+			}
+			if err = persist.TokenUpdateByID(pCtx, token.ID, update, pRuntime); err != nil {
+				logger.Error(err)
+				pSub.Unsubscribe()
+				return err
+			}
+		case err := <-pSub.Err():
+			if err != nil {
+				logger.Error(err)
+				pSub.Unsubscribe()
+				return err
+			}
+		}
+	}
+}
+
+func sortByBlockNumber(transfers []Transfer) {
+	sort.Slice(transfers, func(i, j int) bool {
+		b1, ok := new(big.Int).SetString(transfers[i].BlockNumber[2:], 16)
+		if !ok || !b1.IsUint64() {
 			return false
 		}
-		b2, ok := new(big.Int).SetString(allTransfers[j].BlockNumber[2:], 16)
+		b2, ok := new(big.Int).SetString(transfers[j].BlockNumber[2:], 16)
 		if !ok || !b2.IsUint64() {
-			panic("invalid block number")
 			return false
 		}
 		return b1.Uint64() < b2.Uint64()
 	})
-	return allTransfers, nil
-}
-
-// NewSubscription sets up a new subscription for a set of addresses from a given block with the given topics
-func NewSubscription(pCtx context.Context, fromBlock string, addresses []common.Address, topics [][]common.Hash, pRuntime *runtime.Runtime) error {
-	i := new(big.Int)
-	_, ok := i.SetString(fromBlock[2:], 16)
-	if !ok {
-		return errors.New("invalid block number")
-	}
-	sub, err := pRuntime.InfraClients.ETHClient.SubscribeFilterLogs(pCtx, ethereum.FilterQuery{FromBlock: i, Addresses: addresses, Topics: topics}, pRuntime.InfraClients.SubLogs)
-	if err != nil {
-		return err
-	}
-	go func() {
-		select {
-		case err := <-sub.Err():
-			if err != nil {
-				log.Error(err.Error())
-				sub.Unsubscribe()
-			}
-		}
-	}()
-	return nil
 }

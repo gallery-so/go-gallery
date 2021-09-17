@@ -19,8 +19,8 @@ func TestGetERC721sForWallet_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type response struct {
-		Tokens []persist.ERC721 `json:"tokens"`
-		Error  string           `json:"error"`
+		Tokens []persist.Token `json:"tokens"`
+		Error  string          `json:"error"`
 	}
 
 	var r response

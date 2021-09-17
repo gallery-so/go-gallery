@@ -19,8 +19,8 @@ const (
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
 
-// ERC721 represents an individual ERC721 token
-type ERC721 struct {
+// Token represents an individual Token token
+type Token struct {
 	Version      int64              `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
@@ -42,9 +42,16 @@ type TokenContract struct {
 	TokenName string `bson:"token_name" json:"token_name"`
 }
 
-// ERC721CreateBulk is a helper function to create multiple nfts in one call and returns
+// TokenUpdateWithTransfer represents a token update occuring after a transfer event
+type TokenUpdateWithTransfer struct {
+	OwnerAddress   string   `bson:"owner_address"`
+	PreviousOwners []string `bson:"previous_owners"`
+	LastBlockNum   string   `bson:"last_block_num"`
+}
+
+// TokenCreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func ERC721CreateBulk(pCtx context.Context, pERC721s []*ERC721,
+func TokenCreateBulk(pCtx context.Context, pERC721s []*Token,
 	pRuntime *runtime.Runtime) ([]DBID, error) {
 
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
@@ -63,8 +70,8 @@ func ERC721CreateBulk(pCtx context.Context, pERC721s []*ERC721,
 	return ids, nil
 }
 
-// ERC721Create inserts an ERC721 into the database
-func ERC721Create(pCtx context.Context, pERC721 *ERC721,
+// TokenCreate inserts an ERC721 into the database
+func TokenCreate(pCtx context.Context, pERC721 *Token,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
@@ -72,9 +79,9 @@ func ERC721Create(pCtx context.Context, pERC721 *ERC721,
 	return mp.insert(pCtx, pERC721)
 }
 
-// ERC721GetByWallet gets ERC721 tokens for a given wallet address
-func ERC721GetByWallet(pCtx context.Context, pAddress string,
-	pRuntime *runtime.Runtime) ([]*ERC721, error) {
+// TokenGetByWallet gets ERC721 tokens for a given wallet address
+func TokenGetByWallet(pCtx context.Context, pAddress string,
+	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -82,9 +89,9 @@ func ERC721GetByWallet(pCtx context.Context, pAddress string,
 	}
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
-	result := []*ERC721{}
+	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress)}, &result, opts)
+	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +99,9 @@ func ERC721GetByWallet(pCtx context.Context, pAddress string,
 	return result, nil
 }
 
-// ERC721GetByContract gets ERC721 tokens for a given contract
-func ERC721GetByContract(pCtx context.Context, pAddress string,
-	pRuntime *runtime.Runtime) ([]*ERC721, error) {
+// TokenGetByContract gets ERC721 tokens for a given contract
+func TokenGetByContract(pCtx context.Context, pAddress string,
+	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -102,7 +109,7 @@ func ERC721GetByContract(pCtx context.Context, pAddress string,
 	}
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
-	result := []*ERC721{}
+	result := []*Token{}
 
 	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
@@ -112,9 +119,29 @@ func ERC721GetByContract(pCtx context.Context, pAddress string,
 	return result, nil
 }
 
-// ERC721BulkUpsert will create a bulk operation on the database to upsert many erc721s for a given wallet address
+// TokenGetByTokenID gets tokens for a given contract address and token ID
+func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
+	pRuntime *runtime.Runtime) ([]*Token, error) {
+	opts := options.Find()
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.SetMaxTime(dur)
+	}
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+
+	result := []*Token{}
+
+	err := mp.find(pCtx, bson.M{"token_id": pTokenID, "token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// TokenBulkUpsert will create a bulk operation on the database to upsert many erc721s for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func ERC721BulkUpsert(pCtx context.Context, pERC721s []*ERC721, pRuntime *runtime.Runtime) error {
+func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
 
@@ -125,7 +152,7 @@ func ERC721BulkUpsert(pCtx context.Context, pERC721s []*ERC721, pRuntime *runtim
 
 	for _, v := range pERC721s {
 
-		go func(erc721 *ERC721) {
+		go func(erc721 *Token) {
 			defer wg.Done()
 			_, err := mp.upsert(pCtx, bson.M{"token_id": erc721.TokenID, "token_contract.contract_address": strings.ToLower(erc721.TokenContract.Address)}, erc721)
 			if err != nil {
@@ -141,4 +168,14 @@ func ERC721BulkUpsert(pCtx context.Context, pERC721s []*ERC721, pRuntime *runtim
 		return errs[0]
 	}
 	return nil
+}
+
+// TokenUpdateByID will update a given token by its DB ID
+func TokenUpdateByID(pCtx context.Context, pID DBID,
+	pUpdate interface{},
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+
+	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }

@@ -19,7 +19,7 @@ type getERC721TokensInput struct {
 }
 
 type getERC721TokensOutput struct {
-	Tokens []*persist.ERC721 `json:"tokens"`
+	Tokens []*persist.Token `json:"tokens"`
 }
 
 func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
@@ -35,7 +35,7 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		tokens := []*persist.ERC721{}
+		tokens := []*persist.Token{}
 
 		if input.Address != "" {
 			result, err := getTokensForWallet(c, input.Address, input.SkipDB, pRuntime)
@@ -65,10 +65,10 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
-	tokens := []*persist.ERC721{}
+func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	tokens := []*persist.Token{}
 	if !pSkipDB {
-		result, err := persist.ERC721GetByWallet(pCtx, pWalletAddress, pRuntime)
+		result, err := persist.TokenGetByWallet(pCtx, pWalletAddress, pRuntime)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +76,7 @@ func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB boo
 			go func() {
 				sort.Slice(result, func(i, j int) bool {
 					b1, ok := new(big.Int).SetString(result[i].LastBlockNum[2:], 16)
-					if !ok || b1.IsUint64() {
+					if !ok || !b1.IsUint64() {
 						return false
 					}
 					b2, ok := new(big.Int).SetString(result[j].LastBlockNum[2:], 16)
@@ -104,10 +104,10 @@ func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB boo
 	}
 	return tokens, nil
 }
-func getTokensForContract(pCtx context.Context, pContractAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.ERC721, error) {
-	tokens := []*persist.ERC721{}
+func getTokensForContract(pCtx context.Context, pContractAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	tokens := []*persist.Token{}
 	if !pSkipDB {
-		result, err := persist.ERC721GetByContract(pCtx, pContractAddress, pRuntime)
+		result, err := persist.TokenGetByContract(pCtx, pContractAddress, pRuntime)
 		if err != nil {
 			return nil, err
 		}
