@@ -17,6 +17,8 @@ const (
 	portMetrics    = "GLRY_PORT_METRIM"
 	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
+	alchemyURL = "ALCHEMY_URL"
+
 	mongoURLSecretName = "MONGO_URL_SECRET_NAME"
 	mongoTLSSecretName = "MONGO_TLS_SECRET_NAME"
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
@@ -63,6 +65,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(infraPort, 5000)
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
+	viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 
 	viper.SetDefault(mongoUseTLS, false)
 	viper.SetDefault(mongoURLSecretName, "")

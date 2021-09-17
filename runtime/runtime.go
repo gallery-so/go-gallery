@@ -184,12 +184,12 @@ func connectMongo(pMongoURL string,
 }
 
 func newInfraClients() *InfraClients {
-	client, err := rpc.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
 	if err != nil {
 		panic(err)
 	}
 
-	ethClient, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
 	if err != nil {
 		panic(err)
 	}
