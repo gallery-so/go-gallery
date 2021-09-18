@@ -26,13 +26,14 @@ type Token struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
-	TokenURI       string   `bson:"token_uri" json:"token_uri"`
-	TokenID        string   `bson:"token_id" json:"token_id"`
-	OwnerAddress   string   `bson:"owner_address" json:"owner_address"`
-	PreviousOwners []string `bson:"previous_owners" json:"previous_owners"`
-	LastBlockNum   string   `bson:"last_block_num" json:"last_block_num"`
+	TokenURI       string        `bson:"token_uri" json:"token_uri"`
+	TokenID        string        `bson:"token_id" json:"token_id"`
+	OwnerAddress   string        `bson:"owner_address" json:"owner_address"`
+	PreviousOwners []string      `bson:"previous_owners" json:"previous_owners"`
+	LastBlockNum   string        `bson:"last_block_num" json:"last_block_num"`
+	TokenMetadata  TokenMetadata `bson:"token_metadata" json:"token_metadata"`
 
-	TokenContract TokenContract `bson:"token_contract"`
+	TokenContract TokenContract `bson:"token_contract" json:"token_contract"`
 }
 
 // TokenContract represents the contract for a given ERC721
@@ -40,6 +41,23 @@ type TokenContract struct {
 	Address   string `bson:"contract_address" json:"contract_address"`
 	Symbol    string `bson:"symbol" json:"symbol"`
 	TokenName string `bson:"token_name" json:"token_name"`
+}
+
+// TokenMetadata represents JSON metadata for an NFT
+type TokenMetadata struct {
+	Name         string      `bson:"name" json:"name"`
+	Description  string      `bson:"description" json:"description"`
+	Image        string      `bson:"image" json:"image"`
+	ImageURL     string      `bson:"image_url" json:"image_url"`
+	ExternalURL  string      `bson:"external_url" json:"external_url"`
+	AnimationURL string      `bson:"animation_url" json:"animation_url"`
+	Attributes   []attribute `bson:"attributes" json:"attributes"`
+	Traits       []attribute `bson:"traits" json:"traits"`
+}
+
+type attribute struct {
+	TraitType string `bson:"trait_type" json:"trait_type"`
+	Value     string `bson:"value" json:"value"`
 }
 
 // TokenUpdateWithTransfer represents a token update occuring after a transfer event
@@ -91,7 +109,7 @@ func TokenGetByWallet(pCtx context.Context, pAddress string,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress), "last_updated": bson.M{"$gt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +129,7 @@ func TokenGetByContract(pCtx context.Context, pAddress string,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$gt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
 		return nil, err
 	}

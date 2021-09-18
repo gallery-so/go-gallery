@@ -81,19 +81,19 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	// RUNTIME
 	runtime := &Runtime{
-		Config:       pConfig,
-		DB:           db,
-		InfraClients: newInfraClients(),
+		Config: pConfig,
+		DB:     db,
 	}
+	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
 
 	// TEST REDIS CONNECTION
 	client := redis.NewClient(&redis.Options{
-		Addr:     runtime.Config.RedisURL,
-		Password: runtime.Config.RedisPassword,
+		Addr:     pConfig.RedisURL,
+		Password: pConfig.RedisPassword,
 		DB:       0,
 	})
 	if err = client.Ping().Err(); err != nil {
-		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, runtime.Config.RedisURL)
+		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, pConfig.RedisURL)
 	}
 	log.Info("redis connected! ✅")
 
@@ -183,13 +183,13 @@ func connectMongo(pMongoURL string,
 	return mClient, nil
 }
 
-func newInfraClients() *InfraClients {
-	client, err := rpc.Dial(os.Getenv("ALCHEMY_URL"))
+func newInfraClients(alchemyURL string) *InfraClients {
+	client, err := rpc.Dial(alchemyURL)
 	if err != nil {
 		panic(err)
 	}
 
-	ethClient, err := ethclient.Dial(os.Getenv("ALCHEMY_URL"))
+	ethClient, err := ethclient.Dial(alchemyURL)
 	if err != nil {
 		panic(err)
 	}

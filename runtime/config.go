@@ -40,6 +40,7 @@ type Config struct {
 	InfraPort      int
 	PortMetrics    int
 	AllowedOrigins string
+	AlchemyURL     string
 
 	MongoURL    string
 	MongoUseTLS bool
@@ -103,6 +104,7 @@ func ConfigLoad() *Config {
 		InfraPort:      viper.GetInt(infraPort),
 		PortMetrics:    viper.GetInt(portMetrics),
 		AllowedOrigins: viper.GetString(allowedOrigins),
+		AlchemyURL:     viper.GetString(alchemyURL),
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 

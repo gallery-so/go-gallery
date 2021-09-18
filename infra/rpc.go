@@ -1,10 +1,15 @@
 package infra
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -44,11 +49,16 @@ type Contract struct {
 	Decimal string `json:"decimal"`
 }
 
-// TokenMetadata represents a token contract's metadata
-type TokenMetadata struct {
+// TokenContractMetadata represents a token contract's metadata
+type TokenContractMetadata struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
 	Logo   string `json:"logo"`
+}
+
+type uriWithMetadata struct {
+	uri string
+	md  persist.TokenMetadata
 }
 
 // GetTransfersFrom returns the transfers from the given address
@@ -103,12 +113,12 @@ func GetContractTransfers(address string, fromBlock string, pRuntime *runtime.Ru
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func GetTokenContractMetadata(address string, pRuntime *runtime.Runtime) (TokenMetadata, error) {
-	result := &TokenMetadata{}
+func GetTokenContractMetadata(address string, pRuntime *runtime.Runtime) (TokenContractMetadata, error) {
+	result := &TokenContractMetadata{}
 
 	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getTokenMetadata", address)
 	if err != nil {
-		return TokenMetadata{}, err
+		return TokenContractMetadata{}, err
 	}
 
 	return *result, nil
@@ -138,6 +148,74 @@ func GetTokenURI(address string, tokenID string, pRuntime *runtime.Runtime) (str
 
 }
 
+// GetTokenMetadata parses and returns the NFT metadata for a given token URI
+// TODO handle when the URI is an SVG or image
+// TODO handle when the URI points directly to a file instead of a JSON metadata
+func GetTokenMetadata(tokenURI string) (persist.TokenMetadata, error) {
+	switch {
+	case strings.HasPrefix(tokenURI, "data:application/json;base64,"):
+		// decode the base64 encoded json
+		decoded, err := base64.StdEncoding.DecodeString(tokenURI[len("data:application/json;base64,"):])
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		metadata := persist.TokenMetadata{}
+		err = json.Unmarshal(decoded, &metadata)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		return metadata, nil
+	case strings.HasPrefix(tokenURI, "ipfs://"):
+		strip := strings.TrimPrefix(tokenURI, "ipfs://")
+		again := strings.TrimPrefix(strip, "ipfs/")
+
+		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", again)
+		resp, err := http.Get(url)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		defer resp.Body.Close()
+		buf := &bytes.Buffer{}
+		_, err = io.Copy(buf, resp.Body)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		metadata := persist.TokenMetadata{}
+		err = json.Unmarshal(buf.Bytes(), &metadata)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		return metadata, nil
+	case strings.HasPrefix(tokenURI, "https://") || strings.HasPrefix(tokenURI, "http://"):
+		resp, err := http.Get(tokenURI)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+		defer resp.Body.Close()
+		buf := &bytes.Buffer{}
+		_, err = io.Copy(buf, resp.Body)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		// parse the json
+		metadata := persist.TokenMetadata{}
+		err = json.Unmarshal(buf.Bytes(), &metadata)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
+		return metadata, nil
+	default:
+		return persist.TokenMetadata{}, nil
+	}
+}
+
 // GetERC721TokensForWallet returns the ERC721 token for the given wallet address
 func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	logger := logrus.WithFields(logrus.Fields{"method": "GetERC721TokensForWallet"})
@@ -154,12 +232,12 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 	// channel that will receive errors from goroutines that will fill out token data
 	errChan := make(chan error)
 
-	// map of token contract address + token ID => token URI to prevent duplicate calls to the
+	// map of token contract address + token ID => uriWithMetadata to prevent duplicate calls to the
 	// blockchain for retrieving token URI
-	uris := &sync.Map{}
+	tokenDetails := &sync.Map{}
 	// map of token contract address => token metadata to prevent duplicate calls to the
 	// blockchain for retrieving token metadata
-	metadatas := &sync.Map{}
+	contractMetadatas := &sync.Map{}
 
 	// spin up a goroutine for each transfer
 	for _, t := range allTransfers {
@@ -174,7 +252,7 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 				return
 			}
 
-			if _, ok := metadatas.Load(transfer.RawContract.Address); !ok {
+			if _, ok := contractMetadatas.Load(transfer.RawContract.Address); !ok {
 				metadata, err := GetTokenContractMetadata(transfer.RawContract.Address, pRuntime)
 				if err != nil {
 					logger.WithFields(logrus.Fields{"section": "GetTokenContractMetadata", "contract": transfer.RawContract.Address}).Error(err)
@@ -184,25 +262,37 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 				// spin up a goroutine for each contract to retrieve all other tokens from that contract
 				// and store them in the db
 				go GetERC721TokensForContract(pCtx, transfer.RawContract.Address, pFromBlock, pRuntime)
-				metadatas.Store(transfer.RawContract.Address, metadata)
+				contractMetadatas.Store(transfer.RawContract.Address, metadata)
 			}
-			if _, ok := uris.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
+			if _, ok := tokenDetails.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
 				uri, err := GetTokenURI(transfer.RawContract.Address, transfer.ERC721TokenID, pRuntime)
 				if err != nil {
 					logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": transfer.RawContract.Address, "tokenID": transfer.ERC721TokenID}).Error(err)
 					errChan <- err
 					return
 				}
-				uris.Store(transfer.RawContract.Address+transfer.ERC721TokenID, uri)
+				metadata, err := GetTokenMetadata(uri)
+				if err != nil {
+					logger.WithFields(logrus.Fields{"section": "GetTokenMetadata", "uri": uri}).Error(err)
+					errChan <- err
+					return
+				}
+
+				tokenDetails.Store(transfer.RawContract.Address+transfer.ERC721TokenID, uriWithMetadata{uri, metadata})
 			}
 
-			genericMetadata, _ := metadatas.Load(transfer.RawContract.Address)
-			metadata := genericMetadata.(TokenMetadata)
-			genericURI, _ := uris.Load(transfer.RawContract.Address + transfer.ERC721TokenID)
-			uri := genericURI.(string)
+			genericMetadata, _ := contractMetadatas.Load(transfer.RawContract.Address)
+			metadata := genericMetadata.(TokenContractMetadata)
+			genericURI, _ := tokenDetails.Load(transfer.RawContract.Address + transfer.ERC721TokenID)
+			uri := genericURI.(uriWithMetadata)
 
 			// get token ID in non-prefixed hex format from big int
 			tokenID, err := util.NormalizeHex(transfer.ERC721TokenID)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			blockNum, err := util.NormalizeHex(transfer.ERC721TokenID)
 			if err != nil {
 				errChan <- err
 				return
@@ -215,10 +305,11 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 					Symbol:    metadata.Symbol,
 				},
 				TokenID:        tokenID,
-				TokenURI:       uri,
+				TokenURI:       uri.uri,
 				OwnerAddress:   strings.ToLower(transfer.To),
 				PreviousOwners: []string{strings.ToLower(transfer.From)},
-				LastBlockNum:   transfer.BlockNumber,
+				LastBlockNum:   blockNum,
+				TokenMetadata:  uri.md,
 			}
 			tokenChan <- token
 		}(t)
@@ -254,9 +345,12 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 		i++
 	}
 
-	if err = persist.TokenBulkUpsert(pCtx, allResult, pRuntime); err != nil {
-		return nil, err
-	}
+	go func() {
+		// update DB
+		if err = persist.TokenBulkUpsert(pCtx, allResult, pRuntime); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	return ownedTokens, nil
 }
@@ -284,7 +378,7 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 	// channel receiving errors from goroutines
 	errChan := make(chan error)
 
-	// map of tokenID => tokenURI to prevent duplicate queries
+	// map of tokenID => uriWithMetadata to prevent duplicate queries
 	uris := &sync.Map{}
 
 	for _, t := range allTransfers {
@@ -301,7 +395,13 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 					errChan <- err
 					return
 				}
-				uris.Store(transfer.ERC721TokenID, uri)
+				metadata, err := GetTokenMetadata(uri)
+				if err != nil {
+					logger.WithFields(logrus.Fields{"section": "GetTokenMetadata", "uri": uri}).Error(err)
+					errChan <- err
+					return
+				}
+				uris.Store(transfer.ERC721TokenID, uriWithMetadata{uri, metadata})
 			}
 
 			tokenID, err := util.NormalizeHex(transfer.ERC721TokenID)
@@ -310,8 +410,14 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 				return
 			}
 
+			blockNum, err := util.NormalizeHex(transfer.ERC721TokenID)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
 			genericURI, _ := uris.Load(transfer.ERC721TokenID)
-			uri := genericURI.(string)
+			uri := genericURI.(uriWithMetadata)
 
 			token := &persist.Token{
 				TokenContract: persist.TokenContract{
@@ -320,10 +426,11 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 					Symbol:    contractMetadata.Symbol,
 				},
 				TokenID:        tokenID,
-				TokenURI:       uri,
+				TokenURI:       uri.uri,
 				OwnerAddress:   strings.ToLower(transfer.To),
 				PreviousOwners: []string{strings.ToLower(transfer.From)},
-				LastBlockNum:   transfer.BlockNumber,
+				LastBlockNum:   blockNum,
+				TokenMetadata:  uri.md,
 			}
 			tokenChan <- token
 		}(t)
@@ -356,14 +463,17 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 		i++
 	}
 
-	if err = persist.TokenBulkUpsert(pCtx, result, pRuntime); err != nil {
-		return nil, err
-	}
-
 	// spin up a subscription to listen for new transfers
 	if err = WatchTransfers(pCtx, address, pRuntime); err != nil {
 		return nil, err
 	}
+
+	go func() {
+		// update DB
+		if err = persist.TokenBulkUpsert(pCtx, result, pRuntime); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	return result, nil
 }

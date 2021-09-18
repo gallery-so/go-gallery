@@ -83,9 +83,9 @@ func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB boo
 					if !ok || !b2.IsUint64() {
 						return false
 					}
-					return b1.Uint64() < b2.Uint64()
+					return b1.Uint64() > b2.Uint64()
 				})
-				GetERC721TokensForWallet(pCtx, pWalletAddress, result[0].LastBlockNum, pRuntime)
+				GetERC721TokensForWallet(pCtx, pWalletAddress, "0x"+result[0].LastBlockNum, pRuntime)
 			}()
 		} else {
 			result, err = GetERC721TokensForWallet(pCtx, pWalletAddress, "0x0", pRuntime)
@@ -93,7 +93,6 @@ func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB boo
 				return nil, err
 			}
 		}
-
 		tokens = result
 	} else {
 		result, err := GetERC721TokensForWallet(pCtx, pWalletAddress, "0x0", pRuntime)
@@ -123,9 +122,9 @@ func getTokensForContract(pCtx context.Context, pContractAddress string, pSkipDB
 					if !ok || !b2.IsUint64() {
 						return false
 					}
-					return b1.Uint64() < b2.Uint64()
+					return b1.Uint64() > b2.Uint64()
 				})
-				GetERC721TokensForContract(pCtx, pContractAddress, result[0].LastBlockNum, pRuntime)
+				GetERC721TokensForContract(pCtx, pContractAddress, "0x"+result[0].LastBlockNum, pRuntime)
 			}()
 		} else {
 			result, err = GetERC721TokensForContract(pCtx, pContractAddress, "0x0", pRuntime)
