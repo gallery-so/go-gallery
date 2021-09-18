@@ -142,7 +142,26 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{push, lastUpdated}
 
-	result, err := m.collection.UpdateOne(ctx, query, up)
+	result, err := m.collection.UpdateMany(ctx, query, up)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return &DocumentNotFoundError{}
+	}
+
+	return nil
+}
+
+// pullAll pulls all items from an array field for a given queried document(s)
+// value must be an array
+func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value interface{}) error {
+
+	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
+	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
+	up := bson.D{pull, lastUpdated}
+
+	result, err := m.collection.UpdateMany(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -154,14 +173,13 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 }
 
 // pull puls items from an array field for a given queried document(s)
-// value must be an array
-func (m *storage) pull(ctx context.Context, query bson.M, field string, value interface{}) error {
+func (m *storage) pull(ctx context.Context, query bson.M, field string, value bson.M) error {
 
-	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
+	pull := bson.E{Key: "$pull", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
 
-	result, err := m.collection.UpdateOne(ctx, query, up)
+	result, err := m.collection.UpdateMany(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -174,6 +192,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (DBID, error) {
+	returnID := DBID("")
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
@@ -184,6 +203,11 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	if _, ok := asMap["created_at"]; !ok {
 		asMap["created_at"] = now
 	}
+
+	if id, ok := asMap["_id"]; ok {
+		returnID = id.(DBID)
+	}
+
 	delete(asMap, "_id")
 	for k := range query {
 		delete(asMap, k)
@@ -195,9 +219,10 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	}
 
 	if it, ok := res.UpsertedID.(string); ok {
-		return DBID(it), nil
+		returnID = DBID(it)
 	}
-	return "", nil
+
+	return returnID, nil
 }
 
 // find finds documents in the mongo database which is not deleted

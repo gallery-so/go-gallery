@@ -90,7 +90,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	if pColl.Nfts == nil {
 		pColl.Nfts = []DBID{}
 	} else {
-		if err := mp.pull(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
+		if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if _, ok := err.(*DocumentNotFoundError); !ok {
 				return "", err
 			}
@@ -186,7 +186,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
+	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
@@ -197,6 +197,33 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	}
 
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+}
+
+// CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
+func CollClaimNFTs(pCtx context.Context,
+	pUserID DBID,
+	pUpdate *CollectionUpdateNftsInput,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CollDelete will delete a single collection by ID, also ensuring that the collection is owned

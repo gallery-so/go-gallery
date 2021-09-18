@@ -172,7 +172,7 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, input.SkipCache, pRuntime)
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, input.WalletAddress, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
