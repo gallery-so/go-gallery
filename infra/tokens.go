@@ -75,11 +75,11 @@ func getTokensForWallet(pCtx context.Context, pWalletAddress string, pSkipDB boo
 		if len(result) > 0 {
 			go func() {
 				sort.Slice(result, func(i, j int) bool {
-					b1, ok := new(big.Int).SetString(result[i].LastBlockNum[2:], 16)
+					b1, ok := new(big.Int).SetString(result[i].LastBlockNum, 16)
 					if !ok || !b1.IsUint64() {
 						return false
 					}
-					b2, ok := new(big.Int).SetString(result[j].LastBlockNum[2:], 16)
+					b2, ok := new(big.Int).SetString(result[j].LastBlockNum, 16)
 					if !ok || !b2.IsUint64() {
 						return false
 					}
@@ -114,11 +114,11 @@ func getTokensForContract(pCtx context.Context, pContractAddress string, pSkipDB
 		if len(result) > 0 {
 			go func() {
 				sort.Slice(result, func(i, j int) bool {
-					b1, ok := new(big.Int).SetString(result[i].LastBlockNum[2:], 16)
+					b1, ok := new(big.Int).SetString(result[i].LastBlockNum, 16)
 					if !ok || b1.IsUint64() {
 						return false
 					}
-					b2, ok := new(big.Int).SetString(result[j].LastBlockNum[2:], 16)
+					b2, ok := new(big.Int).SetString(result[j].LastBlockNum, 16)
 					if !ok || !b2.IsUint64() {
 						return false
 					}

@@ -261,7 +261,7 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 				}
 				// spin up a goroutine for each contract to retrieve all other tokens from that contract
 				// and store them in the db
-				go GetERC721TokensForContract(pCtx, transfer.RawContract.Address, pFromBlock, pRuntime)
+				// go GetERC721TokensForContract(pCtx, transfer.RawContract.Address, pFromBlock, pRuntime)
 				contractMetadatas.Store(transfer.RawContract.Address, metadata)
 			}
 			if _, ok := tokenDetails.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
@@ -330,6 +330,7 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 			}
 		case err := <-errChan:
 			logger.Error(err)
+
 		}
 	}
 
