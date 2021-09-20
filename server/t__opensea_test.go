@@ -20,21 +20,21 @@ func TestFetchAssertsForAcc(t *testing.T) {
 	giannaUserID, err := persist.UserCreate(ctx, gianna, tc.r)
 	assert.Nil(t, err)
 
-	nft := &persist.Nft{
+	nft := &persist.NftDB{
 		OwnerUserID:  giannaUserID,
 		OwnerAddress: "0xdd33e6fd03983c970ae5e647df07314435d69f6b",
 		Name:         "kks",
 		OpenSeaID:    34147626,
 	}
 
-	nft2 := &persist.Nft{
+	nft2 := &persist.NftDB{
 		OwnerUserID:  robinUserID,
 		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
 		Name:         "malsjdlaksjd",
 		OpenSeaID:    46062326,
 	}
 
-	_, err = persist.NftCreateBulk(ctx, []*persist.Nft{nft, nft2}, tc.r)
+	_, err = persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2}, tc.r)
 	assert.Nil(t, err)
 
 	now, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
