@@ -35,15 +35,15 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
+	assert.NotNil(body.Collection)
 	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collections[0].Name)
+	assert.Equal(update.Name, body.Collection.Name)
 }
 
 func TestCreateCollection_Success(t *testing.T) {
@@ -80,14 +80,14 @@ func TestCreateCollection_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Len(body.Collections[0].Nfts, 3)
+	assert.NotNil(body.Collection)
+	assert.Len(body.Collection.Nfts, 3)
 	assert.Empty(body.Error)
 
 	gallery, err := persist.GalleryGetByID(context.Background(), gid, true, tc.r)
@@ -262,14 +262,14 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure collection was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Len(body.Collections[0].Nfts, 1)
+	assert.NotNil(body.Collection)
+	assert.Len(body.Collection.Nfts, 1)
 	assert.Empty(body.Error)
 
 }
@@ -307,15 +307,15 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
+	assert.NotNil(body.Collection)
 	assert.Empty(body.Error)
-	assert.Equal(update.Nfts[1], body.Collections[0].Nfts[1].ID)
+	assert.Equal(update.Nfts[1], body.Collection.Nfts[1].ID)
 }
 
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {
