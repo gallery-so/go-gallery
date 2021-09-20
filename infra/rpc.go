@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,8 +25,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const pageLength = 50
+
 // Transfers represents the transfers for a given rpc response
 type Transfers struct {
+	PageKey   string     `json:"pageKey"`
 	Transfers []Transfer `json:"transfers"`
 }
 
@@ -58,7 +62,7 @@ type TokenContractMetadata struct {
 
 type uriWithMetadata struct {
 	uri string
-	md  persist.TokenMetadata
+	md  map[string]interface{}
 }
 
 // GetTransfersFrom returns the transfers from the given address
@@ -139,7 +143,11 @@ func GetTokenURI(address string, tokenID string, pRuntime *runtime.Runtime) (str
 		return "", errors.New("invalid hex string")
 	}
 
-	tokenURI, err := instance.TokenURI(&bind.CallOpts{}, i)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	tokenURI, err := instance.TokenURI(&bind.CallOpts{
+		Context: ctx,
+	}, i)
 	if err != nil {
 		return "", err
 	}
@@ -149,21 +157,26 @@ func GetTokenURI(address string, tokenID string, pRuntime *runtime.Runtime) (str
 }
 
 // GetTokenMetadata parses and returns the NFT metadata for a given token URI
+// TODO timeout requests
 // TODO handle when the URI is an SVG or image
 // TODO handle when the URI points directly to a file instead of a JSON metadata
-func GetTokenMetadata(tokenURI string) (persist.TokenMetadata, error) {
+func GetTokenMetadata(tokenURI string) (map[string]interface{}, error) {
+
+	client := &http.Client{
+		Timeout: time.Second * 3,
+	}
 	switch {
 	case strings.HasPrefix(tokenURI, "data:application/json;base64,"):
 		// decode the base64 encoded json
 		decoded, err := base64.StdEncoding.DecodeString(tokenURI[len("data:application/json;base64,"):])
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
-		metadata := persist.TokenMetadata{}
+		metadata := map[string]interface{}{}
 		err = json.Unmarshal(decoded, &metadata)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
 		return metadata, nil
@@ -172,54 +185,65 @@ func GetTokenMetadata(tokenURI string) (persist.TokenMetadata, error) {
 		again := strings.TrimPrefix(strip, "ipfs/")
 
 		url := fmt.Sprintf("https://ipfs.io/ipfs/%s", again)
-		resp, err := http.Get(url)
+		logrus.Debug(url)
+		resp, err := client.Get(url)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
 		defer resp.Body.Close()
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
-		metadata := persist.TokenMetadata{}
+		metadata := map[string]interface{}{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
 		return metadata, nil
 	case strings.HasPrefix(tokenURI, "https://") || strings.HasPrefix(tokenURI, "http://"):
-		resp, err := http.Get(tokenURI)
+		resp, err := client.Get(tokenURI)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 		defer resp.Body.Close()
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
 		// parse the json
-		metadata := persist.TokenMetadata{}
+		metadata := map[string]interface{}{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
-			return persist.TokenMetadata{}, err
+			return nil, err
 		}
 
 		return metadata, nil
 	default:
-		return persist.TokenMetadata{}, nil
+		return nil, errors.New("invalid token URI")
 	}
+
 }
 
 // GetERC721TokensForWallet returns the ERC721 token for the given wallet address
-func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pageNumber int, pFromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	logger := logrus.WithFields(logrus.Fields{"method": "GetERC721TokensForWallet"})
 	allTransfers, err := getAllTransfersForWallet(pCtx, pAddress, pFromBlock, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	total := pageLength
+	start := pageNumber * pageLength
+	if len(allTransfers) < start {
+		total = len(allTransfers)
+		start = total - pageLength
+	}
 
 	// map of token contract address + token ID => token to keep track of ownership seeing as
 	// tokens will appear more than once in the transfers
@@ -240,7 +264,7 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 	contractMetadatas := &sync.Map{}
 
 	// spin up a goroutine for each transfer
-	for _, t := range allTransfers {
+	for i := start; i < start+total; i++ {
 		go func(transfer Transfer) {
 			// required data for a token
 			if transfer.ERC721TokenID == "" {
@@ -292,7 +316,7 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 				errChan <- err
 				return
 			}
-			blockNum, err := util.NormalizeHex(transfer.ERC721TokenID)
+			blockNum, err := util.NormalizeHex(transfer.BlockNumber)
 			if err != nil {
 				errChan <- err
 				return
@@ -312,10 +336,11 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 				TokenMetadata:  uri.md,
 			}
 			tokenChan <- token
-		}(t)
+		}(allTransfers[i])
 	}
 
-	for i := 0; i < len(allTransfers); i++ {
+out:
+	for i := 0; i < total; i++ {
 		select {
 		case t := <-tokenChan:
 			// add token to map of tokens if not there, otherwise update owner history, last block num,
@@ -330,7 +355,8 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 			}
 		case err := <-errChan:
 			logger.Error(err)
-
+		case <-time.After(time.Second * 5):
+			break out
 		}
 	}
 
@@ -357,11 +383,17 @@ func GetERC721TokensForWallet(pCtx context.Context, pAddress string, pFromBlock 
 }
 
 // GetERC721TokensForContract returns the ERC721 token for the given contract address
-func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+func GetERC721TokensForContract(pCtx context.Context, address string, pageNumber int, fromBlock string, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	logger := logrus.WithFields(logrus.Fields{"method": "GetERC721TokensForContract"})
 	allTransfers, err := GetContractTransfers(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
+	}
+	total := pageLength
+	start := pageNumber * pageLength
+	if len(allTransfers) < start {
+		total = len(allTransfers)
+		start = total - pageLength
 	}
 
 	sortByBlockNumber(allTransfers)
@@ -382,7 +414,7 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 	// map of tokenID => uriWithMetadata to prevent duplicate queries
 	uris := &sync.Map{}
 
-	for _, t := range allTransfers {
+	for i := start; i < total+start; i++ {
 		go func(transfer Transfer) {
 
 			if transfer.ERC721TokenID == "" {
@@ -411,11 +443,11 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 				return
 			}
 
-			blockNum, err := util.NormalizeHex(transfer.ERC721TokenID)
-			if err != nil {
-				errChan <- err
-				return
-			}
+			// blockNum, err := util.NormalizeHex(transfer.BlockNumber)
+			// if err != nil {
+			// 	errChan <- err
+			// 	return
+			// }
 
 			genericURI, _ := uris.Load(transfer.ERC721TokenID)
 			uri := genericURI.(uriWithMetadata)
@@ -430,15 +462,16 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 				TokenURI:       uri.uri,
 				OwnerAddress:   strings.ToLower(transfer.To),
 				PreviousOwners: []string{strings.ToLower(transfer.From)},
-				LastBlockNum:   blockNum,
-				TokenMetadata:  uri.md,
+				// LastBlockNum: blockNum,
+				TokenMetadata: uri.md,
 			}
 			tokenChan <- token
-		}(t)
+		}(allTransfers[i])
 
 	}
 
-	for i := 0; i < len(allTransfers); i++ {
+out:
+	for i := 0; i < total; i++ {
 		select {
 		case token := <-tokenChan:
 			if it, ok := tokens[token.TokenID]; ok {
@@ -453,6 +486,8 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 			}
 		case err := <-errChan:
 			logger.Error(err)
+		case <-time.After(time.Second * 5):
+			break out
 		}
 	}
 
@@ -465,9 +500,9 @@ func GetERC721TokensForContract(pCtx context.Context, address string, fromBlock 
 	}
 
 	// spin up a subscription to listen for new transfers
-	if err = WatchTransfers(pCtx, address, pRuntime); err != nil {
-		return nil, err
-	}
+	// if err = WatchTransfers(pCtx, address, pRuntime); err != nil {
+	// 	return nil, err
+	// }
 
 	go func() {
 		// update DB
