@@ -17,7 +17,6 @@ type galleryGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 
-
 type galleryUpdateInput struct {
 	ID          persist.DBID   `form:"id" json:"id" binding:"required"`
 	Collections []persist.DBID `json:"collections" binding:"required"`
@@ -79,7 +78,7 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			// TODO log that this should not be happening
 		}
 
-		c.JSON(http.StatusOK, galleryGetOutput{Galleries: galleries})
+		c.JSON(http.StatusOK, galleries[0])
 		return
 
 	}

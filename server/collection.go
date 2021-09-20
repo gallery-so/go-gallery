@@ -104,7 +104,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			// TODO log that this should not be happening
 		}
 
-		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
+		c.JSON(http.StatusOK, colls[0])
 		return
 
 	}
