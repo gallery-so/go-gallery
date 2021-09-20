@@ -33,6 +33,10 @@ type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
 }
 
+type getNftByIDOutput struct {
+	Nft *persist.Nft `json:"nft"`
+}
+
 type getUnassignedNftsOutput struct {
 	Nfts []*persist.CollectionNft `json:"nfts"`
 }
@@ -74,7 +78,7 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			nfts = nfts[:1]
 			// TODO log that this should not be happening
 		}
-		c.JSON(http.StatusOK, nfts[0])
+		c.JSON(http.StatusOK, getNftByIDOutput{Nft: nfts[0]})
 	}
 }
 
