@@ -18,6 +18,7 @@ type Account struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	Address         string `bson:"address" json:"address"`
 	LastSyncedBlock string `bson:"last_synced_block" json:"last_synced_block"`

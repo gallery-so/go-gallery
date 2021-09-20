@@ -27,9 +27,12 @@ type Token struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
+	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
+	ThumbnailURL   string `bson:"thumbnail_url" json:"thumbnail_url"`
+	PreviewURL     string `bson:"preview_url" json:"preview_url"`
 
 	TokenURI       string                 `bson:"token_uri" json:"token_uri"`
 	TokenID        string                 `bson:"token_id" json:"token_id"`
@@ -38,6 +41,20 @@ type Token struct {
 	TokenMetadata  map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 
 	TokenContract TokenContract `bson:"token_contract" json:"token_contract"`
+}
+
+// CollectionToken represents a token within a collection
+type CollectionToken struct {
+	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
+
+	OwnerUserID DBID          `bson:"owner_user_id" json:"user_id"`
+	Contract    TokenContract `bson:"contract"     json:"asset_contract"`
+
+	// IMAGES - OPENSEA
+	ThumbnailURL  string                 `bson:"thumbnail_url" json:"thumbnail_url"`
+	PreviewURL    string                 `bson:"preview_url" json:"preview_url"`
+	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 }
 
 // TokenContract represents the contract for a given ERC721
@@ -57,6 +74,11 @@ type TokenUpdateWithTransfer struct {
 	OwnerAddress   string   `bson:"owner_address"`
 	PreviousOwners []string `bson:"previous_owners"`
 	LastBlockNum   string   `bson:"last_block_num"`
+}
+
+// TokenUpdateInfoInput represents a token update to update the token's user inputted info
+type TokenUpdateInfoInput struct {
+	CollectorsNote string `json:"collectors_note"`
 }
 
 // TokenCreateBulk is a helper function to create multiple nfts in one call and returns
@@ -80,16 +102,16 @@ func TokenCreateBulk(pCtx context.Context, pERC721s []*Token,
 	return ids, nil
 }
 
-// TokenCreate inserts an ERC721 into the database
+// TokenCreate inserts a token into the database
 func TokenCreate(pCtx context.Context, pERC721 *Token,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	return mp.insert(pCtx, pERC721)
 }
 
-// TokenGetByWallet gets ERC721 tokens for a given wallet address
+// TokenGetByWallet gets tokens for a given wallet address
 func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
@@ -104,7 +126,34 @@ func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress), "last_updated": bson.M{"$gt": time.Now().Add(-TTB)}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress)}, &result, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
+		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
+	}
+
+	return result, nil
+}
+
+// TokenGetByUserID gets ERC721 tokens for a given userID
+func TokenGetByUserID(pCtx context.Context, pUserID DBID, pPageNumber int,
+	pRuntime *runtime.Runtime) ([]*Token, error) {
+	opts := options.Find()
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.SetMaxTime(dur)
+	}
+
+	opts.SetSort(bson.M{"last_updated": -1})
+
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+
+	result := []*Token{}
+
+	err := mp.find(pCtx, bson.M{"owner_user_id": pUserID}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +180,7 @@ func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$gt": time.Now().Add(-TTB)}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress)}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +203,27 @@ func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"token_id": pTokenID, "token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$lt": time.Now().Add(-TTB)}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"token_id": pTokenID, "token_contract.contract_address": strings.ToLower(pAddress)}, &result, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// TokenGetByID gets tokens for a given DB ID
+func TokenGetByID(pCtx context.Context, pID DBID,
+	pRuntime *runtime.Runtime) ([]*Token, error) {
+	opts := options.Find()
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.SetMaxTime(dur)
+	}
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+
+	result := []*Token{}
+
+	err := mp.find(pCtx, bson.M{"_id": pID}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -194,11 +263,31 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 }
 
 // TokenUpdateByID will update a given token by its DB ID
-func TokenUpdateByID(pCtx context.Context, pID DBID,
+func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
+}
+
+// TokensClaim will ensure that tokens can only be in collections owned by the user
+func TokensClaim(pCtx context.Context, pUserID DBID, pIDs []DBID,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+	allColls, err := CollGetByUserID(pCtx, pUserID, true, pRuntime)
+	if err != nil {
+		return err
+	}
+
+	allCollIDs := make([]DBID, len(allColls))
+	for i, v := range allColls {
+		allCollIDs[i] = v.ID
+	}
+
+	up := bson.M{"collection_id": ""}
+
+	return mp.update(pCtx, bson.M{"collection_id": bson.M{"$nin": allCollIDs}, "_id": bson.M{"$in": pIDs}}, up)
 }

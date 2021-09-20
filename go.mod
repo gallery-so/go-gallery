@@ -14,6 +14,7 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/ipfs/go-ipfs-api v0.2.0
 	github.com/klauspost/compress v1.13.1 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.15

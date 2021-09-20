@@ -18,6 +18,7 @@ const (
 	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
 	alchemyURL = "ALCHEMY_URL"
+	ipfsURL    = "IPFS_URL"
 
 	mongoURLSecretName = "MONGO_URL_SECRET_NAME"
 	mongoTLSSecretName = "MONGO_TLS_SECRET_NAME"
@@ -41,6 +42,7 @@ type Config struct {
 	PortMetrics    int
 	AllowedOrigins string
 	AlchemyURL     string
+	IPFSURL        string
 
 	MongoURL    string
 	MongoUseTLS bool
@@ -67,6 +69,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 	viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 
 	viper.SetDefault(mongoUseTLS, false)
 	viper.SetDefault(mongoURLSecretName, "")
@@ -105,6 +108,7 @@ func ConfigLoad() *Config {
 		PortMetrics:    viper.GetInt(portMetrics),
 		AllowedOrigins: viper.GetString(allowedOrigins),
 		AlchemyURL:     viper.GetString(alchemyURL),
+		IPFSURL:        viper.GetString(ipfsURL),
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 

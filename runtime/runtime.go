@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
+	ipfs "github.com/ipfs/go-ipfs-api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -38,6 +39,7 @@ type Runtime struct {
 	Router                *gin.Engine
 	InfraClients          *InfraClients
 	BlockchainUpdateQueue *queue.Queue
+	IPFS                  *ipfs.Shell
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -86,10 +88,11 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		Config:                pConfig,
 		DB:                    db,
 		BlockchainUpdateQueue: queue.NewQueue("blockchain-updates"),
+		IPFS:                  newIPFSShell(pConfig.IPFSURL),
 	}
 	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
 
-	log.Info("RPC and ETH clients connected! ✅")
+	log.Info("RPC, ETH, and IPFS clients connected! ✅")
 
 	// TEST REDIS CONNECTION
 	client := redis.NewClient(&redis.Options{
@@ -214,4 +217,9 @@ func startWorkers(queues []*queue.Queue) {
 		worker := queue.NewWorker(q)
 		go worker.DoWork()
 	}
+}
+
+func newIPFSShell(url string) *ipfs.Shell {
+	sh := ipfs.NewShell(url)
+	return sh
 }

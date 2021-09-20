@@ -27,6 +27,8 @@ type CollectionDB struct {
 	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
+	GalleryID DBID `bson:"gallery_id" json:"gallery_id"`
+
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"owner_user_id"`
@@ -47,10 +49,10 @@ type Collection struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	Name           string           `bson:"name"          json:"name"`
-	CollectorsNote string           `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    string           `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []*CollectionNft `bson:"nfts"          json:"nfts"`
+	Name           string             `bson:"name"          json:"name"`
+	CollectorsNote string             `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    string             `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []*CollectionToken `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -246,13 +248,13 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 	}
 
 	if countColls == 0 {
-		nfts, err := NftGetByUserID(pCtx, pUserID, pRuntime)
+		tokens, err := TokenGetByUserID(pCtx, pUserID, 0, pRuntime)
 		if err != nil {
 			return nil, err
 		}
-		collNfts := []*CollectionNft{}
-		for _, nft := range nfts {
-			collNfts = append(collNfts, nftToCollectionNft(nft))
+		collNfts := []*CollectionToken{}
+		for _, nft := range tokens {
+			collNfts = append(collNfts, tokenToCollectionToken(nft))
 		}
 
 		result = []*Collection{{Nfts: collNfts}}
@@ -294,7 +296,7 @@ func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 			},
 		}}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "nfts",
+			"from": "tokens",
 			"let":  bson.M{"array": "$nfts"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
@@ -342,14 +344,48 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	}
 }
 
-func nftToCollectionNft(nft *Nft) *CollectionNft {
-	return &CollectionNft{
-		ID:                nft.ID,
-		Name:              nft.Name,
-		CreationTime:      nft.CreationTime,
-		ImageURL:          nft.ImageURL,
-		ImageThumbnailURL: nft.ImageThumbnailURL,
-		ImagePreviewURL:   nft.ImagePreviewURL,
-		OwnerUserID:       nft.OwnerUserID,
+// func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
+
+// 	return mongo.Pipeline{
+// 		{{Key: "$match", Value: matchFilter}},
+// 		{{Key: "$lookup", Value: bson.M{
+// 			"from": "nfts",
+// 			"let":  bson.M{"collID": "$_id"},
+// 			"pipeline": mongo.Pipeline{
+// 				{{Key: "$match", Value: bson.M{
+// 					"$expr": bson.M{
+// 						"$and": []bson.M{
+// 							{"$eq": []string{"$collection_id", "$$collID"}},
+// 							{"$eq": []interface{}{"$deleted", false}},
+// 						},
+// 					},
+// 				}}},
+// 			},
+// 			"as": "nfts",
+// 		}}},
+// 	}
+// }
+
+// func nftToCollectionNft(nft *Nft) *CollectionNft {
+// 	return &CollectionNft{
+// 		ID:                nft.ID,
+// 		Name:              nft.Name,
+// 		CreationTime:      nft.CreationTime,
+// 		ImageURL:          nft.ImageURL,
+// 		ImageThumbnailURL: nft.ImageThumbnailURL,
+// 		ImagePreviewURL:   nft.ImagePreviewURL,
+// 		OwnerUserID:       nft.OwnerUserID,
+// 	}
+// }
+
+func tokenToCollectionToken(token *Token) *CollectionToken {
+	return &CollectionToken{
+		ID:            token.ID,
+		CreationTime:  token.CreationTime,
+		OwnerUserID:   token.OwnerUserID,
+		Contract:      token.TokenContract,
+		ThumbnailURL:  token.ThumbnailURL,
+		PreviewURL:    token.PreviewURL,
+		TokenMetadata: token.TokenMetadata,
 	}
 }

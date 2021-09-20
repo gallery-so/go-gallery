@@ -50,13 +50,8 @@ func TestCreateCollection_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
-	assert.Nil(err)
+	nftIDs := seedTokens(assert)
+
 	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id}, tc.r)
 	assert.Nil(err)
 
@@ -100,14 +95,9 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	nftIDs := seedTokens(assert)
 	// seed DB with collection
-	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+	_, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs[:2],
@@ -118,8 +108,8 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
-		Nfts  []*persist.Nft `json:"nfts"`
-		Error string         `json:"error"`
+		Nfts  []*persist.Token `json:"nfts"`
+		Error string           `json:"error"`
 	}
 	// ensure nft was updated
 	body := NftsResponse{}
@@ -173,14 +163,9 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	nftIDs := seedTokens(assert)
 
-	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+	_, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs,
@@ -205,14 +190,9 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	nftIDs := seedTokens(assert)
 
-	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+	_, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs[0:1],
@@ -243,12 +223,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+	nftIDs := seedTokens(assert)
 
 	preCollID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{Name: "test", Nfts: nftIDs, OwnerUserID: tc.user1.id}, tc.r)
 	gid, err := persist.GalleryCreate(context.Background(), &persist.GalleryDB{OwnerUserID: tc.user1.id, Collections: []persist.DBID{preCollID}}, tc.r)
@@ -278,13 +253,7 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
-	assert.Nil(err)
+	nftIDs := seedTokens(assert)
 
 	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
 		Name:        "very cool collection",
@@ -430,4 +399,15 @@ func createCollectionInDbForUserID(assert *assert.Assertions, collectionName str
 	assert.Nil(err)
 
 	return collID
+}
+
+func seedTokens(assert *assert.Assertions) []persist.DBID {
+	nfts := []*persist.Token{
+		{OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.TokenCreateBulk(context.Background(), nfts, tc.r)
+	assert.Nil(err)
+	return nftIDs
 }

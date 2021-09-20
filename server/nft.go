@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 type getNftsByIDInput struct {
@@ -18,6 +19,7 @@ type getNftsByIDInput struct {
 
 type getNftsByUserIDInput struct {
 	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
+	Page   int          `json:"page" form:"page"`
 }
 
 type getUnassignedNFTByUserIDInput struct {
@@ -29,12 +31,21 @@ type getOpenseaNftsInput struct {
 	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
 }
 
+type syncBlockchainNftsInput struct {
+	WalletAddress string `json:"address" form:"address" binding:"required"`
+	SkipDB        bool   `json:"skip_db" form:"skip_db"`
+}
+
 type getNftsOutput struct {
-	Nfts []*persist.Nft `json:"nfts"`
+	Nfts []*persist.Token `json:"nfts"`
+}
+
+type getTokensOutput struct {
+	Tokens []*persist.Token `json:"tokens"`
 }
 
 type getUnassignedNftsOutput struct {
-	Nfts []*persist.CollectionNft `json:"nfts"`
+	Nfts []*persist.CollectionToken `json:"nfts"`
 }
 
 type updateNftByIDInput struct {
@@ -62,8 +73,13 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
-		if len(nfts) == 0 || err != nil {
+		nfts, err := persist.TokenGetByID(c, input.NftID, pRuntime)
+		if err != nil {
+			logrus.WithError(err).Error("could not get nft by id")
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+		if len(nfts) == 0 {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
 				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
 			})
@@ -95,9 +111,9 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.UpdateNFTInfoInput{CollectorsNote: input.CollectorsNote}
+		update := &persist.TokenUpdateInfoInput{CollectorsNote: input.CollectorsNote}
 
-		err := persist.NftUpdateByID(c, input.ID, userID, update, pRuntime)
+		err := persist.TokenUpdateByID(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
@@ -118,9 +134,17 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := persist.NftGetByUserID(c, input.UserID, pRuntime)
+
+		if input.Page == 0 {
+			input.Page = 1
+		}
+		if input.Page < 0 {
+			input.Page = 0
+		}
+
+		nfts, err := persist.TokenGetByUserID(c, input.UserID, input.Page, pRuntime)
 		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.Nft{}
+			nfts = []*persist.Token{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
@@ -142,16 +166,16 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 		coll, err := persist.CollGetUnassigned(c, userID, input.SkipCache, pRuntime)
 		if coll == nil || err != nil {
-			coll = &persist.Collection{Nfts: []*persist.CollectionNft{}}
+			coll = &persist.Collection{Nfts: []*persist.CollectionToken{}}
 		}
 
 		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
 	}
 }
 
-func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func syncNftsFromBlockChain(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getOpenseaNftsInput{}
+		input := &syncBlockchainNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
@@ -172,12 +196,12 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, input.SkipCache, pRuntime)
-		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.Nft{}
+		tokens, err := getAndSyncTokens(c, userID, input.WalletAddress, input.SkipDB, pRuntime)
+		if len(tokens) == 0 || err != nil {
+			tokens = []*persist.Token{}
 		}
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
+		c.JSON(http.StatusOK, getTokensOutput{Tokens: tokens})
 	}
 }
 
