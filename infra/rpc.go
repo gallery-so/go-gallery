@@ -488,8 +488,7 @@ func processWalletTransfer(contractMetadatas, tokenDetails *sync.Map, transfer *
 			logger.WithFields(logrus.Fields{"section": "GetTokenContractMetadata", "contract": transfer.RawContract.Address}).Error(err)
 			return nil, "", err
 		}
-		// spin up a job for each contract to retrieve all other tokens from that contract
-		// and store them in the db
+
 		contractMetadatas.Store(transfer.RawContract.Address, metadata)
 	}
 	if _, ok := tokenDetails.Load(transfer.RawContract.Address + transfer.ERC721TokenID); !ok {
