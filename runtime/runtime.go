@@ -221,5 +221,6 @@ func startWorkers(queues []*queue.Queue) {
 
 func newIPFSShell(url string) *ipfs.Shell {
 	sh := ipfs.NewShell(url)
+	sh.SetTimeout(time.Second * 2)
 	return sh
 }

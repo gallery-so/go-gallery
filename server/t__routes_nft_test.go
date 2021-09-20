@@ -73,8 +73,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+	resp := updateNFTRequest(assert, nftID, "new nft note", tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	// retrieve updated nft
@@ -85,7 +84,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	// ensure nft was updated
 	body := persist.Token{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(update.CollectorsNote, body.CollectorsNote)
+	assert.Equal("new nft note", body.CollectorsNote)
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
@@ -112,8 +111,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	update := updateNftByIDInput{CollectorsNote: "new nft note"}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+	resp := updateNFTRequest(assert, "", "new nft note", tc.user1.jwt)
 	assertGalleryErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -126,8 +124,8 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 	assert := assert.New(t)
 
 	nftID := persist.DBID("no exist :(")
-	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+
+	resp := updateNFTRequest(assert, nftID, "new nft note", tc.user1.jwt)
 	assertGalleryErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -145,8 +143,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	update := updateNftByIDInput{CollectorsNote: "new nft name", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user2.jwt)
+	resp := updateNFTRequest(assert, nftID, "new nft name", tc.user2.jwt)
 	assertGalleryErrorResponse(assert, resp)
 
 }
@@ -162,7 +159,11 @@ func updateNFTUnauthedRequest(assert *assert.Assertions, update updateNftByIDInp
 	return resp
 }
 
-func updateNFTRequest(assert *assert.Assertions, update updateNftByIDInput, jwt string) *http.Response {
+func updateNFTRequest(assert *assert.Assertions, id persist.DBID, collectorsNote string, jwt string) *http.Response {
+	update := map[string]interface{}{
+		"id":              id,
+		"collectors_note": collectorsNote,
+	}
 	data, err := json.Marshal(update)
 	assert.Nil(err)
 

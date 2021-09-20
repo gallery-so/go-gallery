@@ -78,7 +78,7 @@ type TokenUpdateWithTransfer struct {
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
-	CollectorsNote string `json:"collectors_note"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 // TokenCreateBulk is a helper function to create multiple nfts in one call and returns
@@ -270,6 +270,7 @@ func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
+
 }
 
 // TokensClaim will ensure that tokens can only be in collections owned by the user

@@ -49,8 +49,8 @@ type getUnassignedNftsOutput struct {
 }
 
 type updateNftByIDInput struct {
-	ID             persist.DBID `form:"id" binding:"required"`
-	CollectorsNote string       `form:"collectors_note"`
+	ID             persist.DBID `json:"id" binding:"required"`
+	CollectorsNote string       `json:"collectors_note" binding:"required"`
 }
 
 type getOwnershipHistoryInput struct {
