@@ -2,8 +2,6 @@ package persist
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/segmentio/ksuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -287,11 +286,11 @@ func (m *storage) cacheClose() error {
 }
 
 func generateID(it interface{}) DBID {
-	h := md5.New()
-	h.Write([]byte(fmt.Sprint(it)))
-	sum := h.Sum(nil)
-	hexStr := hex.EncodeToString(sum)
-	return DBID(hexStr)
+	id, err := ksuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return DBID(id.String())
 }
 
 // function that returns the pointer to the bool passed in

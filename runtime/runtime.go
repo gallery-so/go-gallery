@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/queue"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
@@ -32,10 +33,11 @@ const (
 
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
-	Config       *Config
-	DB           *DB
-	Router       *gin.Engine
-	InfraClients *InfraClients
+	Config                *Config
+	DB                    *DB
+	Router                *gin.Engine
+	InfraClients          *InfraClients
+	BlockchainUpdateQueue *queue.Queue
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -81,10 +83,13 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	// RUNTIME
 	runtime := &Runtime{
-		Config: pConfig,
-		DB:     db,
+		Config:                pConfig,
+		DB:                    db,
+		BlockchainUpdateQueue: queue.NewQueue("blockchain-updates"),
 	}
 	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
+
+	log.Info("RPC and ETH clients connected! ✅")
 
 	// TEST REDIS CONNECTION
 	client := redis.NewClient(&redis.Options{
@@ -96,6 +101,9 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, pConfig.RedisURL)
 	}
 	log.Info("redis connected! ✅")
+
+	startWorkers([]*queue.Queue{runtime.BlockchainUpdateQueue})
+	log.Info("async workers started! ✅")
 
 	return runtime, nil
 }
@@ -198,5 +206,12 @@ func newInfraClients(alchemyURL string) *InfraClients {
 		RPCClient:    client,
 		ETHClient:    ethClient,
 		TransferLogs: make(map[string]chan *contracts.IERC721Transfer),
+	}
+}
+
+func startWorkers(queues []*queue.Queue) {
+	for _, q := range queues {
+		worker := queue.NewWorker(q)
+		go worker.DoWork()
 	}
 }

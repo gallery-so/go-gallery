@@ -2,12 +2,12 @@ package infra
 
 import (
 	"context"
-	"math/big"
+	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/queue"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -42,7 +42,7 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		tokens := []*persist.Token{}
 
 		if input.Address != "" {
-			result, err := getTokensForWallet(c, input.Address, input.PageNumber, input.SkipDB, pRuntime)
+			result, err := GetTokensForWallet(c, input.Address, input.PageNumber, input.SkipDB, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
@@ -51,7 +51,7 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 			tokens = result
 		} else if input.ContractAddress != "" {
-			result, err := getTokensForContract(c, input.ContractAddress, input.PageNumber, input.SkipDB, pRuntime)
+			result, err := GetTokensForContract(c, input.ContractAddress, input.PageNumber, input.SkipDB, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
@@ -69,68 +69,67 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
-	tokens := []*persist.Token{}
+// GetTokensForWallet returns the tokens for a wallet from the DB if possible while also queuing an
+// update of DB from the block chain, or goes straight to the block chain if the DB returns no results
+func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	if !pSkipDB {
-		result, err := persist.TokenGetByWallet(pCtx, pWalletAddress, pRuntime)
+		result, err := persist.TokenGetByWallet(pCtx, pWalletAddress, pPageNumber, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 		if len(result) > 0 {
-			go func() {
-				sort.Slice(result, func(i, j int) bool {
-					b1, ok := new(big.Int).SetString(result[i].LastBlockNum, 16)
-					if !ok || !b1.IsUint64() {
-						return false
+			pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
+				Action: func() error {
+					accounts, _ := persist.AccountGetByAddress(pCtx, pWalletAddress, pRuntime)
+					if len(accounts) == 0 {
+						_, err := GetTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, "0", false, pRuntime)
+						return err
 					}
-					b2, ok := new(big.Int).SetString(result[j].LastBlockNum, 16)
-					if !ok || !b2.IsUint64() {
-						return false
-					}
-					return b1.Uint64() > b2.Uint64()
-				})
-				GetERC721TokensForWallet(pCtx, pWalletAddress, pPageNumber, "0x"+result[0].LastBlockNum, pRuntime)
-			}()
-		} else {
-			result, err = GetERC721TokensForWallet(pCtx, pWalletAddress, pPageNumber, "0x0", pRuntime)
-			if err != nil {
-				return nil, err
-			}
+					_, err := GetTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, accounts[0].LastSyncedBlock, false, pRuntime)
+					return err
+
+				},
+				Name: fmt.Sprintf("GetTokensForWallet: %s", pWalletAddress),
+			})
+			return result, nil
 		}
-		tokens = result
-	} else {
-		result, err := GetERC721TokensForWallet(pCtx, pWalletAddress, pPageNumber, "0x0", pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		tokens = result
 	}
-	return tokens, nil
+	result, err := GetTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, "0", true, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
-func getTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
-	tokens := []*persist.Token{}
+
+// GetTokensForContract returns the tokens for a contract from the DB if possible while also queuing an
+// update of DB from the block chain, or goes straight to the block chain if the DB returns no results
+func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+
 	if !pSkipDB {
-		result, err := persist.TokenGetByContract(pCtx, pContractAddress, pRuntime)
+		result, err := persist.TokenGetByContract(pCtx, pContractAddress, pPageNumber, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 
 		if len(result) > 0 {
-			go GetERC721TokensForContract(pCtx, pContractAddress, pPageNumber, "0x0", pRuntime)
-		} else {
-			result, err = GetERC721TokensForContract(pCtx, pContractAddress, pPageNumber, "0x0", pRuntime)
-			if err != nil {
-				return nil, err
-			}
+			pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
+				Action: func() error {
+					accounts, _ := persist.AccountGetByAddress(pCtx, pContractAddress, pRuntime)
+					if len(accounts) == 0 {
+						_, err := GetTokensFromBCForWallet(pCtx, pContractAddress, pPageNumber, "0", true, pRuntime)
+						return err
+					}
+					_, err := GetTokensFromBCForWallet(pCtx, pContractAddress, pPageNumber, accounts[0].LastSyncedBlock, false, pRuntime)
+					return err
+				},
+				Name: fmt.Sprintf("GetTokensForContract: %s", pContractAddress),
+			})
+			return result, nil
 		}
-
-		tokens = result
-	} else {
-		result, err := GetERC721TokensForContract(pCtx, pContractAddress, pPageNumber, "0x0", pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		tokens = result
 	}
-	return tokens, nil
+	result, err := GetTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, "0", true, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

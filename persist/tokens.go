@@ -16,6 +16,8 @@ const (
 	tokenColName = "tokens"
 )
 
+const tokenPageSize = 50
+
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
 
@@ -26,11 +28,13 @@ type Token struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
+
 	TokenURI       string                 `bson:"token_uri" json:"token_uri"`
 	TokenID        string                 `bson:"token_id" json:"token_id"`
 	OwnerAddress   string                 `bson:"owner_address" json:"owner_address"`
 	PreviousOwners []string               `bson:"previous_owners" json:"previous_owners"`
-	LastBlockNum   string                 `bson:"last_block_num" json:"last_block_num"`
 	TokenMetadata  map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 
 	TokenContract TokenContract `bson:"token_contract" json:"token_contract"`
@@ -60,7 +64,7 @@ type TokenUpdateWithTransfer struct {
 func TokenCreateBulk(pCtx context.Context, pERC721s []*Token,
 	pRuntime *runtime.Runtime) ([]DBID, error) {
 
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	nfts := make([]interface{}, len(pERC721s))
 
@@ -86,14 +90,17 @@ func TokenCreate(pCtx context.Context, pERC721 *Token,
 }
 
 // TokenGetByWallet gets ERC721 tokens for a given wallet address
-func TokenGetByWallet(pCtx context.Context, pAddress string,
+func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+
+	opts.SetSort(bson.M{"last_updated": -1})
+
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	result := []*Token{}
 
@@ -102,24 +109,34 @@ func TokenGetByWallet(pCtx context.Context, pAddress string,
 		return nil, err
 	}
 
+	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
+		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
+	}
+
 	return result, nil
 }
 
 // TokenGetByContract gets ERC721 tokens for a given contract
-func TokenGetByContract(pCtx context.Context, pAddress string,
+func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+
+	opts.SetSort(bson.M{"last_updated": -1})
+
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	result := []*Token{}
 
 	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress), "last_updated": bson.M{"$gt": time.Now().Add(-TTB)}}, &result, opts)
 	if err != nil {
 		return nil, err
+	}
+	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
+		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
 	}
 
 	return result, nil
@@ -133,7 +150,7 @@ func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	result := []*Token{}
 
@@ -149,7 +166,7 @@ func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	wg := &sync.WaitGroup{}
 	mu := &sync.Mutex{}
@@ -181,7 +198,7 @@ func TokenUpdateByID(pCtx context.Context, pID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, runtime.InfraDBName, tokenColName, pRuntime)
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }

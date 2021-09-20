@@ -56,6 +56,26 @@ func UserUpdateByID(pCtx context.Context, pID DBID, pUpdate interface{},
 	return nil
 }
 
+// UserUpdateByAddress updates a user by address
+// pUpdate represents a struct with bson tags to specify which fields to update
+func UserUpdateByAddress(pCtx context.Context, pAddress string, pUpdate interface{},
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
+
+	err := mp.update(pCtx, bson.M{
+		"addresses": bson.M{"$in": []string{strings.ToLower(pAddress)}},
+	}, pUpdate)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return fmt.Errorf("attempt to update username to a taken username")
+		}
+		return err
+	}
+
+	return nil
+}
+
 // UserExistsByAddress returns true if a user exists with the given address
 func UserExistsByAddress(pCtx context.Context, pAddress string,
 	pRuntime *runtime.Runtime) (bool, error) {
