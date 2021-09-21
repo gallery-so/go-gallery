@@ -305,6 +305,14 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	var nonce *persist.UserNonce
 	if !userExistsBool {
 
+		hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		if !hasNFT {
+			return nil, errors.New("user does not own required nft to signup")
+		}
+
 		nonce = &persist.UserNonce{
 			Address: strings.ToLower(pInput.Address),
 			Value:   generateNonce(),

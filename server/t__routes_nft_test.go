@@ -19,9 +19,9 @@ func TestGetNftByID_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with nft
-	name := "very cool nft"
+	note := "very cool nft"
 	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
-		CollectorsNote: name,
+		CollectorsNote: note,
 	}, tc.r)
 	assert.Nil(err)
 
@@ -29,9 +29,14 @@ func TestGetNftByID_Success(t *testing.T) {
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
-	body := persist.Token{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(name, body.CollectorsNote)
+	type NftGetByIDResponse struct {
+		Nft   persist.Token `json:"nft"`
+		Error string        `json:"error"`
+	}
+	body := &NftGetByIDResponse{}
+	util.UnmarshallBody(body, resp.Body)
+	assert.Empty(body.Error)
+	assert.Equal(note, body.Nft.CollectorsNote)
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
@@ -82,9 +87,9 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	// ensure nft was updated
-	body := persist.Token{}
+	body := &getNftByIDOutput{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal("new nft note", body.CollectorsNote)
+	assert.Equal("new nft note", body.Nft.CollectorsNote)
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
