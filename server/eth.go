@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"math/big"
 
@@ -8,9 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/runtime"
 )
 
-func hasAnyNFT(contractAddress string, userAddr string) (bool, error) {
+func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
 	// TODO use alchemy URL
 	client, err := ethclient.Dial("https://rinkeby.infura.io")
 	if err != nil {
@@ -25,7 +27,7 @@ func hasAnyNFT(contractAddress string, userAddr string) (bool, error) {
 		return false, err
 	}
 
-	call, err := instance.BalanceOf(&bind.CallOpts{From: addr}, addr)
+	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr)
 	if err != nil {
 		return false, err
 	}
@@ -40,7 +42,7 @@ func hasAnyNFT(contractAddress string, userAddr string) (bool, error) {
 	}
 
 }
-func hasNFT(contractAddress string, id string, userAddr string) (bool, error) {
+func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
 	// TODO use alchemy URL
 	client, err := ethclient.Dial("https://rinkeby.infura.io")
 	if err != nil {
@@ -58,38 +60,11 @@ func hasNFT(contractAddress string, id string, userAddr string) (bool, error) {
 	bigIntID := &big.Int{}
 	bigIntID, _ = bigIntID.SetString(id, 10)
 
-	call, err := instance.OwnerOf(&bind.CallOpts{From: addr}, bigIntID)
+	call, err := instance.OwnerOf(&bind.CallOpts{From: addr, Context: pCtx}, bigIntID)
 	if err != nil {
 		return false, err
 	}
 
 	return call.String() == addr.String(), nil
-
-}
-
-func hasRedeemed(contractAddress string, id string, userAddr string) (bool, error) {
-	// TODO use alchemy URL
-	client, err := ethclient.Dial("https://rinkeby.infura.io")
-	if err != nil {
-		return false, err
-	}
-
-	addr := common.HexToAddress(userAddr)
-
-	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewIRedeemable(contract, client)
-	if err != nil {
-		return false, err
-	}
-
-	bigIntID := &big.Int{}
-	bigIntID, _ = bigIntID.SetString(id, 10)
-
-	call, err := instance.IsRedeemedBy(&bind.CallOpts{From: addr}, bigIntID, addr)
-	if err != nil {
-		return false, err
-	}
-
-	return call, nil
 
 }
