@@ -67,7 +67,11 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
-		if len(nfts) == 0 || err != nil {
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+		if len(nfts) == 0 {
 			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
 			})
