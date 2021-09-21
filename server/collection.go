@@ -17,6 +17,9 @@ type collectionGetByUserIDInput struct {
 type collectionGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
+type collectionGetByIDOutput struct {
+	Collection *persist.Collection `json:"collection"`
+}
 
 type collectionGetOutput struct {
 	Collections []*persist.Collection `json:"collections"`
@@ -104,7 +107,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			// TODO log that this should not be happening
 		}
 
-		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
+		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
 		return
 
 	}
