@@ -83,7 +83,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 		lastSyncedBlock = account.LastSyncedBlock
 
 		if time.Since(account.LastUpdated.Time()) > persist.TTB {
-			pSkipDB = false
+			pSkipDB = true
 		}
 	}
 	if !pSkipDB {
@@ -96,7 +96,6 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 				Action: func() error {
 					_, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, lastSyncedBlock, false, pRuntime)
 					return err
-
 				},
 				Name: fmt.Sprintf("GetTokensForWallet: %s", pWalletAddress),
 			})
@@ -113,14 +112,14 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 // GetTokensForContract returns the tokens for a contract from the DB if possible while also queuing an
 // update of DB from the block chain, or goes straight to the block chain if the DB returns no results
 func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
-	accounts, _ := persist.AccountGetByAddress(pCtx, pContractAddress, pRuntime)
+	accounts, _ := persist.ContractGetByAddress(pCtx, pContractAddress, pRuntime)
 	lastSyncedBlock := "0"
 	if len(accounts) > 0 {
 		account := accounts[0]
 		lastSyncedBlock = account.LastSyncedBlock
 
 		if time.Since(account.LastUpdated.Time()) > persist.TTB {
-			pSkipDB = false
+			pSkipDB = true
 		}
 	}
 	if !pSkipDB {

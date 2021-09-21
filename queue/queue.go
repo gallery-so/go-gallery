@@ -20,11 +20,6 @@ type Job struct {
 	Action func() error // A function that should be executed when the job is running.
 }
 
-// Worker responsible for queue serving.
-type Worker struct {
-	Queue *Queue
-}
-
 // NewQueue instantiates new queue.
 func NewQueue(name string) *Queue {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -73,22 +68,15 @@ func (j Job) Run() error {
 	return nil
 }
 
-// NewWorker initializes a new Worker.
-func NewWorker(queue *Queue) *Worker {
-	return &Worker{
-		Queue: queue,
-	}
-}
-
 // DoWork processes jobs from the queue (jobs channel).
-func (w *Worker) DoWork() bool {
+func (q *Queue) DoWork() bool {
 	for {
 		select {
 		// if context was canceled.
-		case <-w.Queue.ctx.Done():
+		case <-q.ctx.Done():
 			return true
 		// if job received.
-		case job := <-w.Queue.jobs:
+		case job := <-q.jobs:
 			err := job.Run()
 			if err != nil {
 				log.Print(err)

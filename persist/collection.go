@@ -407,12 +407,12 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 
 func tokenToCollectionToken(token *Token) *CollectionToken {
 	return &CollectionToken{
-		ID:            token.ID,
-		CreationTime:  token.CreationTime,
-		OwnerUserID:   token.OwnerUserID,
-		Contract:      token.TokenContract,
-		ThumbnailURL:  token.ThumbnailURL,
-		PreviewURL:    token.PreviewURL,
-		TokenMetadata: token.TokenMetadata,
+		ID:              token.ID,
+		CreationTime:    token.CreationTime,
+		OwnerUserID:     token.OwnerUserID,
+		ContractAddress: token.ContractAddress,
+		ThumbnailURL:    token.ThumbnailURL,
+		PreviewURL:      token.PreviewURL,
+		TokenMetadata:   token.TokenMetadata,
 	}
 }

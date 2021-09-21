@@ -40,7 +40,7 @@ type Token struct {
 	PreviousOwners []string               `bson:"previous_owners" json:"previous_owners"`
 	TokenMetadata  map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 
-	TokenContract TokenContract `bson:"token_contract" json:"token_contract"`
+	ContractAddress string `bson:"contract_address" json:"contract_address"`
 }
 
 // CollectionToken represents a token within a collection
@@ -48,20 +48,12 @@ type CollectionToken struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 
-	OwnerUserID DBID          `bson:"owner_user_id" json:"user_id"`
-	Contract    TokenContract `bson:"contract"     json:"asset_contract"`
+	OwnerUserID     DBID   `bson:"owner_user_id" json:"user_id"`
+	ContractAddress string `bson:"contract_address"     json:"contract_address"`
 
-	// IMAGES - OPENSEA
 	ThumbnailURL  string                 `bson:"thumbnail_url" json:"thumbnail_url"`
 	PreviewURL    string                 `bson:"preview_url" json:"preview_url"`
 	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
-}
-
-// TokenContract represents the contract for a given ERC721
-type TokenContract struct {
-	Address   string `bson:"contract_address" json:"contract_address"`
-	Symbol    string `bson:"symbol" json:"symbol"`
-	TokenName string `bson:"token_name" json:"token_name"`
 }
 
 type attribute struct {
@@ -180,7 +172,7 @@ func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"token_contract.contract_address": strings.ToLower(pAddress)}, &result, opts)
+	err := mp.find(pCtx, bson.M{"contract_address": strings.ToLower(pAddress)}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +195,7 @@ func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
 
 	result := []*Token{}
 
-	err := mp.find(pCtx, bson.M{"token_id": pTokenID, "token_contract.contract_address": strings.ToLower(pAddress)}, &result, opts)
+	err := mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": strings.ToLower(pAddress)}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +223,7 @@ func TokenGetByID(pCtx context.Context, pID DBID,
 	return result, nil
 }
 
-// TokenBulkUpsert will create a bulk operation on the database to upsert many erc721s for a given wallet address
+// TokenBulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.Runtime) error {
 
@@ -244,9 +236,9 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 
 	for _, v := range pERC721s {
 
-		go func(erc721 *Token) {
+		go func(token *Token) {
 			defer wg.Done()
-			_, err := mp.upsert(pCtx, bson.M{"token_id": erc721.TokenID, "token_contract.contract_address": strings.ToLower(erc721.TokenContract.Address)}, erc721)
+			_, err := mp.upsert(pCtx, bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress)}, token)
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, err)

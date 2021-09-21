@@ -214,8 +214,7 @@ func newInfraClients(alchemyURL string) *InfraClients {
 
 func startWorkers(queues []*queue.Queue) {
 	for _, q := range queues {
-		worker := queue.NewWorker(q)
-		go worker.DoWork()
+		go q.DoWork()
 	}
 }
 
