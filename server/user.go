@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -63,6 +64,7 @@ type userGetOutput struct {
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"bio"`
 	Addresses   []string     `json:"addresses"`
+	CreatedAt   time.Time    `json:"created_at"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -332,6 +334,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserID:      user.ID,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
+		CreatedAt:   user.CreationTime.Time(),
 	}
 
 	if pAuthedUserID == user.ID {
