@@ -79,7 +79,8 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// AUTHENTICATED
 
 	usersGroup.POST("/update/info", jwtRequired(pRuntime), updateUserInfo(pRuntime))
-	usersGroup.POST("/update/addresses", jwtRequired(pRuntime), addUserAddress(pRuntime))
+	usersGroup.POST("/update/addresses/add", jwtRequired(pRuntime), addUserAddress(pRuntime))
+	usersGroup.POST("/update/addresses/remove", jwtRequired(pRuntime), removeAddresses(pRuntime))
 
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED

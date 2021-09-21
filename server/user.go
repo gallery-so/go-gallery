@@ -77,6 +77,10 @@ type userAddAddressInput struct {
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
+type userRemoveAddressesInput struct {
+	Addresses []string `json:"addresses"   binding:"required"`
+}
+
 type userCreateOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"` // JWT token is sent back to user to use to continue onboarding
@@ -194,6 +198,33 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
+func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := &userRemoveAddressesInput{}
+
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+
+		err := removeAddressesToUserDB(c, userID, input, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, successOutput{Success: true})
+
+	}
+}
+
 func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
 
@@ -293,6 +324,19 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 	}
 
 	return output, nil
+}
+func removeAddressesToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+	pRuntime *runtime.Runtime) error {
+
+	user, err := persist.UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+	if len(user.Addresses) < len(pInput.Addresses) {
+		return errors.New("user does not have enough addresses to remove")
+	}
+
+	return persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
 }
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
