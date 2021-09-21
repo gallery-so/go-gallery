@@ -189,7 +189,7 @@ func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, p
 	return mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
 
-// UserAddAddresses pushes addresses into a user's address list
+// UserRemoveAddresses removes addresses from a user's address list
 func UserRemoveAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
 	mp := newStorage(0, usersCollName, pRuntime)
 
