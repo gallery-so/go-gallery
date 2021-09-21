@@ -31,7 +31,7 @@ type openseaAsset struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 
-	ExternalURL      string           `json:"external_url"`
+	ExternalURL      string           `json:"external_link"`
 	TokenMetadataURL string           `json:"token_metadata_url"`
 	Creator          openseaAccount   `json:"creator"`
 	Contract         persist.Contract `json:"asset_contract"`
