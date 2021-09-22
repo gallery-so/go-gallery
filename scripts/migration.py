@@ -98,7 +98,7 @@ def create_nft(nft):
             "deleted": False,
             "name": nft["name"],
             "description": nft["description"],
-            "external_url": nft["external_url"],
+            "external_url": nft["external_link"],
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
             "owner_address": user["addresses"][0].lower(),
