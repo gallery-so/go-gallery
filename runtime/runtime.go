@@ -105,7 +105,7 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	}
 	log.Info("redis connected! ✅")
 
-	startWorkers([]*queue.Queue{runtime.BlockchainUpdateQueue})
+	startWorkers([]*queue.Queue{runtime.BlockchainUpdateQueue, runtime.ImageProcessingQueue})
 	log.Info("async workers started! ✅")
 
 	return runtime, nil

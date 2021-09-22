@@ -179,8 +179,8 @@ func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int, 
 	return result, nil
 }
 
-// TokenGetByTokenID gets tokens for a given contract address and token ID
-func TokenGetByTokenID(pCtx context.Context, pTokenID string, pAddress string,
+// TokenGetByNFTIdentifiers gets tokens for a given contract address and token ID
+func TokenGetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {

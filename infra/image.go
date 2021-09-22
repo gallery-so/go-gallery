@@ -18,20 +18,21 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/opennota/screengen"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/blobstore"
 	"google.golang.org/appengine/image"
 )
 
 func processImagesForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) error {
-	tokens, err := persist.TokenGetByTokenID(pCtx, tokenID, contractAddress, pRuntime)
+	tokens, err := persist.TokenGetByNFTIdentifiers(pCtx, tokenID, contractAddress, pRuntime)
 	if err != nil {
 		return err
 	}
-	if len(tokens) > 0 {
+	if len(tokens) > 1 {
 		return errors.New("too many tokens returned for one token ID and contract address")
 	}
+
 	token := tokens[0]
 
 	if token.PreviewURL != "" && token.ThumbnailURL != "" {
@@ -40,6 +41,8 @@ func processImagesForToken(pCtx context.Context, contractAddress, tokenID string
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
 	url := ""
+
+	logrus.Debug("TOKEN METADTA ", token.TokenMetadata)
 
 	if it, ok := token.TokenMetadata["image"]; ok {
 		url = it.(string)
@@ -55,6 +58,7 @@ func processImagesForToken(pCtx context.Context, contractAddress, tokenID string
 		url = token.TokenURI
 	}
 
+	logrus.Debug("URL ", url)
 	res, err := downloadFromURL(pCtx, url)
 	if err != nil {
 		return err
@@ -122,6 +126,8 @@ func getImageServingURL(pCtx context.Context, bucketID, objectID string) (string
 
 func downloadFromURL(pCtx context.Context, url string) ([]byte, error) {
 
+	// TODO handle when url is ipfs
+
 	httpClient := &http.Client{
 		Timeout: time.Second * 2,
 	}
@@ -139,6 +145,7 @@ func downloadFromURL(pCtx context.Context, url string) ([]byte, error) {
 	}
 
 	contentType := http.DetectContentType(buf.Bytes()[:512])
+	logrus.Debug("contentType ", contentType)
 	if strings.HasPrefix(contentType, "image/") {
 		if strings.HasPrefix(contentType, "image/gif") {
 			// thumbnails a gif, do we need to store the whole gif?
@@ -166,20 +173,21 @@ func downloadFromURL(pCtx context.Context, url string) ([]byte, error) {
 			return nil, err
 		}
 
-		gen, err := screengen.NewGenerator(file.Name())
-		if err != nil {
-			return nil, err
-		}
-		defer gen.Close()
-
-		img, err := gen.ImageWxH(gen.Duration/2, 256, 256)
-		if err != nil {
-			return nil, err
-		}
-		buf := &bytes.Buffer{}
-		err = jpeg.Encode(buf, img, &jpeg.Options{Quality: 30})
-		return buf.Bytes(), nil
+		return readVidFrameAsJpeg(file.Name(), 1)
 	} else {
 		return nil, fmt.Errorf("Unsupported content type: %s", contentType)
 	}
+}
+
+func readVidFrameAsJpeg(inFileName string, frameNum int) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	err := ffmpeg.Input(inFileName).
+		Filter("select", ffmpeg.Args{fmt.Sprintf("gte(n,%d)", frameNum)}).
+		Output("pipe:", ffmpeg.KwArgs{"vframes": 1, "format": "image2", "vcodec": "mjpeg"}).
+		WithOutput(buf, os.Stdout).
+		Run()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
