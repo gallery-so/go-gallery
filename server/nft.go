@@ -40,10 +40,6 @@ type getNftsOutput struct {
 	Nfts []*persist.Token `json:"nfts"`
 }
 
-type getTokensOutput struct {
-	Tokens []*persist.Token `json:"tokens"`
-}
-
 type getNftByIDOutput struct {
 	Nft *persist.Token `json:"nft"`
 }
@@ -206,7 +202,7 @@ func syncNftsFromBlockChain(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			tokens = []*persist.Token{}
 		}
 
-		c.JSON(http.StatusOK, getTokensOutput{Tokens: tokens})
+		c.JSON(http.StatusOK, getNftsOutput{Nfts: tokens})
 	}
 }
 
