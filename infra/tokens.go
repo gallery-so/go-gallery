@@ -2,7 +2,6 @@ package infra
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -13,11 +12,14 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const defaultBlock = "3BBAFF" // by default start at block cryptopunks started
+
 type getERC721TokensInput struct {
 	Address         string `form:"address"`
 	ContractAddress string `form:"contract_address"`
 	SkipDB          bool   `form:"skip_db"`
 	PageNumber      int    `form:"page"`
+	MaxCount        int    `form:"max"`
 }
 
 type getERC721TokensOutput struct {
@@ -43,10 +45,14 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			input.PageNumber = 0
 		}
 
+		if input.MaxCount == 0 {
+			input.MaxCount = 50
+		}
+
 		tokens := []*persist.Token{}
 
 		if input.Address != "" {
-			result, err := GetTokensForWallet(c, input.Address, input.PageNumber, input.SkipDB, pRuntime)
+			result, err := GetTokensForWallet(c, input.Address, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
@@ -55,7 +61,7 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 			tokens = result
 		} else if input.ContractAddress != "" {
-			result, err := GetTokensForContract(c, input.ContractAddress, input.PageNumber, input.SkipDB, pRuntime)
+			result, err := GetTokensForContract(c, input.ContractAddress, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
@@ -75,9 +81,9 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 // GetTokensForWallet returns the tokens for a wallet from the DB if possible while also queuing an
 // update of DB from the block chain, or goes straight to the block chain if the DB returns no results
-func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber, pMaxCount int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	accounts, _ := persist.AccountGetByAddress(pCtx, pWalletAddress, pRuntime)
-	lastSyncedBlock := "0"
+	lastSyncedBlock := defaultBlock
 	if len(accounts) > 0 {
 		account := accounts[0]
 		lastSyncedBlock = account.LastSyncedBlock
@@ -87,22 +93,36 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 		}
 	}
 	if !pSkipDB {
-		result, err := persist.TokenGetByWallet(pCtx, pWalletAddress, pPageNumber, pRuntime)
+		result, err := persist.TokenGetByWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, pRuntime)
 		if err != nil {
 			return nil, err
 		}
-		if len(result) > 0 {
-			pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
-				Action: func() error {
-					_, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, lastSyncedBlock, false, pRuntime)
-					return err
-				},
-				Name: fmt.Sprintf("GetTokensForWallet: %s", pWalletAddress),
-			})
+
+		if len(result) < pMaxCount {
+			next, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+			if err != nil {
+				return nil, err
+			}
+			if len(next) > pMaxCount-len(result) {
+				next = next[:pMaxCount-len(result)]
+			}
+			result = append(result, next...)
+
 			return result, nil
 		}
+		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
+			Name: "update wallet tokens",
+			Action: func() error {
+				_, err := getTokensFromBCForWallet(pCtx, pWalletAddress, 0, 0, lastSyncedBlock, false, pRuntime)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		})
+		return result[:pMaxCount], nil
 	}
-	result, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, lastSyncedBlock, true, pRuntime)
+	result, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +131,9 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 
 // GetTokensForContract returns the tokens for a contract from the DB if possible while also queuing an
 // update of DB from the block chain, or goes straight to the block chain if the DB returns no results
-func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pMaxCount int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	accounts, _ := persist.ContractGetByAddress(pCtx, pContractAddress, pRuntime)
-	lastSyncedBlock := "0"
+	lastSyncedBlock := defaultBlock
 	if len(accounts) > 0 {
 		account := accounts[0]
 		lastSyncedBlock = account.LastSyncedBlock
@@ -123,23 +143,36 @@ func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNu
 		}
 	}
 	if !pSkipDB {
-		result, err := persist.TokenGetByContract(pCtx, pContractAddress, pPageNumber, pRuntime)
+		result, err := persist.TokenGetByContract(pCtx, pContractAddress, pPageNumber, pMaxCount, pRuntime)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(result) > 0 {
-			pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
-				Action: func() error {
-					_, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, lastSyncedBlock, false, pRuntime)
-					return err
-				},
-				Name: fmt.Sprintf("GetTokensForContract: %s", pContractAddress),
-			})
+		if len(result) < pMaxCount {
+			next, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+			if err != nil {
+				return nil, err
+			}
+			if len(next) > pMaxCount-len(result) {
+				next = next[:pMaxCount-len(result)]
+			}
+			result = append(result, next...)
+
 			return result, nil
 		}
+		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
+			Name: "update wallet tokens",
+			Action: func() error {
+				_, err := getTokensFromBCForContract(pCtx, pContractAddress, 0, 0, lastSyncedBlock, false, pRuntime)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		})
+		return result[:pMaxCount], nil
 	}
-	result, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, lastSyncedBlock, true, pRuntime)
+	result, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 	if err != nil {
 		return nil, err
 	}

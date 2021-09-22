@@ -146,7 +146,8 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			input.Page = 0
 		}
 
-		nfts, err := persist.TokenGetByUserID(c, input.UserID, input.Page, pRuntime)
+		// TODO magic number
+		nfts, err := persist.TokenGetByUserID(c, input.UserID, input.Page, 50, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Token{}
 		}

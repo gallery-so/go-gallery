@@ -164,6 +164,30 @@ func setupMongoIndexes(db *mongo.Database) error {
 			Sparse: &b,
 		},
 	})
+	// db.Collection("tokens").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	// 	Keys: bson.M{"contract_address": 1, "token_id": 1},
+	// })
+	// db.Collection("tokens").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	// 	Keys: bson.M{"owner_address": 1},
+	// })
+	// db.Collection("tokens").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	// 	Keys: bson.M{"last_updated": -1},
+	// })
+	db.Collection("accounts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+		Keys: bson.M{"address": 1},
+		Options: &options.IndexOptions{
+			Unique: &b,
+			Sparse: &b,
+		},
+	})
+	db.Collection("contracts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+		Keys: bson.M{"address": 1},
+		Options: &options.IndexOptions{
+			Unique: &b,
+			Sparse: &b,
+		},
+	})
+
 	return nil
 }
 

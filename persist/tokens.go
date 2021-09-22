@@ -16,8 +16,6 @@ const (
 	tokenColName = "tokens"
 )
 
-const tokenPageSize = 50
-
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
 
@@ -104,7 +102,7 @@ func TokenCreate(pCtx context.Context, pERC721 *Token,
 }
 
 // TokenGetByWallet gets tokens for a given wallet address
-func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
+func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int, pMaxCount int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -113,6 +111,11 @@ func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
 	}
 
 	opts.SetSort(bson.M{"last_updated": -1})
+
+	if pPageNumber > 0 && pMaxCount > 0 {
+		opts.SetSkip(int64((pPageNumber - 1) * pMaxCount))
+		opts.SetLimit(int64(pMaxCount))
+	}
 
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
@@ -123,15 +126,11 @@ func TokenGetByWallet(pCtx context.Context, pAddress string, pPageNumber int,
 		return nil, err
 	}
 
-	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
-		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
-	}
-
 	return result, nil
 }
 
 // TokenGetByUserID gets ERC721 tokens for a given userID
-func TokenGetByUserID(pCtx context.Context, pUserID DBID, pPageNumber int,
+func TokenGetByUserID(pCtx context.Context, pUserID DBID, pPageNumber int, pMaxCount int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -140,6 +139,11 @@ func TokenGetByUserID(pCtx context.Context, pUserID DBID, pPageNumber int,
 	}
 
 	opts.SetSort(bson.M{"last_updated": -1})
+
+	if pPageNumber > 0 && pMaxCount > 0 {
+		opts.SetSkip(int64((pPageNumber - 1) * pMaxCount))
+		opts.SetLimit(int64(pMaxCount))
+	}
 
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
@@ -150,15 +154,11 @@ func TokenGetByUserID(pCtx context.Context, pUserID DBID, pPageNumber int,
 		return nil, err
 	}
 
-	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
-		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
-	}
-
 	return result, nil
 }
 
 // TokenGetByContract gets ERC721 tokens for a given contract
-func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
+func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int, pMaxCount int,
 	pRuntime *runtime.Runtime) ([]*Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -168,6 +168,11 @@ func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
 
 	opts.SetSort(bson.M{"last_updated": -1})
 
+	if pPageNumber > 0 && pMaxCount > 0 {
+		opts.SetSkip(int64((pPageNumber - 1) * pMaxCount))
+		opts.SetLimit(int64(pMaxCount))
+	}
+
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	result := []*Token{}
@@ -175,9 +180,6 @@ func TokenGetByContract(pCtx context.Context, pAddress string, pPageNumber int,
 	err := mp.find(pCtx, bson.M{"contract_address": strings.ToLower(pAddress)}, &result, opts)
 	if err != nil {
 		return nil, err
-	}
-	if pPageNumber != 0 && len(result) > pPageNumber*tokenPageSize {
-		return result[(pPageNumber-1)*tokenPageSize : pPageNumber*tokenPageSize], nil
 	}
 
 	return result, nil

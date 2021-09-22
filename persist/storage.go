@@ -205,20 +205,19 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 		return "", err
 	}
 	asMap["last_updated"] = now
-	if _, ok := asMap["created_at"]; !ok {
-		asMap["created_at"] = now
-	}
 
 	if id, ok := asMap["_id"]; ok {
 		returnID = id.(DBID)
 	}
 
 	delete(asMap, "_id")
+	delete(asMap, "created_at")
+
 	for k := range query {
 		delete(asMap, k)
 	}
 
-	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
+	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap), "created_at": now}, "$set": asMap}, opts...)
 	if err != nil {
 		return "", err
 	}

@@ -11,7 +11,8 @@ import (
 
 func getAndSyncTokens(pCtx context.Context, pUserID persist.DBID, pWalletAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 
-	tokens, err := infra.GetTokensForWallet(pCtx, pWalletAddress, 1, pSkipDB, pRuntime)
+	// TODO magic numbers
+	tokens, err := infra.GetTokensForWallet(pCtx, pWalletAddress, 1, 50, pSkipDB, pRuntime)
 	if err != nil {
 		return nil, err
 	}

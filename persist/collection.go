@@ -275,7 +275,7 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 	}
 
 	if countColls == 0 {
-		tokens, err := TokenGetByUserID(pCtx, pUserID, 0, pRuntime)
+		tokens, err := TokenGetByUserID(pCtx, pUserID, 0, 0, pRuntime)
 		if err != nil {
 			return nil, err
 		}
