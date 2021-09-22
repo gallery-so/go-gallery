@@ -418,7 +418,7 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
 				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
 				Action: func() error {
-					return processImagesForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+					return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
 				},
 			})
 		}
@@ -488,7 +488,7 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
 				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
 				Action: func() error {
-					return processImagesForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+					return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
 				},
 			})
 		}

@@ -24,7 +24,7 @@ import (
 	"google.golang.org/appengine/image"
 )
 
-func processImagesForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) error {
+func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) error {
 	tokens, err := persist.TokenGetByNFTIdentifiers(pCtx, tokenID, contractAddress, pRuntime)
 	if err != nil {
 		return err
@@ -42,8 +42,6 @@ func processImagesForToken(pCtx context.Context, contractAddress, tokenID string
 
 	url := ""
 
-	logrus.Debug("TOKEN METADTA ", token.TokenMetadata)
-
 	if it, ok := token.TokenMetadata["image"]; ok {
 		url = it.(string)
 	} else if it, ok := token.TokenMetadata["image_url"]; ok {
@@ -58,8 +56,7 @@ func processImagesForToken(pCtx context.Context, contractAddress, tokenID string
 		url = token.TokenURI
 	}
 
-	logrus.Debug("URL ", url)
-	res, err := downloadFromURL(pCtx, url)
+	res, err := downloadFromURL(pCtx, url, pRuntime)
 	if err != nil {
 		return err
 	}
@@ -124,28 +121,41 @@ func getImageServingURL(pCtx context.Context, bucketID, objectID string) (string
 	return res.String(), nil
 }
 
-func downloadFromURL(pCtx context.Context, url string) ([]byte, error) {
+func downloadFromURL(pCtx context.Context, url string, pRuntime *runtime.Runtime) ([]byte, error) {
 
 	// TODO handle when url is ipfs
-
-	httpClient := &http.Client{
-		Timeout: time.Second * 2,
-	}
-
-	req, err := httpClient.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer req.Body.Close()
-
 	buf := &bytes.Buffer{}
-	_, err = io.Copy(buf, req.Body)
-	if err != nil {
-		return nil, err
+
+	if strings.HasPrefix(url, "ipfs://") {
+		res, err := pRuntime.IPFS.Cat(strings.TrimPrefix(url, "ipfs://"))
+		if err != nil {
+			return nil, err
+		}
+		_, err = io.Copy(buf, res)
+		if err != nil {
+			return nil, err
+		}
+	} else if strings.HasPrefix(url, "http") {
+		httpClient := &http.Client{
+			Timeout: time.Second * 2,
+		}
+
+		req, err := httpClient.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		defer req.Body.Close()
+
+		_, err = io.Copy(buf, req.Body)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("unsupported url")
 	}
 
 	contentType := http.DetectContentType(buf.Bytes()[:512])
-	logrus.Debug("contentType ", contentType)
+
 	if strings.HasPrefix(contentType, "image/") {
 		if strings.HasPrefix(contentType, "image/gif") {
 			// thumbnails a gif, do we need to store the whole gif?
@@ -184,6 +194,19 @@ func readVidFrameAsJpeg(inFileName string, frameNum int) ([]byte, error) {
 	err := ffmpeg.Input(inFileName).
 		Filter("select", ffmpeg.Args{fmt.Sprintf("gte(n,%d)", frameNum)}).
 		Output("pipe:", ffmpeg.KwArgs{"vframes": 1, "format": "image2", "vcodec": "mjpeg"}).
+		WithOutput(buf, os.Stdout).
+		Run()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func scaleVideo(pCtx context.Context, inFileName string, w, h float64) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	err := ffmpeg.Input(inFileName).
+		Filter("scale", ffmpeg.Args{fmt.Sprintf("%f:%f", w, h)}).
+		Output("pipe:", ffmpeg.KwArgs{"vcodec": "mjpeg"}).
 		WithOutput(buf, os.Stdout).
 		Run()
 	if err != nil {
