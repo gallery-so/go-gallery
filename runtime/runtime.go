@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/queue"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -39,6 +38,7 @@ type Runtime struct {
 	Router                *gin.Engine
 	InfraClients          *InfraClients
 	BlockchainUpdateQueue *queue.Queue
+	ImageProcessingQueue  *queue.Queue
 	IPFS                  *ipfs.Shell
 }
 
@@ -51,9 +51,8 @@ type DB struct {
 
 // InfraClients is a wrapper for the alchemy clients necessary for json RPC and contract interaction
 type InfraClients struct {
-	RPCClient    *rpc.Client
-	ETHClient    *ethclient.Client
-	TransferLogs map[string]chan *contracts.IERC721Transfer
+	RPCClient *rpc.Client
+	ETHClient *ethclient.Client
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -88,6 +87,7 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		Config:                pConfig,
 		DB:                    db,
 		BlockchainUpdateQueue: queue.NewQueue("blockchain-updates"),
+		ImageProcessingQueue:  queue.NewQueue("image-processing"),
 		IPFS:                  newIPFSShell(pConfig.IPFSURL),
 	}
 	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
@@ -230,9 +230,8 @@ func newInfraClients(alchemyURL string) *InfraClients {
 	}
 
 	return &InfraClients{
-		RPCClient:    client,
-		ETHClient:    ethClient,
-		TransferLogs: make(map[string]chan *contracts.IERC721Transfer),
+		RPCClient: client,
+		ETHClient: ethClient,
 	}
 }
 

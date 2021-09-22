@@ -17,6 +17,8 @@ const (
 	portMetrics    = "GLRY_PORT_METRIM"
 	allowedOrigins = "GLRY_ALLOWED_ORIGINS"
 
+	gcloudTokenBucket = "GCLOUD_TOKEN_BUCKET"
+
 	alchemyURL = "ALCHEMY_URL"
 	ipfsURL    = "IPFS_URL"
 
@@ -44,6 +46,8 @@ type Config struct {
 	AlchemyURL     string
 	IPFSURL        string
 
+	GCloudTokenContentBucket string
+
 	MongoURL    string
 	MongoUseTLS bool
 
@@ -69,7 +73,8 @@ func ConfigLoad() *Config {
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 	viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	viper.SetDefault("IPFS_URL", "https://ipfs.io")
+	viper.SetDefault(ipfsURL, "https://ipfs.io")
+	viper.SetDefault(gcloudTokenBucket, "token-bucket")
 
 	viper.SetDefault(mongoUseTLS, false)
 	viper.SetDefault(mongoURLSecretName, "")
@@ -99,16 +104,17 @@ func ConfigLoad() *Config {
 	}
 
 	config := &Config{
-		Env:            viper.GetString(env),
-		InfraEnv:       viper.GetString(infraEnv),
-		BaseURL:        viper.GetString(baseURL),
-		InfraBaseURL:   viper.GetString(infraBaseURL),
-		Port:           viper.GetInt(port),
-		InfraPort:      viper.GetInt(infraPort),
-		PortMetrics:    viper.GetInt(portMetrics),
-		AllowedOrigins: viper.GetString(allowedOrigins),
-		AlchemyURL:     viper.GetString(alchemyURL),
-		IPFSURL:        viper.GetString(ipfsURL),
+		Env:                      viper.GetString(env),
+		InfraEnv:                 viper.GetString(infraEnv),
+		BaseURL:                  viper.GetString(baseURL),
+		InfraBaseURL:             viper.GetString(infraBaseURL),
+		Port:                     viper.GetInt(port),
+		InfraPort:                viper.GetInt(infraPort),
+		PortMetrics:              viper.GetInt(portMetrics),
+		AllowedOrigins:           viper.GetString(allowedOrigins),
+		AlchemyURL:               viper.GetString(alchemyURL),
+		IPFSURL:                  viper.GetString(ipfsURL),
+		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 

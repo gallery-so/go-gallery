@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -343,7 +344,7 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 	errChan := make(chan error)
 
 	// map of token contract address + token ID => uriWithMetadata to prevent duplicate calls to the
-	// blockchain for retrieving token URI
+	// blockchain for retrieving token URI and Metadata
 	tokenDetails := &sync.Map{}
 
 	// spin up a goroutine for each transfer
@@ -359,6 +360,8 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 			}
 		}
 
+		// if this user is removing a token we want to increase total so that
+		// we get the correct number of items per page
 		if strings.EqualFold(allTransfers[i].From, pAddress) {
 			if len(allTransfers) > end+i {
 				end++
@@ -410,6 +413,14 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 		}
 		if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
 			logger.WithError(err).Error("error updating contracts for transfers")
+		}
+		for _, v := range allTokens {
+			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
+				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
+				Action: func() error {
+					return processImagesForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+				},
+			})
 		}
 		// if pQueueUpdate {
 		// 	queueUpdateForWallet(pCtx, pRuntime.BlockchainUpdateQueue, pAddress, finalBlockNum, pRuntime)
@@ -473,9 +484,17 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 		if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
 			logger.WithError(err).Error("error updating contracts for transfers")
 		}
-		if pQueueUpdate {
-			queueUpdateForContract(pCtx, pRuntime.BlockchainUpdateQueue, pAddress, finalBlockNum, pRuntime)
+		for _, v := range tokens {
+			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
+				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
+				Action: func() error {
+					return processImagesForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+				},
+			})
 		}
+		// if pQueueUpdate {
+		// 	queueUpdateForContract(pCtx, pRuntime.BlockchainUpdateQueue, pAddress, finalBlockNum, pRuntime)
+		// }
 
 	}()
 

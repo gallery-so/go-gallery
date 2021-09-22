@@ -54,21 +54,15 @@ type CollectionToken struct {
 	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 }
 
-type attribute struct {
-	TraitType string `bson:"trait_type" json:"trait_type"`
-	Value     string `bson:"value" json:"value"`
-}
-
-// TokenUpdateWithTransfer represents a token update occuring after a transfer event
-type TokenUpdateWithTransfer struct {
-	OwnerAddress   string   `bson:"owner_address"`
-	PreviousOwners []string `bson:"previous_owners"`
-	LastBlockNum   string   `bson:"last_block_num"`
-}
-
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+}
+
+// TokenUpdateImageURLsInput represents an update to a tokens image properties
+type TokenUpdateImageURLsInput struct {
+	ThumbnailURL string `bson:"thumbnail_url" json:"thumbnail_url"`
+	PreviewURL   string `bson:"preview_url" json:"preview_url"`
 }
 
 // TokenCreateBulk is a helper function to create multiple nfts in one call and returns
@@ -256,14 +250,25 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 	return nil
 }
 
-// TokenUpdateByID will update a given token by its DB ID
-func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
+// TokenUpdateByIDs will update a given token by its DB ID and owner user ID
+func TokenUpdateByIDs(pCtx context.Context, pID DBID, pUserID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
 	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
+
+}
+
+// TokenUpdateByID will update a given token by its DB ID
+func TokenUpdateByID(pCtx context.Context, pID DBID,
+	pUpdate interface{},
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+
+	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 
 }
 
