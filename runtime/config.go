@@ -72,7 +72,8 @@ func ConfigLoad() *Config {
 	viper.SetDefault(infraPort, 5000)
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
-	viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	// viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault(alchemyURL, "ws://localhost:8546")
 	viper.SetDefault(ipfsURL, "https://ipfs.io")
 	viper.SetDefault(gcloudTokenBucket, "token-bucket")
 

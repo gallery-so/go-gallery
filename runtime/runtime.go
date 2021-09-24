@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -40,6 +42,7 @@ type Runtime struct {
 	BlockchainUpdateQueue *queue.Queue
 	ImageProcessingQueue  *queue.Queue
 	IPFS                  *ipfs.Shell
+	Cancel                chan os.Signal
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -89,10 +92,14 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		BlockchainUpdateQueue: queue.NewQueue("blockchain-updates"),
 		ImageProcessingQueue:  queue.NewQueue("image-processing"),
 		IPFS:                  newIPFSShell(pConfig.IPFSURL),
+		Cancel:                make(chan os.Signal),
 	}
 	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
 
 	log.Info("RPC, ETH, and IPFS clients connected! ✅")
+
+	// notify cancel channel when SIGINT or SIGTERM is received
+	notifyOnCancel(runtime.Cancel)
 
 	// TEST REDIS CONNECTION
 	client := redis.NewClient(&redis.Options{
@@ -242,4 +249,8 @@ func newIPFSShell(url string) *ipfs.Shell {
 	sh := ipfs.NewShell(url)
 	sh.SetTimeout(time.Second * 2)
 	return sh
+}
+
+func notifyOnCancel(cancelChan chan os.Signal) {
+	signal.Notify(cancelChan, syscall.SIGINT, syscall.SIGTERM)
 }
