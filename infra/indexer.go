@@ -2,12 +2,14 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -118,7 +120,7 @@ func (i *Indexer) Start() {
 	go i.processTransfers()
 	go i.processTokens()
 	go i.processContracts()
-	go i.handleCancel()
+	go i.handleDone()
 	i.wg.Wait()
 }
 
@@ -318,7 +320,7 @@ func (i *Indexer) processContracts() {
 	}
 }
 
-func (i *Indexer) handleCancel() {
+func (i *Indexer) handleDone() {
 	defer i.wg.Done()
 	for {
 		select {
@@ -328,6 +330,7 @@ func (i *Indexer) handleCancel() {
 			return
 		case <-i.done:
 			logrus.Info("STATE ", i.state)
+			i.writeStats()
 			return
 		}
 	}
@@ -474,4 +477,22 @@ func transfersToTokens(i *Indexer) {
 		}
 	}
 	i.mu.RUnlock()
+}
+
+func (i *Indexer) writeStats() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	fi, err := os.Create(fmt.Sprintf("%s-%s.txt", i.statsFile, time.Now().Format("2006-01-02-15-04-05")))
+	if err != nil {
+		logrus.WithError(err).Error("Error creating stats file")
+		return
+	}
+	defer fi.Close()
+	fi.WriteString(fmt.Sprintf("State: %d\n", atomic.LoadInt64(&i.state)))
+	fi.WriteString(fmt.Sprintf("Total ERC721 Tokens: %d\n", len(i.owners)))
+	fi.WriteString(fmt.Sprintf("Total ERC1155 Tokens: %d\n", len(i.balances)))
+	fi.WriteString(fmt.Sprintf("Total Tokens with URI: %d\n", len(i.uris)))
+	fi.WriteString(fmt.Sprintf("Total Tokens with Metadata: %d\n", len(i.metadatas)))
+	fi.WriteString(fmt.Sprintf("Last Block Number: %d", i.lastBlockNumber))
 }
