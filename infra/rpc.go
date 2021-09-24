@@ -73,8 +73,8 @@ type tokenWithBlockNumber struct {
 
 // TODO combine this function with get transfers to so that we can ensure a certain amount of results are returned and paginate
 
-// getTransfersFrom returns the transfers from the given address
-func getTransfersFrom(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
+// getTokenTransfersFrom returns the transfers from the given address
+func getTokenTransfersFrom(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
 	result := &transfers{}
 
 	block, err := util.NormalizeHexString(pFromBlock)
@@ -109,8 +109,8 @@ func getTransfersFrom(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([
 	return result.Transfers, nil
 }
 
-// getTransfersTo returns the transfers to the given address
-func getTransfersTo(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
+// getTokenTransfersTo returns the transfers to the given address
+func getTokenTransfersTo(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
 	result := &transfers{}
 
 	block, err := util.NormalizeHexString(pFromBlock)
@@ -145,8 +145,8 @@ func getTransfersTo(pAddress, pFromBlock string, pRuntime *runtime.Runtime) ([]*
 	return result.Transfers, nil
 }
 
-// getContractTransfers returns the transfers for a given contract
-func getContractTransfers(pAddress, pFromBlock string, pPageNumber, pMaxCount int, pRuntime *runtime.Runtime) ([]*transfer, error) {
+// getContractTokenTransfers returns the transfers for a given contract
+func getContractTokenTransfers(pAddress, pFromBlock string, pPageNumber, pMaxCount int, pRuntime *runtime.Runtime) ([]*transfer, error) {
 	result := &transfers{}
 
 	if pMaxCount < 1 {
@@ -232,8 +232,8 @@ func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (tokenC
 	return *result, nil
 }
 
-// getTokenURI returns metadata URI for a given token address
-func getTokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, error) {
+// getERC721TokenURI returns metadata URI for a given token address
+func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, error) {
 
 	contract := common.HexToAddress(address)
 	instance, err := contracts.NewIERC721Metadata(contract, pRuntime.InfraClients.ETHClient)
@@ -259,8 +259,8 @@ func getTokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, er
 
 }
 
-// getTokenMetadata parses and returns the NFT metadata for a given token URI
-func getTokenMetadata(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, error) {
+// getMetadataFromURI parses and returns the NFT metadata for a given token URI
+func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 3,
@@ -329,10 +329,10 @@ func getTokenMetadata(tokenURI string, pRuntime *runtime.Runtime) (map[string]in
 
 }
 
-// getTokensFromBCForWallet returns the ERC721 token for the given wallet address
-func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber, pMaxCount int, pFromBlock string, pQueueUpdate bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+// getERC721sForWallet returns the ERC721 token for the given wallet address
+func getERC721sForWallet(pCtx context.Context, pAddress string, pPageNumber, pMaxCount int, pFromBlock string, pQueueUpdate bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	logger := logrus.WithFields(logrus.Fields{"method": "getTokensFromBCForWallet"})
-	allTransfers, err := getAllTransfersForWallet(pCtx, pAddress, pFromBlock, pRuntime)
+	allTransfers, err := aggregateTransfersForWallet(pCtx, pAddress, pFromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +381,7 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 
 	// map of token contract address + token ID => token to keep track of ownership seeing as
 	// tokens will appear more than once in the transfers
-	allTokens, _ := receieveTransfers(tokenChan, errChan, total, logger)
+	allTokens, _ := receieveERC721Transfers(tokenChan, errChan, total, logger)
 
 	// all the tokens owned by `address`
 	ownedTokens := []*persist.Token{}
@@ -430,10 +430,10 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 	return ownedTokens, nil
 }
 
-// getTokensFromBCForContract returns the ERC721 token for the given contract address
-func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumber, pMaxCount int, pFromBlock string, pQueueUpdate bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+// getERC721sForContract returns the ERC721 token for the given contract address
+func getERC721sForContract(pCtx context.Context, pAddress string, pPageNumber, pMaxCount int, pFromBlock string, pQueueUpdate bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	logger := logrus.WithFields(logrus.Fields{"method": "getTokensFromBCForContract"})
-	allTransfers, err := getContractTransfers(pAddress, pFromBlock, pPageNumber, pMaxCount, pRuntime)
+	allTransfers, err := getContractTokenTransfers(pAddress, pFromBlock, pPageNumber, pMaxCount, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +468,7 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 	}
 
 	// map of tokenID => token
-	tokens, _ := receieveTransfers(tokenChan, errChan, total, logger)
+	tokens, _ := receieveERC721Transfers(tokenChan, errChan, total, logger)
 
 	go func() {
 		// update DB
@@ -501,14 +501,14 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 	return tokens, nil
 }
 
-func getAllTransfersForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
+func aggregateTransfersForWallet(pCtx context.Context, address string, fromBlock string, pRuntime *runtime.Runtime) ([]*transfer, error) {
 
-	from, err := getTransfersFrom(address, fromBlock, pRuntime)
+	from, err := getTokenTransfersFrom(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
 
-	to, err := getTransfersTo(address, fromBlock, pRuntime)
+	to, err := getTokenTransfersTo(address, fromBlock, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -563,12 +563,12 @@ func processWalletTransfer(tokenDetails *sync.Map, tran *transfer, logger *logru
 
 	genericUwm, ok := tokenDetails.Load(tran.RawContract.Address + tran.TokenID)
 	if !ok {
-		uri, err := getTokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
+		uri, err := getERC721TokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
 		if err != nil {
 			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.TokenID}).Error(err)
 		}
 
-		metadata, err := getTokenMetadata(uri, pRuntime)
+		metadata, err := getMetadataFromURI(uri, pRuntime)
 		if err != nil {
 			logger.WithFields(logrus.Fields{"section": "GetTokenMetadata", "uri": uri}).Error(err)
 		}
@@ -601,7 +601,7 @@ func processWalletTransfer(tokenDetails *sync.Map, tran *transfer, logger *logru
 	return token, blockNum, nil
 }
 
-func receieveTransfers(tokenChan chan *tokenWithBlockNumber, errChan chan error, total int, logger *logrus.Entry) ([]*persist.Token, string) {
+func receieveERC721Transfers(tokenChan chan *tokenWithBlockNumber, errChan chan error, total int, logger *logrus.Entry) ([]*persist.Token, string) {
 
 	allTokens := []*tokenWithBlockNumber{}
 out:
@@ -656,11 +656,11 @@ func processContractTransfers(uris *sync.Map, tran *transfer, logger *logrus.Ent
 	}
 
 	if _, ok := uris.Load(tran.TokenID); !ok {
-		uri, err := getTokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
+		uri, err := getERC721TokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
 		if err != nil {
 			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.TokenID}).Error(err)
 		}
-		metadata, err := getTokenMetadata(uri, pRuntime)
+		metadata, err := getMetadataFromURI(uri, pRuntime)
 		if err != nil {
 			logger.WithFields(logrus.Fields{"section": "GetTokenMetadata", "uri": uri}).Error(err)
 		}
@@ -732,7 +732,7 @@ func queueUpdateForWallet(pCtx context.Context, pQueue *queue.Queue, pWalletAddr
 	pQueue.AddJob(queue.Job{
 		Name: "UpdateWallet",
 		Action: func() error {
-			_, err := getTokensFromBCForWallet(pCtx, pWalletAddress, 0, 0, pLastBlock, false, pRuntime)
+			_, err := getERC721sForWallet(pCtx, pWalletAddress, 0, 0, pLastBlock, false, pRuntime)
 			return err
 		},
 	})
@@ -741,7 +741,7 @@ func queueUpdateForContract(pCtx context.Context, pQueue *queue.Queue, pContract
 	pQueue.AddJob(queue.Job{
 		Name: "UpdateContract",
 		Action: func() error {
-			_, err := getTokensFromBCForContract(pCtx, pContractAddress, 0, 0, pLastBlock, false, pRuntime)
+			_, err := getERC721sForContract(pCtx, pContractAddress, 0, 0, pLastBlock, false, pRuntime)
 			return err
 		},
 	})

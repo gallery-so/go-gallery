@@ -58,6 +58,7 @@ type Indexer struct {
 	types          map[string]string
 	contractStored map[string]bool
 	owners         map[string]ownerAtBlock
+	balances       map[string]map[string]*big.Int
 	previousOwners map[string][]ownerAtBlock
 
 	eventHashes []EventHash
@@ -89,6 +90,7 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 		metadatas:      make(map[string]map[string]interface{}),
 		uris:           make(map[string]string),
 		types:          make(map[string]string),
+		balances:       make(map[string]map[string]*big.Int),
 		contractStored: make(map[string]bool),
 		owners:         make(map[string]ownerAtBlock),
 		previousOwners: make(map[string][]ownerAtBlock),
@@ -125,7 +127,7 @@ func (i *Indexer) processLogs() {
 	finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
 	if err != nil {
 		logrus.Errorf("failed to get block number: %v", err)
-		atomic.SwapInt64(&i.state, -1)
+		atomic.StoreInt64(&i.state, -1)
 		i.done <- true
 	}
 
@@ -256,106 +258,13 @@ func (i *Indexer) processTransfers() {
 		case transfers, ok := <-i.transfers:
 			logrus.Infof("Got %d transfers", len(transfers))
 			for _, transfer := range transfers {
-				bn, err := util.HexToBigInt(transfer.BlockNumber)
-				if err != nil {
-					logrus.WithError(err).Error("Error converting block number")
-					atomic.SwapInt64(&i.state, -1)
-					i.done <- true
-				}
-				key := transfer.RawContract.Address + "--" + transfer.TokenID
-				logrus.Infof("Processing transfer %s", key)
-				i.mu.Lock()
-				if !i.contractStored[key] {
-					i.contractStored[key] = true
-					i.contracts <- transfer.RawContract.Address
-				}
-				if it, ok := i.owners[key]; ok {
-					if it.owner != transfer.To {
-						if it.block < bn.Uint64() {
-							it.block = bn.Uint64()
-							it.owner = transfer.To
-						}
-						i.previousOwners[key] = append(i.previousOwners[key], it)
-					}
-				} else {
-					i.owners[key] = ownerAtBlock{transfer.From, bn.Uint64()}
-				}
-				if it, ok := i.previousOwners[key]; !ok {
-					i.previousOwners[key] = []ownerAtBlock{{
-						owner: transfer.From,
-						block: bn.Uint64(),
-					}}
-				} else {
-					it = append(it, ownerAtBlock{
-						owner: transfer.From,
-						block: bn.Uint64(),
-					})
-				}
-				if _, ok := i.types[key]; !ok {
-					i.types[key] = transfer.Type
-				}
-				if _, ok := i.uris[key]; !ok {
-					uri, err := getURIForERC1155Token(transfer.RawContract.Address, transfer.TokenID, i.runtime)
-					if err != nil {
-						logrus.WithError(err).Error("Error getting URI for ERC1155 token")
-						// TODO handle this
-					}
-					i.uris[key] = uri
-				}
-				if _, ok := i.metadatas[key]; !ok {
-					uri := i.uris[key]
-					if uri == "" {
-						logrus.Error("No URI found for ERC1155 token")
-						atomic.SwapInt64(&i.state, -1)
-						i.done <- true
-					}
-					id, err := util.HexToBigInt(transfer.TokenID)
-					if err != nil {
-						logrus.WithError(err).Error("Error converting token ID to big int")
-						atomic.SwapInt64(&i.state, -1)
-						i.done <- true
-					}
-					uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
-					metadata, err := getTokenMetadata(uriReplaced, i.runtime)
-					if err != nil {
-						logrus.WithError(err).Error("Error getting metadata for token")
-						// TODO handle this
-					}
-					i.metadatas[key] = metadata
-				}
-				i.mu.Unlock()
+				go processTransfer(i, transfer)
 			}
 			if !ok {
 				logrus.Info("Transfer channel closed")
-				i.mu.Lock()
-				for k, v := range i.owners {
-					spl := strings.Split(k, "--")
-					if len(spl) != 2 {
-						logrus.Error("Invalid key")
-						atomic.SwapInt64(&i.state, -1)
-						i.done <- true
-					}
-					sort.Slice(i.previousOwners[k], func(l, m int) bool {
-						return i.previousOwners[k][l].block < i.previousOwners[k][m].block
-					})
-					previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
-					for i, v := range i.previousOwners[k] {
-						previousOwnerAddresses[i] = v.owner
-					}
-					token := &persist.Token{
-						TokenID:         spl[1],
-						ContractAddress: spl[0],
-						OwnerAddress:    v.owner,
-						PreviousOwners:  previousOwnerAddresses,
-						Type:            i.types[k],
-						TokenMetadata:   i.metadatas[k],
-						TokenURI:        i.uris[k],
-					}
-					i.tokens <- token
-				}
+				transfersToTokens(i)
 				logrus.Info("Done processing transfers, closing tokens channel")
 				close(i.tokens)
-				i.mu.Unlock()
 				return
 			}
 		case <-i.done:
@@ -373,6 +282,7 @@ func (i *Indexer) processTokens() {
 			go func(notDone bool) {
 				if !notDone {
 					defer func() {
+						atomic.StoreInt64(&i.state, 0)
 						i.done <- true
 					}()
 				}
@@ -421,4 +331,147 @@ func (i *Indexer) handleCancel() {
 			return
 		}
 	}
+}
+
+func processTransfer(i *Indexer, transfer *transfer) {
+	bn, err := util.HexToBigInt(transfer.BlockNumber)
+	if err != nil {
+		logrus.WithError(err).Error("Error converting block number")
+		atomic.StoreInt64(&i.state, -1)
+		i.done <- true
+	}
+	key := transfer.RawContract.Address + "--" + transfer.TokenID
+	logrus.Infof("Processing transfer %s", key)
+	i.mu.Lock()
+
+	tokenType, ok := i.types[key]
+	if !ok {
+		i.types[key] = transfer.Type
+		tokenType = transfer.Type
+	}
+
+	if !i.contractStored[key] {
+		i.contractStored[key] = true
+		i.contracts <- transfer.RawContract.Address
+	}
+	switch tokenType {
+	case persist.TokenTypeERC721:
+		if it, ok := i.owners[key]; ok {
+			if it.owner != transfer.To {
+				if it.block < bn.Uint64() {
+					it.block = bn.Uint64()
+					it.owner = transfer.To
+				}
+				i.previousOwners[key] = append(i.previousOwners[key], it)
+			}
+		} else {
+			i.owners[key] = ownerAtBlock{transfer.From, bn.Uint64()}
+		}
+		if it, ok := i.previousOwners[key]; !ok {
+			i.previousOwners[key] = []ownerAtBlock{{
+				owner: transfer.From,
+				block: bn.Uint64(),
+			}}
+		} else {
+			it = append(it, ownerAtBlock{
+				owner: transfer.From,
+				block: bn.Uint64(),
+			})
+		}
+	case persist.TokenTypeERC1155:
+		if it, ok := i.balances[key][transfer.From]; ok {
+			it.Sub(it, new(big.Int).SetUint64(transfer.Amount))
+		} else {
+			i.balances[key][transfer.From] = new(big.Int).SetUint64(transfer.Amount)
+		}
+		if it, ok := i.balances[key][transfer.To]; ok {
+			it.Add(it, new(big.Int).SetUint64(transfer.Amount))
+		} else {
+			i.balances[key][transfer.To] = new(big.Int).SetUint64(transfer.Amount)
+		}
+	default:
+		logrus.Error("Unknown token type")
+		atomic.StoreInt64(&i.state, -1)
+		i.done <- true
+	}
+	if _, ok := i.uris[key]; !ok {
+		uri, err := getURIForERC1155Token(transfer.RawContract.Address, transfer.TokenID, i.runtime)
+		if err != nil {
+			logrus.WithError(err).Error("Error getting URI for ERC1155 token")
+			// TODO handle this
+		}
+		i.uris[key] = uri
+	}
+	if _, ok := i.metadatas[key]; !ok {
+		uri := i.uris[key]
+		if uri == "" {
+			logrus.Error("No URI found for ERC1155 token")
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- true
+		}
+		id, err := util.HexToBigInt(transfer.TokenID)
+		if err != nil {
+			logrus.WithError(err).Error("Error converting token ID to big int")
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- true
+		}
+		uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
+		metadata, err := getMetadataFromURI(uriReplaced, i.runtime)
+		if err != nil {
+			logrus.WithError(err).Error("Error getting metadata for token")
+			// TODO handle this
+		}
+		i.metadatas[key] = metadata
+	}
+	i.mu.Unlock()
+}
+
+func transfersToTokens(i *Indexer) {
+	i.mu.RLock()
+	for k, v := range i.owners {
+		spl := strings.Split(k, "--")
+		if len(spl) != 2 {
+			logrus.Error("Invalid key")
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- true
+		}
+		sort.Slice(i.previousOwners[k], func(l, m int) bool {
+			return i.previousOwners[k][l].block < i.previousOwners[k][m].block
+		})
+		previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
+		for i, v := range i.previousOwners[k] {
+			previousOwnerAddresses[i] = v.owner
+		}
+		token := &persist.Token{
+			TokenID:         spl[1],
+			ContractAddress: spl[0],
+			OwnerAddress:    v.owner,
+			PreviousOwners:  previousOwnerAddresses,
+			Type:            persist.TokenTypeERC721,
+			TokenMetadata:   i.metadatas[k],
+			TokenURI:        i.uris[k],
+		}
+		i.tokens <- token
+	}
+	for k, v := range i.balances {
+		spl := strings.Split(k, "--")
+		if len(spl) != 2 {
+			logrus.Error("Invalid key")
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- true
+		}
+		for addr, balance := range v {
+			token := &persist.Token{
+				TokenID:         spl[1],
+				ContractAddress: spl[0],
+				OwnerAddress:    addr,
+				Amount:          balance.Uint64(),
+				Type:            persist.TokenTypeERC1155,
+				TokenMetadata:   i.metadatas[k],
+				TokenURI:        i.uris[k],
+			}
+			i.tokens <- token
+		}
+	}
+	i.mu.RUnlock()
 }

@@ -100,7 +100,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 		}
 
 		if len(result) < pMaxCount {
-			next, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+			next, err := getERC721sForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 			if err != nil {
 				return nil, err
 			}
@@ -114,7 +114,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
 			Name: "update wallet tokens",
 			Action: func() error {
-				_, err := getTokensFromBCForWallet(pCtx, pWalletAddress, 0, 0, lastSyncedBlock, false, pRuntime)
+				_, err := getERC721sForWallet(pCtx, pWalletAddress, 0, 0, lastSyncedBlock, false, pRuntime)
 				if err != nil {
 					return err
 				}
@@ -123,7 +123,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 		})
 		return result[:pMaxCount], nil
 	}
-	result, err := getTokensFromBCForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+	result, err := getERC721sForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNu
 		}
 
 		if len(result) < pMaxCount {
-			next, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+			next, err := getERC721sForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 			if err != nil {
 				return nil, err
 			}
@@ -164,7 +164,7 @@ func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNu
 		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
 			Name: "update wallet tokens",
 			Action: func() error {
-				_, err := getTokensFromBCForContract(pCtx, pContractAddress, 0, 0, lastSyncedBlock, false, pRuntime)
+				_, err := getERC721sForContract(pCtx, pContractAddress, 0, 0, lastSyncedBlock, false, pRuntime)
 				if err != nil {
 					return err
 				}
@@ -173,7 +173,7 @@ func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNu
 		})
 		return result[:pMaxCount], nil
 	}
-	result, err := getTokensFromBCForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
+	result, err := getERC721sForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
 	if err != nil {
 		return nil, err
 	}
