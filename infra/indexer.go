@@ -256,7 +256,9 @@ func (i *Indexer) subscribeNewLogs() {
 	for {
 		select {
 		case log := <-i.subscriptions:
-			i.transfers <- logToTransfer(log)
+			logrus.Infof("Got log at: %d", log.BlockNumber)
+			// for now just log because we have no way of knowing if transfers is closed
+			// i.transfers <- logToTransfer(log)
 		case err := <-sub.Err():
 			logrus.Errorf("subscription error: %v", err)
 			atomic.StoreInt64(&i.state, -1)
