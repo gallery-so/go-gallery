@@ -230,14 +230,6 @@ func (i *Indexer) processContracts() {
 
 func (i *Indexer) subscribeNewLogs() {
 	defer i.wg.Done()
-	finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
-	if err != nil {
-		logrus.Errorf("failed to get block number: %v", err)
-		atomic.StoreInt64(&i.state, -1)
-		i.done <- true
-	}
-
-	logrus.Infof("final block number: %v", finalBlockUint)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -246,9 +238,8 @@ func (i *Indexer) subscribeNewLogs() {
 
 	topics := [][]common.Hash{events}
 
-	finalBlock := new(big.Int).SetUint64(finalBlockUint)
 	sub, err := i.runtime.InfraClients.ETHClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: finalBlock,
+		FromBlock: new(big.Int).SetUint64(i.lastSyncedBlock),
 		Topics:    topics,
 	}, i.subscriptions)
 	if err != nil {
