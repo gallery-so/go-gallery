@@ -56,31 +56,29 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 		url = token.TokenURI
 	}
 
-	res, err := downloadFromURL(pCtx, url, pRuntime)
+	err = downloadAndCache(pCtx, url, name, pRuntime)
 	if err != nil {
 		return err
 	}
-	err = cacheRawImage(pCtx, res, pRuntime.Config.GCloudTokenContentBucket, name)
-	if err != nil {
-		return err
+	update := &persist.TokenUpdateImageURLsInput{}
+
+	imageURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
+	if err == nil {
+		update.ThumbnailURL = imageURL + "=s256"
+		update.PreviewURL = imageURL + "=s1024"
 	}
 
-	servingURL, err := getImageServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, name)
-	if err != nil {
-		return err
+	videoURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("video-%s", name))
+	if err == nil {
+		update.VideoURL = videoURL
 	}
 
-	logrus.WithFields(logrus.Fields{"token": token.ID, "servingURL": servingURL}).Info("processImagesForToken")
-
-	update := &persist.TokenUpdateImageURLsInput{
-		ThumbnailURL: servingURL,
-		PreviewURL:   servingURL,
-	}
+	logrus.WithFields(logrus.Fields{"token": token.ID, "servingURL": imageURL}).Info("processImagesForToken")
 
 	return persist.TokenUpdateByID(pCtx, token.ID, update, pRuntime)
 }
 
-func cacheRawImage(pCtx context.Context, image []byte, bucket, fileName string) error {
+func cacheRawMedia(pCtx context.Context, image []byte, bucket, fileName string) error {
 
 	ctx, cancel := context.WithTimeout(pCtx, 2*time.Second)
 	defer cancel()
@@ -100,7 +98,7 @@ func cacheRawImage(pCtx context.Context, image []byte, bucket, fileName string) 
 	return nil
 }
 
-func getImageServingURL(pCtx context.Context, bucketID, objectID string) (string, error) {
+func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string, error) {
 	objectName := fmt.Sprintf("gs/%s/%s", bucketID, objectID)
 	key, err := blobstore.BlobKeyForFile(pCtx, objectName)
 	if err != nil {
@@ -121,7 +119,7 @@ func getImageServingURL(pCtx context.Context, bucketID, objectID string) (string
 	return res.String(), nil
 }
 
-func downloadFromURL(pCtx context.Context, url string, pRuntime *runtime.Runtime) ([]byte, error) {
+func downloadAndCache(pCtx context.Context, url, name string, pRuntime *runtime.Runtime) error {
 
 	// TODO handle when url is ipfs
 	buf := &bytes.Buffer{}
@@ -129,29 +127,29 @@ func downloadFromURL(pCtx context.Context, url string, pRuntime *runtime.Runtime
 	if strings.HasPrefix(url, "ipfs://") {
 		res, err := pRuntime.IPFS.Cat(strings.TrimPrefix(url, "ipfs://"))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		_, err = io.Copy(buf, res)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else if strings.HasPrefix(url, "http") {
-		httpClient := &http.Client{
+		hc := &http.Client{
 			Timeout: time.Second * 2,
 		}
 
-		req, err := httpClient.Get(url)
+		req, err := hc.Get(url)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer req.Body.Close()
 
 		_, err = io.Copy(buf, req.Body)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else {
-		return nil, errors.New("unsupported url")
+		return errors.New("unsupported url")
 	}
 
 	contentType := http.DetectContentType(buf.Bytes()[:512])
@@ -161,31 +159,41 @@ func downloadFromURL(pCtx context.Context, url string, pRuntime *runtime.Runtime
 			// thumbnails a gif, do we need to store the whole gif?
 			asGif, err := gif.DecodeAll(bytes.NewReader(buf.Bytes()))
 			if err != nil {
-				return nil, err
+				return err
 			}
 			buf = &bytes.Buffer{}
 			err = jpeg.Encode(buf, asGif.Image[0], &jpeg.Options{Quality: 30})
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
-		return buf.Bytes(), nil
+		return cacheRawMedia(pCtx, buf.Bytes(), pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
 	} else if strings.HasPrefix(contentType, "video/") {
 		// thumbnails the video, do we need to store a whole video?
 		file, err := ioutil.TempFile("/tmp", "")
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer os.Remove(file.Name())
 
 		_, err = file.Write(buf.Bytes())
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		return readVidFrameAsJpeg(file.Name(), 1)
+		scaled, err := scaleVideo(pCtx, file.Name(), 640, 480)
+		if err != nil {
+			return err
+		}
+		cacheRawMedia(pCtx, scaled, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("video-%s", name))
+
+		jp, err := readVidFrameAsJpeg(file.Name(), 1)
+		if err != nil {
+			return err
+		}
+		return cacheRawMedia(pCtx, jp, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
 	} else {
-		return nil, fmt.Errorf("Unsupported content type: %s", contentType)
+		return fmt.Errorf("Unsupported content type: %s", contentType)
 	}
 }
 

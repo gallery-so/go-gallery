@@ -17,8 +17,8 @@ func NormalizeHexString(hex string) (string, error) {
 	return i.Text(16), nil
 }
 
-// NormalizeHexInt converts a hex string with 0x prefix to a big int
-func NormalizeHexInt(hex string) (*big.Int, error) {
+// HexToBigInt converts a hex string with 0x prefix to a big int
+func HexToBigInt(hex string) (*big.Int, error) {
 	hex = strings.TrimPrefix(hex, "0x")
 
 	i, ok := new(big.Int).SetString(hex, 16)

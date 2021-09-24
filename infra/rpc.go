@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -15,9 +14,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/queue"
@@ -34,15 +35,16 @@ type transfers struct {
 
 // transfer represents a transfer from the RPC response
 type transfer struct {
-	Category      string   `json:"category"`
-	BlockNumber   string   `json:"blockNum"`
-	From          string   `json:"from"`
-	To            string   `json:"to"`
-	Value         float64  `json:"value"`
-	ERC721TokenID string   `json:"erc721TokenId"`
-	Asset         string   `json:"asset"`
-	Hash          string   `json:"hash"`
-	RawContract   contract `json:"rawContract"`
+	Category    string   `json:"category"`
+	BlockNumber string   `json:"blockNum"`
+	From        string   `json:"from"`
+	To          string   `json:"to"`
+	Value       float64  `json:"value"`
+	TokenID     string   `json:"erc721TokenId"`
+	Amount      uint64   `json:"amount"`
+	Asset       string   `json:"asset"`
+	Hash        string   `json:"hash"`
+	RawContract contract `json:"rawContract"`
 }
 
 // contract represents a contract that is interacted with during a transfer
@@ -174,9 +176,9 @@ func getContractTransfers(pAddress, pFromBlock string, pPageNumber, pMaxCount in
 		uniqueIDs := 0
 		ids := map[string]bool{}
 		for _, tran := range result.Transfers {
-			if _, ok := ids[tran.ERC721TokenID]; !ok {
+			if _, ok := ids[tran.TokenID]; !ok {
 				uniqueIDs++
-				ids[tran.ERC721TokenID] = true
+				ids[tran.TokenID] = true
 			}
 		}
 
@@ -191,9 +193,9 @@ func getContractTransfers(pAddress, pFromBlock string, pPageNumber, pMaxCount in
 				break
 			}
 			for _, tran := range it.Transfers {
-				if _, ok := ids[tran.ERC721TokenID]; !ok {
+				if _, ok := ids[tran.TokenID]; !ok {
 					uniqueIDs++
-					ids[tran.ERC721TokenID] = true
+					ids[tran.TokenID] = true
 				}
 			}
 			result.Transfers = append(result.Transfers, it.Transfers...)
@@ -239,10 +241,9 @@ func getTokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, er
 		return "", err
 	}
 
-	i := new(big.Int)
-	_, success := i.SetString(tokenID[2:], 16)
-	if !success {
-		return "", errors.New("invalid hex string")
+	i, err := util.HexToBigInt(tokenID)
+	if err != nil {
+		return "", err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
@@ -262,13 +263,12 @@ func getTokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, er
 func getTokenMetadata(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, error) {
 
 	client := &http.Client{
-		Timeout: time.Second + (time.Millisecond * 300),
+		Timeout: time.Second * 3,
 	}
 
 	if strings.Contains(tokenURI, "data:application/json;base64,") {
 		// decode the base64 encoded json
-		noSuffix := strings.TrimSuffix(tokenURI, "==#4")
-		b64data := noSuffix[strings.IndexByte(noSuffix, ',')+1:]
+		b64data := tokenURI[strings.IndexByte(tokenURI, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(b64data)
 		if err != nil {
 			return nil, err
@@ -350,7 +350,7 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 	// spin up a goroutine for each transfer
 	for i := start; i < end; i++ {
 
-		if allTransfers[i].ERC721TokenID == "" {
+		if allTransfers[i].TokenID == "" {
 			if len(allTransfers) > end+i {
 				end++
 				continue
@@ -381,7 +381,7 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 
 	// map of token contract address + token ID => token to keep track of ownership seeing as
 	// tokens will appear more than once in the transfers
-	allTokens, finalBlockNum := receieveTransfers(tokenChan, errChan, total, logger)
+	allTokens, _ := receieveTransfers(tokenChan, errChan, total, logger)
 
 	// all the tokens owned by `address`
 	ownedTokens := []*persist.Token{}
@@ -395,33 +395,33 @@ func getTokensFromBCForWallet(pCtx context.Context, pAddress string, pPageNumber
 	}
 
 	go func() {
-		user, _ := persist.UserGetByAddress(pCtx, pAddress, pRuntime)
-		if user != nil {
-			for _, v := range allTokens {
-				v.OwnerUserID = user.ID
-			}
-		}
-		// update DB
-		if err = persist.TokenBulkUpsert(pCtx, allTokens, pRuntime); err != nil {
-			logger.WithError(err).Error("failed to upsert tokens")
-		}
-		if err = persist.AccountUpsertByAddress(pCtx, pAddress, &persist.Account{
-			Address:         pAddress,
-			LastSyncedBlock: finalBlockNum,
-		}, pRuntime); err != nil {
-			logger.WithError(err).Error("failed to update account")
-		}
-		if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
-			logger.WithError(err).Error("error updating contracts for transfers")
-		}
-		for _, v := range allTokens {
-			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
-				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
-				Action: func() error {
-					return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
-				},
-			})
-		}
+		// user, _ := persist.UserGetByAddress(pCtx, pAddress, pRuntime)
+		// if user != nil {
+		// 	for _, v := range allTokens {
+		// 		v.OwnerUserID = user.ID
+		// 	}
+		// }
+		// // update DB
+		// if err = persist.TokenBulkUpsert(pCtx, allTokens, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("failed to upsert tokens")
+		// }
+		// if err = persist.AccountUpsertByAddress(pCtx, pAddress, &persist.Account{
+		// 	Address:         pAddress,
+		// 	LastSyncedBlock: finalBlockNum,
+		// }, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("failed to update account")
+		// }
+		// if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("error updating contracts for transfers")
+		// }
+		// for _, v := range allTokens {
+		// 	pRuntime.ImageProcessingQueue.AddJob(queue.Job{
+		// 		Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
+		// 		Action: func() error {
+		// 			return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+		// 		},
+		// 	})
+		// }
 		// if pQueueUpdate {
 		// 	queueUpdateForWallet(pCtx, pRuntime.BlockchainUpdateQueue, pAddress, finalBlockNum, pRuntime)
 		// }
@@ -448,7 +448,7 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 	uris := &sync.Map{}
 
 	for i := start; i < end; i++ {
-		if allTransfers[i].ERC721TokenID == "" {
+		if allTransfers[i].TokenID == "" {
 			if len(allTransfers) > end+i {
 				end++
 				continue
@@ -468,30 +468,30 @@ func getTokensFromBCForContract(pCtx context.Context, pAddress string, pPageNumb
 	}
 
 	// map of tokenID => token
-	tokens, finalBlockNum := receieveTransfers(tokenChan, errChan, total, logger)
+	tokens, _ := receieveTransfers(tokenChan, errChan, total, logger)
 
 	go func() {
 		// update DB
-		if err = persist.TokenBulkUpsert(pCtx, tokens, pRuntime); err != nil {
-			logger.WithError(err).Error("failed to upsert tokens")
-		}
-		if err = persist.AccountUpsertByAddress(pCtx, pAddress, &persist.Account{
-			Address:         pAddress,
-			LastSyncedBlock: finalBlockNum,
-		}, pRuntime); err != nil {
-			logger.WithError(err).Error("failed to update account")
-		}
-		if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
-			logger.WithError(err).Error("error updating contracts for transfers")
-		}
-		for _, v := range tokens {
-			pRuntime.ImageProcessingQueue.AddJob(queue.Job{
-				Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
-				Action: func() error {
-					return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
-				},
-			})
-		}
+		// if err = persist.TokenBulkUpsert(pCtx, tokens, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("failed to upsert tokens")
+		// }
+		// if err = persist.AccountUpsertByAddress(pCtx, pAddress, &persist.Account{
+		// 	Address:         pAddress,
+		// 	LastSyncedBlock: finalBlockNum,
+		// }, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("failed to update account")
+		// }
+		// if err = updateContractsForTransfers(pCtx, allTransfers, pRuntime); err != nil {
+		// 	logger.WithError(err).Error("error updating contracts for transfers")
+		// }
+		// for _, v := range tokens {
+		// 	pRuntime.ImageProcessingQueue.AddJob(queue.Job{
+		// 		Name: fmt.Sprintf("image processing %s-%s", v.ContractAddress, v.TokenID),
+		// 		Action: func() error {
+		// 			return makePreviewsForToken(pCtx, v.ContractAddress, v.TokenID, pRuntime)
+		// 		},
+		// 	})
+		// }
 		// if pQueueUpdate {
 		// 	queueUpdateForContract(pCtx, pRuntime.BlockchainUpdateQueue, pAddress, finalBlockNum, pRuntime)
 		// }
@@ -516,11 +516,11 @@ func getAllTransfersForWallet(pCtx context.Context, address string, fromBlock st
 	allTransfers := append(to, from...)
 
 	sort.Slice(allTransfers, func(i, j int) bool {
-		b1, err := util.NormalizeHexInt(allTransfers[i].BlockNumber)
+		b1, err := util.HexToBigInt(allTransfers[i].BlockNumber)
 		if err != nil {
 			return false
 		}
-		b2, err := util.NormalizeHexInt(allTransfers[j].BlockNumber)
+		b2, err := util.HexToBigInt(allTransfers[j].BlockNumber)
 		if err != nil {
 			return false
 		}
@@ -554,18 +554,18 @@ func setupPagination(pPageNumber, pPageSize, pLenTotal int) (int, int, int) {
 
 func processWalletTransfer(tokenDetails *sync.Map, tran *transfer, logger *logrus.Entry, pRuntime *runtime.Runtime) (*persist.Token, string, error) {
 	// required data for a token
-	if tran.ERC721TokenID == "" {
+	if tran.TokenID == "" {
 		return nil, "", errors.New("no token ID found for token")
 	}
 	if tran.RawContract.Address == "" {
 		return nil, "", errors.New("no contract address found for token")
 	}
 
-	genericUwm, ok := tokenDetails.Load(tran.RawContract.Address + tran.ERC721TokenID)
+	genericUwm, ok := tokenDetails.Load(tran.RawContract.Address + tran.TokenID)
 	if !ok {
-		uri, err := getTokenURI(tran.RawContract.Address, tran.ERC721TokenID, pRuntime)
+		uri, err := getTokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
 		if err != nil {
-			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.ERC721TokenID}).Error(err)
+			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.TokenID}).Error(err)
 		}
 
 		metadata, err := getTokenMetadata(uri, pRuntime)
@@ -574,13 +574,13 @@ func processWalletTransfer(tokenDetails *sync.Map, tran *transfer, logger *logru
 		}
 		genericUwm = uriWithMetadata{uri, metadata}
 
-		tokenDetails.Store(tran.RawContract.Address+tran.ERC721TokenID, genericUwm)
+		tokenDetails.Store(tran.RawContract.Address+tran.TokenID, genericUwm)
 	}
 
 	uwm := genericUwm.(uriWithMetadata)
 
 	// get token ID in non-prefixed hex format from big int
-	tokenID, err := util.NormalizeHexString(tran.ERC721TokenID)
+	tokenID, err := util.NormalizeHexString(tran.TokenID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -596,6 +596,7 @@ func processWalletTransfer(tokenDetails *sync.Map, tran *transfer, logger *logru
 		OwnerAddress:    strings.ToLower(tran.To),
 		PreviousOwners:  []string{strings.ToLower(tran.From)},
 		TokenMetadata:   uwm.md,
+		Type:            persist.TokenTypeERC721,
 	}
 	return token, blockNum, nil
 }
@@ -617,11 +618,11 @@ out:
 	}
 
 	sort.Slice(allTokens, func(i, j int) bool {
-		b1, err := util.NormalizeHexInt(allTokens[i].blockNumber)
+		b1, err := util.HexToBigInt(allTokens[i].blockNumber)
 		if err != nil {
 			return false
 		}
-		b2, err := util.NormalizeHexInt(allTokens[j].blockNumber)
+		b2, err := util.HexToBigInt(allTokens[j].blockNumber)
 		if err != nil {
 			return false
 		}
@@ -650,23 +651,23 @@ out:
 
 func processContractTransfers(uris *sync.Map, tran *transfer, logger *logrus.Entry, pRuntime *runtime.Runtime) (*persist.Token, string, error) {
 
-	if tran.ERC721TokenID == "" {
+	if tran.TokenID == "" {
 		return nil, "", errors.New("no token ID found for token")
 	}
 
-	if _, ok := uris.Load(tran.ERC721TokenID); !ok {
-		uri, err := getTokenURI(tran.RawContract.Address, tran.ERC721TokenID, pRuntime)
+	if _, ok := uris.Load(tran.TokenID); !ok {
+		uri, err := getTokenURI(tran.RawContract.Address, tran.TokenID, pRuntime)
 		if err != nil {
-			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.ERC721TokenID}).Error(err)
+			logger.WithFields(logrus.Fields{"section": "GetTokenURI", "contract": tran.RawContract.Address, "tokenID": tran.TokenID}).Error(err)
 		}
 		metadata, err := getTokenMetadata(uri, pRuntime)
 		if err != nil {
 			logger.WithFields(logrus.Fields{"section": "GetTokenMetadata", "uri": uri}).Error(err)
 		}
-		uris.Store(tran.ERC721TokenID, uriWithMetadata{uri, metadata})
+		uris.Store(tran.TokenID, uriWithMetadata{uri, metadata})
 	}
 
-	tokenID, err := util.NormalizeHexString(tran.ERC721TokenID)
+	tokenID, err := util.NormalizeHexString(tran.TokenID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -676,7 +677,7 @@ func processContractTransfers(uris *sync.Map, tran *transfer, logger *logrus.Ent
 		return nil, "", err
 	}
 
-	genericURI, _ := uris.Load(tran.ERC721TokenID)
+	genericURI, _ := uris.Load(tran.TokenID)
 	uri := genericURI.(uriWithMetadata)
 
 	token := &persist.Token{
@@ -685,6 +686,7 @@ func processContractTransfers(uris *sync.Map, tran *transfer, logger *logrus.Ent
 		TokenURI:        uri.uri,
 		OwnerAddress:    strings.ToLower(tran.To),
 		PreviousOwners:  []string{strings.ToLower(tran.From)},
+		Type:            persist.TokenTypeERC721,
 		TokenMetadata:   uri.md,
 	}
 	return token, blockNum, nil
@@ -694,7 +696,7 @@ func updateContractsForTransfers(pCtx context.Context, pTranfsers []*transfer, p
 	transferToBlock := map[string]*big.Int{}
 
 	for _, tran := range pTranfsers {
-		newBlock, err := util.NormalizeHexInt(tran.BlockNumber)
+		newBlock, err := util.HexToBigInt(tran.BlockNumber)
 		if err != nil {
 			return err
 		}
@@ -756,4 +758,289 @@ func metadataToContract(metadata tokenContractMetadata, address string, blockNum
 		Symbol:          metadata.Symbol,
 		LastSyncedBlock: bn,
 	}, nil
+}
+
+func getERC1155Transfers(pCtx context.Context, pWalletAddress, fromBlock string, to, batch bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	_, err := pRuntime.InfraClients.ETHClient.BlockNumber(pCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	topics := [][]common.Hash{nil}
+	if batch {
+		topics[0] = []common.Hash{common.HexToHash("0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb")}
+	} else {
+		topics[0] = []common.Hash{common.HexToHash("0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62")}
+	}
+	// if to {
+	// 	topics[2] = nil
+	// 	topics[3] = []common.Hash{common.HexToHash("0x" + padHex(strings.TrimPrefix("0x", pWalletAddress), 64))}
+	// } else {
+	// 	topics[2] = []common.Hash{common.HexToHash("0x" + padHex(strings.TrimPrefix("0x", pWalletAddress), 64))}
+	// }
+
+	allLogs := make(chan []types.Log)
+	go func() {
+		finalBlockUint, err := pRuntime.InfraClients.ETHClient.BlockNumber(pCtx)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"section": "getERC1155Transfers", "err": err}).Error("Error getting block number")
+
+		}
+
+		finalBlock := new(big.Int).SetUint64(finalBlockUint)
+
+		curBlock, err := util.HexToBigInt(fromBlock)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"section": "getERC1155Transfers", "err": err}).Error("Error converting block number")
+
+		}
+		nextBlock := new(big.Int).Add(curBlock, big.NewInt(1800))
+		defer close(allLogs)
+		for nextBlock.Cmp(finalBlock) == -1 {
+			logsTo, err := pRuntime.InfraClients.ETHClient.FilterLogs(context.Background(), ethereum.FilterQuery{
+				FromBlock: curBlock,
+				ToBlock:   nextBlock,
+				Topics:    topics,
+			})
+			if err != nil {
+				logrus.WithError(err).Error("Error getting logs")
+				continue
+			}
+			curBlock.Add(curBlock, big.NewInt(1800))
+			nextBlock.Add(nextBlock, big.NewInt(1800))
+
+			logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
+			allLogs <- logsTo
+		}
+	}()
+
+	tokenMetadatas := &sync.Map{}
+	result := []*persist.Token{}
+	for logs := range allLogs {
+		totalLogs := len(logs)
+		transfersChan := make(chan []*persist.Token)
+		go func() {
+			for _, log := range logs {
+				if batch {
+					go func() {
+						transfers, err := processBatchTransferLog(tokenMetadatas, log, pRuntime)
+						if err != nil {
+							logrus.WithError(err).Error("Error processing batch transfer log")
+						}
+						transfersChan <- transfers
+					}()
+				} else {
+					go func() {
+						transfer, err := processSingleTransferLog(tokenMetadatas, log, pRuntime)
+						if err != nil {
+							logrus.WithError(err).Error("Error processing single transfer log")
+						}
+						if transfer != nil {
+							transfersChan <- []*persist.Token{transfer}
+						} else {
+							transfersChan <- nil
+						}
+					}()
+				}
+			}
+		}()
+		for i := 0; i < totalLogs; i++ {
+			transfers := <-transfersChan
+			if transfers != nil && len(transfers) > 0 {
+				result = append(result, transfers...)
+			}
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		asInt, err := util.HexToBigInt(result[i].LatestBlock)
+		if err != nil {
+			return false
+		}
+		bsInt, err := util.HexToBigInt(result[j].LatestBlock)
+		if err != nil {
+			return false
+		}
+		return asInt.Cmp(bsInt) == 1
+	})
+
+	final := map[string]*persist.Token{}
+	finalResult := []*persist.Token{}
+	for _, token := range result {
+		if token.Amount == 0 {
+			continue
+		}
+		if _, ok := final[token.ContractAddress+token.TokenID]; !ok {
+			final[token.ContractAddress+token.TokenID] = token
+			finalResult = append(finalResult, token)
+		}
+	}
+
+	return finalResult, nil
+}
+
+func processSingleTransferLog(pMetadatas *sync.Map, pLog types.Log, pRuntime *runtime.Runtime) (*persist.Token, error) {
+	if len(pLog.Topics) < 4 {
+		return nil, errors.New("Invalid log")
+	}
+
+	to := strings.TrimPrefix("0x", pLog.Topics[3].Hex())
+	id := new(big.Int).SetBytes(pLog.Data[:len(pLog.Data)/2])
+	amount := new(big.Int).SetBytes(pLog.Data[len(pLog.Data)/2:])
+
+	token := &persist.Token{
+		ContractAddress: strings.ToLower(pLog.Address.Hex()),
+		TokenID:         id.Text(16),
+		LatestBlock:     new(big.Int).SetUint64(pLog.BlockNumber).Text(16),
+		OwnerAddress:    to,
+		Amount:          amount.Uint64(),
+		Type:            persist.TokenTypeERC1155,
+	}
+
+	if it, ok := pMetadatas.Load(token.ContractAddress + token.TokenID); ok {
+		uwm := it.(uriWithMetadata)
+		token.TokenMetadata = uwm.md
+		token.TokenURI = uwm.uri
+	} else {
+		uri, err := getURIForERC1155Token(token.ContractAddress, token.TokenID, pRuntime)
+		if err != nil {
+			logrus.WithError(err).Error("Error getting URI for ERC1155 token")
+		}
+		token.TokenURI = uri
+
+		uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
+		metadata, err := getTokenMetadata(uriReplaced, pRuntime)
+		if err != nil {
+			logrus.WithError(err).Error("Error getting metadata for token")
+		}
+		token.TokenMetadata = metadata
+		pMetadatas.Store(token.ContractAddress+token.TokenID, uriWithMetadata{uri, metadata})
+	}
+	balance, err := getBalanceOfERC1155Token(to, token.ContractAddress, token.TokenID, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+	token.Amount = balance.Uint64()
+	return token, nil
+}
+
+func processBatchTransferLog(pMetadatas *sync.Map, pLog types.Log, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+	if len(pLog.Topics) < 4 {
+		return nil, errors.New("Invalid log")
+	}
+
+	to := strings.TrimPrefix("0x", pLog.Topics[3].Hex())
+	amountOffset := len(pLog.Data) / 2
+	total := amountOffset / 64
+	result := make([]*persist.Token, total)
+
+	for i := 0; i < total; i++ {
+		id := new(big.Int).SetBytes(pLog.Data[i*64 : (i+1)*64])
+		amount := new(big.Int).SetBytes(pLog.Data[(amountOffset)+(i*64) : (amountOffset)+((i+1)*64)])
+		token := &persist.Token{
+			ContractAddress: strings.ToLower(pLog.Address.Hex()),
+			TokenID:         id.Text(16),
+			LatestBlock:     new(big.Int).SetUint64(pLog.BlockNumber).Text(16),
+			OwnerAddress:    to,
+			Amount:          amount.Uint64(),
+			Type:            persist.TokenTypeERC1155,
+		}
+		if it, ok := pMetadatas.Load(token.ContractAddress + token.TokenID); ok {
+			uwm := it.(uriWithMetadata)
+			token.TokenMetadata = uwm.md
+			token.TokenURI = uwm.uri
+		} else {
+			uri, err := getURIForERC1155Token(token.ContractAddress, token.TokenID, pRuntime)
+			if err != nil {
+				logrus.WithError(err).Error("Error getting URI for ERC1155 token")
+			}
+			token.TokenURI = uri
+
+			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
+			metadata, err := getTokenMetadata(uriReplaced, pRuntime)
+			if err != nil {
+				logrus.WithError(err).Error("Error getting metadata for token")
+			}
+			token.TokenMetadata = metadata
+			pMetadatas.Store(token.ContractAddress+token.TokenID, uriWithMetadata{uri, metadata})
+		}
+
+		balance, err := getBalanceOfERC1155Token(to, token.ContractAddress, token.TokenID, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		token.Amount = balance.Uint64()
+		result[i] = token
+	}
+
+	return result, nil
+}
+
+// if logging all events is too large and takes too much time, start from the front and go backwards until one is found
+// given that the most recent URI event should be the current URI
+func getURIForERC1155Token(pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (string, error) {
+	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(pTokenID, 64))}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+
+	def, err := util.HexToBigInt(defaultERC721Block)
+	if err != nil {
+		return "", err
+	}
+
+	logs, err := pRuntime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
+		FromBlock: def,
+		Addresses: []common.Address{common.HexToAddress(pContractAddress)},
+		Topics:    topics,
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(logs) == 0 {
+		return "", errors.New("No logs found")
+	}
+
+	sort.Slice(logs, func(i, j int) bool {
+		return logs[i].BlockNumber > logs[j].BlockNumber
+	})
+	if len(logs[0].Data) < 128 {
+		return "", errors.New("invalid data")
+	}
+
+	offset := new(big.Int).SetBytes(logs[0].Data[:32])
+	length := new(big.Int).SetBytes(logs[0].Data[32:64])
+	uri := string(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
+	return uri, nil
+}
+
+func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (*big.Int, error) {
+	contract := common.HexToAddress(pContractAddress)
+	owner := common.HexToAddress(pOwnerAddress)
+	instance, err := contracts.NewIERC1155(contract, pRuntime.InfraClients.ETHClient)
+	if err != nil {
+		return nil, err
+	}
+
+	i, err := util.HexToBigInt(pTokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	tokenURI, err := instance.BalanceOf(&bind.CallOpts{
+		Context: ctx,
+	}, owner, i)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenURI, nil
+}
+
+func padHex(pHex string, pLength int) string {
+	for len(pHex) < pLength {
+		pHex = "0" + pHex
+	}
+	return pHex
 }

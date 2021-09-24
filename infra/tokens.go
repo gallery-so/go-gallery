@@ -10,9 +10,11 @@ import (
 	"github.com/mikeydub/go-gallery/queue"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
-const defaultBlock = "3BBAFF" // by default start at block cryptopunks started
+const defaultERC721Block = "4BB2B1" // by default start at ERC721 start
+const defaultERC1155Block = "57EA7F"
 
 type getERC721TokensInput struct {
 	Address         string `form:"address"`
@@ -52,23 +54,34 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		tokens := []*persist.Token{}
 
 		if input.Address != "" {
-			result, err := GetTokensForWallet(c, input.Address, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
+
+			res, err := getERC1155Transfers(c, input.Address, defaultERC1155Block, true, false, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
 			}
-			tokens = result
+			logrus.Infof("got %d ERC1155 transfers", len(res))
+			c.JSON(http.StatusOK, res)
+			return
+			// result, err := GetTokensForWallet(c, input.Address, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
+			// if err != nil {
+			// 	c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+			// 		Error: err.Error(),
+			// 	})
+			// 	return
+			// }
+			// tokens = result
 		} else if input.ContractAddress != "" {
-			result, err := GetTokensForContract(c, input.ContractAddress, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-					Error: err.Error(),
-				})
-				return
-			}
-			tokens = result
+			// result, err := GetTokensForContract(c, input.ContractAddress, input.PageNumber, input.MaxCount, input.SkipDB, pRuntime)
+			// if err != nil {
+			// 	c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+			// 		Error: err.Error(),
+			// 	})
+			// 	return
+			// }
+			// tokens = result
 		} else {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "wallet address or contract address required"})
 			return
@@ -83,7 +96,7 @@ func getERC721Tokens(pRuntime *runtime.Runtime) gin.HandlerFunc {
 // update of DB from the block chain, or goes straight to the block chain if the DB returns no results
 func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber, pMaxCount int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	accounts, _ := persist.AccountGetByAddress(pCtx, pWalletAddress, pRuntime)
-	lastSyncedBlock := defaultBlock
+	lastSyncedBlock := defaultERC721Block
 	if len(accounts) > 0 {
 		account := accounts[0]
 		lastSyncedBlock = account.LastSyncedBlock
@@ -133,7 +146,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 // update of DB from the block chain, or goes straight to the block chain if the DB returns no results
 func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNumber int, pMaxCount int, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 	accounts, _ := persist.ContractGetByAddress(pCtx, pContractAddress, pRuntime)
-	lastSyncedBlock := defaultBlock
+	lastSyncedBlock := defaultERC721Block
 	if len(accounts) > 0 {
 		account := accounts[0]
 		lastSyncedBlock = account.LastSyncedBlock

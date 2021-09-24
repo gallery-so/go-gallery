@@ -224,10 +224,7 @@ func newInfraClients(alchemyURL string) *InfraClients {
 		panic(err)
 	}
 
-	ethClient, err := ethclient.Dial(alchemyURL)
-	if err != nil {
-		panic(err)
-	}
+	ethClient := ethclient.NewClient(client)
 
 	return &InfraClients{
 		RPCClient: client,

@@ -16,6 +16,13 @@ const (
 	tokenColName = "tokens"
 )
 
+const (
+	// TokenTypeERC721 is the type of an ERC721 token
+	TokenTypeERC721 = "ERC-721"
+	// TokenTypeERC1155 is the type of an ERC1155 token
+	TokenTypeERC1155 = "ERC-1155"
+)
+
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
 
@@ -31,14 +38,18 @@ type Token struct {
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
 	ThumbnailURL   string `bson:"thumbnail_url" json:"thumbnail_url"`
 	PreviewURL     string `bson:"preview_url" json:"preview_url"`
+	VideoURL       string `bson:"video_url" json:"video_url"`
+	Type           string `bson:"type" json:"type"`
 
-	TokenURI       string                 `bson:"token_uri" json:"token_uri"`
-	TokenID        string                 `bson:"token_id" json:"token_id"`
-	OwnerAddress   string                 `bson:"owner_address" json:"owner_address"`
-	PreviousOwners []string               `bson:"previous_owners" json:"previous_owners"`
-	TokenMetadata  map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
+	TokenURI        string                 `bson:"token_uri" json:"token_uri"`
+	TokenID         string                 `bson:"token_id" json:"token_id"`
+	Amount          uint64                 `bson:"amount" json:"amount"`
+	OwnerAddress    string                 `bson:"owner_address" json:"owner_address"`
+	PreviousOwners  []string               `bson:"previous_owners" json:"previous_owners"`
+	TokenMetadata   map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
+	ContractAddress string                 `bson:"contract_address" json:"contract_address"`
 
-	ContractAddress string `bson:"contract_address" json:"contract_address"`
+	LatestBlock string `bson:"latest_block" json:"latest_block"`
 }
 
 // CollectionToken represents a token within a collection
@@ -63,6 +74,7 @@ type TokenUpdateInfoInput struct {
 type TokenUpdateImageURLsInput struct {
 	ThumbnailURL string `bson:"thumbnail_url" json:"thumbnail_url"`
 	PreviewURL   string `bson:"preview_url" json:"preview_url"`
+	VideoURL     string `bson:"video_url" json:"video_url"`
 }
 
 // TokenCreateBulk is a helper function to create multiple nfts in one call and returns
