@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -306,7 +307,7 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*NftDB, pWalletAddress st
 }
 
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
-func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
+func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pPage int, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
 	defer mp.cacheClose()
@@ -315,16 +316,16 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nf
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(pCtx, strings.ToLower(pWalletAddress), toCache, openseaAssetsTTL)
+	return mp.cacheSet(pCtx, fmt.Sprintf("Page-%d--%s", pPage, pWalletAddress), toCache, openseaAssetsTTL)
 }
 
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
-func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *runtime.Runtime) ([]*Nft, error) {
+func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pPage int, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
 	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
 	defer mp.cacheClose()
 
-	result, err := mp.cacheGet(pCtx, strings.ToLower(pWalletAddress))
+	result, err := mp.cacheGet(pCtx, fmt.Sprintf("Page-%d--%s", pPage, pWalletAddress))
 	if err != nil {
 		return nil, err
 	}

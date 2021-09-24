@@ -70,17 +70,17 @@ type openseaUser struct {
 	Username string `json:"username"`
 }
 
-func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddress string, skipCache bool,
+func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddress string, pPage int, pSkipCache bool,
 	pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 
-	if !skipCache {
-		nfts, err := persist.NftOpenseaCacheGet(pCtx, pOwnerWalletAddress, pRuntime)
+	if !pSkipCache {
+		nfts, err := persist.NftOpenseaCacheGet(pCtx, pOwnerWalletAddress, pPage, pRuntime)
 		if err == nil && len(nfts) > 0 {
 			return nfts, nil
 		}
 	}
 
-	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pOwnerWalletAddress)
+	openSeaAssetsForAccLst, err := openSeaFetchAssetsForAcc(pOwnerWalletAddress, pPage)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 		return nil, err
 	}
 
-	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, result, pRuntime)
+	err = persist.NftOpenseaCacheSet(pCtx, pOwnerWalletAddress, pPage, result, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +160,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NftDB, pRuntime
 	return updatedNfts, nil
 }
 
+// TODO do we need to paginate this as well?
 func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
 	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
 	events := &persist.OwnershipHistory{}
@@ -203,7 +204,7 @@ func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAdd
 	return events, nil
 }
 
-func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string) ([]*openseaAsset, error) {
+func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string, pPage int) ([]*openseaAsset, error) {
 
 	/*{
 	*	"id": 21976544,
@@ -357,8 +358,9 @@ func openSeaFetchAssetsForAcc(pOwnerWalletAddressStr string) ([]*openseaAsset, e
 	]
 	*/
 
-	offsetInt := 0
-	limitInt := 50
+	offsetInt := (pPage - 1) * 50
+	limitInt := (pPage) * 50
+
 	qsArgsMap := map[string]string{
 		"owner":           pOwnerWalletAddressStr,
 		"order_direction": "desc",
@@ -397,10 +399,8 @@ func openseaToDBNfts(pCtx context.Context, openseaNfts []*openseaAsset, pWalletA
 		}(openseaNft)
 	}
 	for i := 0; i < len(openseaNfts); i++ {
-		select {
-		case nft := <-nftChan:
-			nfts[i] = nft
-		}
+		nft := <-nftChan
+		nfts[i] = nft
 	}
 	return nfts, nil
 }

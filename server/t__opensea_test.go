@@ -41,7 +41,7 @@ func TestFetchAssertsForAcc(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Len(t, now, 1)
 
-	nfts, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15", true, tc.r)
+	nfts, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15", 1, true, tc.r)
 	assert.Nil(t, err)
 
 	nftsByUser, err := persist.NftGetByUserID(ctx, robinUserID, tc.r)

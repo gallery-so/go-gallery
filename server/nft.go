@@ -27,6 +27,7 @@ type getUnassignedNFTByUserIDInput struct {
 type getOpenseaNftsInput struct {
 	WalletAddress string `json:"address" form:"address" binding:"required"`
 	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
+	Page          int    `json:"page" form:"page"`
 }
 
 type getNftsOutput struct {
@@ -165,6 +166,10 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		if input.Page < 1 {
+			input.Page = 1
+		}
+
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
@@ -180,7 +185,7 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, userID, input.WalletAddress, input.SkipCache, pRuntime)
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, input.WalletAddress, input.Page, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
