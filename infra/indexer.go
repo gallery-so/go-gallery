@@ -34,6 +34,8 @@ const (
 	URIEventHash EventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 )
 
+// TODO do we need this if we can ensure that each log is proccessed in order
+// TODO if we remove this we can allow token processing to occur without waiting for transfers to be sorted
 type ownerAtBlock struct {
 	owner string
 	block uint64
@@ -185,14 +187,20 @@ func (i *Indexer) processLogs() {
 func (i *Indexer) processTransfers() {
 	defer i.wg.Done()
 	defer close(i.tokens)
+	count := 0
 	for transfers := range i.transfers {
+		if count%1000 == 0 {
+			logrus.Infof("Processed %d sets of transfers", count)
+			go storedDataToTokens(i)
+		}
 		logrus.Infof("Got %d transfers", len(transfers))
 		for _, transfer := range transfers {
 			go processTransfer(i, transfer)
 		}
+		count++
 	}
 	logrus.Info("Transfer channel closed")
-	transfersToTokens(i)
+	storedDataToTokens(i)
 	logrus.Info("Done processing transfers, closing tokens channel")
 }
 
@@ -275,11 +283,11 @@ func (i *Indexer) handleDone() {
 		select {
 		case <-i.cancel:
 			logrus.Warn("CANCELLING")
-			i.done <- true
 			return
 		case <-i.done:
 			logrus.Info("STATE ", i.state)
 			i.writeStats()
+			// TODO start subscribing to events starting from last block
 			return
 		}
 	}
@@ -294,8 +302,9 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	}
 	key := transfer.RawContract.Address + "--" + transfer.TokenID
 	logrus.Infof("Processing transfer %s", key)
-	i.mu.Lock()
 
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	tokenType, ok := i.types[key]
 	if !ok {
 		i.types[key] = transfer.Type
@@ -314,7 +323,6 @@ func processTransfer(i *Indexer, transfer *transfer) {
 					it.block = bn.Uint64()
 					it.owner = transfer.To
 				}
-				i.previousOwners[key] = append(i.previousOwners[key], it)
 			}
 		} else {
 			i.owners[key] = ownerAtBlock{transfer.From, bn.Uint64()}
@@ -375,11 +383,11 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		}
 		i.metadatas[key] = metadata
 	}
-	i.mu.Unlock()
 }
 
-func transfersToTokens(i *Indexer) {
+func storedDataToTokens(i *Indexer) {
 	i.mu.RLock()
+	defer i.mu.RUnlock()
 	for k, v := range i.owners {
 		spl := strings.Split(k, "--")
 		if len(spl) != 2 {
@@ -425,7 +433,6 @@ func transfersToTokens(i *Indexer) {
 			i.tokens <- token
 		}
 	}
-	i.mu.RUnlock()
 }
 
 func logToTransfer(pLog types.Log) []*transfer {
@@ -492,13 +499,13 @@ func logToTransfer(pLog types.Log) []*transfer {
 		}
 		return result
 	default:
-		panic("unknown event hash")
+		return nil
 	}
 }
 
 func (i *Indexer) writeStats() {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+	i.mu.RLock()
+	defer i.mu.RUnlock()
 
 	fi, err := os.Create(fmt.Sprintf("%s-%s.txt", i.statsFile, time.Now().Format("2006-01-02-15-04-05")))
 	if err != nil {
