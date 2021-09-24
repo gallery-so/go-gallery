@@ -68,6 +68,7 @@ type Indexer struct {
 	eventHashes []EventHash
 
 	lastSyncedBlock uint64
+	mostRecentBlock uint64
 	statsFile       string
 
 	logs          chan []types.Log
@@ -124,7 +125,6 @@ func (i *Indexer) Start() {
 	go i.processTransfers()
 	go i.processTokens()
 	go i.processContracts()
-	go i.subscribeNewLogs()
 	go i.handleDone()
 	i.wg.Wait()
 }
@@ -132,14 +132,11 @@ func (i *Indexer) Start() {
 func (i *Indexer) processLogs() {
 	defer i.wg.Done()
 	defer close(i.transfers)
-	finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
-	if err != nil {
-		logrus.Errorf("failed to get block number: %v", err)
-		atomic.StoreInt64(&i.state, -1)
-		i.done <- true
-	}
+	defer func() {
+		go i.subscribeNewLogs()
+	}()
 
-	logrus.Infof("final block number: %v", finalBlockUint)
+	go checkForNewBlocks(i)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -148,13 +145,11 @@ func (i *Indexer) processLogs() {
 
 	topics := [][]common.Hash{events}
 
-	finalBlock := new(big.Int).SetUint64(finalBlockUint)
-
 	go func() {
 		defer close(i.logs)
 		curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
 		nextBlock := new(big.Int).Add(curBlock, big.NewInt(1800))
-		for nextBlock.Cmp(finalBlock) == -1 {
+		for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
 			logsTo, err := i.runtime.InfraClients.ETHClient.FilterLogs(context.Background(), ethereum.FilterQuery{
 				FromBlock: curBlock,
 				ToBlock:   nextBlock,
@@ -519,4 +514,19 @@ func (i *Indexer) writeStats() {
 	fi.WriteString(fmt.Sprintf("Total Tokens with URI: %d\n", len(i.uris)))
 	fi.WriteString(fmt.Sprintf("Total Tokens with Metadata: %d\n", len(i.metadatas)))
 	fi.WriteString(fmt.Sprintf("Last Block Number: %d", i.lastSyncedBlock))
+}
+
+func checkForNewBlocks(i *Indexer) {
+	for {
+		finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
+		if err != nil {
+			logrus.Errorf("failed to get block number: %v", err)
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- true
+		}
+		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
+		logrus.Infof("final block number: %v", finalBlockUint)
+		time.Sleep(time.Minute)
+	}
+
 }
