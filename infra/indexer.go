@@ -133,6 +133,8 @@ func (i *Indexer) processLogs() {
 		i.done <- true
 	}
 
+	logrus.Infof("final block number: %v", finalBlockUint)
+
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
 		events[i] = common.HexToHash(string(event))
