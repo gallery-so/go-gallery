@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/mikeydub/go-gallery/queue"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
@@ -35,14 +34,12 @@ const (
 
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
-	Config                *Config
-	DB                    *DB
-	Router                *gin.Engine
-	InfraClients          *InfraClients
-	BlockchainUpdateQueue *queue.Queue
-	ImageProcessingQueue  *queue.Queue
-	IPFS                  *ipfs.Shell
-	Cancel                chan os.Signal
+	Config       *Config
+	DB           *DB
+	Router       *gin.Engine
+	InfraClients *InfraClients
+	IPFS         *ipfs.Shell
+	Cancel       chan os.Signal
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -87,12 +84,10 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 
 	// RUNTIME
 	runtime := &Runtime{
-		Config:                pConfig,
-		DB:                    db,
-		BlockchainUpdateQueue: queue.NewQueue("blockchain-updates"),
-		ImageProcessingQueue:  queue.NewQueue("image-processing"),
-		IPFS:                  newIPFSShell(pConfig.IPFSURL),
-		Cancel:                make(chan os.Signal),
+		Config: pConfig,
+		DB:     db,
+		IPFS:   newIPFSShell(pConfig.IPFSURL),
+		Cancel: make(chan os.Signal),
 	}
 	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
 
@@ -112,7 +107,6 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	}
 	log.Info("redis connected! ✅")
 
-	startWorkers([]*queue.Queue{runtime.BlockchainUpdateQueue, runtime.ImageProcessingQueue})
 	log.Info("async workers started! ✅")
 
 	return runtime, nil
@@ -226,7 +220,9 @@ func connectMongo(pMongoURL string,
 }
 
 func newInfraClients(alchemyURL string) *InfraClients {
-	client, err := rpc.Dial(alchemyURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := rpc.DialContext(ctx, alchemyURL)
 	if err != nil {
 		panic(err)
 	}
@@ -236,12 +232,6 @@ func newInfraClients(alchemyURL string) *InfraClients {
 	return &InfraClients{
 		RPCClient: client,
 		ETHClient: ethClient,
-	}
-}
-
-func startWorkers(queues []*queue.Queue) {
-	for _, q := range queues {
-		go q.DoWork()
 	}
 }
 

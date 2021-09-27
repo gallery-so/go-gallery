@@ -49,7 +49,7 @@ type Token struct {
 	TokenMetadata   map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 	ContractAddress string                 `bson:"contract_address" json:"contract_address"`
 
-	LatestBlock string `bson:"latest_block" json:"latest_block"`
+	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
 }
 
 // CollectionToken represents a token within a collection

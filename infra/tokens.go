@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/queue"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -111,16 +110,7 @@ func GetTokensForWallet(pCtx context.Context, pWalletAddress string, pPageNumber
 
 			return result, nil
 		}
-		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
-			Name: "update wallet tokens",
-			Action: func() error {
-				_, err := getERC721sForWallet(pCtx, pWalletAddress, 0, 0, lastSyncedBlock, false, pRuntime)
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		})
+
 		return result[:pMaxCount], nil
 	}
 	result, err := getERC721sForWallet(pCtx, pWalletAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)
@@ -161,16 +151,7 @@ func GetTokensForContract(pCtx context.Context, pContractAddress string, pPageNu
 
 			return result, nil
 		}
-		pRuntime.BlockchainUpdateQueue.AddJob(queue.Job{
-			Name: "update wallet tokens",
-			Action: func() error {
-				_, err := getERC721sForContract(pCtx, pContractAddress, 0, 0, lastSyncedBlock, false, pRuntime)
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		})
+
 		return result[:pMaxCount], nil
 	}
 	result, err := getERC721sForContract(pCtx, pContractAddress, pPageNumber, pMaxCount, lastSyncedBlock, true, pRuntime)

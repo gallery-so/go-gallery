@@ -24,6 +24,10 @@ import (
 	"google.golang.org/appengine/image"
 )
 
+type media struct {
+	persist.TokenUpdateImageURLsInput
+}
+
 func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) error {
 	tokens, err := persist.TokenGetByNFTIdentifiers(pCtx, tokenID, contractAddress, pRuntime)
 	if err != nil {
@@ -76,6 +80,48 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 	logrus.WithFields(logrus.Fields{"token": token.ID, "servingURL": imageURL}).Info("processImagesForToken")
 
 	return persist.TokenUpdateByID(pCtx, token.ID, update, pRuntime)
+}
+
+func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, tokenURI string, pRuntime *runtime.Runtime) (media, error) {
+
+	url := ""
+
+	if it, ok := metadata["image"]; ok {
+		url = it.(string)
+	} else if it, ok := metadata["image_url"]; ok {
+		url = it.(string)
+	} else if it, ok := metadata["video_url"]; ok {
+		url = it.(string)
+	} else if it, ok := metadata["animation_url"]; ok {
+		url = it.(string)
+	}
+
+	if url == "" {
+		url = tokenURI
+	}
+
+	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
+
+	err := downloadAndCache(pCtx, url, name, pRuntime)
+	if err != nil {
+		return media{}, err
+	}
+	res := media{}
+
+	imageURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
+	if err == nil {
+		res.ThumbnailURL = imageURL + "=s256"
+		res.PreviewURL = imageURL + "=s1024"
+	}
+
+	videoURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("video-%s", name))
+	if err == nil {
+		res.VideoURL = videoURL
+	}
+
+	logrus.WithFields(logrus.Fields{"token": name, "servingURL": imageURL}).Info("processImagesForToken")
+
+	return res, nil
 }
 
 func cacheRawMedia(pCtx context.Context, image []byte, bucket, fileName string) error {

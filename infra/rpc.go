@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/queue"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -245,6 +244,7 @@ func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (stri
 	if err != nil {
 		return "", err
 	}
+	logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
@@ -728,25 +728,6 @@ func updateContractsForTransfers(pCtx context.Context, pTranfsers []*transfer, p
 	return nil
 }
 
-func queueUpdateForWallet(pCtx context.Context, pQueue *queue.Queue, pWalletAddress string, pLastBlock string, pRuntime *runtime.Runtime) {
-	pQueue.AddJob(queue.Job{
-		Name: "UpdateWallet",
-		Action: func() error {
-			_, err := getERC721sForWallet(pCtx, pWalletAddress, 0, 0, pLastBlock, false, pRuntime)
-			return err
-		},
-	})
-}
-func queueUpdateForContract(pCtx context.Context, pQueue *queue.Queue, pContractAddress string, pLastBlock string, pRuntime *runtime.Runtime) {
-	pQueue.AddJob(queue.Job{
-		Name: "UpdateContract",
-		Action: func() error {
-			_, err := getERC721sForContract(pCtx, pContractAddress, 0, 0, pLastBlock, false, pRuntime)
-			return err
-		},
-	})
-}
-
 func metadataToContract(metadata tokenContractMetadata, address string, blockNum string) (*persist.Contract, error) {
 	bn, err := util.NormalizeHexString(blockNum)
 	if err != nil {
@@ -762,7 +743,7 @@ func metadataToContract(metadata tokenContractMetadata, address string, blockNum
 
 // if logging all events is too large and takes too much time, start from the front and go backwards until one is found
 // given that the most recent URI event should be the current URI
-func getURIForERC1155Token(pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (string, error) {
+func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (string, error) {
 	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(pTokenID, 64))}}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
