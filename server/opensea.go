@@ -89,7 +89,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 		pOwnerWalletAddresses = user.Addresses
 	}
 
-	openSeaAssetsForAccLst, err := openseaFetchAssetsForWallets(pOwnerWalletAddresses)
+	openSeaAssetsForAccLst, err := openseaFetchAssetsForWallets(pOwnerWalletAddresses, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -206,10 +206,10 @@ func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAdd
 	return events, nil
 }
 
-func openseaFetchAssetsForWallets(pWalletAddresses []string) ([]*openseaAsset, error) {
+func openseaFetchAssetsForWallets(pWalletAddresses []string, pRuntime *runtime.Runtime) ([]*openseaAsset, error) {
 	result := []*openseaAsset{}
 	for _, walletAddress := range pWalletAddresses {
-		assets, err := openseaFetchAssetsForWallet(walletAddress, 0)
+		assets, err := openseaFetchAssetsForWallet(walletAddress, 0, pRuntime)
 		if err != nil {
 			return nil, err
 		}
@@ -220,13 +220,13 @@ func openseaFetchAssetsForWallets(pWalletAddresses []string) ([]*openseaAsset, e
 }
 
 // recursively fetches all assets for a wallet
-func openseaFetchAssetsForWallet(pWalletAddress string, offset int) ([]*openseaAsset, error) {
+func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int, pRuntime *runtime.Runtime) ([]*openseaAsset, error) {
 
 	result := []*openseaAsset{}
 	qsArgsMap := map[string]string{
 		"owner":           pWalletAddress,
 		"order_direction": "desc",
-		"offset":          fmt.Sprintf("%d", offset),
+		"offset":          fmt.Sprintf("%d", pOffset),
 		"limit":           fmt.Sprintf("%d", 50),
 	}
 
@@ -237,7 +237,14 @@ func openseaFetchAssetsForWallet(pWalletAddress string, offset int) ([]*openseaA
 	qsStr := strings.Join(qsLst, "&")
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?%s", qsStr)
 
-	resp, err := http.Get(urlStr)
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	if pRuntime.Config.OpenseaAPIKey != "" {
+		req.Header.Set("X-API-KEY", pRuntime.Config.OpenseaAPIKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +256,7 @@ func openseaFetchAssetsForWallet(pWalletAddress string, offset int) ([]*openseaA
 	}
 	result = append(result, response.Assets...)
 	if len(response.Assets) == 50 {
-		next, err := openseaFetchAssetsForWallet(pWalletAddress, offset+50)
+		next, err := openseaFetchAssetsForWallet(pWalletAddress, pOffset+50, pRuntime)
 		if err != nil {
 			return nil, err
 		}
