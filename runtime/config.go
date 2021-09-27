@@ -19,8 +19,12 @@ const (
 
 	gcloudTokenBucket = "GCLOUD_TOKEN_BUCKET"
 
-	alchemyURL = "ALCHEMY_URL"
-	ipfsURL    = "IPFS_URL"
+	awsManagedBlockChainURL = "AWS_MANAGED_BLOCKCHAIN_URL"
+	awsAccessKeyID          = "AWS_ACCESS_KEY_ID"
+	awsSecretAccessKey      = "AWS_SECRET_ACCESS_KEY"
+
+	rpcURL  = "RPC_URL"
+	ipfsURL = "IPFS_URL"
 
 	mongoURLSecretName = "MONGO_URL_SECRET_NAME"
 	mongoTLSSecretName = "MONGO_TLS_SECRET_NAME"
@@ -35,16 +39,19 @@ const (
 
 // Config represents an application configuration that is determined at runtime start
 type Config struct {
-	Env            string
-	InfraEnv       string
-	BaseURL        string
-	InfraBaseURL   string
-	Port           int
-	InfraPort      int
-	PortMetrics    int
-	AllowedOrigins string
-	AlchemyURL     string
-	IPFSURL        string
+	Env                     string
+	InfraEnv                string
+	BaseURL                 string
+	InfraBaseURL            string
+	Port                    int
+	InfraPort               int
+	PortMetrics             int
+	AllowedOrigins          string
+	RPCURL                  string
+	IPFSURL                 string
+	AWSManagedBlockchainURL string
+	AWSSecretAccessKey      string
+	AWSAccessKeyID          string
 
 	GCloudTokenContentBucket string
 
@@ -72,7 +79,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(infraPort, 5000)
 	viper.SetDefault(portMetrics, 4000)
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
-	viper.SetDefault(alchemyURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault(rpcURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault(ipfsURL, "https://ipfs.io")
 	viper.SetDefault(gcloudTokenBucket, "token-bucket")
 
@@ -112,9 +119,10 @@ func ConfigLoad() *Config {
 		InfraPort:                viper.GetInt(infraPort),
 		PortMetrics:              viper.GetInt(portMetrics),
 		AllowedOrigins:           viper.GetString(allowedOrigins),
-		AlchemyURL:               viper.GetString(alchemyURL),
+		RPCURL:                   viper.GetString(rpcURL),
 		IPFSURL:                  viper.GetString(ipfsURL),
 		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
+		AWSManagedBlockchainURL:  viper.GetString(awsManagedBlockChainURL),
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 

@@ -66,35 +66,33 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	// log.SetLevel(log.WarnLevel)
 	log.SetLevel(log.DebugLevel)
 
+	// RUNTIME
+	runtime := &Runtime{
+		Config: pConfig,
+		IPFS:   newIPFSShell(pConfig.IPFSURL),
+		Cancel: make(chan os.Signal),
+	}
+	runtime.newInfraClients()
 	//------------------
 	// DB
 
 	mongoURLstr := pConfig.MongoURL
 
-	db, err := dbInit(mongoURLstr, pConfig)
+	err := runtime.dbInit(mongoURLstr, pConfig)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = setupMongoIndexes(db.MongoClient.Database(GalleryDBName))
+	err = runtime.setupMongoIndexes()
 	if err != nil {
 		return nil, err
 	}
-
-	// RUNTIME
-	runtime := &Runtime{
-		Config: pConfig,
-		DB:     db,
-		IPFS:   newIPFSShell(pConfig.IPFSURL),
-		Cancel: make(chan os.Signal),
-	}
-	runtime.InfraClients = newInfraClients(pConfig.AlchemyURL)
 
 	log.Info("RPC, ETH, and IPFS clients connected! ✅")
 
 	// notify cancel channel when SIGINT or SIGTERM is received
-	notifyOnCancel(runtime.Cancel)
+	runtime.notifyOnCancel()
 
 	// TEST REDIS CONNECTION
 	client := redis.NewClient(&redis.Options{
@@ -102,18 +100,18 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		Password: pConfig.RedisPassword,
 		DB:       0,
 	})
+
 	if err = client.Ping().Err(); err != nil {
 		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, pConfig.RedisURL)
 	}
-	log.Info("redis connected! ✅")
-
-	log.Info("async workers started! ✅")
+	log.Info("redis working! ✅")
 
 	return runtime, nil
 }
 
-func dbInit(pMongoURLstr string,
-	pConfig *Config) (*DB, error) {
+func (r *Runtime) dbInit(pMongoURLstr string,
+	pConfig *Config) error {
+	r.DB = &DB{}
 
 	log.WithFields(log.Fields{}).Info("connecting to mongo...")
 
@@ -121,26 +119,22 @@ func dbInit(pMongoURLstr string,
 	if pConfig.MongoUseTLS {
 		tlsCerts, err := accessSecret(context.Background(), viper.GetString(mongoTLSSecretName))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		tlsConf, err = dbGetCustomTLSConfig(tlsCerts)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	mongoClient, err := connectMongo(pMongoURLstr, tlsConf)
+	err := r.connectMongo(pMongoURLstr, tlsConf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	log.Info("mongo connected! ✅")
+	r.DB.GalleryDB = r.DB.MongoClient.Database(GalleryDBName)
+	r.DB.InfraDB = r.DB.MongoClient.Database(InfraDBName)
 
-	db := &DB{
-		MongoClient: mongoClient,
-		GalleryDB:   mongoClient.Database(GalleryDBName),
-		InfraDB:     mongoClient.Database(InfraDBName),
-	}
-
-	return db, nil
+	return nil
 }
 
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
@@ -156,9 +150,9 @@ func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func setupMongoIndexes(db *mongo.Database) error {
+func (r *Runtime) setupMongoIndexes() error {
 	b := true
-	db.Collection("users").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	r.DB.GalleryDB.Collection("users").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
 		Keys: bson.M{"username_idempotent": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,
@@ -174,14 +168,14 @@ func setupMongoIndexes(db *mongo.Database) error {
 	// db.Collection("tokens").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
 	// 	Keys: bson.M{"last_updated": -1},
 	// })
-	db.Collection("accounts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	r.DB.GalleryDB.Collection("accounts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
 		Keys: bson.M{"address": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,
 			Sparse: &b,
 		},
 	})
-	db.Collection("contracts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	r.DB.GalleryDB.Collection("contracts").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
 		Keys: bson.M{"address": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,
@@ -192,9 +186,7 @@ func setupMongoIndexes(db *mongo.Database) error {
 	return nil
 }
 
-func connectMongo(pMongoURL string,
-	pTLS *tls.Config,
-) (*mongo.Client, error) {
+func (r *Runtime) connectMongo(pMongoURL string, pTLS *tls.Config) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 	defer cancel()
@@ -208,28 +200,35 @@ func connectMongo(pMongoURL string,
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = mClient.Ping(ctx, readpref.Primary())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return mClient, nil
+	r.DB.MongoClient = mClient
+	return nil
 }
 
-func newInfraClients(alchemyURL string) *InfraClients {
+func (r *Runtime) newInfraClients() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	client, err := rpc.DialContext(ctx, alchemyURL)
+	client, err := rpc.DialContext(ctx, r.Config.RPCURL)
 	if err != nil {
 		panic(err)
 	}
 
+	if r.Config.RPCURL == r.Config.AWSManagedBlockchainURL {
+		amz, auth := createAWSSigV4Headers(time.Now(), r)
+		client.SetHeader("Authorization", auth)
+		client.SetHeader("x-amz-date", amz)
+	}
+
 	ethClient := ethclient.NewClient(client)
 
-	return &InfraClients{
+	r.InfraClients = &InfraClients{
 		RPCClient: client,
 		ETHClient: ethClient,
 	}
@@ -241,6 +240,6 @@ func newIPFSShell(url string) *ipfs.Shell {
 	return sh
 }
 
-func notifyOnCancel(cancelChan chan os.Signal) {
-	signal.Notify(cancelChan, syscall.SIGINT, syscall.SIGTERM)
+func (r *Runtime) notifyOnCancel() {
+	signal.Notify(r.Cancel, syscall.SIGINT, syscall.SIGTERM)
 }
