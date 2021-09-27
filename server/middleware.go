@@ -89,7 +89,7 @@ func handleCORS(runtimeConfig *runtime.Config) gin.HandlerFunc {
 		requestOrigin := c.Request.Header.Get("Origin")
 		allowedOrigins := strings.Split(runtimeConfig.AllowedOrigins, ",")
 
-		if util.Contains(allowedOrigins, requestOrigin) {
+		if util.Contains(allowedOrigins, requestOrigin) || strings.HasPrefix(requestOrigin, "https://gallery-git") {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 
