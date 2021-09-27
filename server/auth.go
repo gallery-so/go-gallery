@@ -270,7 +270,12 @@ func authVerifySignature(pSignatureStr string,
 	if err != nil {
 		return false, err
 	}
-	if sig[64] != 27 && sig[64] != 28 {
+	// Ledger-produced signatures have v = 0 or 1
+	if sig[64] == 0 || sig[64] == 1 {
+		sig[64] += 27
+	}
+	v := sig[64]
+	if v != 27 && v != 28 {
 		return false, errors.New("invalid signature (V is not 27 or 28)")
 	}
 	sig[64] -= 27
