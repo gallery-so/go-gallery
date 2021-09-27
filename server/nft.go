@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
@@ -25,8 +26,9 @@ type getUnassignedNFTByUserIDInput struct {
 }
 
 type getOpenseaNftsInput struct {
-	WalletAddress string `json:"address" form:"address" binding:"required"`
-	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
+	// Comma separated list of wallet addresses
+	WalletAddresses string `json:"addresses" form:"addresses"`
+	SkipCache       bool   `json:"skip_cache" form:"skip_cache"`
 }
 
 type getNftsOutput struct {
@@ -170,17 +172,21 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
-		ownsWallet, err := doesUserOwnWallet(c, userID, input.WalletAddress, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
-			return
-		}
-		if !ownsWallet {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user does not own wallet"})
-			return
+
+		addresses := strings.Split(input.WalletAddresses, ",")
+		if len(addresses) > 0 {
+			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				return
+			}
+			if !ownsWallet {
+				c.JSON(http.StatusBadRequest, errorResponse{Error: "user does not own wallet"})
+				return
+			}
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, userID, input.WalletAddress, input.SkipCache, pRuntime)
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
@@ -189,10 +195,15 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func doesUserOwnWallet(pCtx context.Context, userID persist.DBID, walletAddress string, pRuntime *runtime.Runtime) (bool, error) {
+func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, pRuntime *runtime.Runtime) (bool, error) {
 	user, err := persist.UserGetByID(pCtx, userID, pRuntime)
 	if err != nil {
 		return false, err
 	}
-	return util.Contains(user.Addresses, walletAddress), nil
+	for _, walletAddress := range walletAddresses {
+		if !util.Contains(user.Addresses, walletAddress) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
