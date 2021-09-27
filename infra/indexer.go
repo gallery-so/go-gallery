@@ -174,9 +174,12 @@ func (i *Indexer) processLogs() {
 
 		defer close(i.logs)
 		curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
-		nextBlock := new(big.Int).Add(curBlock, big.NewInt(1800))
+		nextBlock := new(big.Int).Add(curBlock, big.NewInt(2000))
+		backedUp := int64(0)
 		for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			logsTo, err := i.runtime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
 				FromBlock: curBlock,
 				ToBlock:   nextBlock,
@@ -185,17 +188,23 @@ func (i *Indexer) processLogs() {
 			cancel()
 			if err != nil {
 				logrus.WithError(err).Error("Error getting logs, trying again")
+				nextBlock.Sub(nextBlock, big.NewInt(250))
+				backedUp += 250
 				continue
 			}
 			logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
+
 			i.logs <- logsTo
+
 			i.mu.Lock()
 			i.lastSyncedBlock = curBlock.Uint64()
 			i.mu.Unlock()
-			curBlock.Add(curBlock, big.NewInt(1800))
-			nextBlock.Add(nextBlock, big.NewInt(1800))
 
-			logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
+			curBlock.Add(curBlock, big.NewInt(2000))
+			nextBlock.Add(nextBlock, big.NewInt(2000))
+			nextBlock.Add(nextBlock, big.NewInt(backedUp))
+
+			backedUp = 0
 		}
 	}()
 
