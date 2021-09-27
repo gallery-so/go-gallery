@@ -214,7 +214,7 @@ func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		err := removeAddressesToUserDB(c, userID, input, pRuntime)
+		err := removeAddressesFromUserDB(c, userID, input, pRuntime)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -325,7 +325,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	return output, nil
 }
-func removeAddressesToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
 	pRuntime *runtime.Runtime) error {
 
 	user, err := persist.UserGetByID(pCtx, pUserID, pRuntime)
@@ -336,7 +336,11 @@ func removeAddressesToUserDB(pCtx context.Context, pUserID persist.DBID, pInput 
 		return errors.New("user does not have enough addresses to remove")
 	}
 
-	return persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	err = persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	if err != nil {
+		return err
+	}
+	return persist.CollRemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
 }
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
