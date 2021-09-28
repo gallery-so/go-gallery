@@ -121,6 +121,8 @@ func ConfigLoad() *Config {
 		IPFSURL:                  viper.GetString(ipfsURL),
 		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
 		AWSManagedBlockchainURL:  viper.GetString(awsManagedBlockChainURL),
+		AWSSecretAccessKey:       viper.GetString(awsSecretAccessKey),
+		AWSAccessKeyID:           viper.GetString(awsAccessKeyID),
 
 		MongoUseTLS:   viper.GetBool(mongoUseTLS),
 		OpenseaAPIKey: viper.GetString(openseaAPIKey),

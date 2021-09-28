@@ -3,10 +3,9 @@ package runtime
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"fmt"
 	"strings"
 	"time"
-
-	"github.com/spf13/viper"
 )
 
 const (
@@ -29,10 +28,11 @@ func getAWSSigKey(k string, t time.Time) []byte {
 }
 
 func createAWSSigV4Headers(t time.Time, pRuntime *Runtime) (string, string) {
+
 	amz := t.Format("20060102T150405Z")
 	canonicalURI := "/"
 	canonicalQueryString := ""
-	canonicalHeaders := "host:" + strings.TrimSuffix("https://", viper.GetString(pRuntime.Config.AWSManagedBlockchainURL)) + "\n" + "x-amz-date:" + amz + "\n"
+	canonicalHeaders := "host:" + strings.TrimSuffix("https://", pRuntime.Config.AWSManagedBlockchainURL) + "\n" + "x-amz-date:" + amz + "\n"
 	signedHeaders := "host;x-amz-date"
 	payloadHash := sha256.New().Sum([]byte(""))
 	canonicalRequest := method + "\n" + canonicalURI + "\n" + canonicalQueryString + "\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + string(payloadHash)
@@ -42,6 +42,6 @@ func createAWSSigV4Headers(t time.Time, pRuntime *Runtime) (string, string) {
 	stringToSign := signMethod + "\n" + amz + "\n" + credentialScope + "\n" + canonicalRequest
 	signingKey := getAWSSigKey(pRuntime.Config.AWSSecretAccessKey, t)
 	sig := hmacSign(signingKey, stringToSign)
-	authHeader := "AWS4-HMAC-SHA256 Credential=" + pRuntime.Config.AWSAccessKeyID + "/" + credentialScope + ",SignedHeaders=host;x-amz-date" + ",Signature=" + string(sig)
+	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", pRuntime.Config.AWSAccessKeyID, credentialScope, signedHeaders, string(sig))
 	return amz, authHeader
 }
