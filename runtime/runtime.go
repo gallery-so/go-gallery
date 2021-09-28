@@ -19,10 +19,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RedisDB represents the database number to use for the redis client
+type RedisDB int
+
+const (
+	// CollUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
+	CollUnassignedRDB RedisDB = iota
+	// OpenseaRDB is a throttled cache for expensive queries finding Opensea NFTs
+	OpenseaRDB
+)
+
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
 	Config *Config
 	DB     *DB
+	Redis  *Redis
 	Router *gin.Engine
 }
 
@@ -30,6 +41,12 @@ type Runtime struct {
 type DB struct {
 	MongoClient *mongo.Client
 	MongoDB     *mongo.Database
+}
+
+// Redis represents the redis clients throughout the application
+type Redis struct {
+	OpenseaClient    *redis.Client
+	UnassignedClient *redis.Client
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -69,15 +86,7 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		DB:     db,
 	}
 
-	// TEST REDIS CONNECTION
-	client := redis.NewClient(&redis.Options{
-		Addr:     runtime.Config.RedisURL,
-		Password: runtime.Config.RedisPassword,
-		DB:       0,
-	})
-	if err = client.Ping().Err(); err != nil {
-		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, runtime.Config.RedisURL)
-	}
+	runtime.setupRedis()
 	log.Info("redis connected! ✅")
 
 	return runtime, nil
@@ -114,6 +123,29 @@ func dbInit(pMongoURLstr string,
 	}
 
 	return db, nil
+}
+
+func (r *Runtime) setupRedis() {
+	opensea := redis.NewClient(&redis.Options{
+		Addr:     r.Config.RedisURL,
+		Password: r.Config.RedisPassword,
+		DB:       int(OpenseaRDB),
+	})
+	if err := opensea.Ping().Err(); err != nil {
+		panic(err)
+	}
+	unassigned := redis.NewClient(&redis.Options{
+		Addr:     r.Config.RedisURL,
+		Password: r.Config.RedisPassword,
+		DB:       int(CollUnassignedRDB),
+	})
+	if err := unassigned.Ping().Err(); err != nil {
+		panic(err)
+	}
+	r.Redis = &Redis{
+		OpenseaClient:    opensea,
+		UnassignedClient: unassigned,
+	}
 }
 
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {

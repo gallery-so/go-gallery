@@ -308,23 +308,21 @@ func NftRemoveDifference(pCtx context.Context, pNfts []*NftDB, pWalletAddress st
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
 func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, nftColName, pRuntime)
 
 	toCache, err := json.Marshal(pNfts)
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(pCtx, strings.ToLower(pWalletAddress), toCache, openseaAssetsTTL)
+	return mp.cacheSet(runtime.OpenseaRDB, strings.ToLower(pWalletAddress), toCache, openseaAssetsTTL)
 }
 
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
 func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, nftColName, pRuntime)
 
-	result, err := mp.cacheGet(pCtx, strings.ToLower(pWalletAddress))
+	result, err := mp.cacheGet(runtime.OpenseaRDB, strings.ToLower(pWalletAddress))
 	if err != nil {
 		return nil, err
 	}

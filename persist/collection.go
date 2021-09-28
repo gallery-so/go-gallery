@@ -81,7 +81,7 @@ type CollectionUpdateDeletedInput struct {
 func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -97,7 +97,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 		}
 	}
 
-	if err := mp.cacheDelete(pCtx, string(pColl.OwnerUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pColl.OwnerUserID)); err != nil {
 		return "", err
 	}
 
@@ -167,9 +167,9 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
-	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
@@ -184,7 +184,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -192,7 +192,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 		}
 	}
 
-	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -205,7 +205,7 @@ func CollClaimNFTs(pCtx context.Context,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -219,7 +219,7 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -232,10 +232,10 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pUserID DBID,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	mp := newStorage(0, collectionColName, pRuntime)
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
-	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -252,13 +252,12 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 		opts.SetMaxTime(dur)
 	}
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	result := []*Collection{}
 
 	if !skipCache {
-		if cachedResult, err := mp.cacheGet(pCtx, string(pUserID)); err == nil && cachedResult != "" {
+		if cachedResult, err := mp.cacheGet(runtime.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
 			err = json.Unmarshal([]byte(cachedResult), &result)
 			if err != nil {
 				return nil, err
@@ -297,7 +296,7 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 		return nil, err
 	}
 
-	if err := mp.cacheSet(pCtx, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
+	if err := mp.cacheSet(runtime.CollUnassignedRDB, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
 		return nil, err
 	}
 
