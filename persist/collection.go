@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -202,6 +203,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 // CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func CollClaimNFTs(pCtx context.Context,
 	pUserID DBID,
+	pWalletAddresses []string,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
@@ -213,13 +215,46 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
+	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
 	}
 
 	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CollRemoveNFTsOfAddresses will remove all NFTs from a user's collections that are associated with
+// an array of addresses
+func CollRemoveNFTsOfAddresses(pCtx context.Context,
+	pUserID DBID,
+	pAddresses []string,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
+
+	for i, addr := range pAddresses {
+		pAddresses[i] = strings.ToLower(addr)
+	}
+
+	nmp := newStorage(0, nftColName, pRuntime)
+	res := []*NftDB{}
+	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &res)
+	ids := make([]DBID, len(res))
+	for i, nft := range res {
+		ids[i] = nft.ID
+	}
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", ids); err != nil {
+		return err
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -233,6 +268,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime)
+
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
 	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {

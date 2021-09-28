@@ -19,6 +19,8 @@ const (
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
 	mongoDBname        = "GLRY_MONGO_DB_NAME"
 
+	openseaAPIKey = "OPENSEA_API_KEY"
+
 	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "REDIS_PASS_SECRET_NAME"
 
@@ -37,6 +39,8 @@ type Config struct {
 	MongoURL    string
 	MongoDBName string
 	MongoUseTLS bool
+
+	OpenseaAPIKey string
 
 	RedisURL      string
 	RedisPassword string
@@ -58,14 +62,9 @@ func ConfigLoad() *Config {
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 
 	viper.SetDefault(mongoDBname, "gallery")
-	viper.SetDefault(mongoUseTLS, false)
-	viper.SetDefault(mongoURLSecretName, "")
-	viper.SetDefault(mongoTLSSecretName, "")
 
 	viper.SetDefault(redisURL, "localhost:6379")
-	viper.SetDefault(redisPassSecretName, "")
 
-	viper.SetDefault(sentryEndpoint, "")
 	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24*3)
 
 	//------------------
@@ -92,8 +91,9 @@ func ConfigLoad() *Config {
 		PortMetrics:    viper.GetInt(portMetrics),
 		AllowedOrigins: viper.GetString(allowedOrigins),
 
-		MongoUseTLS: viper.GetBool(mongoUseTLS),
-		MongoDBName: viper.GetString(mongoDBname),
+		MongoUseTLS:   viper.GetBool(mongoUseTLS),
+		MongoDBName:   viper.GetString(mongoDBname),
+		OpenseaAPIKey: viper.GetString(openseaAPIKey),
 
 		RedisURL: viper.GetString(redisURL),
 

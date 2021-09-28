@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -265,64 +266,34 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 
 }
 
-// NftRemoveDifference will update all nfts that are not in the given slice of nfts with having an
-// empty owner id and address
-func NftRemoveDifference(pCtx context.Context, pNfts []*NftDB, pWalletAddress string, pRuntime *runtime.Runtime) (int, error) {
-
-	mp := newStorage(0, nftColName, pRuntime)
-	// FIND DIFFERENCE AND DELETE OUTLIERS
-	// -------------------------------------------------------
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
-	dbNfts := []*NftDB{}
-	if err := mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pWalletAddress)}, &dbNfts, opts); err != nil {
-		return 0, err
-	}
-
-	if len(dbNfts) > len(pNfts) {
-		diff, err := findDifference(pNfts, dbNfts)
-		if err != nil {
-			return 0, err
-		}
-
-		updateModels := make([]mongo.WriteModel, len(diff))
-
-		for i, v := range diff {
-			updateModels[i] = &mongo.UpdateOneModel{Filter: bson.M{"_id": v}, Update: bson.M{"$set": bson.M{"owner_user_id": "", "owner_address": ""}}}
-		}
-
-		res, err := mp.collection.BulkWrite(pCtx, updateModels)
-		if err != nil {
-			return 0, err
-		}
-		return int(res.ModifiedCount), nil
-	}
-
-	return 0, nil
-}
-
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
-func NftOpenseaCacheSet(pCtx context.Context, pWalletAddress string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
+func NftOpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, nftColName, pRuntime)
+  
+	for i, v := range pWalletAddresses {
+		pWalletAddresses[i] = strings.ToLower(v)
+	}
 
 	toCache, err := json.Marshal(pNfts)
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(runtime.OpenseaRDB, strings.ToLower(pWalletAddress), toCache, openseaAssetsTTL)
+
+	return mp.cacheSet(runtime.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
-func NftOpenseaCacheGet(pCtx context.Context, pWalletAddress string, pRuntime *runtime.Runtime) ([]*Nft, error) {
+func NftOpenseaCacheGet(pCtx context.Context, pWalletAddresses []string, pRuntime *runtime.Runtime) ([]*Nft, error) {
+
 
 	mp := newStorage(0, nftColName, pRuntime)
+	defer mp.cacheClose()
+	for i, v := range pWalletAddresses {
+		pWalletAddresses[i] = strings.ToLower(v)
+	}
 
-	result, err := mp.cacheGet(runtime.OpenseaRDB, strings.ToLower(pWalletAddress))
+	result, err := mp.cacheGet(runtime.OpenseaRDB, fmt.Sprint(pWalletAddresses))
 	if err != nil {
 		return nil, err
 	}
