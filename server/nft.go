@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
@@ -27,13 +28,14 @@ type getUnassignedNFTByUserIDInput struct {
 }
 
 type getOpenseaNftsInput struct {
-	WalletAddress string `json:"address" form:"address" binding:"required"`
-	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
+	// Comma separated list of wallet addresses
+	WalletAddresses string `json:"addresses" form:"addresses"`
+	SkipCache       bool   `json:"skip_cache" form:"skip_cache"`
 }
 
 type syncBlockchainNftsInput struct {
-	WalletAddress string `json:"address" form:"address" binding:"required"`
-	SkipDB        bool   `json:"skip_db" form:"skip_db"`
+	WalletAddresses string `json:"addresses" form:"addresses"`
+	SkipDB          bool   `json:"skip_db" form:"skip_db"`
 }
 
 type getNftsOutput struct {
@@ -187,17 +189,20 @@ func syncNftsFromBlockChain(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
-		ownsWallet, err := doesUserOwnWallet(c, userID, input.WalletAddress, pRuntime)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-		if !ownsWallet {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user does not own wallet"})
-			return
+		addresses := strings.Split(input.WalletAddresses, ",")
+		if len(addresses) > 0 {
+			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				return
+			}
+			if !ownsWallet {
+				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user does not own wallet"})
+				return
+			}
 		}
 
-		tokens, err := getAndSyncTokens(c, userID, input.WalletAddress, input.SkipDB, pRuntime)
+		tokens, err := getAndSyncTokens(c, userID, addresses, input.SkipDB, pRuntime)
 		if len(tokens) == 0 || err != nil {
 			tokens = []*persist.Token{}
 		}
@@ -206,10 +211,15 @@ func syncNftsFromBlockChain(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func doesUserOwnWallet(pCtx context.Context, userID persist.DBID, walletAddress string, pRuntime *runtime.Runtime) (bool, error) {
+func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, pRuntime *runtime.Runtime) (bool, error) {
 	user, err := persist.UserGetByID(pCtx, userID, pRuntime)
 	if err != nil {
 		return false, err
 	}
-	return util.Contains(user.Addresses, walletAddress), nil
+	for _, walletAddress := range walletAddresses {
+		if !util.Contains(user.Addresses, walletAddress) {
+			return false, nil
+		}
+	}
+	return true, nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -64,6 +65,7 @@ type userGetOutput struct {
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"bio"`
 	Addresses   []string     `json:"addresses"`
+	CreatedAt   time.Time    `json:"created_at"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -76,6 +78,10 @@ type userAddAddressInput struct {
 	// the user still needs to prove ownership of their address.
 	Signature string `json:"signature" binding:"required,signature"`
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+}
+
+type userRemoveAddressesInput struct {
+	Addresses []string `json:"addresses"   binding:"required"`
 }
 
 type userCreateOutput struct {
@@ -99,15 +105,29 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		if _, ok := bannedUsernames[up.UserNameStr]; ok {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "username is banned/invalid"})
-			return
-		}
-
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
+		}
+
+		if strings.HasSuffix(strings.ToLower(up.UserNameStr), ".eth") {
+			user, err := persist.UserGetByID(c, userID, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				return
+			}
+			can := false
+			for _, addr := range user.Addresses {
+				if resolves, _ := resolvesENS(c, up.UserNameStr, addr, pRuntime); resolves {
+					can = true
+					break
+				}
+			}
+			if !can {
+				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "one of user's addresses must resolve to ENS to set ENS as username"})
+				return
+			}
 		}
 
 		err := userUpdateInfoDB(c, userID, up, pRuntime)
@@ -191,6 +211,33 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, output)
+
+	}
+}
+
+func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := &userRemoveAddressesInput{}
+
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			return
+		}
+
+		err := removeAddressesFromUserDB(c, userID, input, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
 	}
 }
@@ -295,6 +342,23 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	return output, nil
 }
+func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+	pRuntime *runtime.Runtime) error {
+
+	user, err := persist.UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+	if len(user.Addresses) < len(pInput.Addresses) {
+		return errors.New("user does not have enough addresses to remove")
+	}
+
+	err = persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	if err != nil {
+		return err
+	}
+	return persist.CollRemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+}
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
 	pAuthedUserID persist.DBID,
@@ -333,6 +397,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserID:      user.ID,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
+		CreatedAt:   user.CreationTime.Time(),
 	}
 
 	if pAuthedUserID == user.ID {

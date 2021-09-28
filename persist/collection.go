@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -84,6 +85,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -170,6 +172,7 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
@@ -187,6 +190,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -204,10 +208,12 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 // CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func CollClaimNFTs(pCtx context.Context,
 	pUserID DBID,
+	pWalletAddresses []string,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -215,10 +221,43 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
+	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CollRemoveNFTsOfAddresses will remove all NFTs from a user's collections that are associated with
+// an array of addresses
+func CollRemoveNFTsOfAddresses(pCtx context.Context,
+	pUserID DBID,
+	pAddresses []string,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
+
+	for i, addr := range pAddresses {
+		pAddresses[i] = strings.ToLower(addr)
+	}
+
+	nmp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+	res := []*Token{}
+	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &res)
+	ids := make([]DBID, len(res))
+	for i, nft := range res {
+		ids[i] = nft.ID
+	}
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", ids); err != nil {
+		return err
 	}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
@@ -235,6 +274,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {

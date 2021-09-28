@@ -283,23 +283,3 @@ func TokenUpdateByID(pCtx context.Context, pID DBID,
 	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 
 }
-
-// TokensClaim will ensure that tokens can only be in collections owned by the user
-func TokensClaim(pCtx context.Context, pUserID DBID, pIDs []DBID,
-	pRuntime *runtime.Runtime) error {
-
-	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
-	allColls, err := CollGetByUserID(pCtx, pUserID, true, pRuntime)
-	if err != nil {
-		return err
-	}
-
-	allCollIDs := make([]DBID, len(allColls))
-	for i, v := range allColls {
-		allCollIDs[i] = v.ID
-	}
-
-	up := bson.M{"collection_id": ""}
-
-	return mp.update(pCtx, bson.M{"collection_id": bson.M{"$nin": allCollIDs}, "_id": bson.M{"$in": pIDs}}, up)
-}

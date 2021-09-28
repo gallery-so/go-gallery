@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func getAndSyncTokens(pCtx context.Context, pUserID persist.DBID, pWalletAddress string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
+func getAndSyncTokens(pCtx context.Context, pUserID persist.DBID, pWalletAddresses []string, pSkipDB bool, pRuntime *runtime.Runtime) ([]*persist.Token, error) {
 
-	// TODO magic numbers
-	tokens, err := infra.GetTokensForWallet(pCtx, pWalletAddress, 1, 50, pSkipDB, pRuntime)
+	// TODO magic numbers and index
+	tokens, err := infra.GetTokensForWallet(pCtx, pWalletAddresses[0], 1, 50, pSkipDB, pRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func getAndSyncTokens(pCtx context.Context, pUserID persist.DBID, pWalletAddress
 		for i, token := range tokens {
 			tokenIDs[i] = token.ID
 		}
-		err := persist.TokensClaim(pCtx, pUserID, tokenIDs, pRuntime)
+		err := persist.CollClaimNFTs(pCtx, pUserID, pWalletAddresses, &persist.CollectionUpdateNftsInput{Nfts: tokenIDs}, pRuntime)
 		if err != nil {
 			logrus.WithError(err).Error("failed to claim tokens")
 		}

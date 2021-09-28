@@ -30,6 +30,8 @@ const (
 	mongoTLSSecretName = "MONGO_TLS_SECRET_NAME"
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
 
+	openseaAPIKey = "OPENSEA_API_KEY"
+
 	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "REDIS_PASS_SECRET_NAME"
 
@@ -58,6 +60,8 @@ type Config struct {
 	MongoURL    string
 	MongoUseTLS bool
 
+	OpenseaAPIKey string
+
 	RedisURL      string
 	RedisPassword string
 
@@ -83,14 +87,8 @@ func ConfigLoad() *Config {
 	viper.SetDefault(ipfsURL, "https://ipfs.io")
 	viper.SetDefault(gcloudTokenBucket, "token-bucket")
 
-	viper.SetDefault(mongoUseTLS, false)
-	viper.SetDefault(mongoURLSecretName, "")
-	viper.SetDefault(mongoTLSSecretName, "")
-
 	viper.SetDefault(redisURL, "localhost:6379")
-	viper.SetDefault(redisPassSecretName, "")
 
-	viper.SetDefault(sentryEndpoint, "")
 	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24*3)
 
 	//------------------
@@ -124,7 +122,8 @@ func ConfigLoad() *Config {
 		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
 		AWSManagedBlockchainURL:  viper.GetString(awsManagedBlockChainURL),
 
-		MongoUseTLS: viper.GetBool(mongoUseTLS),
+		MongoUseTLS:   viper.GetBool(mongoUseTLS),
+		OpenseaAPIKey: viper.GetString(openseaAPIKey),
 
 		RedisURL: viper.GetString(redisURL),
 

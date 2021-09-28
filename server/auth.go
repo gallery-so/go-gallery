@@ -59,8 +59,10 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		authed := c.GetBool(authContextKey)
+
 		// GET_PUBLIC_INFO
-		output, err := authUserGetPreflightDb(c, input, pRuntime)
+		output, err := authUserGetPreflightDb(c, input, authed, pRuntime)
 		if err != nil {
 			// TODO: log specific error and return user friendly error message instead
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
@@ -269,7 +271,12 @@ func authVerifySignature(pSignatureStr string,
 	if err != nil {
 		return false, err
 	}
-	if sig[64] != 27 && sig[64] != 28 {
+	// Ledger-produced signatures have v = 0 or 1
+	if sig[64] == 0 || sig[64] == 1 {
+		sig[64] += 27
+	}
+	v := sig[64]
+	if v != 27 && v != 28 {
 		return false, errors.New("invalid signature (V is not 27 or 28)")
 	}
 	sig[64] -= 27
@@ -292,7 +299,7 @@ func authVerifySignature(pSignatureStr string,
 
 }
 
-func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput,
+func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
 	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
@@ -305,12 +312,15 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	var nonce *persist.UserNonce
 	if !userExistsBool {
 
-		hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		if !hasNFT {
-			return nil, errors.New("user does not own required nft to signup")
+		if !pPreAuthed {
+			// TODO enable this when we are checking for nfts
+			// hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// if !hasNFT {
+			// 	return nil, errors.New("user does not own required nft to signup")
+			// }
 		}
 
 		nonce = &persist.UserNonce{
