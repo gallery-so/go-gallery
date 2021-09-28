@@ -19,10 +19,6 @@ const (
 
 	gcloudTokenBucket = "GCLOUD_TOKEN_BUCKET"
 
-	awsManagedBlockChainURL = "AWS_MANAGED_BLOCKCHAIN_URL"
-	awsAccessKeyID          = "AWS_ACCESS_KEY_ID"
-	awsSecretAccessKey      = "AWS_SECRET_ACCESS_KEY"
-
 	rpcURL  = "RPC_URL"
 	ipfsURL = "IPFS_URL"
 
@@ -41,19 +37,16 @@ const (
 
 // Config represents an application configuration that is determined at runtime start
 type Config struct {
-	Env                     string
-	InfraEnv                string
-	BaseURL                 string
-	InfraBaseURL            string
-	Port                    int
-	InfraPort               int
-	PortMetrics             int
-	AllowedOrigins          string
-	RPCURL                  string
-	IPFSURL                 string
-	AWSManagedBlockchainURL string
-	AWSSecretAccessKey      string
-	AWSAccessKeyID          string
+	Env            string
+	InfraEnv       string
+	BaseURL        string
+	InfraBaseURL   string
+	Port           int
+	InfraPort      int
+	PortMetrics    int
+	AllowedOrigins string
+	RPCURL         string
+	IPFSURL        string
 
 	GCloudTokenContentBucket string
 
@@ -120,9 +113,6 @@ func ConfigLoad() *Config {
 		RPCURL:                   viper.GetString(rpcURL),
 		IPFSURL:                  viper.GetString(ipfsURL),
 		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
-		AWSManagedBlockchainURL:  viper.GetString(awsManagedBlockChainURL),
-		AWSSecretAccessKey:       viper.GetString(awsSecretAccessKey),
-		AWSAccessKeyID:           viper.GetString(awsAccessKeyID),
 
 		MongoUseTLS:   viper.GetBool(mongoUseTLS),
 		OpenseaAPIKey: viper.GetString(openseaAPIKey),

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -217,22 +216,11 @@ func (r *Runtime) connectMongo(pMongoURL string, pTLS *tls.Config) error {
 func (r *Runtime) newInfraClients() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if r.Config.AWSManagedBlockchainURL != "" {
-		r.Config.RPCURL = "http://" + r.Config.AWSManagedBlockchainURL
-	}
 
 	logrus.Debugf("Connecting to RPC with URL: %s", r.Config.RPCURL)
 	client, err := rpc.DialContext(ctx, r.Config.RPCURL)
 	if err != nil {
 		panic(err)
-	}
-
-	if strings.Contains(r.Config.RPCURL, r.Config.AWSManagedBlockchainURL) {
-		logrus.Info("Setting AWS S4 Headers for RPC Client")
-		amz, auth := createAWSSigV4Headers(time.Now(), r)
-		logrus.Debugf("AWS Headers: %s\n AMZ: %s", auth, amz)
-		client.SetHeader("Authorization", auth)
-		client.SetHeader("x-amz-date", amz)
 	}
 
 	ethClient := ethclient.NewClient(client)
