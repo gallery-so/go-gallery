@@ -1,9 +1,10 @@
 package infra
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"sort"
@@ -73,7 +74,6 @@ type Indexer struct {
 	mostRecentBlock uint64
 	statsFile       string
 
-	logs          chan []types.Log
 	subscriptions chan types.Log
 	transfers     chan []*transfer
 	tokens        chan *persist.Token
@@ -95,8 +95,8 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 		panic(err)
 	}
 
-	statsFile, err := os.Open(fmt.Sprintf("%s.json", statsFileName))
-	startingBlock := uint64(0)
+	statsFile, err := os.Open(statsFileName)
+	startingBlock := uint64(4900000)
 	if err == nil {
 		defer statsFile.Close()
 		decoder := json.NewDecoder(statsFile)
@@ -130,7 +130,6 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 		eventHashes: pEvents,
 		statsFile:   statsFileName,
 
-		logs:          make(chan []types.Log),
 		subscriptions: make(chan types.Log),
 		transfers:     make(chan []*transfer),
 		tokens:        make(chan *persist.Token),
@@ -170,50 +169,36 @@ func (i *Indexer) processLogs() {
 
 	topics := [][]common.Hash{events, nil, nil, nil}
 
-	go func() {
+	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
+	interval := getBlockInterval(1, 2000, int64(i.lastSyncedBlock))
+	nextBlock := new(big.Int).Add(curBlock, big.NewInt(interval))
+	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
+		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
-		defer close(i.logs)
-		curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
-		nextBlock := new(big.Int).Add(curBlock, big.NewInt(2000))
-		backedUp := int64(0)
-		for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
-			logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-			logsTo, err := i.runtime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
-				FromBlock: curBlock,
-				ToBlock:   nextBlock,
-				Topics:    topics,
-			})
-			cancel()
-			if err != nil {
-				logrus.WithError(err).Error("Error getting logs, trying again")
-				nextBlock.Sub(nextBlock, big.NewInt(250))
-				backedUp += 250
-				continue
-			}
-			logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
-
-			i.logs <- logsTo
-
-			i.mu.Lock()
-			i.lastSyncedBlock = curBlock.Uint64()
-			i.mu.Unlock()
-
-			curBlock.Add(curBlock, big.NewInt(2000))
-			nextBlock.Add(nextBlock, big.NewInt(2000))
-			nextBlock.Add(nextBlock, big.NewInt(backedUp))
-
-			backedUp = 0
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		logsTo, err := i.runtime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: curBlock,
+			ToBlock:   nextBlock,
+			Topics:    topics,
+		})
+		cancel()
+		if err != nil {
+			logrus.WithError(err).Error("Error getting logs, trying again")
+			continue
 		}
-	}()
+		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
-	for logs := range i.logs {
-		for _, log := range logs {
+		for _, log := range logsTo {
 			i.transfers <- logToTransfer(log)
 		}
+
+		atomic.StoreUint64(&i.lastSyncedBlock, nextBlock.Uint64())
+
+		curBlock.Add(curBlock, big.NewInt(interval))
+		nextBlock.Add(nextBlock, big.NewInt(interval))
+		interval = getBlockInterval(1, 2000, curBlock.Int64())
 	}
-	logrus.Info("Logs channel closed, listening for new logs on subscriptions")
+
 }
 
 func (i *Indexer) processTransfers() {
@@ -221,7 +206,7 @@ func (i *Indexer) processTransfers() {
 	defer close(i.tokens)
 	count := 0
 	for transfers := range i.transfers {
-		if count%1000 == 0 {
+		if count%10000 == 0 {
 			logrus.Infof("Processed %d sets of transfers", count)
 			go storedDataToTokens(i)
 		}
@@ -362,16 +347,22 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			if err != nil {
 				logrus.WithError(err).Error("Error getting URI for ERC721 token")
 				// TODO handle this
+			} else {
+				i.uris[key] = uri
 			}
-			i.uris[key] = uri
 		}
 	case persist.TokenTypeERC1155:
-		if it, ok := i.balances[key][transfer.From]; ok {
+		balances, ok := i.balances[key]
+		if !ok {
+			balances = make(map[string]*big.Int)
+			i.balances[key] = balances
+		}
+		if it, ok := balances[transfer.From]; ok {
 			it.Sub(it, new(big.Int).SetUint64(transfer.Amount))
 		} else {
 			i.balances[key][transfer.From] = new(big.Int).SetUint64(transfer.Amount)
 		}
-		if it, ok := i.balances[key][transfer.To]; ok {
+		if it, ok := balances[transfer.To]; ok {
 			it.Add(it, new(big.Int).SetUint64(transfer.Amount))
 		} else {
 			i.balances[key][transfer.To] = new(big.Int).SetUint64(transfer.Amount)
@@ -381,8 +372,9 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			if err != nil {
 				logrus.WithError(err).Error("Error getting URI for ERC1155 token")
 				// TODO handle this
+			} else {
+				i.uris[key] = uri
 			}
-			i.uris[key] = uri
 		}
 	default:
 		logrus.Error("Unknown token type")
@@ -404,21 +396,23 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			if err != nil {
 				logrus.WithError(err).Error("Error getting metadata for token")
 				// TODO handle this
+			} else {
+				i.metadatas[key] = metadata
 			}
-			i.metadatas[key] = metadata
 		}
 	}
-	if _, ok := i.medias[key]; !ok {
-		if metadata, ok := i.metadatas[key]; ok {
-			uri := i.uris[key]
-			media, err := makePreviewsForMetadata(context.TODO(), metadata, transfer.RawContract.Address, transfer.TokenID, uri, i.runtime)
-			if err != nil {
-				logrus.WithError(err).Error("Error creating preview for token")
-				// TODO handle this
-			}
-			i.medias[key] = media
-		}
-	}
+	// if _, ok := i.medias[key]; !ok {
+	// 	if metadata, ok := i.metadatas[key]; ok {
+	// 		uri := i.uris[key]
+	// 		media, err := makePreviewsForMetadata(context.TODO(), metadata, transfer.RawContract.Address, transfer.TokenID, uri, i.runtime)
+	// 		if err != nil {
+	// 			logrus.WithError(err).Error("Error creating preview for token")
+	// 			// TODO handle this
+	// 		} else {
+	// 			i.medias[key] = media
+	// 		}
+	// 	}
+	// }
 }
 
 func storedDataToTokens(i *Indexer) {
@@ -557,7 +551,7 @@ func (i *Indexer) writeStats() {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	fi, err := os.Create(fmt.Sprintf("%s.json", i.statsFile))
+	fi, err := os.Create(i.statsFile)
 	if err != nil {
 		logrus.WithError(err).Error("Error creating stats file")
 		return
@@ -575,7 +569,11 @@ func (i *Indexer) writeStats() {
 		logrus.WithError(err).Error("Error marshalling stats")
 		return
 	}
-	_, err = fi.Write(bs)
+	_, err = io.Copy(fi, bytes.NewReader(bs))
+	if err != nil {
+		logrus.WithError(err).Error("Error writing stats")
+		return
+	}
 }
 
 func checkForNewBlocks(i *Indexer) {
@@ -590,4 +588,12 @@ func checkForNewBlocks(i *Indexer) {
 		logrus.Infof("final block number: %v", finalBlockUint)
 		time.Sleep(time.Minute)
 	}
+}
+
+// function that returns a progressively smaller value between min and max for every million block numbers
+func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
+	if blockNumber < 800000 {
+		return max
+	}
+	return (max - min) / (blockNumber / 800000)
 }

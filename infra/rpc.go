@@ -235,7 +235,7 @@ func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (tokenC
 func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, error) {
 
 	contract := common.HexToAddress(address)
-	instance, err := contracts.NewIERC721Metadata(contract, pRuntime.InfraClients.ETHClient)
+	instance, err := contracts.NewIERC721MetadataCaller(contract, pRuntime.InfraClients.ETHClient)
 	if err != nil {
 		return "", err
 	}
@@ -255,7 +255,7 @@ func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (stri
 		return "", err
 	}
 
-	return tokenURI, nil
+	return strings.ReplaceAll(tokenURI, "\x00", ""), nil
 
 }
 

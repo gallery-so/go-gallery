@@ -86,13 +86,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 
 	url := ""
 
-	if it, ok := metadata["image"]; ok {
+	if it, ok := metadata["image"]; ok && it != nil {
 		url = it.(string)
-	} else if it, ok := metadata["image_url"]; ok {
+	} else if it, ok := metadata["image_url"]; ok && it != nil {
 		url = it.(string)
-	} else if it, ok := metadata["video_url"]; ok {
+	} else if it, ok := metadata["video_url"]; ok && it != nil {
 		url = it.(string)
-	} else if it, ok := metadata["animation_url"]; ok {
+	} else if it, ok := metadata["animation_url"]; ok && it != nil {
 		url = it.(string)
 	}
 

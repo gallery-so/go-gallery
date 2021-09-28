@@ -21,7 +21,7 @@ func main() {
 	}
 	events := []infra.EventHash{infra.TransferBatchEventHash, infra.TransferEventHash, infra.TransferSingleEventHash}
 
-	indexer := infra.NewIndexer(events, tokenReceive, contractReceive, "test", runtime)
+	indexer := infra.NewIndexer(events, tokenReceive, contractReceive, "stats.json", runtime)
 
 	logrus.Infof("Starting indexer")
 	indexer.Start()
