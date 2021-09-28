@@ -104,15 +104,29 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		if _, ok := bannedUsernames[up.UserNameStr]; ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
-			return
-		}
-
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
+		}
+
+		if strings.HasSuffix(strings.ToLower(up.UserNameStr), ".eth") {
+			user, err := persist.UserGetByID(c, userID, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				return
+			}
+			can := false
+			for _, addr := range user.Addresses {
+				if resolves, _ := resolvesENS(c, up.UserNameStr, addr, pRuntime); resolves {
+					can = true
+					break
+				}
+			}
+			if !can {
+				c.JSON(http.StatusBadRequest, errorResponse{Error: "one of user's addresses must resolve to ENS to set ENS as username"})
+				return
+			}
 		}
 
 		err := userUpdateInfoDB(c, userID, up, pRuntime)

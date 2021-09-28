@@ -51,6 +51,9 @@ var usernameValidator validator.Func = func(fl validator.FieldLevel) bool {
 	if s == "" {
 		return true
 	}
+	if _, ok := bannedUsernames[s]; ok {
+		return false
+	}
 	return len(s) >= 2 && len(s) <= 50 &&
 		alphanumericUnderscoresPeriodsRegex.MatchString(s) &&
 		!consecutivePeriodsOrUnderscores(s)
