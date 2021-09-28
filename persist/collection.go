@@ -235,8 +235,7 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 	pAddresses []string,
 	pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, collectionColName, pRuntime)
 
 	for i, addr := range pAddresses {
 		pAddresses[i] = strings.ToLower(addr)
@@ -254,7 +253,7 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 		return err
 	}
 
-	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
