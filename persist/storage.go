@@ -17,16 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// redisDB represents the database number to use for the redis client
-type redisDB int
-
-const (
-	// CollectionsUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
-	CollectionsUnassignedRDB redisDB = iota
-	// OpenseaAssetsRDB is a throttled cache for expensive queries finding Opensea NFTs
-	OpenseaAssetsRDB
-)
-
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
 	openseaAssetsTTL        time.Duration = time.Minute * 5
@@ -39,7 +29,7 @@ type DBID string
 type storage struct {
 	version    int64
 	collection *mongo.Collection
-	rdbClient  *redis.Client
+	rdb        *runtime.Redis
 }
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
@@ -53,18 +43,7 @@ func newStorage(version int64, dbName, collName string, pRuntime *runtime.Runtim
 		coll = pRuntime.DB.InfraDB.Collection(collName)
 	}
 
-	return &storage{version: version, collection: coll}
-}
-
-// withRedis attaches a redis client to the Storage instance
-func (m *storage) withRedis(rdb redisDB, runtime *runtime.Runtime) *storage {
-	client := redis.NewClient(&redis.Options{
-		Addr:     runtime.Config.RedisURL,
-		Password: runtime.Config.RedisPassword,
-		DB:       int(rdb),
-	})
-	m.rdbClient = client
-	return m
+	return &storage{version: version, collection: coll, rdb: pRuntime.Redis}
 }
 
 // Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
@@ -270,43 +249,51 @@ func (m *storage) createIndex(ctx context.Context, index mongo.IndexModel, opts 
 }
 
 // cacheSet sets a value in the redis cache
-func (m *storage) cacheSet(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-	if m.rdbClient == nil {
-		return errors.New("no redis client attached to storage instance")
+func (m *storage) cacheSet(r runtime.RedisDB, key string, value interface{}, expiration time.Duration) error {
+	switch r {
+	case runtime.OpenseaRDB:
+		return m.rdb.OpenseaClient.Set(key, value, expiration).Err()
+	case runtime.CollUnassignedRDB:
+		return m.rdb.UnassignedClient.Set(key, value, expiration).Err()
+	default:
+		return errors.New("unknown redis database")
 	}
-	return m.rdbClient.Set(ctx, key, value, expiration).Err()
 }
 
 // cacheSetKeepTTL sets a value in the redis cache without resetting TTL
-func (m *storage) cacheSetKeepTTL(ctx context.Context, key string, value interface{}) error {
-	if m.rdbClient == nil {
-		return errors.New("no redis client attached to storage instance")
+func (m *storage) cacheSetKeepTTL(r runtime.RedisDB, key string, value interface{}) error {
+	switch r {
+	case runtime.OpenseaRDB:
+		return m.rdb.OpenseaClient.Set(key, value, redis.KeepTTL).Err()
+	case runtime.CollUnassignedRDB:
+		return m.rdb.UnassignedClient.Set(key, value, redis.KeepTTL).Err()
+	default:
+		return errors.New("unknown redis database")
 	}
-	return m.rdbClient.Set(ctx, key, value, redis.KeepTTL).Err()
 }
 
 // cacheGet gets a value from the redis cache
-func (m *storage) cacheGet(ctx context.Context, key string) (string, error) {
-	if m.rdbClient == nil {
-		return "", errors.New("no redis client attached to storage instance")
+func (m *storage) cacheGet(r runtime.RedisDB, key string) (string, error) {
+	switch r {
+	case runtime.OpenseaRDB:
+		return m.rdb.OpenseaClient.Get(key).Result()
+	case runtime.CollUnassignedRDB:
+		return m.rdb.UnassignedClient.Get(key).Result()
+	default:
+		return "", errors.New("unknown redis database")
 	}
-	return m.rdbClient.Get(ctx, key).Result()
 }
 
 // cacheDelete deletes a value from the redis cache
-func (m *storage) cacheDelete(ctx context.Context, key string) error {
-	if m.rdbClient == nil {
-		return errors.New("no redis client attached to storage instance")
+func (m *storage) cacheDelete(r runtime.RedisDB, key string) error {
+	switch r {
+	case runtime.OpenseaRDB:
+		return m.rdb.OpenseaClient.Del(key).Err()
+	case runtime.CollUnassignedRDB:
+		return m.rdb.UnassignedClient.Del(key).Err()
+	default:
+		return errors.New("unknown redis database")
 	}
-	return m.rdbClient.Del(ctx, key).Err()
-}
-
-// cacheClose closes the redis client
-func (m *storage) cacheClose() error {
-	if m.rdbClient == nil {
-		return errors.New("no redis client attached to storage instance")
-	}
-	return m.rdbClient.Close()
 }
 
 func generateID(it interface{}) DBID {

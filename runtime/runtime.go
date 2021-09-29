@@ -33,6 +33,16 @@ const (
 	InfraDBName = "infra"
 )
 
+// RedisDB represents the database number to use for the redis client
+type RedisDB int
+
+const (
+	// CollUnassignedRDB is a throttled cache for expensive queries finding unassigned NFTs
+	CollUnassignedRDB RedisDB = iota
+	// OpenseaRDB is a throttled cache for expensive queries finding Opensea NFTs
+	OpenseaRDB
+)
+
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
 	Config       *Config
@@ -41,6 +51,7 @@ type Runtime struct {
 	InfraClients *InfraClients
 	IPFS         *ipfs.Shell
 	Cancel       chan os.Signal
+	Redis        *Redis
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -54,6 +65,12 @@ type DB struct {
 type InfraClients struct {
 	RPCClient *rpc.Client
 	ETHClient *ethclient.Client
+}
+
+// Redis represents the redis clients throughout the application
+type Redis struct {
+	OpenseaClient    *redis.Client
+	UnassignedClient *redis.Client
 }
 
 // GetRuntime sets up the runtime to be used at the start of the application
@@ -95,17 +112,8 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 	// notify cancel channel when SIGINT or SIGTERM is received
 	runtime.notifyOnCancel()
 
-	// TEST REDIS CONNECTION
-	client := redis.NewClient(&redis.Options{
-		Addr:     pConfig.RedisURL,
-		Password: pConfig.RedisPassword,
-		DB:       0,
-	})
-
-	if err = client.Ping().Err(); err != nil {
-		return nil, fmt.Errorf("redis ping failed: %s\n connecting with URL %s", err, pConfig.RedisURL)
-	}
-	log.Info("redis working! ✅")
+	runtime.setupRedis()
+	log.Info("redis connected! ✅")
 
 	return runtime, nil
 }
@@ -136,6 +144,29 @@ func (r *Runtime) dbInit(pMongoURLstr string,
 	r.DB.InfraDB = r.DB.MongoClient.Database(InfraDBName)
 
 	return nil
+}
+
+func (r *Runtime) setupRedis() {
+	opensea := redis.NewClient(&redis.Options{
+		Addr:     r.Config.RedisURL,
+		Password: r.Config.RedisPassword,
+		DB:       int(OpenseaRDB),
+	})
+	if err := opensea.Ping().Err(); err != nil {
+		panic(err)
+	}
+	unassigned := redis.NewClient(&redis.Options{
+		Addr:     r.Config.RedisURL,
+		Password: r.Config.RedisPassword,
+		DB:       int(CollUnassignedRDB),
+	})
+	if err := unassigned.Ping().Err(); err != nil {
+		panic(err)
+	}
+	r.Redis = &Redis{
+		OpenseaClient:    opensea,
+		UnassignedClient: unassigned,
+	}
 }
 
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
