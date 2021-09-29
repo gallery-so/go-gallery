@@ -213,6 +213,8 @@ func CollClaimNFTs(pCtx context.Context,
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	defer mp.cacheClose()
 
+	nmp := newStorage(0, nftColName, pRuntime)
+
 	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
@@ -223,6 +225,10 @@ func CollClaimNFTs(pCtx context.Context,
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
+	}
+
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, bson.M{"$set": bson.M{"owner_user_id": "", "owner_address": ""}}); err != nil {
+		return err
 	}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
