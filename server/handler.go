@@ -38,7 +38,7 @@ func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 
 	nftsGroup.GET("/get", jwtOptional(pRuntime), getNftByID(pRuntime))
 	nftsGroup.GET("/user_get", jwtOptional(pRuntime), getNftsForUser(pRuntime))
-	nftsGroup.GET("/opensea_get", jwtOptional(pRuntime), getNftsFromOpensea(pRuntime))
+	nftsGroup.GET("/opensea_get", rateLimited(pRuntime), jwtRequired(pRuntime), getNftsFromOpensea(pRuntime))
 	nftsGroup.POST("/update", jwtRequired(pRuntime), updateNftByID(pRuntime))
 	nftsGroup.GET("/get_unassigned", jwtRequired(pRuntime), getUnassignedNftsForUser(pRuntime))
 
@@ -63,7 +63,7 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
 
 	// [GET] /glry/v1/auth/get_preflight?address=:walletAddress
-	authGroup.GET("/get_preflight", getAuthPreflight(pRuntime))
+	authGroup.GET("/get_preflight", jwtOptional(pRuntime), getAuthPreflight(pRuntime))
 
 	// AUTH VALIDATE_JWT
 
@@ -79,7 +79,8 @@ func authHandlersInit(pRuntime *runtime.Runtime, parent *gin.RouterGroup) {
 	// AUTHENTICATED
 
 	usersGroup.POST("/update/info", jwtRequired(pRuntime), updateUserInfo(pRuntime))
-	usersGroup.POST("/update/addresses", jwtRequired(pRuntime), addUserAddress(pRuntime))
+	usersGroup.POST("/update/addresses/add", jwtRequired(pRuntime), addUserAddress(pRuntime))
+	usersGroup.POST("/update/addresses/remove", jwtRequired(pRuntime), removeAddresses(pRuntime))
 
 	// USER_GET
 	// AUTHENTICATED/UN-AUTHENTICATED

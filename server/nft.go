@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type getNftsByIDInput struct {
@@ -23,12 +26,17 @@ type getUnassignedNFTByUserIDInput struct {
 }
 
 type getOpenseaNftsInput struct {
-	WalletAddress string `json:"address" form:"address" binding:"required"`
-	SkipCache     bool   `json:"skip_cache" form:"skip_cache"`
+	// Comma separated list of wallet addresses
+	WalletAddresses string `json:"addresses" form:"addresses"`
+	SkipCache       bool   `json:"skip_cache" form:"skip_cache"`
 }
 
 type getNftsOutput struct {
 	Nfts []*persist.Nft `json:"nfts"`
+}
+
+type getNftByIDOutput struct {
+	Nft *persist.Nft `json:"nft"`
 }
 
 type getUnassignedNftsOutput struct {
@@ -61,7 +69,11 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
-		if len(nfts) == 0 || err != nil {
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+		if len(nfts) == 0 {
 			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
 			})
@@ -72,7 +84,7 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			nfts = nfts[:1]
 			// TODO log that this should not be happening
 		}
-		c.JSON(http.StatusOK, nfts[0])
+		c.JSON(http.StatusOK, getNftByIDOutput{Nft: nfts[0]})
 	}
 }
 
@@ -154,11 +166,44 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := openSeaPipelineAssetsForAcc(c, input.WalletAddress, input.SkipCache, pRuntime)
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+
+		addresses := strings.Split(input.WalletAddresses, ",")
+		if len(addresses) > 0 {
+			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				return
+			}
+			if !ownsWallet {
+				c.JSON(http.StatusBadRequest, errorResponse{Error: "user does not own wallet"})
+				return
+			}
+		}
+
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, input.SkipCache, pRuntime)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
+}
+
+func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, pRuntime *runtime.Runtime) (bool, error) {
+	user, err := persist.UserGetByID(pCtx, userID, pRuntime)
+	if err != nil {
+		return false, err
+	}
+	for _, walletAddress := range walletAddresses {
+		if !util.Contains(user.Addresses, walletAddress) {
+			return false, nil
+		}
+	}
+	return true, nil
 }

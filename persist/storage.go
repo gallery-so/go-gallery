@@ -2,8 +2,6 @@ package persist
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/segmentio/ksuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -26,14 +25,11 @@ const (
 	CollectionsUnassignedRDB redisDB = iota
 	// OpenseaAssetsRDB is a throttled cache for expensive queries finding Opensea NFTs
 	OpenseaAssetsRDB
-	// OpenseaTransfersRDB is a throttled cache for expensive queries finding Opensea Transfer Events
-	OpenseaTransfersRDB
 )
 
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
 	openseaAssetsTTL        time.Duration = time.Minute * 5
-	openseaTransfersTTL     time.Duration = time.Minute * 5
 )
 
 // DBID represents a mongo database ID
@@ -126,7 +122,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 	}
 	asMap["last_updated"] = now
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
+	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -145,7 +141,26 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{push, lastUpdated}
 
-	result, err := m.collection.UpdateOne(ctx, query, up)
+	result, err := m.collection.UpdateMany(ctx, query, up)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return &DocumentNotFoundError{}
+	}
+
+	return nil
+}
+
+// pullAll pulls all items from an array field for a given queried document(s)
+// value must be an array
+func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value interface{}) error {
+
+	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
+	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
+	up := bson.D{pull, lastUpdated}
+
+	result, err := m.collection.UpdateMany(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -157,14 +172,13 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 }
 
 // pull puls items from an array field for a given queried document(s)
-// value must be an array
-func (m *storage) pull(ctx context.Context, query bson.M, field string, value interface{}) error {
+func (m *storage) pull(ctx context.Context, query bson.M, field string, value bson.M) error {
 
-	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
+	pull := bson.E{Key: "$pull", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
 
-	result, err := m.collection.UpdateOne(ctx, query, up)
+	result, err := m.collection.UpdateMany(ctx, query, up)
 	if err != nil {
 		return err
 	}
@@ -176,28 +190,38 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value in
 }
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
-func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) error {
+func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (DBID, error) {
+	returnID := DBID("")
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
 	if err != nil {
-		return err
+		return "", err
 	}
 	asMap["last_updated"] = now
 	if _, ok := asMap["created_at"]; !ok {
 		asMap["created_at"] = now
 	}
+
+	if id, ok := asMap["_id"]; ok && id != "" {
+		returnID = id.(DBID)
+	}
+
 	delete(asMap, "_id")
 	for k := range query {
 		delete(asMap, k)
 	}
 
-	_, err = m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, &options.UpdateOptions{Upsert: boolin(true)})
+	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	if it, ok := res.UpsertedID.(string); ok {
+		returnID = DBID(it)
+	}
+
+	return returnID, nil
 }
 
 // find finds documents in the mongo database which is not deleted
@@ -281,11 +305,11 @@ func (m *storage) cacheClose() error {
 }
 
 func generateID(it interface{}) DBID {
-	h := md5.New()
-	h.Write([]byte(fmt.Sprint(it)))
-	sum := h.Sum(nil)
-	hexStr := hex.EncodeToString(sum)
-	return DBID(hexStr)
+	id, err := ksuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return DBID(id.String())
 }
 
 // function that returns the pointer to the bool passed in

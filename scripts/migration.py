@@ -91,7 +91,7 @@ def create_nft(nft):
             errored_documents.append({"doc": nft, "error": "no id in opensea asset"})
             return
         nft_id = create_id()
-        contract_document = {"contract_address": nft["contract_address"]}
+        contract_document = {"contract_address": nft["contract_address"].lower()}
         nft_document = {
             "version": 0,
             "_id": nft_id,
@@ -101,7 +101,7 @@ def create_nft(nft):
             "external_url": nft["external_url"],
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
-            "owner_address": user["addresses"][0],
+            "owner_address": user["addresses"][0].lower(),
             "owner_user_id": user["_id"],
             "contract": contract_document,
             "opensea_id": opensea_asset["id"],
@@ -147,7 +147,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "deleted": False,
             "username": user["username"],
             "username_idempotent": user["username"].lower(),
-            "addresses": [user["wallet_address"]],
+            "addresses": [user["wallet_address"].lower()],
         }
 
         if user["id"] in creation_dict:
@@ -162,7 +162,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "user_id": user_id,
-            "address": user["wallet_address"],
+            "address": user["wallet_address"].lower(),
             "value": str(random.randint(1000000000000000000, 9999999999999999999)),
         }
 
@@ -212,7 +212,7 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
 
     sorted_nfts = sorted(reader, key=lambda row: int(row["position"]))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(create_nft, sorted_nfts)
 
     # add all colls to collection_documents
@@ -239,11 +239,11 @@ nft_collection = db.nfts
 nonce_collection = db.nonces
 
 # Bulk insert into database
-user_collection.insert_many(user_documents)
 gallery_collection.insert_many(gallery_documents)
 collection_collection.insert_many(collection_documents)
 nft_collection.insert_many(nft_documents)
 nonce_collection.insert_many(nonce_documents)
+user_collection.insert_many(user_documents)
 
 
 # migration strategy

@@ -62,7 +62,7 @@ func UserExistsByAddress(pCtx context.Context, pAddress string,
 
 	mp := newStorage(0, usersCollName, pRuntime)
 
-	countInt, err := mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}})
+	countInt, err := mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []string{strings.ToLower(pAddress)}}})
 
 	if err != nil {
 		return false, err
@@ -142,7 +142,7 @@ func UserGetByAddress(pCtx context.Context, pAddress string,
 	mp := newStorage(0, usersCollName, pRuntime)
 
 	result := []*User{}
-	err := mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []string{pAddress}}}, &result, opts)
+	err := mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []string{strings.ToLower(pAddress)}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -191,6 +191,10 @@ func UserGetByUsername(pCtx context.Context, pUsername string,
 func UserAddAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
 	mp := newStorage(0, usersCollName, pRuntime)
 
+	for i, addr := range pAddresses {
+		pAddresses[i] = strings.ToLower(addr)
+	}
+
 	return mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
 
@@ -205,4 +209,15 @@ func hasRecentUserEvent(pCtx context.Context, pEventType int, pUserID DBID, pRun
 	}
 
 	return count > 1, nil
+}
+
+// UserRemoveAddresses removes addresses from a user's address list
+func UserRemoveAddresses(pCtx context.Context, pUserID DBID, pAddresses []string, pRuntime *runtime.Runtime) error {
+	mp := newStorage(0, usersCollName, pRuntime)
+
+	for i, addr := range pAddresses {
+		pAddresses[i] = strings.ToLower(addr)
+	}
+
+	return mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

@@ -35,22 +35,22 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
+	assert.NotNil(body.Collection)
 	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collections[0].Name)
+	assert.Equal(update.Name, body.Collection.Name)
 }
 
 func TestCreateCollection_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -80,14 +80,14 @@ func TestCreateCollection_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Len(body.Collections[0].Nfts, 3)
+	assert.NotNil(body.Collection)
+	assert.Len(body.Collection.Nfts, 3)
 	assert.Empty(body.Error)
 
 	gallery, err := persist.GalleryGetByID(context.Background(), gid, true, tc.r)
@@ -100,7 +100,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -118,8 +118,8 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
-		Nfts  []*persist.Nft `json:"nfts"`
-		Error string         `json:"error"`
+		Nfts  []*persist.NftDB `json:"nfts"`
+		Error string           `json:"error"`
 	}
 	// ensure nft was updated
 	body := NftsResponse{}
@@ -173,7 +173,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -205,7 +205,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -243,7 +243,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -262,14 +262,14 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure collection was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Len(body.Collections[0].Nfts, 1)
+	assert.NotNil(body.Collection)
+	assert.Len(body.Collection.Nfts, 1)
 	assert.Empty(body.Error)
 
 }
@@ -278,7 +278,7 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
 
-	nfts := []*persist.Nft{
+	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
@@ -307,15 +307,15 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type CollectionGetResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
+		Collection *persist.Collection `json:"collection"`
+		Error      string              `json:"error"`
 	}
 	// ensure nft was updated
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
+	assert.NotNil(body.Collection)
 	assert.Empty(body.Error)
-	assert.Equal(update.Nfts[1], body.Collections[0].Nfts[1].ID)
+	assert.Equal(update.Nfts[1], body.Collection.Nfts[1].ID)
 }
 
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {

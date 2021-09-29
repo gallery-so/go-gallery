@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	// log "github.com/sirupsen/logrus"
@@ -57,8 +58,10 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		authed := c.GetBool(authContextKey)
+
 		// GET_PUBLIC_INFO
-		output, err := authUserGetPreflightDb(c, input, pRuntime)
+		output, err := authUserGetPreflightDb(c, input, authed, pRuntime)
 		if err != nil {
 			// TODO: log specific error and return user friendly error message instead
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
@@ -267,7 +270,12 @@ func authVerifySignature(pSignatureStr string,
 	if err != nil {
 		return false, err
 	}
-	if sig[64] != 27 && sig[64] != 28 {
+	// Ledger-produced signatures have v = 0 or 1
+	if sig[64] == 0 || sig[64] == 1 {
+		sig[64] += 27
+	}
+	v := sig[64]
+	if v != 27 && v != 28 {
 		return false, errors.New("invalid signature (V is not 27 or 28)")
 	}
 	sig[64] -= 27
@@ -278,7 +286,7 @@ func authVerifySignature(pSignatureStr string,
 	}
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-	if pubkeyAddressHexStr != pAddress {
+	if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
 		return false, errors.New("address does not match signature")
 	}
 
@@ -290,36 +298,47 @@ func authVerifySignature(pSignatureStr string,
 
 }
 
-func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput,
+func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
-	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+	user, _ := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
 
-	userExistsBool := user != nil && err == nil
+	userExistsBool := user != nil
 
 	output := &authUserGetPreflightOutput{
 		UserExists: userExistsBool,
 	}
-	var nonce *persist.UserNonce
 	if !userExistsBool {
 
-		nonce = &persist.UserNonce{
-			Address: pInput.Address,
+		if !pPreAuthed {
+			// TODO enable this when we are checking for nfts
+			// hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// if !hasNFT {
+			// 	return nil, errors.New("user does not own required nft to signup")
+			// }
+		}
+
+		nonce := &persist.UserNonce{
+			Address: strings.ToLower(pInput.Address),
 			Value:   generateNonce(),
 		}
 
-		_, err = persist.AuthNonceCreate(pCtx, nonce, pRuntime)
+		_, err := persist.AuthNonceCreate(pCtx, nonce, pRuntime)
 		if err != nil {
 			return nil, err
 		}
+		output.Nonce = noncePrepend + nonce.Value
 
 	} else {
-		nonce, err = persist.AuthNonceGet(pCtx, pInput.Address, pRuntime)
+		nonce, err := persist.AuthNonceGet(pCtx, pInput.Address, pRuntime)
 		if err != nil {
 			return nil, err
 		}
+		output.Nonce = noncePrepend + nonce.Value
 	}
-	output.Nonce = noncePrepend + nonce.Value
 
 	return output, nil
 }
@@ -328,7 +347,7 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
-		Address: pAddress,
+		Address: strings.ToLower(pAddress),
 		UserID:  pUserID,
 	}
 

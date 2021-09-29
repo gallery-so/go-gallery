@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -63,6 +64,7 @@ type userGetOutput struct {
 	UserNameStr string       `json:"username"`
 	BioStr      string       `json:"bio"`
 	Addresses   []string     `json:"addresses"`
+	CreatedAt   time.Time    `json:"created_at"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -75,6 +77,10 @@ type userAddAddressInput struct {
 	// the user still needs to prove ownership of their address.
 	Signature string `json:"signature" binding:"required,signature"`
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+}
+
+type userRemoveAddressesInput struct {
+	Addresses []string `json:"addresses"   binding:"required"`
 }
 
 type userCreateOutput struct {
@@ -98,15 +104,29 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		if _, ok := bannedUsernames[up.UserNameStr]; ok {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "username is banned/invalid"})
-			return
-		}
-
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
+		}
+
+		if strings.HasSuffix(strings.ToLower(up.UserNameStr), ".eth") {
+			user, err := persist.UserGetByID(c, userID, pRuntime)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				return
+			}
+			can := false
+			for _, addr := range user.Addresses {
+				if resolves, _ := resolvesENS(c, up.UserNameStr, addr, pRuntime); resolves {
+					can = true
+					break
+				}
+			}
+			if !can {
+				c.JSON(http.StatusBadRequest, errorResponse{Error: "one of user's addresses must resolve to ENS to set ENS as username"})
+				return
+			}
 		}
 
 		err := userUpdateInfoDB(c, userID, up, pRuntime)
@@ -129,16 +149,12 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := false
 		userID, _ := getUserIDfromCtx(c)
-		if userID == input.UserID {
-			auth = true
-		}
 
 		output, err := userGetDb(
 			c,
 			input,
-			auth,
+			userID,
 			pRuntime,
 		)
 		if err != nil {
@@ -198,6 +214,33 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
+func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := &userRemoveAddressesInput{}
+
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+
+		userID, ok := getUserIDfromCtx(c)
+		if !ok {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			return
+		}
+
+		err := removeAddressesFromUserDB(c, userID, input, pRuntime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, successOutput{Success: true})
+
+	}
+}
+
 func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
 
@@ -225,7 +268,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	}
 
 	user := &persist.User{
-		Addresses: []string{pInput.Address},
+		Addresses: []string{strings.ToLower(pInput.Address)},
 	}
 
 	userID, err := persist.UserCreate(pCtx, user, pRuntime)
@@ -298,9 +341,26 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	return output, nil
 }
+func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+	pRuntime *runtime.Runtime) error {
+
+	user, err := persist.UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+	if len(user.Addresses) < len(pInput.Addresses) {
+		return errors.New("user does not have enough addresses to remove")
+	}
+
+	err = persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	if err != nil {
+		return err
+	}
+	return persist.CollRemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+}
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
-	pAuthenticatedBool bool,
+	pAuthedUserID persist.DBID,
 	pRuntime *runtime.Runtime) (*userGetOutput, error) {
 
 	//------------------
@@ -336,9 +396,10 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserID:      user.ID,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
+		CreatedAt:   user.CreationTime.Time(),
 	}
 
-	if pAuthenticatedBool {
+	if pAuthedUserID == user.ID {
 		output.Addresses = user.Addresses
 	}
 

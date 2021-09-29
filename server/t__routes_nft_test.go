@@ -20,8 +20,9 @@ func TestGetNftByID_Success(t *testing.T) {
 
 	// seed DB with nft
 	name := "very cool nft"
-	nftID, err := persist.NftCreate(context.Background(), &persist.Nft{
-		Name: name,
+	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
+		Name:        name,
+		OwnerUserID: tc.user1.id,
 	}, tc.r)
 	assert.Nil(err)
 
@@ -29,9 +30,14 @@ func TestGetNftByID_Success(t *testing.T) {
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
-	body := persist.Nft{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(name, body.Name)
+	type NftGetByIDResponse struct {
+		Nft   persist.Nft `json:"nft"`
+		Error string      `json:"error"`
+	}
+	body := &NftGetByIDResponse{}
+	util.UnmarshallBody(body, resp.Body)
+	assert.Empty(body.Error)
+	assert.Equal(name, body.Nft.Name)
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
@@ -67,7 +73,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.Nft{
+	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
 		OwnerUserID:    tc.user1.id,
@@ -84,9 +90,15 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	// ensure nft was updated
-	body := persist.Nft{}
+	type NftGetByIDResponse struct {
+		Nft   persist.Nft `json:"nft"`
+		Error string      `json:"error"`
+	}
+	body := &NftGetByIDResponse{}
+	util.UnmarshallBody(body, resp.Body)
+	assert.Empty(body.Error)
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(update.CollectorsNote, body.CollectorsNote)
+	assert.Equal(update.CollectorsNote, body.Nft.CollectorsNote)
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
@@ -94,7 +106,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.Nft{
+	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
 		OwnerUserID:    tc.user1.id,
@@ -142,7 +154,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert := assert.New(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.Nft{
+	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
 		Name:        "very cool nft",
 		OwnerUserID: tc.user1.id,
 	}, tc.r)

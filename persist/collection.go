@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -83,6 +84,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	pRuntime *runtime.Runtime) (DBID, error) {
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -91,7 +93,7 @@ func CollCreate(pCtx context.Context, pColl *CollectionDB,
 	if pColl.Nfts == nil {
 		pColl.Nfts = []DBID{}
 	} else {
-		if err := mp.pull(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
+		if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if _, ok := err.(*DocumentNotFoundError); !ok {
 				return "", err
 			}
@@ -171,6 +173,7 @@ func CollUpdate(pCtx context.Context, pID DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
 		return err
@@ -193,12 +196,12 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 
 	// check if the collection has recently added nfts and if not and if the update is adding nfts
 	// then create an event
 	go createUpdateCollectionNFTsEvent(pCtx, pIDstr, pUserID, pUpdate.Nfts, pRuntime)
-
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", pUpdate.Nfts); err != nil {
+	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
@@ -211,6 +214,94 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
+// CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
+func CollClaimNFTs(pCtx context.Context,
+	pUserID DBID,
+	pWalletAddresses []string,
+	pUpdate *CollectionUpdateNftsInput,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
+
+	nmp := newStorage(0, nftColName, pRuntime)
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	nftsToBeRemoved := []*NftDB{}
+
+	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+		return err
+	}
+
+	idsToPull := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
+		idsToPull[i] = nft.ID
+	}
+
+	logrus.WithFields(logrus.Fields{"section": "CollClaimNFTs"}).Debug("NFTs to be removed: ", idsToPull)
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	type update struct {
+		OwnerUserID  DBID   `bson:"owner_user_id"`
+		OwnerAddress string `bson:"owner_address"`
+	}
+
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, update{}); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CollRemoveNFTsOfAddresses will remove all NFTs from a user's collections that are associated with
+// an array of addresses
+func CollRemoveNFTsOfAddresses(pCtx context.Context,
+	pUserID DBID,
+	pAddresses []string,
+	pRuntime *runtime.Runtime) error {
+
+	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
+
+	for i, addr := range pAddresses {
+		pAddresses[i] = strings.ToLower(addr)
+	}
+
+	nmp := newStorage(0, nftColName, pRuntime)
+	nftsToBeRemoved := []*NftDB{}
+	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved)
+	ids := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
+		ids[i] = nft.ID
+	}
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", ids); err != nil {
+		return err
+	}
+
+	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // CollDelete will delete a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 func CollDelete(pCtx context.Context, pIDstr DBID,
@@ -218,6 +309,7 @@ func CollDelete(pCtx context.Context, pIDstr DBID,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
+	defer mp.cacheClose()
 	update := &CollectionUpdateDeletedInput{Deleted: true}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {

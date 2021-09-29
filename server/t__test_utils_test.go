@@ -40,7 +40,7 @@ func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 	user := &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{address},
+		Addresses:          []string{strings.ToLower(address)},
 	}
 	id, err := persist.UserCreate(ctx, user, r)
 	if err != nil {
