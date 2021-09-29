@@ -128,7 +128,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 	}
 	asMap["last_updated"] = now
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
+	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	}
 	asMap["last_updated"] = now
 
-	if id, ok := asMap["_id"]; ok {
+	if id, ok := asMap["_id"]; ok && id != "" {
 		returnID = id.(DBID)
 	}
 

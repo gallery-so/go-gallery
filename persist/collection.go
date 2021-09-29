@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -215,13 +216,39 @@ func CollClaimNFTs(pCtx context.Context,
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime).withRedis(CollectionsUnassignedRDB, pRuntime)
 	defer mp.cacheClose()
 
+	nmp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+
 	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
 	}
 
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
+	nftsToBeRemoved := []*Token{}
+
+	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+		return err
+	}
+
+	idsToPull := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
+		idsToPull[i] = nft.ID
+	}
+
+	logrus.WithFields(logrus.Fields{"section": "CollClaimNFTs"}).Debug("NFTs to be removed: ", idsToPull)
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	type update struct {
+		OwnerUserID  DBID   `bson:"owner_user_id"`
+		OwnerAddress string `bson:"owner_address"`
+	}
+
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, update{}); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}

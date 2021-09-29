@@ -302,14 +302,13 @@ func authVerifySignature(pSignatureStr string,
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
-	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+	user, _ := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
 
-	userExistsBool := user != nil && err == nil
+	userExistsBool := user != nil
 
 	output := &authUserGetPreflightOutput{
 		UserExists: userExistsBool,
 	}
-	var nonce *persist.UserNonce
 	if !userExistsBool {
 
 		if !pPreAuthed {
@@ -323,23 +322,24 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 			// }
 		}
 
-		nonce = &persist.UserNonce{
+		nonce := &persist.UserNonce{
 			Address: strings.ToLower(pInput.Address),
 			Value:   generateNonce(),
 		}
 
-		_, err = persist.AuthNonceCreate(pCtx, nonce, pRuntime)
+		_, err := persist.AuthNonceCreate(pCtx, nonce, pRuntime)
 		if err != nil {
 			return nil, err
 		}
+		output.Nonce = noncePrepend + nonce.Value
 
 	} else {
-		nonce, err = persist.AuthNonceGet(pCtx, pInput.Address, pRuntime)
+		nonce, err := persist.AuthNonceGet(pCtx, pInput.Address, pRuntime)
 		if err != nil {
 			return nil, err
 		}
+		output.Nonce = noncePrepend + nonce.Value
 	}
-	output.Nonce = noncePrepend + nonce.Value
 
 	return output, nil
 }
