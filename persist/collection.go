@@ -227,8 +227,15 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, bson.M{"$set": bson.M{"owner_user_id": "", "owner_address": ""}}); err != nil {
-		return err
+	type update struct {
+		OwnerUserID  DBID   `bson:"owner_user_id"`
+		OwnerAddress string `bson:"owner_address"`
+	}
+
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, update{}); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
 	}
 
 	if err := mp.cacheDelete(pCtx, string(pUserID)); err != nil {
