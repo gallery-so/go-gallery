@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
@@ -173,41 +172,6 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
-	}
-}
-
-func syncNftsFromBlockChain(pRuntime *runtime.Runtime) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		input := &syncBlockchainNftsInput{}
-		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
-			return
-		}
-		addresses := strings.Split(input.WalletAddresses, ",")
-		if len(addresses) > 0 {
-			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, pRuntime)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-				return
-			}
-			if !ownsWallet {
-				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user does not own wallet"})
-				return
-			}
-		}
-
-		tokens, err := getAndSyncTokens(c, userID, addresses, input.SkipDB, pRuntime)
-		if len(tokens) == 0 || err != nil {
-			tokens = []*persist.Token{}
-		}
-
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: tokens})
 	}
 }
 
