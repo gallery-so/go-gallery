@@ -287,8 +287,8 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 // NftOpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
 func NftOpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*Nft, pRuntime *runtime.Runtime) error {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, nftColName, pRuntime)
+
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = strings.ToLower(v)
 	}
@@ -297,19 +297,19 @@ func NftOpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts [
 	if err != nil {
 		return err
 	}
-	return mp.cacheSet(pCtx, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
+
+	return mp.cacheSet(runtime.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
 // NftOpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
 func NftOpenseaCacheGet(pCtx context.Context, pWalletAddresses []string, pRuntime *runtime.Runtime) ([]*Nft, error) {
 
-	mp := newStorage(0, nftColName, pRuntime).withRedis(OpenseaAssetsRDB, pRuntime)
-	defer mp.cacheClose()
+	mp := newStorage(0, nftColName, pRuntime)
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = strings.ToLower(v)
 	}
 
-	result, err := mp.cacheGet(pCtx, fmt.Sprint(pWalletAddresses))
+	result, err := mp.cacheGet(runtime.OpenseaRDB, fmt.Sprint(pWalletAddresses))
 	if err != nil {
 		return nil, err
 	}
