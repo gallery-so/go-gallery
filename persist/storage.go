@@ -2,8 +2,6 @@ package persist
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/segmentio/ksuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -123,7 +122,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 	}
 	asMap["last_updated"] = now
 
-	result, err := m.collection.UpdateOne(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
+	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -204,7 +203,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 		asMap["created_at"] = now
 	}
 
-	if id, ok := asMap["_id"]; ok {
+	if id, ok := asMap["_id"]; ok && id != "" {
 		returnID = id.(DBID)
 	}
 
@@ -306,11 +305,11 @@ func (m *storage) cacheClose() error {
 }
 
 func generateID(it interface{}) DBID {
-	h := md5.New()
-	h.Write([]byte(fmt.Sprint(it)))
-	sum := h.Sum(nil)
-	hexStr := hex.EncodeToString(sum)
-	return DBID(hexStr)
+	id, err := ksuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return DBID(id.String())
 }
 
 // function that returns the pointer to the bool passed in
