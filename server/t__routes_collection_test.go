@@ -201,38 +201,6 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	assert.Empty(body.Error)
 }
 
-func TestGetHiddenCollectionsUnauthenticated_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
-
-	nfts := []*persist.NftDB{
-		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	}
-	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
-
-	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs,
-		Hidden:      true,
-	}, tc.r)
-	assert.Nil(err)
-
-	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
-
-	type CollectionsResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
-	}
-
-	body := CollectionsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 0)
-	assert.Empty(body.Error)
-}
-
 func TestGetNoHiddenCollections_Success(t *testing.T) {
 	setupTest(t)
 	assert := assert.New(t)
@@ -267,7 +235,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 
 	body := CollectionsResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 2)
+	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 }
 
