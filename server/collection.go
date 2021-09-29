@@ -207,6 +207,12 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		// TODO magic number
+		if len(input.Nfts) > 100 {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "collections can have no more than 100 NFTs"})
+			return
+		}
+
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
