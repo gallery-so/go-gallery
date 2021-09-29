@@ -34,7 +34,6 @@ type openseaAsset struct {
 	ExternalURL      string           `json:"external_link"`
 	TokenMetadataURL string           `json:"token_metadata_url"`
 	Creator          openseaAccount   `json:"creator"`
-	Owner            openseaAccount   `json:"owner"`
 	Contract         persist.Contract `json:"asset_contract"`
 
 	// OPEN_SEA_TOKEN_ID
@@ -199,16 +198,31 @@ func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAdd
 
 func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []string, pUser *persist.User, pRuntime *runtime.Runtime) ([]*persist.NftDB, error) {
 	result := []*persist.NftDB{}
+	nftsChan := make(chan []*persist.NftDB)
+	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
-		assets, err := openseaFetchAssetsForWallet(walletAddress, 0, pRuntime)
-		if err != nil {
+		go func(wa string) {
+			assets, err := openseaFetchAssetsForWallet(wa, 0, pRuntime)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			asGlry, err := openseaToDBNfts(pCtx, wa, assets, pUser, pRuntime)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			nftsChan <- asGlry
+		}(walletAddress)
+	}
+
+	for i := 0; i < len(pWalletAddresses); i++ {
+		select {
+		case nfts := <-nftsChan:
+			result = append(result, nfts...)
+		case err := <-errChan:
 			return nil, err
 		}
-		asGlry, err := openseaToDBNfts(pCtx, walletAddress, assets, pUser, pRuntime)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, asGlry...)
 	}
 
 	return result, nil
@@ -278,33 +292,58 @@ func openseaToDBNfts(pCtx context.Context, pWalletAddress string, openseaNfts []
 func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persist.User, pRuntime *runtime.Runtime) ([]*persist.Nft, error) {
 
 	nfts := make([]*persist.Nft, len(pNfts))
-	for i, nft := range pNfts {
-		nfts[i] = &persist.Nft{
-			ID:                   nft.ID,
-			Name:                 nft.Name,
-			Description:          nft.Description,
-			Version:              nft.Version,
-			CreationTime:         nft.CreationTime,
-			Deleted:              nft.Deleted,
-			CollectorsNote:       nft.CollectorsNote,
-			OwnerUserID:          pUser.ID,
-			OwnerUsername:        pUser.UserName,
-			OwnershipHistory:     nft.OwnershipHistory,
-			ExternalURL:          nft.ExternalURL,
-			TokenMetadataURL:     nft.TokenMetadataURL,
-			ImageURL:             nft.ImageURL,
-			CreatorAddress:       nft.CreatorAddress,
-			CreatorName:          nft.CreatorName,
-			OwnerAddress:         nft.OwnerAddress,
-			Contract:             nft.Contract,
-			OpenSeaID:            nft.OpenSeaID,
-			OpenSeaTokenID:       nft.OpenSeaTokenID,
-			ImageThumbnailURL:    nft.ImageThumbnailURL,
-			ImagePreviewURL:      nft.ImagePreviewURL,
-			ImageOriginalURL:     nft.ImageOriginalURL,
-			AnimationURL:         nft.AnimationURL,
-			AnimationOriginalURL: nft.AnimationOriginalURL,
-			AcquisitionDateStr:   nft.AcquisitionDateStr,
+	nftChan := make(chan *persist.Nft)
+	errChan := make(chan error)
+	for _, nft := range pNfts {
+		go func(n *persist.NftDB) {
+			result := &persist.Nft{
+				ID:                   n.ID,
+				Name:                 n.Name,
+				Description:          n.Description,
+				Version:              n.Version,
+				CreationTime:         n.CreationTime,
+				Deleted:              n.Deleted,
+				CollectorsNote:       n.CollectorsNote,
+				OwnerUserID:          pUser.ID,
+				OwnerUsername:        pUser.UserName,
+				OwnershipHistory:     n.OwnershipHistory,
+				ExternalURL:          n.ExternalURL,
+				TokenMetadataURL:     n.TokenMetadataURL,
+				ImageURL:             n.ImageURL,
+				CreatorAddress:       n.CreatorAddress,
+				CreatorName:          n.CreatorName,
+				OwnerAddress:         n.OwnerAddress,
+				Contract:             n.Contract,
+				OpenSeaID:            n.OpenSeaID,
+				OpenSeaTokenID:       n.OpenSeaTokenID,
+				ImageThumbnailURL:    n.ImageThumbnailURL,
+				ImagePreviewURL:      n.ImagePreviewURL,
+				ImageOriginalURL:     n.ImageOriginalURL,
+				AnimationURL:         n.AnimationURL,
+				AnimationOriginalURL: n.AnimationOriginalURL,
+				AcquisitionDateStr:   n.AcquisitionDateStr,
+			}
+			if n.ID == "" {
+				dbNFT, err := persist.NftGetByOpenseaID(pCtx, n.OpenSeaID, pRuntime)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if len(dbNFT) != 1 {
+					errChan <- fmt.Errorf("unable to find a single nft with opensea id %d", n.OpenSeaID)
+					return
+				}
+				result.ID = dbNFT[0].ID
+			}
+			nftChan <- result
+		}(nft)
+	}
+	for i := 0; i < len(pNfts); i++ {
+		select {
+		case nft := <-nftChan:
+			nfts[i] = nft
+		case err := <-errChan:
+			return nil, err
 		}
 	}
 
