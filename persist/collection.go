@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -221,7 +222,20 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := mp.pull(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, "nfts", bson.M{"$nin": pUpdate.Nfts}); err != nil {
+	nftsToBeRemoved := []*NftDB{}
+
+	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+		return err
+	}
+
+	idsToPull := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
+		idsToPull[i] = nft.ID
+	}
+
+	logrus.WithFields(logrus.Fields{"section": "CollClaimNFTs"}).Debug("NFTs to be removed: ", idsToPull)
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
@@ -260,10 +274,10 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 	}
 
 	nmp := newStorage(0, nftColName, pRuntime)
-	res := []*NftDB{}
-	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &res)
-	ids := make([]DBID, len(res))
-	for i, nft := range res {
+	nftsToBeRemoved := []*NftDB{}
+	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved)
+	ids := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
 		ids[i] = nft.ID
 	}
 

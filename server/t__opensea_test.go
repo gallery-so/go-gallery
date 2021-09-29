@@ -44,7 +44,18 @@ func TestFetchAssertsForAcc(t *testing.T) {
 		OpenSeaID:    46062320,
 	}
 
-	_, err = persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3}, tc.r)
+	nft4 := &persist.NftDB{
+		OwnerUserID:  mikeUserID,
+		OwnerAddress: "0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA",
+		Name:         "asdasdasd",
+		OpenSeaID:    46062322,
+	}
+
+	ids, err := persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3, nft4}, tc.r)
+	assert.Nil(t, err)
+
+	coll := &persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", Nfts: []persist.DBID{ids[3]}}
+	collID, err := persist.CollCreate(ctx, coll, tc.r)
 	assert.Nil(t, err)
 
 	now, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
@@ -56,6 +67,11 @@ func TestFetchAssertsForAcc(t *testing.T) {
 
 	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{"0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"}, true, tc.r)
 	assert.Nil(t, err)
+
+	mikeColl, err := persist.CollGetByID(ctx, collID, true, tc.r)
+	assert.Nil(t, err)
+	assert.Len(t, mikeColl, 1)
+	assert.Len(t, mikeColl[0].Nfts, 0)
 
 	nftsByUser, err := persist.NftGetByUserID(ctx, robinUserID, tc.r)
 	assert.Nil(t, err)
