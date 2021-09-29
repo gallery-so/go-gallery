@@ -188,7 +188,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user1)
+	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user1)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -198,6 +198,38 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	body := CollectionsResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Collections, 1)
+	assert.Empty(body.Error)
+}
+
+func TestGetHiddenCollectionsUnauthenticated_Failure(t *testing.T) {
+	setupTest(t)
+	assert := assert.New(t)
+
+	nfts := []*persist.NftDB{
+		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{Description: "bbb", OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{Description: "wowowowow", OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+	}
+	nftIDs, err := persist.NftCreateBulk(context.Background(), nfts, tc.r)
+
+	_, err = persist.CollCreate(context.Background(), &persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		Nfts:        nftIDs,
+		Hidden:      true,
+	}, tc.r)
+	assert.Nil(err)
+
+	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
+
+	type CollectionsResponse struct {
+		Collections []*persist.Collection `json:"collections"`
+		Error       string                `json:"error"`
+	}
+
+	body := CollectionsResponse{}
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Len(body.Collections, 0)
 	assert.Empty(body.Error)
 }
 
@@ -226,7 +258,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user2)
+	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -356,7 +388,7 @@ func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID) *h
 	return resp
 }
 
-func sendUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
+func sendCollUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
 
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, forUserID),

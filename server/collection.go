@@ -70,7 +70,8 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		userID, _ := getUserIDfromCtx(c)
+		auth := userID == input.UserID
 		colls, err := persist.CollGetByUserID(c, input.UserID, auth, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}

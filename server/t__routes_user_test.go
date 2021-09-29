@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -92,14 +93,14 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	update := userUpdateInput{
-		UserNameStr: "kaito",
+		UserName: "kaito",
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
-	assert.Equal(update.UserNameStr, user.UserName)
+	assert.Equal(update.UserName, user.UserName)
 }
 
 // Updating the username to itself should not trigger an error, despite the DB
@@ -109,14 +110,14 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	update := userUpdateInput{
-		UserNameStr: "bob",
+		UserName: "bob",
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
-	assert.Equal(update.UserNameStr, user.UserName)
+	assert.Equal(update.UserName, user.UserName)
 }
 
 func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
@@ -124,10 +125,10 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 	assert := assert.New(t)
 
 	update := userUpdateInput{
-		UserNameStr: "kaito",
+		UserName: "kaito",
 	}
 	resp := updateUserInfoNoAuthRequest(assert, update)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 }
 
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
@@ -135,14 +136,100 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert := assert.New(t)
 
 	update := userUpdateInput{
-		UserNameStr: tc.user2.username,
+		UserName: tc.user2.username,
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
 	assert.Nil(err)
-	assert.NotEqual(update.UserNameStr, user.UserName)
+	assert.NotEqual(update.UserName, user.UserName)
+}
+func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
+	setupTest(t)
+	assert := assert.New(t)
+
+	update := userUpdateInput{
+		UserName: "92ks&$m__",
+	}
+	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
+	assertErrorResponse(assert, resp)
+
+	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	assert.Nil(err)
+	assert.NotEqual(update.UserName, user.UserName)
+}
+
+func TestUserAddAddresses_Success(t *testing.T) {
+	setupTest(t)
+	assert := assert.New(t)
+
+	nonce := &persist.UserNonce{
+		Value:   "TestNonce",
+		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+	}
+	_, err := persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	assert.Nil(err)
+
+	update := userAddAddressInput{
+		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+	}
+	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
+	assertValidJSONResponse(assert, resp)
+
+	errResp := &errorResponse{}
+	err = util.UnmarshallBody(errResp, resp.Body)
+	assert.Nil(err)
+	assert.Empty(errResp.Error)
+
+	updatedUser, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	assert.Nil(err)
+	assert.Equal(update.Address, updatedUser.Addresses[1])
+}
+
+func TestUserRemoveAddresses_Success(t *testing.T) {
+	setupTest(t)
+	assert := assert.New(t)
+
+	user := &persist.User{
+		Addresses: []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+	}
+	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	assert.Nil(err)
+
+	nft := &persist.NftDB{
+		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Name:         "test",
+		OwnerUserID:  userID,
+	}
+	nftID, err := persist.NftCreate(context.Background(), nft, tc.r)
+
+	coll := &persist.CollectionDB{
+		Nfts:        []persist.DBID{nftID},
+		Name:        "test-coll",
+		OwnerUserID: userID,
+	}
+	collID, err := persist.CollCreate(context.Background(), coll, tc.r)
+
+	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	assert.Nil(err)
+
+	update := userRemoveAddressesInput{
+		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+	}
+	resp := userRemoveAddressesRequest(assert, update, jwt)
+	assertValidJSONResponse(assert, resp)
+
+	nfts, err := persist.NftGetByUserID(context.Background(), userID, tc.r)
+	assert.Nil(err)
+	assert.Empty(nfts)
+
+	colls, err := persist.CollGetByID(context.Background(), collID, true, tc.r)
+	assert.Nil(err)
+	assert.NotEmpty(colls)
+	assert.Empty(colls[0].Nfts)
+
 }
 
 func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt string) *http.Response {
@@ -150,6 +237,31 @@ func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt
 	assert.Nil(err)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/info", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
+}
+func userAddAddressesRequest(assert *assert.Assertions, input userAddAddressInput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/addresses/add", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
+}
+
+func userRemoveAddressesRequest(assert *assert.Assertions, input userRemoveAddressesInput, jwt string) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/addresses/remove", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 	client := &http.Client{}
