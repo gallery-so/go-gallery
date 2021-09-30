@@ -15,8 +15,7 @@ import (
 )
 
 func TestGetNftByID_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	name := "very cool nft"
@@ -41,8 +40,7 @@ func TestGetNftByID_Success(t *testing.T) {
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
 	assert.Nil(err)
@@ -54,8 +52,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonexistentNftID := "12345"
 
@@ -69,8 +66,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
@@ -102,8 +98,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
@@ -123,8 +118,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note"}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
@@ -136,8 +130,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NotFoundError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nftID := persist.DBID("no exist :(")
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
@@ -150,8 +143,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{

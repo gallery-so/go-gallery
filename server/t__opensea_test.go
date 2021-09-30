@@ -124,8 +124,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 }
 
 func TestOpenseaRateLimit_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 	var resp *http.Response
 	for i := 0; i < 100; i++ {
 		resp = openseaSyncRequest(assert, tc.user1.address, tc.user1.jwt)

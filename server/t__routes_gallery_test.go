@@ -14,8 +14,7 @@ import (
 )
 
 func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	initialCollectionOrder := []persist.DBID{}
 

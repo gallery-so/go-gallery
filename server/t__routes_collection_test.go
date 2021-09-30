@@ -14,8 +14,7 @@ import (
 )
 
 func TestUpdateCollectionNameByID_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with collection
 	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
@@ -47,8 +46,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 }
 
 func TestCreateCollection_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
@@ -97,8 +95,7 @@ func TestCreateCollection_Success(t *testing.T) {
 }
 
 func TestGetUnassignedCollection_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
@@ -129,8 +126,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
@@ -147,8 +143,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
@@ -159,8 +154,7 @@ func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
 }
 
 func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
@@ -170,8 +164,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 }
 
 func TestGetHiddenCollections_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
@@ -202,8 +195,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 }
 
 func TestGetNoHiddenCollections_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
@@ -240,8 +232,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 }
 
 func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
@@ -275,8 +266,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 }
 
 func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nfts := []*persist.NftDB{
 		{Description: "asd", OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},

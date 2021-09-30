@@ -15,8 +15,7 @@ import (
 )
 
 func TestAuthPreflightUserExists_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp := getPreflightRequest(assert, tc.user1.address, tc.user1.jwt)
 	assertValidResponse(assert, resp)
@@ -33,8 +32,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 }
 
 func TestAuthPreflightUserNotExists_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp := getPreflightRequest(assert, "0x456d569592f15Af845D0dbe984C12BAB8F430e31", "")
 	assertValidResponse(assert, resp)
@@ -51,8 +49,7 @@ func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 }
 
 func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp := getPreflightRequest(assert, "0x456d569592f15Af845D0dbe984C12BAB8F430e31", tc.user1.jwt)
 	assertValidResponse(assert, resp)
@@ -69,8 +66,7 @@ func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 }
 
 func TestUserCreate_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -94,8 +90,7 @@ func TestUserCreate_Success(t *testing.T) {
 	assert.NotEmpty(output.UserID)
 }
 func TestUserCreate_WrongNonce_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "Wrong Nonce",
@@ -109,8 +104,7 @@ func TestUserCreate_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestUserCreate_WrongSig_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -124,8 +118,7 @@ func TestUserCreate_WrongSig_Failure(t *testing.T) {
 }
 
 func TestUserCreate_WrongAddress_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -139,16 +132,14 @@ func TestUserCreate_WrongAddress_Failure(t *testing.T) {
 }
 
 func TestUserCreate_NoNonce_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp := createUserRequest(assert, "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b", "0x456d569592f15Af845D0dbe984C12BAB8F430e32")
 	assertErrorResponse(assert, resp)
 }
 
 func TestUserLogin_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -181,8 +172,7 @@ func TestUserLogin_Success(t *testing.T) {
 }
 
 func TestUserLogin_WrongNonce_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -204,8 +194,7 @@ func TestUserLogin_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestUserLogin_WrongSig_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -227,8 +216,7 @@ func TestUserLogin_WrongSig_Failure(t *testing.T) {
 }
 
 func TestUserLogin_WrongAddr_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -250,8 +238,7 @@ func TestUserLogin_WrongAddr_Failure(t *testing.T) {
 }
 
 func TestUserLogin_NoNonce_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -265,8 +252,7 @@ func TestUserLogin_NoNonce_Failure(t *testing.T) {
 }
 
 func TestUserLogin_UserNotExist_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -280,8 +266,7 @@ func TestUserLogin_UserNotExist_Failure(t *testing.T) {
 }
 
 func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
