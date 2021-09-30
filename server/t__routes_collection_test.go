@@ -188,7 +188,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user1)
+	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user1)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -226,7 +226,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 	}, tc.r)
 	assert.Nil(err)
 
-	resp := sendUserGetRequest(assert, string(tc.user1.id), tc.user2)
+	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -235,7 +235,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 
 	body := CollectionsResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 2)
+	assert.Len(body.Collections, 1)
 	assert.Empty(body.Error)
 }
 
@@ -356,7 +356,7 @@ func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID) *h
 	return resp
 }
 
-func sendUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
+func sendCollUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
 
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, forUserID),

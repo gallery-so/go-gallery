@@ -49,8 +49,8 @@ var bannedUsernames = map[string]bool{
 }
 
 type userUpdateInput struct {
-	UserNameStr string `json:"username" binding:"username"`
-	BioStr      string `json:"bio"`
+	UserName string `json:"username" binding:"username"`
+	BioStr   string `json:"bio"`
 }
 
 type userGetInput struct {
@@ -110,7 +110,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		if strings.HasSuffix(strings.ToLower(up.UserNameStr), ".eth") {
+		if strings.HasSuffix(strings.ToLower(up.UserName), ".eth") {
 			user, err := persist.UserGetByID(c, userID, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
@@ -118,7 +118,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 			can := false
 			for _, addr := range user.Addresses {
-				if resolves, _ := resolvesENS(c, up.UserNameStr, addr, pRuntime); resolves {
+				if resolves, _ := resolvesENS(c, up.UserName, addr, pRuntime); resolves {
 					can = true
 					break
 				}
@@ -415,8 +415,8 @@ func userUpdateInfoDB(pCtx context.Context, pUserID persist.DBID, pInput *userUp
 		pCtx,
 		pUserID,
 		&persist.UserUpdateInfoInput{
-			UserNameIdempotent: strings.ToLower(pInput.UserNameStr),
-			UserName:           pInput.UserNameStr,
+			UserNameIdempotent: strings.ToLower(pInput.UserName),
+			UserName:           pInput.UserName,
 			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
 		},
 		pRuntime,

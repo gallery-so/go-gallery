@@ -46,7 +46,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
 	assert.Nil(err)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := errorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -61,7 +61,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nonexistentNftID))
 	assert.Nil(err)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := errorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -115,7 +115,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
 	resp := updateNFTUnauthedRequest(assert, update)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := errorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -128,7 +128,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note"}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := errorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -142,7 +142,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 	nftID := persist.DBID("no exist :(")
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := errorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -162,7 +162,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 
 	update := updateNftByIDInput{CollectorsNote: "new nft name", ID: nftID}
 	resp := updateNFTRequest(assert, update, tc.user2.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 }
 

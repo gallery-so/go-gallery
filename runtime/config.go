@@ -21,6 +21,8 @@ const (
 
 	openseaAPIKey = "OPENSEA_API_KEY"
 
+	jwtSecret = "JWT_SECRET"
+
 	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "REDIS_PASS_SECRET_NAME"
 
@@ -42,6 +44,8 @@ type Config struct {
 
 	OpenseaAPIKey string
 
+	JWTSecret string
+
 	RedisURL      string
 	RedisPassword string
 
@@ -62,6 +66,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 
 	viper.SetDefault(mongoDBname, "gallery")
+	viper.SetDefault(jwtSecret, "Test-Secret")
 
 	viper.SetDefault(redisURL, "localhost:6379")
 

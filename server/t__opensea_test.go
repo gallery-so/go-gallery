@@ -2,16 +2,19 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
 //---------------------------------------------------
-func TestFetchAssertsForAcc(t *testing.T) {
+func TestOpenseaSync_Success(t *testing.T) {
 	setupTest(t)
 	ctx := context.Background()
 
@@ -46,7 +49,7 @@ func TestFetchAssertsForAcc(t *testing.T) {
 
 	nft4 := &persist.NftDB{
 		OwnerUserID:  mikeUserID,
-		OwnerAddress: "0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA",
+		OwnerAddress: strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"),
 		Name:         "asdasdasd",
 		OpenSeaID:    46062322,
 	}
@@ -65,7 +68,7 @@ func TestFetchAssertsForAcc(t *testing.T) {
 	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, true, tc.r)
 	assert.Nil(t, err)
 
-	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{"0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"}, true, tc.r)
+	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}, true, tc.r)
 	assert.Nil(t, err)
 
 	mikeColl, err := persist.CollGetByID(ctx, collID, true, tc.r)
@@ -93,6 +96,21 @@ func TestFetchAssertsForAcc(t *testing.T) {
 		ids2[i] = nft.OpenSeaID
 	}
 
+	// a function that finds the difference between two arrays
+	arrayDiff := func(a, b []int) []int {
+		mb := map[int]bool{}
+		for _, x := range b {
+			mb[x] = true
+		}
+		ab := []int{}
+		for _, x := range a {
+			if _, ok := mb[x]; !ok {
+				ab = append(ab, x)
+			}
+		}
+		return ab
+	}
+
 	log.Println(arrayDiff(ids1, ids2))
 
 	assert.Len(t, robinOpenseaNFTs, len(nftsByUser))
@@ -105,17 +123,33 @@ func TestFetchAssertsForAcc(t *testing.T) {
 
 }
 
-// a function that finds the difference between two arrays
-func arrayDiff(a, b []int) []int {
-	mb := map[int]bool{}
-	for _, x := range b {
-		mb[x] = true
+func TestOpenseaRateLimit_Failure(t *testing.T) {
+	setupTest(t)
+	assert := assert.New(t)
+	var resp *http.Response
+	for i := 0; i < 100; i++ {
+		resp = openseaSyncRequest(assert, tc.user1.address, tc.user1.jwt)
 	}
-	ab := []int{}
-	for _, x := range a {
-		if _, ok := mb[x]; !ok {
-			ab = append(ab, x)
-		}
+	assertErrorResponse(assert, resp)
+	type OpenseaSyncResp struct {
+		getNftsOutput
+		Error string `json:"error"`
 	}
-	return ab
+	output := &OpenseaSyncResp{}
+	err := util.UnmarshallBody(output, resp.Body)
+	assert.Nil(err)
+	assert.NotEmpty(output.Error)
+	assert.Equal(output.Error, "rate limited")
+}
+
+func openseaSyncRequest(assert *assert.Assertions, address string, jwt string) *http.Response {
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/nfts/opensea_get?addresses=%s&skip_cache=true", tc.serverURL, address),
+		nil)
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
 }
