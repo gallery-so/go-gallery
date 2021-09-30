@@ -181,12 +181,22 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 // by a given authorized user as well as that no other collection contains the NFTs
 // being included in the updated collection. This is to ensure that the NFTs are not
 // being shared between collections.
-func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
+func CollUpdateNFTs(pCtx context.Context, pID DBID,
 	pUserID DBID,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, collectionColName, pRuntime)
+
+	nmp := newStorage(0, nftColName, pRuntime)
+
+	ct, err := nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_user_id": pUserID})
+	if err != nil {
+		return err
+	}
+	if int(ct) != len(pUpdate.Nfts) {
+		return errors.New("not all nfts are owned by the user")
+	}
 
 	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -198,7 +208,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 		return err
 	}
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
 // CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
