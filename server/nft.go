@@ -105,7 +105,7 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.UpdateNFTInfoInput{CollectorsNote: input.CollectorsNote}
+		update := &persist.UpdateNFTInfoInput{CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := persist.NftUpdateByID(c, input.ID, userID, update, pRuntime)
 		if err != nil {
