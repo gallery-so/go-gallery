@@ -300,8 +300,8 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 
 // uniqueDBID ensures that an array of DBIDs has no repeat items
 func uniqueDBID(a []persist.DBID) []persist.DBID {
-	result := make([]persist.DBID, 0)
-	m := make(map[persist.DBID]bool)
+	result := []persist.DBID{}
+	m := map[persist.DBID]bool{}
 
 	for _, val := range a {
 		if _, ok := m[val]; !ok {
