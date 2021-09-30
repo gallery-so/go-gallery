@@ -347,7 +347,6 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
 		Address: strings.ToLower(pAddress),
-		UserID:  pUserID,
 	}
 
 	_, err := persist.AuthNonceCreate(pCtx, newNonce, pRuntime)

@@ -308,11 +308,11 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	output := &userAddAddressOutput{}
 
-	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	nonceValueStr, userID, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
-	if id != "" {
+	if userID != "" {
 		return nil, errors.New("user already exists with a given address")
 	}
 
@@ -461,6 +461,7 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	} else {
 		return nonceValue, userID, errors.New("no user found")
 	}
+
 	//------------------
 
 	return nonceValue, userID, nil

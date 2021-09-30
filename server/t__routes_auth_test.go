@@ -145,12 +145,11 @@ func TestUserLogin_Success(t *testing.T) {
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
 	}
 
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	_, err := persist.UserCreate(context.Background(), user, tc.r)
 	assert.Nil(err)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		UserID:  userID,
 		Address: user.Addresses[0],
 	}
 	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
@@ -178,12 +177,11 @@ func TestUserLogin_WrongNonce_Failure(t *testing.T) {
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
 	}
 
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	_, err := persist.UserCreate(context.Background(), user, tc.r)
 	assert.Nil(err)
 
 	nonce := &persist.UserNonce{
 		Value:   "Wrong Nonce",
-		UserID:  userID,
 		Address: user.Addresses[0],
 	}
 	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
@@ -200,12 +198,11 @@ func TestUserLogin_WrongSig_Failure(t *testing.T) {
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
 	}
 
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	_, err := persist.UserCreate(context.Background(), user, tc.r)
 	assert.Nil(err)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		UserID:  userID,
 		Address: user.Addresses[0],
 	}
 	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
@@ -222,12 +219,11 @@ func TestUserLogin_WrongAddr_Failure(t *testing.T) {
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
 	}
 
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	_, err := persist.UserCreate(context.Background(), user, tc.r)
 	assert.Nil(err)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		UserID:  userID,
 		Address: user.Addresses[0],
 	}
 	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
@@ -270,7 +266,6 @@ func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		UserID:  tc.user1.id,
 		Address: "0x456d569592f15Af845D0dbe984C12BAB8F430e31",
 	}
 	_, err := persist.AuthNonceCreate(context.Background(), nonce, tc.r)
