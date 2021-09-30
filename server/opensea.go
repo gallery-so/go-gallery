@@ -20,7 +20,7 @@ import (
 
 // persist.GLRYnft struct tags reflect the json data of an open sea response and therefore
 // can be unmarshalled from the api response
-type openSeaAssets struct {
+type openseaAssets struct {
 	Assets []*openseaAsset `json:"assets"`
 }
 
@@ -31,10 +31,11 @@ type openseaAsset struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 
-	ExternalURL      string           `json:"external_link"`
-	TokenMetadataURL string           `json:"token_metadata_url"`
-	Creator          openseaAccount   `json:"creator"`
-	Contract         persist.Contract `json:"asset_contract"`
+	ExternalURL      string            `json:"external_link"`
+	TokenMetadataURL string            `json:"token_metadata_url"`
+	Creator          openseaAccount    `json:"creator"`
+	Contract         persist.Contract  `json:"asset_contract"`
+	Collection       openseaCollection `json:"collection"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
@@ -68,6 +69,10 @@ type openseaAccount struct {
 
 type openseaUser struct {
 	Username string `json:"username"`
+}
+
+type openseaCollection struct {
+	Name string `json:"name"`
 }
 
 func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []string, skipCache bool,
@@ -258,7 +263,7 @@ func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int, pRuntime *r
 		return nil, err
 	}
 	defer resp.Body.Close()
-	response := &openSeaAssets{}
+	response := &openseaAssets{}
 	err = util.UnmarshallBody(response, resp.Body)
 	if err != nil {
 		return nil, err
@@ -306,6 +311,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 				CollectorsNote:       n.CollectorsNote,
 				OwnerUserID:          pUser.ID,
 				OwnerUsername:        pUser.UserName,
+				TokenCollectionName:  n.TokenCollectionName,
 				OwnershipHistory:     n.OwnershipHistory,
 				ExternalURL:          n.ExternalURL,
 				TokenMetadataURL:     n.TokenMetadataURL,
@@ -363,6 +369,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAss
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
 		OpenSeaID:            nft.ID,
+		TokenCollectionName:  nft.Collection.Name,
 		ImageThumbnailURL:    nft.ImageThumbnailURL,
 		ImagePreviewURL:      nft.ImagePreviewURL,
 		ImageOriginalURL:     nft.ImageOriginalURL,
