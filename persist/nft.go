@@ -68,7 +68,7 @@ type Nft struct {
 
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 
-	OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
+	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
 	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
@@ -418,17 +418,17 @@ func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {
 			"as":           "ownership_history",
 		}}},
 		{{Key: "$set", Value: bson.M{"ownership_history": bson.M{"$arrayElemAt": []interface{}{"$ownership_history", 0}}}}},
-		{{Key: "$lookup", Value: bson.M{
-			"from": "users",
-			"let":  bson.M{"owners": "$owner_addresses"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{
-					"$expr": bson.M{
-						"$in": []interface{}{"$addresses", "$$owners"},
-					},
-				}}},
-			},
-			"as": "owner_users",
-		}}},
+		// {{Key: "$lookup", Value: bson.M{
+		// 	"from": "users",
+		// 	"let":  bson.M{"owners": "$owner_addresses"},
+		// 	"pipeline": mongo.Pipeline{
+		// 		{{Key: "$match", Value: bson.M{
+		// 			"$expr": bson.M{
+		// 				"$in": []interface{}{bson.M{"$first": "$addresses"}, "$$owners"},
+		// 			},
+		// 		}}},
+		// 	},
+		// 	"as": "owner_users",
+		// }}},
 	}
 }
