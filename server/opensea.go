@@ -323,7 +323,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 				CreatorName:          n.CreatorName,
 				OwnerAddresses:       n.OwnerAddresses,
 				Contract:             n.Contract,
-				OpenSeaID:            n.OpenSeaID,
+				OpenSeaID:            n.OpenseaID,
 				OpenSeaTokenID:       n.OpenSeaTokenID,
 				ImageThumbnailURL:    n.ImageThumbnailURL,
 				ImagePreviewURL:      n.ImagePreviewURL,
@@ -333,13 +333,13 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 				AcquisitionDateStr:   n.AcquisitionDateStr,
 			}
 			if n.ID == "" {
-				dbNFT, err := persist.NftGetByOpenseaID(pCtx, n.OpenSeaID, pRuntime)
+				dbNFT, err := persist.NftGetByOpenseaID(pCtx, n.OpenseaID, pRuntime)
 				if err != nil {
 					errChan <- err
 					return
 				}
 				if len(dbNFT) != 1 {
-					errChan <- fmt.Errorf("unable to find a single nft with opensea id %d", n.OpenSeaID)
+					errChan <- fmt.Errorf("unable to find a single nft with opensea id %d", n.OpenseaID)
 					return
 				}
 				result.ID = dbNFT[0].ID
@@ -371,7 +371,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAss
 		CreatorAddress:       strings.ToLower(nft.Creator.Address),
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
-		OpenSeaID:            nft.ID,
+		OpenseaID:            nft.ID,
 		TokenCollectionName:  nft.Collection.Name,
 		ImageThumbnailURL:    nft.ImageThumbnailURL,
 		ImagePreviewURL:      nft.ImagePreviewURL,

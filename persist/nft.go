@@ -42,7 +42,7 @@ type NftDB struct {
 	Contract            Contract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string   `bson:"token_collection_name" json:"token_collection_name"`
 
-	OpenSeaID int `bson:"opensea_id"       json:"opensea_id"`
+	OpenseaID int `bson:"opensea_id"       json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
@@ -322,7 +322,7 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 					addresses := it["owner_addresses"]
 					delete(it, "owner_addresses")
 					delete(it, "_id")
-					_, err := mp.collection.UpdateOne(pCtx, bson.M{"_id": returnID}, bson.M{"$addToSet": bson.M{"owner_addresses": addresses}, "$set": it})
+					_, err := mp.collection.UpdateOne(pCtx, bson.M{"_id": returnID}, bson.M{"$addToSet": bson.M{"owner_addresses": bson.M{"$each": addresses}}, "$set": it})
 					if err != nil {
 						errs <- err
 						return
@@ -330,7 +330,7 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 				}
 				ids <- returnID
 			} else {
-				id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
+				id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID}, nft)
 				if err != nil {
 					errs <- err
 				}
@@ -394,12 +394,12 @@ func findDifference(nfts []*NftDB, dbNfts []*NftDB) ([]DBID, error) {
 	currOpenseaIds := map[int]bool{}
 
 	for _, v := range nfts {
-		currOpenseaIds[v.OpenSeaID] = true
+		currOpenseaIds[v.OpenseaID] = true
 	}
 
 	diff := []DBID{}
 	for _, v := range dbNfts {
-		if !currOpenseaIds[v.OpenSeaID] {
+		if !currOpenseaIds[v.OpenseaID] {
 			diff = append(diff, v.ID)
 		}
 	}

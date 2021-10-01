@@ -36,11 +36,11 @@ type TestUser struct {
 func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 	ctx := context.Background()
 
-	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
+	address := strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40)))
 	user := &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{strings.ToLower(address)},
+		Addresses:          []string{address},
 	}
 	id, err := persist.UserCreate(ctx, user, r)
 	if err != nil {

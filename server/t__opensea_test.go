@@ -15,73 +15,94 @@ import (
 
 //---------------------------------------------------
 func TestOpenseaSync_Success(t *testing.T) {
-	setupTest(t)
+	assert := setupTest(t)
 	ctx := context.Background()
 
 	mike := &persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}}
 	robin := &persist.User{UserName: "robin", UserNameIdempotent: "robin", Addresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}}
 	gianna := &persist.User{UserName: "gianna", UserNameIdempotent: "gianna", Addresses: []string{"0xdd33e6fd03983c970ae5e647df07314435d69f6b"}}
+	userWithERC1155 := &persist.User{UserName: "bibby", UserNameIdempotent: "bibby", Addresses: []string{strings.ToLower("0x04212b21b40631d4de9653e5ec751267c2599d11")}}
+	anotherUserWithSameERC1155 := &persist.User{UserName: "bibby2", UserNameIdempotent: "bibby2", Addresses: []string{strings.ToLower("0x140fa5513e110e4a5dcef471b84bc431c13e3d0e")}}
 	robinUserID, err := persist.UserCreate(ctx, robin, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 	giannaUserID, err := persist.UserCreate(ctx, gianna, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 	mikeUserID, err := persist.UserCreate(ctx, mike, tc.r)
+	assert.Nil(err)
+	_, err = persist.UserCreate(ctx, userWithERC1155, tc.r)
+	assert.Nil(err)
+	anotherUserWithSameERC1155ID, err := persist.UserCreate(ctx, anotherUserWithSameERC1155, tc.r)
+	assert.Nil(err)
 
 	nft := &persist.NftDB{
 		OwnerAddresses: []string{"0xdd33e6fd03983c970ae5e647df07314435d69f6b"},
 		Name:           "kks",
-		OpenSeaID:      34147626,
+		OpenseaID:      34147626,
 	}
 
 	nft2 := &persist.NftDB{
 		OwnerAddresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"},
 		Name:           "malsjdlaksjd",
-		OpenSeaID:      46062326,
+		OpenseaID:      46062326,
 	}
 	nft3 := &persist.NftDB{
 		OwnerAddresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"},
 		Name:           "asdjasdasd",
-		OpenSeaID:      46062320,
+		OpenseaID:      46062320,
 	}
 
 	nft4 := &persist.NftDB{
 		OwnerAddresses: []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")},
 		Name:           "asdasdasd",
-		OpenSeaID:      46062322,
+		OpenseaID:      46062322,
 	}
 
-	ids, err := persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3, nft4}, tc.r)
-	assert.Nil(t, err)
+	erc1155 := &persist.NftDB{
+		OwnerAddresses: []string{strings.ToLower("0x04212b21b40631d4de9653e5ec751267c2599d11")},
+		Name:           "be",
+		OpenseaID:      34530596,
+	}
+
+	ids, err := persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3, nft4, erc1155}, tc.r)
+	assert.Nil(err)
 
 	coll := &persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", Nfts: []persist.DBID{ids[3]}}
 	collID, err := persist.CollCreate(ctx, coll, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
 	now, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
-	assert.Nil(t, err)
-	assert.Len(t, now, 1)
+	assert.Nil(err)
+	assert.Len(now, 1)
 
 	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, true, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
 	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}, true, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
+
+	_, err = openSeaPipelineAssetsForAcc(ctx, anotherUserWithSameERC1155ID, []string{strings.ToLower("0x140fa5513e110e4a5dcef471b84bc431c13e3d0e")}, true, tc.r)
+	assert.Nil(err)
+
+	erc1155Now, err := persist.NftGetByOpenseaID(ctx, 34530596, tc.r)
+	assert.Nil(err)
+	assert.Len(erc1155Now, 1)
+	assert.Len(erc1155Now[0].OwnerAddresses, 2)
 
 	mikeColl, err := persist.CollGetByID(ctx, collID, true, tc.r)
-	assert.Nil(t, err)
-	assert.Len(t, mikeColl, 1)
-	assert.Len(t, mikeColl[0].Nfts, 0)
+	assert.Nil(err)
+	assert.Len(mikeColl, 1)
+	assert.Len(mikeColl[0].Nfts, 0)
 
 	nftsByUser, err := persist.NftGetByUserID(ctx, robinUserID, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
 	nftsByUserTwo, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
 	nftsByUserThree, err := persist.NftGetByUserID(ctx, mikeUserID, tc.r)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
-	assert.Len(t, nftsByUserTwo, 0)
+	assert.Len(nftsByUserTwo, 0)
 
 	ids1 := make([]int, len(robinOpenseaNFTs))
 	ids2 := make([]int, len(nftsByUser))
@@ -109,13 +130,13 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	log.Println("DIF", arrayDiff(ids1, ids2))
 
-	assert.Len(t, robinOpenseaNFTs, len(nftsByUser))
+	assert.Len(robinOpenseaNFTs, len(nftsByUser))
 
-	assert.Len(t, mikeOpenseaNFTs, len(nftsByUserThree))
+	assert.Len(mikeOpenseaNFTs, len(nftsByUserThree))
 
-	assert.Greater(t, len(nftsByUserThree), 0)
+	assert.Greater(len(nftsByUserThree), 0)
 
-	assert.NotNil(t, nftsByUser[0].OwnershipHistory)
+	assert.NotNil(nftsByUser[0].OwnershipHistory)
 
 }
 
