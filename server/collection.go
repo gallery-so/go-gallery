@@ -162,7 +162,7 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.CollectionUpdateInfoInput{Name: input.Name, CollectorsNote: input.CollectorsNote}
+		update := &persist.CollectionUpdateInfoInput{Name: sanitizationPolicy.Sanitize(input.Name), CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
@@ -277,8 +277,8 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	coll := &persist.CollectionDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
-		Name:           pInput.Name,
-		CollectorsNote: pInput.CollectorsNote,
+		Name:           sanitizationPolicy.Sanitize(pInput.Name),
+		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 
 	collID, err := persist.CollCreate(pCtx, coll, pRuntime)

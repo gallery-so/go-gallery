@@ -106,7 +106,8 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
-func setupTest(t *testing.T) {
+func setupTest(t *testing.T) *assert.Assertions {
 	tc = initializeTestEnv()
 	t.Cleanup(teardown)
+	return assert.New(t)
 }

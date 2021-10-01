@@ -29,8 +29,7 @@ func TestGetUserByID_Success(t *testing.T) {
 }
 
 func TestGetUserByAddress_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/users/get?address=%s", tc.serverURL, tc.user2.address))
 	assert.Nil(err)
@@ -42,8 +41,7 @@ func TestGetUserByAddress_Success(t *testing.T) {
 }
 
 func TestGetUserByUsername_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/users/get?username=%s", tc.serverURL, tc.user1.username))
 	assert.Nil(err)
@@ -55,8 +53,7 @@ func TestGetUserByUsername_Success(t *testing.T) {
 }
 
 func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	userID := tc.user1.id
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, userID), nil)
@@ -74,8 +71,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 }
 
 func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	userID := tc.user1.id
 	resp, err := http.Get(fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, userID))
@@ -89,8 +85,7 @@ func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
 }
 
 func TestUpdateUserAuthenticated_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := userUpdateInput{
 		UserName: "kaito",
@@ -106,8 +101,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 // Updating the username to itself should not trigger an error, despite the DB
 // having a user entity with that username already
 func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := userUpdateInput{
 		UserName: "bob",
@@ -121,8 +115,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 }
 
 func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := userUpdateInput{
 		UserName: "kaito",
@@ -132,8 +125,7 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 }
 
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := userUpdateInput{
 		UserName: tc.user2.username,
@@ -146,8 +138,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert.NotEqual(update.UserName, user.UserName)
 }
 func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	update := userUpdateInput{
 		UserName: "92ks&$m__",
@@ -161,8 +152,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
 }
 
 func TestUserAddAddresses_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -188,9 +178,49 @@ func TestUserAddAddresses_Success(t *testing.T) {
 	assert.Equal(update.Address, updatedUser.Addresses[1])
 }
 
+func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
+	assert := setupTest(t)
+
+	nonce := &persist.UserNonce{
+		Value:   "Wrong Nonce",
+		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+	}
+	_, err := persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	assert.Nil(err)
+
+	update := userAddAddressInput{
+		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+	}
+	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
+	assertErrorResponse(assert, resp)
+}
+
+func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
+	assert := setupTest(t)
+
+	user := &persist.User{
+		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+	}
+	_, err := persist.UserCreate(context.Background(), user, tc.r)
+
+	nonce := &persist.UserNonce{
+		Value:   "TestNonce",
+		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+	}
+	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	assert.Nil(err)
+
+	update := userAddAddressInput{
+		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+	}
+	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
+	assertErrorResponse(assert, resp)
+}
+
 func TestUserRemoveAddresses_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
@@ -230,6 +260,47 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert.NotEmpty(colls)
 	assert.Empty(colls[0].Nfts)
 
+}
+
+func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
+	assert := setupTest(t)
+
+	user := &persist.User{
+		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+	}
+	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	assert.Nil(err)
+
+	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	assert.Nil(err)
+
+	update := userRemoveAddressesInput{
+		Addresses: []string{strings.ToLower(tc.user1.address)},
+	}
+
+	resp := userRemoveAddressesRequest(assert, update, jwt)
+	assertErrorResponse(assert, resp)
+
+}
+
+func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
+	assert := setupTest(t)
+
+	user := &persist.User{
+		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+	}
+	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	assert.Nil(err)
+
+	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	assert.Nil(err)
+
+	update := userRemoveAddressesInput{
+		Addresses: user.Addresses,
+	}
+
+	resp := userRemoveAddressesRequest(assert, update, jwt)
+	assertErrorResponse(assert, resp)
 }
 
 func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt string) *http.Response {
