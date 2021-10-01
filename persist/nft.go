@@ -31,14 +31,15 @@ type NftDB struct {
 
 	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
 
-	Name             string   `bson:"name"                 json:"name"`
-	Description      string   `bson:"description"          json:"description"`
-	ExternalURL      string   `bson:"external_url"         json:"external_url"`
-	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
-	CreatorAddress   string   `bson:"creator_address"      json:"creator_address"`
-	CreatorName      string   `bson:"creator_name" json:"creator_name"`
-	OwnerAddress     string   `bson:"owner_address" json:"owner_address"`
-	Contract         Contract `bson:"contract"     json:"asset_contract"`
+	Name                string   `bson:"name"                 json:"name"`
+	Description         string   `bson:"description"          json:"description"`
+	ExternalURL         string   `bson:"external_url"         json:"external_url"`
+	TokenMetadataURL    string   `bson:"token_metadata_url" json:"token_metadata_url"`
+	CreatorAddress      string   `bson:"creator_address"      json:"creator_address"`
+	CreatorName         string   `bson:"creator_name" json:"creator_name"`
+	OwnerAddress        string   `bson:"owner_address" json:"owner_address"`
+	Contract            Contract `bson:"contract"     json:"asset_contract"`
+	TokenCollectionName string   `bson:"token_collection_name" json:"token_collection_name"`
 
 	OpenSeaID int `bson:"opensea_id"       json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
@@ -70,14 +71,15 @@ type Nft struct {
 
 	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
 
-	Name             string   `bson:"name"                 json:"name"`
-	Description      string   `bson:"description"          json:"description"`
-	ExternalURL      string   `bson:"external_url"         json:"external_url"`
-	TokenMetadataURL string   `bson:"token_metadata_url" json:"token_metadata_url"`
-	CreatorAddress   string   `bson:"creator_address"      json:"creator_address"`
-	CreatorName      string   `bson:"creator_name" json:"creator_name"`
-	OwnerAddress     string   `bson:"owner_address" json:"owner_address"`
-	Contract         Contract `bson:"contract"     json:"asset_contract"`
+	Name                string   `bson:"name"                 json:"name"`
+	Description         string   `bson:"description"          json:"description"`
+	ExternalURL         string   `bson:"external_url"         json:"external_url"`
+	TokenMetadataURL    string   `bson:"token_metadata_url" json:"token_metadata_url"`
+	CreatorAddress      string   `bson:"creator_address"      json:"creator_address"`
+	CreatorName         string   `bson:"creator_name" json:"creator_name"`
+	OwnerAddress        string   `bson:"owner_address" json:"owner_address"`
+	Contract            Contract `bson:"contract"     json:"asset_contract"`
+	TokenCollectionName string   `bson:"token_collection_name" json:"token_collection_name"`
 
 	OpenSeaID int `bson:"opensea_id"       json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
