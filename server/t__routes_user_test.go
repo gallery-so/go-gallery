@@ -229,9 +229,8 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 
 	nft := &persist.NftDB{
-		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-		Name:         "test",
-		OwnerUserID:  userID,
+		OwnerAddresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		Name:           "test",
 	}
 	nftID, err := persist.NftCreate(context.Background(), nft, tc.r)
 

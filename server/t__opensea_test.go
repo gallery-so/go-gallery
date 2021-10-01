@@ -28,30 +28,26 @@ func TestOpenseaSync_Success(t *testing.T) {
 	mikeUserID, err := persist.UserCreate(ctx, mike, tc.r)
 
 	nft := &persist.NftDB{
-		OwnerUserID:  giannaUserID,
-		OwnerAddress: "0xdd33e6fd03983c970ae5e647df07314435d69f6b",
-		Name:         "kks",
-		OpenSeaID:    34147626,
+		OwnerAddresses: []string{"0xdd33e6fd03983c970ae5e647df07314435d69f6b"},
+		Name:           "kks",
+		OpenSeaID:      34147626,
 	}
 
 	nft2 := &persist.NftDB{
-		OwnerUserID:  robinUserID,
-		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
-		Name:         "malsjdlaksjd",
-		OpenSeaID:    46062326,
+		OwnerAddresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"},
+		Name:           "malsjdlaksjd",
+		OpenSeaID:      46062326,
 	}
 	nft3 := &persist.NftDB{
-		OwnerUserID:  robinUserID,
-		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
-		Name:         "asdjasdasd",
-		OpenSeaID:    46062320,
+		OwnerAddresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"},
+		Name:           "asdjasdasd",
+		OpenSeaID:      46062320,
 	}
 
 	nft4 := &persist.NftDB{
-		OwnerUserID:  mikeUserID,
-		OwnerAddress: strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"),
-		Name:         "asdasdasd",
-		OpenSeaID:    46062322,
+		OwnerAddresses: []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")},
+		Name:           "asdasdasd",
+		OpenSeaID:      46062322,
 	}
 
 	ids, err := persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3, nft4}, tc.r)
@@ -111,7 +107,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 		return ab
 	}
 
-	log.Println(arrayDiff(ids1, ids2))
+	log.Println("DIF", arrayDiff(ids1, ids2))
 
 	assert.Len(t, robinOpenseaNFTs, len(nftsByUser))
 

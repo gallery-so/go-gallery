@@ -26,8 +26,10 @@ type NftDB struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
+	CollectorsNote string   `bson:"collectors_note" json:"collectors_note"`
+	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+
+	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
 	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
 
@@ -37,7 +39,6 @@ type NftDB struct {
 	TokenMetadataURL    string   `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress      string   `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string   `bson:"creator_name" json:"creator_name"`
-	OwnerAddress        string   `bson:"owner_address" json:"owner_address"`
 	Contract            Contract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string   `bson:"token_collection_name" json:"token_collection_name"`
 
@@ -66,8 +67,11 @@ type Nft struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
-	OwnerUsername  string `bson:"owner_username" json:"owner_username"`
+
+	OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
+	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+
+	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
 	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
 
@@ -77,7 +81,6 @@ type Nft struct {
 	TokenMetadataURL    string   `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress      string   `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string   `bson:"creator_name" json:"creator_name"`
-	OwnerAddress        string   `bson:"owner_address" json:"owner_address"`
 	Contract            Contract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string   `bson:"token_collection_name" json:"token_collection_name"`
 
@@ -103,7 +106,9 @@ type CollectionNft struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 
-	OwnerUserID DBID `bson:"owner_user_id" json:"user_id"`
+	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+
+	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
 	Name string `bson:"name"                 json:"name"`
 
@@ -177,10 +182,27 @@ func NftGetByUserID(pCtx context.Context, pUserID DBID,
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
+
+	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return nil, err
+	}
+
+	return NftGetByAddresses(pCtx, user.Addresses, pRuntime)
+}
+
+// NftGetByAddresses finds an nft by its owner user id
+func NftGetByAddresses(pCtx context.Context, pAddresses []string,
+	pRuntime *runtime.Runtime) ([]*Nft, error) {
+	opts := options.Aggregate()
+	if deadline, ok := pCtx.Deadline(); ok {
+		dur := time.Until(deadline)
+		opts.SetMaxTime(dur)
+	}
 	mp := newStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_user_id": pUserID}), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_addresses": bson.M{"$in": pAddresses}}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -249,7 +271,12 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 
 	mp := newStorage(0, nftColName, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
+	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+
+	return mp.update(pCtx, bson.M{"_id": pID, "owner_addresses": bson.M{"$in": user.Addresses}}, pUpdate)
 }
 
 // NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
@@ -262,13 +289,53 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 	errs := make(chan error)
 
 	for _, v := range pNfts {
-
 		go func(nft *NftDB) {
-			id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
-			if err != nil {
-				errs <- err
+			if nft.MultipleOwners {
+				// manually upsert with a push to set for addresses
+				returnID := DBID("")
+				now := primitive.NewDateTimeFromTime(time.Now())
+				it, err := structToBsonMap(nft)
+				if err != nil {
+					errs <- err
+					return
+				}
+				it["last_updated"] = now
+				if _, ok := it["created_at"]; !ok {
+					it["created_at"] = now
+				}
+
+				if id, ok := it["_id"]; ok && id != "" {
+					returnID = id.(DBID)
+				}
+
+				if returnID == "" {
+					delete(it, "_id")
+					res, err := mp.collection.InsertOne(pCtx, it)
+					if err != nil {
+						errs <- err
+						return
+					}
+					if it, ok := res.InsertedID.(string); ok {
+						returnID = DBID(it)
+					}
+				} else {
+					addresses := it["owner_addresses"]
+					delete(it, "owner_addresses")
+					delete(it, "_id")
+					_, err := mp.collection.UpdateOne(pCtx, bson.M{"_id": returnID}, bson.M{"$addToSet": bson.M{"owner_addresses": addresses}, "$set": it})
+					if err != nil {
+						errs <- err
+						return
+					}
+				}
+				ids <- returnID
+			} else {
+				id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenSeaID}, nft)
+				if err != nil {
+					errs <- err
+				}
+				ids <- id
 			}
-			ids <- id
 		}(v)
 	}
 
@@ -353,18 +420,15 @@ func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {
 		{{Key: "$set", Value: bson.M{"ownership_history": bson.M{"$arrayElemAt": []interface{}{"$ownership_history", 0}}}}},
 		{{Key: "$lookup", Value: bson.M{
 			"from": "users",
-			"let":  bson.M{"userID": "$owner_user_id"},
+			"let":  bson.M{"owners": "$owner_addresses"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
 					"$expr": bson.M{
-						"$eq": []interface{}{"$_id", "$$userID"},
+						"$in": []interface{}{"$addresses", "$$owners"},
 					},
 				}}},
 			},
-			"as": "owner_user",
+			"as": "owner_users",
 		}}},
-		{{Key: "$set", Value: bson.M{"owner_user": bson.M{"$arrayElemAt": []interface{}{"$owner_user", 0}}}}},
-		{{Key: "$set", Value: bson.M{"owner_username": "$owner_user.username"}}},
-		{{Key: "$project", Value: bson.M{"owner_user": 0}}},
 	}
 }

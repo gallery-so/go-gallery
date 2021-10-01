@@ -190,7 +190,12 @@ func CollUpdateNFTs(pCtx context.Context, pID DBID,
 
 	nmp := newStorage(0, nftColName, pRuntime)
 
-	ct, err := nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_user_id": pUserID})
+	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+
+	ct, err := nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_addresses": bson.M{"$in": user.Addresses}})
 	if err != nil {
 		return err
 	}
@@ -226,15 +231,9 @@ func CollClaimNFTs(pCtx context.Context,
 		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
-	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
-			return err
-		}
-	}
-
 	nftsToBeRemoved := []*NftDB{}
 
-	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_addresses": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 
@@ -251,12 +250,7 @@ func CollClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	type update struct {
-		OwnerUserID  DBID   `bson:"owner_user_id"`
-		OwnerAddress string `bson:"owner_address"`
-	}
-
-	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, update{}); err != nil {
+	if err := nmp.pullAll(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, "owner_addresses", pWalletAddresses); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
@@ -285,7 +279,10 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 	nmp := newStorage(0, nftColName, pRuntime)
 
 	nftsToBeRemoved := []*NftDB{}
-	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved)
+
+	if err := nmp.find(pCtx, bson.M{"owner_addresses": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
+		return err
+	}
 
 	idsToBePulled := make([]DBID, len(nftsToBeRemoved))
 	for i, nft := range nftsToBeRemoved {
@@ -295,13 +292,11 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToBePulled); err != nil {
 		return err
 	}
-	type update struct {
-		OwnerUserID  DBID   `bson:"owner_user_id"`
-		OwnerAddress string `bson:"owner_address"`
-	}
 
-	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, update{}); err != nil {
-		return err
+	if err := nmp.pullAll(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, "owner_addresses", pAddresses); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
 	}
 
 	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
@@ -414,7 +409,6 @@ func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 						"$and": []bson.M{
 							{"$not": bson.M{"$in": []string{"$_id", "$$array"}}},
 							{"$eq": []interface{}{"$deleted", false}},
-							{"$eq": []interface{}{"$owner_user_id", pUserID}},
 						},
 					},
 				}}},
@@ -462,6 +456,7 @@ func nftToCollectionNft(nft *Nft) *CollectionNft {
 		ImageURL:          nft.ImageURL,
 		ImageThumbnailURL: nft.ImageThumbnailURL,
 		ImagePreviewURL:   nft.ImagePreviewURL,
-		OwnerUserID:       nft.OwnerUserID,
+		OwnerAddresses:    nft.OwnerAddresses,
+		MultipleOwners:    nft.MultipleOwners,
 	}
 }

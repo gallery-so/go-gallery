@@ -34,6 +34,7 @@ type openseaAsset struct {
 	ExternalURL      string            `json:"external_link"`
 	TokenMetadataURL string            `json:"token_metadata_url"`
 	Creator          openseaAccount    `json:"creator"`
+	Owner            openseaAccount    `json:"owner"`
 	Contract         persist.Contract  `json:"asset_contract"`
 	Collection       openseaCollection `json:"collection"`
 
@@ -106,8 +107,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 	// update other user's collections and this user's collection so that they and ONLY they can display these
 	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
 	go func() {
-		err = persist.CollClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, &persist.CollectionUpdateNftsInput{Nfts: ids}, pRuntime)
-		if err != nil {
+		if err := persist.CollClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, &persist.CollectionUpdateNftsInput{Nfts: ids}, pRuntime); err != nil {
 			logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to claim nfts: %v", err)
 		}
 	}()
@@ -137,16 +137,19 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NftDB, pRuntime
 
 	// create a goroutine for each nft and sync history
 	for _, nft := range pNfts {
-		go func(nft *persist.NftDB) {
-			history, err := openseaSyncHistory(pCtx, nft.OpenSeaTokenID, nft.Contract.ContractAddress, pRuntime)
-			if err != nil {
-				errorChan <- err
-				return
-			}
+		go func(n *persist.NftDB) {
+			if !n.MultipleOwners {
+				history, err := openseaSyncHistory(pCtx, n.OpenSeaTokenID, n.Contract.ContractAddress, pRuntime)
+				if err != nil {
+					errorChan <- err
+					return
+				}
 
-			nft.OwnershipHistory = history
-			resultChan <- nft
+				n.OwnershipHistory = history
+			}
+			resultChan <- n
 		}(nft)
+
 	}
 
 	// wait for all goroutines to finish and collect results from chan
@@ -304,13 +307,13 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 			result := &persist.Nft{
 				ID:                   n.ID,
 				Name:                 n.Name,
+				MultipleOwners:       n.MultipleOwners,
 				Description:          n.Description,
 				Version:              n.Version,
 				CreationTime:         n.CreationTime,
 				Deleted:              n.Deleted,
 				CollectorsNote:       n.CollectorsNote,
-				OwnerUserID:          pUser.ID,
-				OwnerUsername:        pUser.UserName,
+				OwnerUsers:           []*persist.User{pUser},
 				TokenCollectionName:  n.TokenCollectionName,
 				OwnershipHistory:     n.OwnershipHistory,
 				ExternalURL:          n.ExternalURL,
@@ -318,7 +321,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 				ImageURL:             n.ImageURL,
 				CreatorAddress:       n.CreatorAddress,
 				CreatorName:          n.CreatorName,
-				OwnerAddress:         n.OwnerAddress,
+				OwnerAddresses:       n.OwnerAddresses,
 				Contract:             n.Contract,
 				OpenSeaID:            n.OpenSeaID,
 				OpenSeaTokenID:       n.OpenSeaTokenID,
@@ -359,8 +362,8 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAsset, ownerUserID persist.DBID, pRuntime *runtime.Runtime) *persist.NftDB {
 
 	result := &persist.NftDB{
-		OwnerUserID:          ownerUserID,
-		OwnerAddress:         strings.ToLower(pWalletAddress),
+		OwnerAddresses:       []string{pWalletAddress},
+		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
 		Name:                 nft.Name,
 		Description:          nft.Description,
 		ExternalURL:          nft.ExternalURL,
