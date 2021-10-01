@@ -50,7 +50,7 @@ func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*optio
 	}
 	asMap["created_at"] = now
 	asMap["last_updated"] = now
-	asMap["_id"] = generateID(asMap)
+	asMap["_id"] = generateID()
 
 	res, err := m.collection.InsertOne(ctx, asMap, opts...)
 	if err != nil {
@@ -72,7 +72,7 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 		}
 		asMap["created_at"] = now
 		asMap["last_updated"] = now
-		asMap["_id"] = generateID(asMap)
+		asMap["_id"] = generateID()
 		mapsToInsert[i] = asMap
 	}
 
@@ -191,7 +191,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 		delete(asMap, k)
 	}
 
-	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID(asMap)}, "$set": asMap}, opts...)
+	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": generateID()}, "$set": asMap}, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -291,7 +291,7 @@ func (m *storage) cacheDelete(r runtime.RedisDB, key string) error {
 	}
 }
 
-func generateID(it interface{}) DBID {
+func generateID() DBID {
 	id, err := ksuid.NewRandom()
 	if err != nil {
 		panic(err)
