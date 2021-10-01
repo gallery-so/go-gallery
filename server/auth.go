@@ -310,14 +310,13 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	if !userExistsBool {
 
 		if !pPreAuthed {
-			// TODO enable this when we are checking for nfts
-			// hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// if !hasNFT {
-			// 	return nil, errors.New("user does not own required nft to signup")
-			// }
+			hasNFT, err := hasAnyNFT(pCtx, "0xcD8b86836684B35Fd365c9cFbf5B2b7CFe7BE3A7", pInput.Address, pRuntime)
+			if err != nil {
+				return nil, err
+			}
+			if !hasNFT {
+				return nil, errors.New("user does not own required nft to signup")
+			}
 		}
 
 		nonce := &persist.UserNonce{
