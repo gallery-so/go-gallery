@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,14 +49,19 @@ func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 
 func TestJwtValid_Success(t *testing.T) {
 	assert := setupTest(t)
-	resp := jwtValidRequest(assert, tc.user1.jwt)
+	userID, err := persist.UserCreate(context.Background(), &persist.User{
+		Addresses: []string{"0xbb3f043290841b97b9c92f6bc001a020d4b33255"},
+	}, tc.r)
+	assert.Nil(err)
+	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	resp := jwtValidRequest(assert, jwt)
 	assertValidJSONResponse(assert, resp)
 
 	output := &jwtValidateResponse{}
-	err := util.UnmarshallBody(output, resp.Body)
+	err = util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.True(output.IsValid)
-	assert.Equal(tc.user1.id, output.UserID)
+	assert.Equal(userID, output.UserID)
 }
 
 func TestJwtValid_WrongSignatureAndClaims_Failure(t *testing.T) {
