@@ -17,8 +17,7 @@ import (
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
 func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	// TODO use alchemy URL
-	client, err := ethclient.Dial("https://rinkeby.infura.io")
+	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	if err != nil {
 		return false, err
 	}
@@ -47,8 +46,7 @@ func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pR
 
 }
 func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	// TODO use alchemy URL
-	client, err := ethclient.Dial("https://rinkeby.infura.io")
+	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	if err != nil {
 		return false, err
 	}
@@ -74,8 +72,7 @@ func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr st
 }
 
 func resolvesENS(pCtx context.Context, ens string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	// TODO use alchemy URL
-	client, err := ethclient.Dial("https://rinkeby.infura.io")
+	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	if err != nil {
 		return false, err
 	}

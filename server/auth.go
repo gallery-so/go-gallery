@@ -310,7 +310,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	if !userExistsBool {
 
 		if !pPreAuthed {
-			hasNFT, err := hasAnyNFT(pCtx, "0x0", pInput.Address, pRuntime)
+			hasNFT, err := hasAnyNFT(pCtx, "0x0000000000000000000000000000000000000000", pInput.Address, pRuntime)
 			if err != nil {
 				return nil, err
 			}
