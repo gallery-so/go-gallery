@@ -321,7 +321,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 				ImageURL:             n.ImageURL,
 				CreatorAddress:       n.CreatorAddress,
 				CreatorName:          n.CreatorName,
-				OwnerAddresses:       n.OwnerAddresses,
+				OwnerAddress:         n.OwnerAddress,
 				Contract:             n.Contract,
 				OpenSeaID:            n.OpenseaID,
 				OpenSeaTokenID:       n.OpenSeaTokenID,
@@ -362,7 +362,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NftDB, pUser *persis
 func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAsset, ownerUserID persist.DBID, pRuntime *runtime.Runtime) *persist.NftDB {
 
 	result := &persist.NftDB{
-		OwnerAddresses:       []string{pWalletAddress},
+		OwnerAddress:         pWalletAddress,
 		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
 		Name:                 nft.Name,
 		Description:          nft.Description,

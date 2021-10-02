@@ -348,6 +348,7 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 	if err != nil {
 		return err
 	}
+
 	if len(user.Addresses) < len(pInput.Addresses) {
 		return errors.New("user does not have enough addresses to remove")
 	}

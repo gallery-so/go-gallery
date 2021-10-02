@@ -26,8 +26,8 @@ type NftDB struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool               `bson:"deleted" json:"-"`
 
-	CollectorsNote string   `bson:"collectors_note" json:"collectors_note"`
-	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	OwnerAddress   string `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -69,7 +69,7 @@ type Nft struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 
 	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+	OwnerAddress string `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -106,7 +106,7 @@ type CollectionNft struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 
-	OwnerAddresses []string `bson:"owner_addresses" json:"owner_addresses"`
+	OwnerAddress string `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -202,7 +202,7 @@ func NftGetByAddresses(pCtx context.Context, pAddresses []string,
 	mp := newStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_addresses": bson.M{"$in": pAddresses}}), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_address": bson.M{"$in": pAddresses}}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -276,7 +276,7 @@ func NftUpdateByID(pCtx context.Context, pID DBID, pUserID DBID, pUpdate interfa
 		return err
 	}
 
-	return mp.update(pCtx, bson.M{"_id": pID, "owner_addresses": bson.M{"$in": user.Addresses}}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
 }
 
 // NftBulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
@@ -290,52 +290,11 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 
 	for _, v := range pNfts {
 		go func(nft *NftDB) {
-			if nft.MultipleOwners {
-				// manually upsert with a push to set for addresses
-				returnID := DBID("")
-				now := primitive.NewDateTimeFromTime(time.Now())
-				it, err := structToBsonMap(nft)
-				if err != nil {
-					errs <- err
-					return
-				}
-				it["last_updated"] = now
-				if _, ok := it["created_at"]; !ok {
-					it["created_at"] = now
-				}
-
-				if id, ok := it["_id"]; ok && id != "" {
-					returnID = id.(DBID)
-				}
-
-				if returnID == "" {
-					delete(it, "_id")
-					res, err := mp.collection.InsertOne(pCtx, it)
-					if err != nil {
-						errs <- err
-						return
-					}
-					if it, ok := res.InsertedID.(string); ok {
-						returnID = DBID(it)
-					}
-				} else {
-					addresses := it["owner_addresses"]
-					delete(it, "owner_addresses")
-					delete(it, "_id")
-					_, err := mp.collection.UpdateOne(pCtx, bson.M{"_id": returnID}, bson.M{"$addToSet": bson.M{"owner_addresses": bson.M{"$each": addresses}}, "$set": it})
-					if err != nil {
-						errs <- err
-						return
-					}
-				}
-				ids <- returnID
-			} else {
-				id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID}, nft)
-				if err != nil {
-					errs <- err
-				}
-				ids <- id
+			id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID}, nft)
+			if err != nil {
+				errs <- err
 			}
+			ids <- id
 		}(v)
 	}
 

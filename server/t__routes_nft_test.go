@@ -21,8 +21,8 @@ func TestGetNftByID_Success(t *testing.T) {
 	// seed DB with nft
 	name := "very cool nft"
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
-		Name:           name,
-		OwnerAddresses: []string{strings.ToLower(tc.user1.address)},
+		Name:         name,
+		OwnerAddress: strings.ToLower(tc.user1.address),
 	}, tc.r)
 	assert.Nil(err)
 
@@ -73,7 +73,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
-		OwnerAddresses: []string{strings.ToLower(tc.user1.address)},
+		OwnerAddress:   strings.ToLower(tc.user1.address),
 	}, tc.r)
 	assert.Nil(err)
 
@@ -105,7 +105,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
-		OwnerAddresses: []string{strings.ToLower(tc.user1.address)},
+		OwnerAddress:   strings.ToLower(tc.user1.address),
 	}, tc.r)
 	assert.Nil(err)
 

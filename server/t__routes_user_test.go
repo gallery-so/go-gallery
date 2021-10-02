@@ -223,14 +223,16 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		Addresses:          []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		UserName:           "TestUser",
+		UserNameIdempotent: "testuser",
 	}
 	userID, err := persist.UserCreate(context.Background(), user, tc.r)
 	assert.Nil(err)
 
 	nft := &persist.NftDB{
-		OwnerAddresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
-		Name:           "test",
+		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Name:         "test",
 	}
 	nftID, err := persist.NftCreate(context.Background(), nft, tc.r)
 
@@ -249,6 +251,10 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	}
 	resp := userRemoveAddressesRequest(assert, update, jwt)
 	assertValidJSONResponse(assert, resp)
+
+	errResp := &errorResponse{}
+	util.UnmarshallBody(errResp, resp.Body)
+	assert.Empty(errResp.Error)
 
 	nfts, err := persist.NftGetByUserID(context.Background(), userID, tc.r)
 	assert.Nil(err)
@@ -300,6 +306,7 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 
 	resp := userRemoveAddressesRequest(assert, update, jwt)
 	assertErrorResponse(assert, resp)
+
 }
 
 func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt string) *http.Response {
