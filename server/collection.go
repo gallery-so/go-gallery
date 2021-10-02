@@ -209,7 +209,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		// TODO magic number
-		if len(input.Nfts) > 100 {
+		if len(input.Nfts) > 1000 {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "collections can have no more than 100 NFTs"})
 			return
 		}

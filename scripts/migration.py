@@ -1,4 +1,3 @@
-import datetime
 import csv
 import requests
 import hashlib
@@ -84,9 +83,9 @@ def create_nft(nft):
             nft["contract_address"], nft["token_id"]
         )
 
-        headers = {"X-API-KEY": os.environ["OPENSEA_API_KEY"]}
+        # headers = {"X-API-KEY": "b0ef5249af274e30ab3af4b380bc5bca"}
 
-        r = requests.get(get_url, timeout=5, headers=headers)
+        r = requests.get(get_url, timeout=5)
 
         opensea_asset = r.json()
         if not "id" in opensea_asset:
