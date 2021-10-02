@@ -102,7 +102,8 @@ def create_nft(nft):
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
             "owner_address": user["addresses"][0].lower(),
-            "owner_user_id": user["_id"],
+            "multiple_addresses": opensea_asset["owner"]["address"]
+            == "0x0000000000000000000000000000000000000000",
             "contract": contract_document,
             "opensea_id": opensea_asset["id"],
             "opensea_token_id": nft["token_id"],
