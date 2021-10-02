@@ -84,7 +84,9 @@ def create_nft(nft):
             nft["contract_address"], nft["token_id"]
         )
 
-        r = requests.get(get_url, timeout=5)
+        headers = {"X-API-KEY": os.environ["OPENSEA_API_KEY"]}
+
+        r = requests.get(get_url, timeout=5, headers=headers)
 
         opensea_asset = r.json()
         if not "id" in opensea_asset:
@@ -102,7 +104,7 @@ def create_nft(nft):
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
             "owner_address": user["addresses"][0].lower(),
-            "multiple_addresses": opensea_asset["owner"]["address"]
+            "multiple_owners": opensea_asset["owner"]["address"]
             == "0x0000000000000000000000000000000000000000",
             "contract": contract_document,
             "opensea_id": opensea_asset["id"],
