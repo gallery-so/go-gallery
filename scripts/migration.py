@@ -85,8 +85,7 @@ def create_nft(nft):
 
         # headers = {"X-API-KEY": "b0ef5249af274e30ab3af4b380bc5bca"}
 
-        r = requests.get(get_url, timeout=5)
-
+        r = requests.get(get_url, timeout=10)
         opensea_asset = r.json()
         if not "id" in opensea_asset:
             errored_documents.append({"doc": nft, "error": "no id in opensea asset"})
@@ -124,6 +123,8 @@ def create_nft(nft):
 
         user_collection_dict[supabase_user_id]["nfts"].append(nft_id)
     except Exception as e:
+        print("ERR", e)
+        time.sleep(2)
         errored_documents.append({"doc": nft, "error": str(e)})
 
 
@@ -214,7 +215,7 @@ with open("glry-nfts.csv", encoding="utf-8-sig") as nftsFile:
 
     sorted_nfts = sorted(reader, key=lambda row: int(row["position"]))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         executor.map(create_nft, sorted_nfts)
 
     # add all colls to collection_documents
