@@ -290,7 +290,7 @@ func NftBulkUpsert(pCtx context.Context, pNfts []*NftDB, pRuntime *runtime.Runti
 
 	for _, v := range pNfts {
 		go func(nft *NftDB) {
-			id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID}, nft)
+			id, err := mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
 			}
