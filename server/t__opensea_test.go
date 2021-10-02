@@ -76,13 +76,8 @@ func TestOpenseaSync_Success(t *testing.T) {
 	nftsByUser, err := persist.NftGetByUserID(ctx, robinUserID, tc.r)
 	assert.Nil(err)
 
-	nftsByUserTwo, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
-	assert.Nil(err)
-
 	nftsByUserThree, err := persist.NftGetByUserID(ctx, mikeUserID, tc.r)
 	assert.Nil(err)
-
-	assert.Len(nftsByUserTwo, 0)
 
 	ids1 := make([]int, len(robinOpenseaNFTs))
 	ids2 := make([]int, len(nftsByUser))
