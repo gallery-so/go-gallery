@@ -315,7 +315,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 				return nil, err
 			}
 			if !hasNFT {
-				return nil, errors.New("user does not own required nft to signup")
+				return nil, errors.New("user does not own required NFT to signup")
 			}
 		}
 
