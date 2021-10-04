@@ -229,7 +229,7 @@ func NftGetByID(pCtx context.Context, pID DBID, pRuntime *runtime.Runtime) ([]*N
 }
 
 // NftGetByContractData finds an nft by its contract data
-func NftGetByContractData(pCtx context.Context, pTokenID, pContractAddress string,
+func NftGetByContractData(pCtx context.Context, pTokenID, pContractAddress, pWalletAddress string,
 	pRuntime *runtime.Runtime) ([]*Nft, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -239,7 +239,7 @@ func NftGetByContractData(pCtx context.Context, pTokenID, pContractAddress strin
 	mp := newStorage(0, nftColName, pRuntime)
 	result := []*Nft{}
 
-	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}), &result, opts); err != nil {
+	if err := mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress, "owner_address": pWalletAddress}), &result, opts); err != nil {
 		return nil, err
 	}
 

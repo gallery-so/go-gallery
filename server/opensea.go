@@ -139,7 +139,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NftDB, pRuntime
 	for _, nft := range pNfts {
 		go func(n *persist.NftDB) {
 			if !n.MultipleOwners {
-				history, err := openseaSyncHistory(pCtx, n.OpenSeaTokenID, n.Contract.ContractAddress, pRuntime)
+				history, err := openseaSyncHistory(pCtx, n.OpenSeaTokenID, n.Contract.ContractAddress, n.OwnerAddress, pRuntime)
 				if err != nil {
 					errorChan <- err
 					return
@@ -165,7 +165,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NftDB, pRuntime
 	return updatedNfts, nil
 }
 
-func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
+func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, pWalletAddress string, pRuntime *runtime.Runtime) (*persist.OwnershipHistory, error) {
 	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
 	events := &persist.OwnershipHistory{}
 	resp, err := http.Get(getURL)
@@ -187,7 +187,7 @@ func openseaSyncHistory(pCtx context.Context, pTokenID string, pTokenContractAdd
 		return nil, err
 	}
 
-	nfts, err := persist.NftGetByContractData(pCtx, pTokenID, pTokenContractAddress, pRuntime)
+	nfts, err := persist.NftGetByContractData(pCtx, pTokenID, pTokenContractAddress, pWalletAddress, pRuntime)
 	if err != nil {
 		return nil, err
 	}
