@@ -294,6 +294,14 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 	return nil
 }
 
+// TokenUpsert will upsert a token into the database
+// This function's primary purpose is to be used when syncing a user's tokens from an external provider
+func TokenUpsert(pCtx context.Context, pToken *Token, pRuntime *runtime.Runtime) error {
+	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+	_, err := mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": strings.ToLower(pToken.ContractAddress), "owner_address": pToken.OwnerAddress}, pToken)
+	return err
+}
+
 // TokenUpdateByID will update a given token by its DB ID and owner user ID
 func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
 	pUpdate interface{},

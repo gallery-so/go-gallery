@@ -24,9 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// var testAllTokens = []*persist.Token{}
-// var testMu = &sync.Mutex{}
-
 // EventHash represents an event keccak256 hash
 type EventHash string
 
@@ -47,12 +44,6 @@ type ownerAtBlock struct {
 	owner string
 	block uint64
 }
-
-// TokenReceiveFunc is a function that is called when a token is received
-type TokenReceiveFunc func(pCtx context.Context, token *persist.Token, runtime *runtime.Runtime) error
-
-// ContractReceiveFunc is a function that is called when a token contract is received
-type ContractReceiveFunc func(pCtx context.Context, contract *persist.Contract, runtime *runtime.Runtime) error
 
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
@@ -82,19 +73,15 @@ type Indexer struct {
 	subscriptions chan types.Log
 	transfers     chan []*transfer
 	tokens        chan *persist.Token
-	contracts     chan string
+	contracts     chan *persist.Contract
 	done          chan error
 	cancel        chan os.Signal
 
 	badURIs uint64
-
-	tokenReceive    TokenReceiveFunc
-	contractReceive ContractReceiveFunc
 }
 
-// NewIndexer sets up an indexer for retrieving the specified events that will process tokens with the given
-// tokenReceiveFunc and store stats on the indexer in the given statsFile
-func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contractReceiveFunc ContractReceiveFunc, statsFileName string, pRuntime *runtime.Runtime) *Indexer {
+// NewIndexer sets up an indexer for retrieving the specified events that will process tokens
+func NewIndexer(pEvents []EventHash, statsFileName string, pRuntime *runtime.Runtime) *Indexer {
 	finalBlockUint, err := pRuntime.InfraClients.ETHClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -138,12 +125,9 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 		subscriptions: make(chan types.Log),
 		transfers:     make(chan []*transfer),
 		tokens:        make(chan *persist.Token),
-		contracts:     make(chan string),
+		contracts:     make(chan *persist.Contract),
 		done:          make(chan error),
 		cancel:        pRuntime.Cancel,
-
-		tokenReceive:    tokenReceiveFunc,
-		contractReceive: contractReceiveFunc,
 	}
 }
 
@@ -165,7 +149,7 @@ func (i *Indexer) processLogs() {
 		go i.subscribeNewLogs()
 	}()
 
-	// go checkForNewBlocks(i)
+	go checkForNewBlocks(i)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -188,7 +172,7 @@ func (i *Indexer) processLogs() {
 		})
 		cancel()
 		if err != nil {
-			logrus.WithError(err).Error("Error getting logs, trying again")
+			logrus.WithError(err).Error("error getting logs, trying again")
 			continue
 		}
 		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
@@ -230,25 +214,22 @@ func (i *Indexer) processTokens() {
 	for token := range i.tokens {
 		go func(t *persist.Token) {
 			logrus.Infof("Processing token %s-%s", t.ContractAddress, t.TokenID)
-			err := i.tokenReceive(context.Background(), t, i.runtime)
+			err := i.tokenReceive(context.Background(), t)
 			if err != nil {
-				logrus.WithError(err).Error("Error processing token")
+				logrus.WithError(err).Error("error processing token")
 			}
-			// testMu.Lock()
-			// defer testMu.Unlock()
-			// testAllTokens = append(testAllTokens, t)
 		}(token)
 	}
 }
 
 func (i *Indexer) processContracts() {
 	for contract := range i.contracts {
-		go func(c string) {
+		go func(c *persist.Contract) {
 			logrus.Infof("Processing contract %s", c)
 			// TODO turn contract into persist.Contract
-			err := i.contractReceive(context.Background(), &persist.Contract{Address: c}, i.runtime)
+			err := i.contractReceive(context.Background(), c)
 			if err != nil {
-				logrus.WithError(err).Error("Error processing token")
+				logrus.WithError(err).Error("error processing token")
 			}
 		}(contract)
 	}
@@ -316,7 +297,18 @@ func processTransfer(i *Indexer, transfer *transfer) {
 
 	if !i.contractStored[key] {
 		i.contractStored[key] = true
-		i.contracts <- transfer.RawContract.Address
+		c := &persist.Contract{
+			Address:     transfer.RawContract.Address,
+			LatestBlock: atomic.LoadUint64(&i.lastSyncedBlock),
+		}
+		cMetadata, err := getTokenContractMetadata(c.Address, i.runtime)
+		if err != nil {
+			logrus.WithError(err).Error("error getting contract metadata")
+		} else {
+			c.Name = cMetadata.Name
+			c.Symbol = cMetadata.Symbol
+		}
+		i.contracts <- c
 	}
 	switch persist.TokenType(transfer.Type) {
 	case persist.TokenTypeERC721:
@@ -342,7 +334,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		if _, ok := i.uris[key]; !ok {
 			uri, err := getERC721TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
 			if err != nil {
-				logrus.WithError(err).Error("Error getting URI for ERC721 token")
+				logrus.WithError(err).Error("error getting URI for ERC721 token")
 				// TODO handle this
 			} else {
 				i.uris[key] = uri
@@ -367,7 +359,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		if _, ok := i.uris[key]; !ok {
 			uri, err := getERC1155TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
 			if err != nil {
-				logrus.WithError(err).Error("Error getting URI for ERC1155 token")
+				logrus.WithError(err).Error("error getting URI for ERC1155 token")
 				// TODO handle this
 			} else {
 				i.uris[key] = uri
@@ -384,14 +376,14 @@ func processTransfer(i *Indexer, transfer *transfer) {
 
 			id, err := util.HexToBigInt(transfer.TokenID)
 			if err != nil {
-				logrus.WithError(err).Error("Error converting token ID to big int")
+				logrus.WithError(err).Error("error converting token ID to big int")
 				atomic.StoreInt64(&i.state, -1)
 				i.done <- err
 			}
 			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
 			metadata, mediaType, err := getMetadataFromURI(uriReplaced, i.runtime)
 			if err != nil {
-				logrus.WithError(err).Error("Error getting metadata for token")
+				logrus.WithError(err).Error("error getting metadata for token")
 				atomic.AddUint64(&i.badURIs, 1)
 				// TODO handle this
 			} else {
@@ -405,13 +397,21 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	// 		uri := i.uris[key]
 	// 		media, err := makePreviewsForMetadata(context.TODO(), metadata, transfer.RawContract.Address, transfer.TokenID, uri, i.runtime)
 	// 		if err != nil {
-	// 			logrus.WithError(err).Error("Error creating preview for token")
+	// 			logrus.WithError(err).Error("error creating preview for token")
 	// 			// TODO handle this
 	// 		} else {
 	// 			i.medias[key] = media
 	// 		}
 	// 	}
 	// }
+}
+
+func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
+	return persist.TokenUpsert(ctx, t, i.runtime)
+}
+
+func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contract) error {
+	return persist.ContractUpsertByAddress(ctx, contract.Address, contract, i.runtime)
 }
 
 func storedDataToTokens(i *Indexer) {
@@ -563,7 +563,7 @@ func (i *Indexer) writeStats() {
 
 	fi, err := os.Create(i.statsFile)
 	if err != nil {
-		logrus.WithError(err).Error("Error creating stats file")
+		logrus.WithError(err).Error("error creating stats file")
 		return
 	}
 	defer fi.Close()
@@ -578,12 +578,12 @@ func (i *Indexer) writeStats() {
 	stats["bad_uris"] = atomic.LoadUint64(&i.badURIs)
 	bs, err := json.Marshal(stats)
 	if err != nil {
-		logrus.WithError(err).Error("Error marshalling stats")
+		logrus.WithError(err).Error("error marshalling stats")
 		return
 	}
 	_, err = io.Copy(fi, bytes.NewReader(bs))
 	if err != nil {
-		logrus.WithError(err).Error("Error writing stats")
+		logrus.WithError(err).Error("error writing stats")
 		return
 	}
 }
@@ -604,10 +604,10 @@ func checkForNewBlocks(i *Indexer) {
 
 // function that returns a progressively smaller value between min and max for every million block numbers
 func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
-	if blockNumber < 800000 {
+	if blockNumber < 7000000 {
 		return max
 	}
-	return (max - min) / (blockNumber / 800000)
+	return (max - min) / (blockNumber / 7000000)
 }
 
 func toRegularAddress(address string) string {

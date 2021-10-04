@@ -21,10 +21,11 @@ type Contract struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	Address         string `bson:"address" json:"address"`
-	LastSyncedBlock string `bson:"last_synced_block" json:"last_synced_block"`
-	Symbol          string `bson:"symbol" json:"symbol"`
-	TokenName       string `bson:"token_name" json:"token_name"`
+	Address string `bson:"address" json:"address"`
+	Symbol  string `bson:"symbol" json:"symbol"`
+	Name    string `bson:"name" json:"name"`
+
+	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
 }
 
 // ContractUpsertByAddress upserts an contract by a given address
