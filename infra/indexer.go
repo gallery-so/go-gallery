@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"os"
@@ -21,6 +23,9 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
+
+// var testAllTokens = []*persist.Token{}
+// var testMu = &sync.Mutex{}
 
 // EventHash represents an event keccak256 hash
 type EventHash string
@@ -78,14 +83,14 @@ type Indexer struct {
 	transfers     chan []*transfer
 	tokens        chan *persist.Token
 	contracts     chan string
-	done          chan bool
+	done          chan error
 	cancel        chan os.Signal
+
+	badURIs uint64
 
 	tokenReceive    TokenReceiveFunc
 	contractReceive ContractReceiveFunc
 }
-
-// TODO figure out how to ensure that the event types are represented when going transfer -> token
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens with the given
 // tokenReceiveFunc and store stats on the indexer in the given statsFile
@@ -134,7 +139,7 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 		transfers:     make(chan []*transfer),
 		tokens:        make(chan *persist.Token),
 		contracts:     make(chan string),
-		done:          make(chan bool),
+		done:          make(chan error),
 		cancel:        pRuntime.Cancel,
 
 		tokenReceive:    tokenReceiveFunc,
@@ -228,8 +233,10 @@ func (i *Indexer) processTokens() {
 			err := i.tokenReceive(context.Background(), t, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("Error processing token")
-				// TODO handle this
 			}
+			// testMu.Lock()
+			// defer testMu.Unlock()
+			// testAllTokens = append(testAllTokens, t)
 		}(token)
 	}
 }
@@ -242,7 +249,6 @@ func (i *Indexer) processContracts() {
 			err := i.contractReceive(context.Background(), &persist.Contract{Address: c}, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("Error processing token")
-				// TODO handle this
 			}
 		}(contract)
 	}
@@ -264,7 +270,7 @@ func (i *Indexer) subscribeNewLogs() {
 	if err != nil {
 		logrus.Errorf("failed to subscribe to logs: %v", err)
 		atomic.StoreInt64(&i.state, -1)
-		i.done <- true
+		i.done <- err
 	}
 	for {
 		select {
@@ -274,7 +280,7 @@ func (i *Indexer) subscribeNewLogs() {
 		case err := <-sub.Err():
 			logrus.Errorf("subscription error: %v", err)
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- true
+			i.done <- err
 		case <-i.done:
 			return
 		}
@@ -289,8 +295,9 @@ func (i *Indexer) handleDone() {
 			i.writeStats()
 			os.Exit(1)
 			return
-		case <-i.done:
+		case err := <-i.done:
 			i.writeStats()
+			logrus.Errorf("Indexer done: %v", err)
 			os.Exit(0)
 			return
 		case <-time.After(time.Second * 30):
@@ -300,12 +307,7 @@ func (i *Indexer) handleDone() {
 }
 
 func processTransfer(i *Indexer, transfer *transfer) {
-	bn, err := util.HexToBigInt(transfer.BlockNumber)
-	if err != nil {
-		logrus.WithError(err).Error("Error converting block number")
-		atomic.StoreInt64(&i.state, -1)
-		i.done <- true
-	}
+
 	key := transfer.RawContract.Address + "--" + transfer.TokenID
 	logrus.Infof("Processing transfer %s", key)
 
@@ -319,22 +321,22 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	switch persist.TokenType(transfer.Type) {
 	case persist.TokenTypeERC721:
 		if it, ok := i.owners[key]; ok {
-			if it.block < bn.Uint64() {
-				it.block = bn.Uint64()
+			if it.block < transfer.BlockNumber.Uint64() {
+				it.block = transfer.BlockNumber.Uint64()
 				it.owner = transfer.To
 			}
 		} else {
-			i.owners[key] = ownerAtBlock{transfer.From, bn.Uint64()}
+			i.owners[key] = ownerAtBlock{transfer.From, transfer.BlockNumber.Uint64()}
 		}
 		if it, ok := i.previousOwners[key]; !ok {
 			i.previousOwners[key] = []ownerAtBlock{{
 				owner: transfer.From,
-				block: bn.Uint64(),
+				block: transfer.BlockNumber.Uint64(),
 			}}
 		} else {
 			it = append(it, ownerAtBlock{
 				owner: transfer.From,
-				block: bn.Uint64(),
+				block: transfer.BlockNumber.Uint64(),
 			})
 		}
 		if _, ok := i.uris[key]; !ok {
@@ -372,9 +374,9 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			}
 		}
 	default:
-		logrus.Error("Unknown token type")
+		logrus.Error("unknown token type")
 		atomic.StoreInt64(&i.state, -1)
-		i.done <- true
+		i.done <- errors.New("unknown token type")
 	}
 
 	if _, ok := i.metadatas[key]; !ok {
@@ -384,12 +386,13 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			if err != nil {
 				logrus.WithError(err).Error("Error converting token ID to big int")
 				atomic.StoreInt64(&i.state, -1)
-				i.done <- true
+				i.done <- err
 			}
 			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
 			metadata, mediaType, err := getMetadataFromURI(uriReplaced, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("Error getting metadata for token")
+				atomic.AddUint64(&i.badURIs, 1)
 				// TODO handle this
 			} else {
 				i.metadatas[key] = metadata
@@ -417,28 +420,32 @@ func storedDataToTokens(i *Indexer) {
 	for k, v := range i.owners {
 		spl := strings.Split(k, "--")
 		if len(spl) != 2 {
-			logrus.Error("Invalid key")
+			logrus.Error("invalid key")
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- true
+			i.done <- errors.New("invalid key")
 		}
 		sort.Slice(i.previousOwners[k], func(l, m int) bool {
 			return i.previousOwners[k][l].block < i.previousOwners[k][m].block
 		})
 		previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
-		for i, v := range i.previousOwners[k] {
-			previousOwnerAddresses[i] = v.owner
+		for i, w := range i.previousOwners[k] {
+			previousOwnerAddresses[i] = toRegularAddress(w.owner)
 		}
 		media := i.medias[k]
+		mediaType := i.mediaTypes[k]
+		if media.Type != "" {
+			mediaType = media.Type
+		}
 		token := &persist.Token{
 			TokenID:         spl[1],
 			ContractAddress: spl[0],
-			OwnerAddress:    v.owner,
+			OwnerAddress:    toRegularAddress(v.owner),
 			Amount:          1,
 			PreviousOwners:  previousOwnerAddresses,
 			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   i.metadatas[k],
 			TokenURI:        i.uris[k],
-			MediaType:       i.mediaTypes[k],
+			MediaType:       mediaType,
 			PreviewURL:      media.PreviewURL,
 			ThumbnailURL:    media.ThumbnailURL,
 			MediaURL:        media.MediaURL,
@@ -451,19 +458,23 @@ func storedDataToTokens(i *Indexer) {
 		if len(spl) != 2 {
 			logrus.Error("Invalid key")
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- true
+			i.done <- errors.New("invalid key")
 		}
 		media := i.medias[k]
+		mediaType := i.mediaTypes[k]
+		if media.Type != "" {
+			mediaType = media.Type
+		}
 		for addr, balance := range v {
 			token := &persist.Token{
 				TokenID:         spl[1],
 				ContractAddress: spl[0],
-				OwnerAddress:    addr,
+				OwnerAddress:    toRegularAddress(addr),
 				Amount:          balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   i.metadatas[k],
 				TokenURI:        i.uris[k],
-				MediaType:       i.mediaTypes[k],
+				MediaType:       mediaType,
 				PreviewURL:      media.PreviewURL,
 				ThumbnailURL:    media.ThumbnailURL,
 				MediaURL:        media.MediaURL,
@@ -489,7 +500,7 @@ func logToTransfer(pLog types.Log) []*transfer {
 				To:          pLog.Topics[2].Hex(),
 				TokenID:     pLog.Topics[3].Hex(),
 				Amount:      1,
-				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber).Text(16),
+				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber),
 				RawContract: contract{
 					Address: pLog.Address.Hex(),
 				},
@@ -508,7 +519,7 @@ func logToTransfer(pLog types.Log) []*transfer {
 				To:          pLog.Topics[3].Hex(),
 				TokenID:     common.BytesToHash(pLog.Data[:len(pLog.Data)/2]).Hex(),
 				Amount:      common.BytesToHash(pLog.Data[len(pLog.Data)/2:]).Big().Uint64(),
-				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber).Text(16),
+				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber),
 				RawContract: contract{
 					Address: pLog.Address.Hex(),
 				},
@@ -563,6 +574,8 @@ func (i *Indexer) writeStats() {
 	stats["total_metadatas"] = len(i.metadatas)
 	stats["total_uris"] = len(i.uris)
 	stats["last_block"] = atomic.LoadUint64(&i.lastSyncedBlock)
+	// stats["all_tokens"] = testAllTokens[(len(testAllTokens)/10)*9:]
+	stats["bad_uris"] = atomic.LoadUint64(&i.badURIs)
 	bs, err := json.Marshal(stats)
 	if err != nil {
 		logrus.WithError(err).Error("Error marshalling stats")
@@ -581,7 +594,7 @@ func checkForNewBlocks(i *Indexer) {
 		if err != nil {
 			logrus.Errorf("failed to get block number: %v", err)
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- true
+			i.done <- err
 		}
 		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
 		logrus.Infof("final block number: %v", finalBlockUint)
@@ -595,4 +608,8 @@ func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
 		return max
 	}
 	return (max - min) / (blockNumber / 800000)
+}
+
+func toRegularAddress(address string) string {
+	return strings.ToLower(fmt.Sprintf("0x%s", address[len(address)-38:]))
 }

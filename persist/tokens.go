@@ -29,6 +29,8 @@ const (
 	MediaTypeVideo MediaType = "video"
 	// MediaTypeImage represents an image
 	MediaTypeImage MediaType = "image"
+	// MediaTypeGIF represents a gif
+	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
 	// MediaTypeBase64JSON represents a base64 encoded JSON document
@@ -311,20 +313,23 @@ func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
 	contentType := http.DetectContentType(buf[:512])
+	spl := strings.Split(contentType, "/")
 
-	switch {
-	case strings.Contains(contentType, "image"):
-		if strings.Contains(contentType, "svg") {
+	switch spl[0] {
+	case "image":
+		switch spl[1] {
+		case "svg":
 			return MediaTypeSVG
+		case "gif":
+			return MediaTypeGIF
+		default:
+			return MediaTypeImage
 		}
-		return MediaTypeImage
-	case strings.Contains(contentType, "video"):
+	case "video":
 		return MediaTypeVideo
-	case strings.Contains(contentType, "audio"):
+	case "audio":
 		return MediaTypeAudio
-	case strings.Contains(contentType, "json"):
-		return MediaTypeJSON
-	case strings.Contains(contentType, "text/plain"):
+	case "text":
 		return MediaTypeText
 	default:
 		return MediaTypeUnknown

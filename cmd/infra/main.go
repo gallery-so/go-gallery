@@ -33,9 +33,10 @@ func main() {
 }
 
 func tokenReceive(pCtx context.Context, pToken *persist.Token, pRuntime *runtime.Runtime) error {
-	logrus.Infof("tokenReceive: %s", pToken.TokenURI)
+	logrus.Infof("tokenReceive: %s %s", pToken.TokenURI, pToken.OwnerAddress)
 	return nil
 }
+
 func contractReceive(pCtx context.Context, pContract *persist.Contract, pRuntime *runtime.Runtime) error {
 	logrus.Infof("contractReceive: %+v", pContract)
 	return nil

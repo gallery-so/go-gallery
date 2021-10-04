@@ -34,7 +34,7 @@ type transfers struct {
 // transfer represents a transfer from the RPC response
 type transfer struct {
 	Category    string            `json:"category"`
-	BlockNumber string            `json:"blockNum"`
+	BlockNumber *big.Int          `json:"blockNum"`
 	From        string            `json:"from"`
 	To          string            `json:"to"`
 	Value       float64           `json:"value"`
@@ -211,7 +211,7 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Run
 		return "", err
 	}
 	if len(logs) == 0 {
-		return "", errors.New("No logs found")
+		return "", errors.New("no logs found")
 	}
 
 	sort.Slice(logs, func(i, j int) bool {
