@@ -57,7 +57,6 @@ type contract struct {
 type tokenContractMetadata struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
-	Logo   string `json:"logo"`
 }
 
 type uriWithMetadata struct {
@@ -71,15 +70,29 @@ type tokenWithBlockNumber struct {
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
-func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (tokenContractMetadata, error) {
-	result := &tokenContractMetadata{}
-
-	err := pRuntime.InfraClients.RPCClient.Call(result, "alchemy_getTokenMetadata", address)
+func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (*tokenContractMetadata, error) {
+	contract := common.HexToAddress(address)
+	instance, err := contracts.NewIERC721MetadataCaller(contract, pRuntime.InfraClients.ETHClient)
 	if err != nil {
-		return tokenContractMetadata{}, err
+		return nil, err
 	}
 
-	return *result, nil
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	name, err := instance.Name(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+	symbol, err := instance.Symbol(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &tokenContractMetadata{Name: name, Symbol: symbol}, nil
 }
 
 // getERC721TokenURI returns metadata URI for a given token address
