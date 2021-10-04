@@ -127,7 +127,7 @@ func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (stri
 func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, persist.MediaType, error) {
 
 	client := &http.Client{
-		Timeout: time.Second * 3,
+		Timeout: time.Second * 5,
 	}
 
 	if strings.Contains(tokenURI, "data:application/json;base64,") {

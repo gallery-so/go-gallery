@@ -225,7 +225,7 @@ func (i *Indexer) processTokens() {
 func (i *Indexer) processContracts() {
 	for contract := range i.contracts {
 		go func(c *persist.Contract) {
-			logrus.Infof("Processing contract %s", c)
+			logrus.Infof("Processing contract %+v", c)
 			// TODO turn contract into persist.Contract
 			err := i.contractReceive(context.Background(), c)
 			if err != nil {
@@ -295,8 +295,8 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	if !i.contractStored[key] {
-		i.contractStored[key] = true
+	if !i.contractStored[transfer.RawContract.Address] {
+		i.contractStored[transfer.RawContract.Address] = true
 		c := &persist.Contract{
 			Address:     transfer.RawContract.Address,
 			LatestBlock: atomic.LoadUint64(&i.lastSyncedBlock),
@@ -604,10 +604,10 @@ func checkForNewBlocks(i *Indexer) {
 
 // function that returns a progressively smaller value between min and max for every million block numbers
 func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
-	if blockNumber < 7000000 {
+	if blockNumber < 700000 {
 		return max
 	}
-	return (max - min) / (blockNumber / 7000000)
+	return (max - min) / (blockNumber / 700000)
 }
 
 func toRegularAddress(address string) string {
