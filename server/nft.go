@@ -114,7 +114,7 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		update := &persist.TokenUpdateInfoInput{CollectorsNote: input.CollectorsNote}
 
-		err := persist.TokenUpdateByIDs(c, input.ID, userID, update, pRuntime)
+		err := persist.TokenUpdateByID(c, input.ID, userID, update, pRuntime)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})

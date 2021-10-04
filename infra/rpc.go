@@ -33,17 +33,17 @@ type transfers struct {
 
 // transfer represents a transfer from the RPC response
 type transfer struct {
-	Category    string   `json:"category"`
-	BlockNumber string   `json:"blockNum"`
-	From        string   `json:"from"`
-	To          string   `json:"to"`
-	Value       float64  `json:"value"`
-	TokenID     string   `json:"erc721TokenId"`
-	Type        string   `json:"type"`
-	Amount      uint64   `json:"amount"`
-	Asset       string   `json:"asset"`
-	Hash        string   `json:"hash"`
-	RawContract contract `json:"rawContract"`
+	Category    string            `json:"category"`
+	BlockNumber string            `json:"blockNum"`
+	From        string            `json:"from"`
+	To          string            `json:"to"`
+	Value       float64           `json:"value"`
+	TokenID     string            `json:"erc721TokenId"`
+	Type        persist.TokenType `json:"type"`
+	Amount      uint64            `json:"amount"`
+	Asset       string            `json:"asset"`
+	Hash        string            `json:"hash"`
+	RawContract contract          `json:"rawContract"`
 }
 
 // contract represents a contract that is interacted with during a transfer
@@ -111,7 +111,7 @@ func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (stri
 }
 
 // getMetadataFromURI parses and returns the NFT metadata for a given token URI
-func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, error) {
+func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, persist.MediaType, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 3,
@@ -122,60 +122,60 @@ func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]
 		b64data := tokenURI[strings.IndexByte(tokenURI, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(b64data)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		metadata := map[string]interface{}{}
 		err = json.Unmarshal(decoded, &metadata)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
-		return metadata, nil
+		return metadata, persist.MediaTypeBase64JSON, nil
 	} else if strings.HasPrefix(tokenURI, "ipfs://") {
 
 		path := strings.TrimPrefix(tokenURI, "ipfs://")
 
 		it, err := pRuntime.IPFS.Cat(path)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		defer it.Close()
 
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, it)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		metadata := map[string]interface{}{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
-		return metadata, nil
+		return metadata, persist.SniffMediaType(buf.Bytes()), nil
 	} else if strings.HasPrefix(tokenURI, "https://") || strings.HasPrefix(tokenURI, "http://") {
 		resp, err := client.Get(tokenURI)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		defer resp.Body.Close()
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		// parse the json
 		metadata := map[string]interface{}{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
-		return metadata, nil
+		return metadata, persist.SniffMediaType(buf.Bytes()), nil
 	} else {
-		return nil, nil
+		return nil, persist.MediaTypeUnknown, nil
 	}
 
 }

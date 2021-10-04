@@ -137,7 +137,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 
 	// seed DB with nft
 	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
-		OwnerUserID: tc.user1.id,
+		OwnerAddress: tc.user1.address,
 	}, tc.r)
 	assert.Nil(err)
 

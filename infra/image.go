@@ -28,19 +28,19 @@ type media struct {
 	persist.TokenUpdateImageURLsInput
 }
 
-func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) error {
+func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) (*media, error) {
 	tokens, err := persist.TokenGetByNFTIdentifiers(pCtx, tokenID, contractAddress, pRuntime)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(tokens) > 1 {
-		return errors.New("too many tokens returned for one token ID and contract address")
+		return nil, errors.New("too many tokens returned for one token ID and contract address")
 	}
 
 	token := tokens[0]
 
 	if token.PreviewURL != "" && token.ThumbnailURL != "" {
-		return errors.New("token already has preview and thumbnail URLs")
+		return nil, errors.New("token already has preview and thumbnail URLs")
 	}
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
@@ -62,24 +62,25 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 
 	err = downloadAndCache(pCtx, url, name, pRuntime)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	update := &persist.TokenUpdateImageURLsInput{}
+	update := &media{}
 
 	imageURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
 	if err == nil {
-		update.ThumbnailURL = imageURL + "=s256"
-		update.PreviewURL = imageURL + "=s1024"
+		update.ThumbnailURL = imageURL + "=s96"
+		update.PreviewURL = imageURL + "=s256"
+		update.MediaURL = imageURL + "=s1024"
 	}
 
 	videoURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("video-%s", name))
 	if err == nil {
-		update.VideoURL = videoURL
+		update.MediaURL = videoURL
 	}
 
 	logrus.WithFields(logrus.Fields{"token": token.ID, "servingURL": imageURL}).Info("processImagesForToken")
 
-	return persist.TokenUpdateByID(pCtx, token.ID, update, pRuntime)
+	return update, nil
 }
 
 func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, tokenURI string, pRuntime *runtime.Runtime) (media, error) {
@@ -116,7 +117,7 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 
 	videoURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("video-%s", name))
 	if err == nil {
-		res.VideoURL = videoURL
+		res.MediaURL = videoURL
 	}
 
 	logrus.WithFields(logrus.Fields{"token": name, "servingURL": imageURL}).Info("processImagesForToken")

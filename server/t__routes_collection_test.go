@@ -397,9 +397,9 @@ func createCollectionInDbForUserID(assert *assert.Assertions, collectionName str
 
 func seedTokens(assert *assert.Assertions) []persist.DBID {
 	nfts := []*persist.Token{
-		{OwnerUserID: tc.user1.id, CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{OwnerUserID: tc.user1.id, CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-		{OwnerUserID: tc.user1.id, CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
+		{CollectorsNote: "asd", OwnerAddress: tc.user1.address},
+		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
 	nftIDs, err := persist.TokenCreateBulk(context.Background(), nfts, tc.r)
 	assert.Nil(err)

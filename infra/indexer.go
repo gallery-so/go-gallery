@@ -61,7 +61,7 @@ type Indexer struct {
 
 	metadatas      map[string]map[string]interface{}
 	uris           map[string]string
-	types          map[string]string
+	mediaTypes     map[string]persist.MediaType
 	medias         map[string]media
 	contractStored map[string]bool
 	owners         map[string]ownerAtBlock
@@ -96,7 +96,7 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 	}
 
 	statsFile, err := os.Open(statsFileName)
-	startingBlock := uint64(4900000)
+	startingBlock := uint64(defaultERC721Block)
 	if err == nil {
 		defer statsFile.Close()
 		decoder := json.NewDecoder(statsFile)
@@ -117,7 +117,7 @@ func NewIndexer(pEvents []EventHash, tokenReceiveFunc TokenReceiveFunc, contract
 
 		metadatas:      make(map[string]map[string]interface{}),
 		uris:           make(map[string]string),
-		types:          make(map[string]string),
+		mediaTypes:     make(map[string]persist.MediaType),
 		medias:         make(map[string]media),
 		balances:       make(map[string]map[string]*big.Int),
 		contractStored: make(map[string]bool),
@@ -311,17 +311,12 @@ func processTransfer(i *Indexer, transfer *transfer) {
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	tokenType, ok := i.types[key]
-	if !ok {
-		i.types[key] = transfer.Type
-		tokenType = transfer.Type
-	}
 
 	if !i.contractStored[key] {
 		i.contractStored[key] = true
 		i.contracts <- transfer.RawContract.Address
 	}
-	switch tokenType {
+	switch persist.TokenType(transfer.Type) {
 	case persist.TokenTypeERC721:
 		if it, ok := i.owners[key]; ok {
 			if it.block < bn.Uint64() {
@@ -392,12 +387,13 @@ func processTransfer(i *Indexer, transfer *transfer) {
 				i.done <- true
 			}
 			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
-			metadata, err := getMetadataFromURI(uriReplaced, i.runtime)
+			metadata, mediaType, err := getMetadataFromURI(uriReplaced, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("Error getting metadata for token")
 				// TODO handle this
 			} else {
 				i.metadatas[key] = metadata
+				i.mediaTypes[key] = mediaType
 			}
 		}
 	}
@@ -437,13 +433,15 @@ func storedDataToTokens(i *Indexer) {
 			TokenID:         spl[1],
 			ContractAddress: spl[0],
 			OwnerAddress:    v.owner,
+			Amount:          1,
 			PreviousOwners:  previousOwnerAddresses,
-			Type:            persist.TokenTypeERC721,
+			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   i.metadatas[k],
 			TokenURI:        i.uris[k],
+			MediaType:       i.mediaTypes[k],
 			PreviewURL:      media.PreviewURL,
 			ThumbnailURL:    media.ThumbnailURL,
-			VideoURL:        media.VideoURL,
+			MediaURL:        media.MediaURL,
 			LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 		}
 		i.tokens <- token
@@ -462,12 +460,13 @@ func storedDataToTokens(i *Indexer) {
 				ContractAddress: spl[0],
 				OwnerAddress:    addr,
 				Amount:          balance.Uint64(),
-				Type:            persist.TokenTypeERC1155,
+				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   i.metadatas[k],
 				TokenURI:        i.uris[k],
+				MediaType:       i.mediaTypes[k],
 				PreviewURL:      media.PreviewURL,
 				ThumbnailURL:    media.ThumbnailURL,
-				VideoURL:        media.VideoURL,
+				MediaURL:        media.MediaURL,
 				LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 			}
 			i.tokens <- token

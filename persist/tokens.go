@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -18,13 +19,42 @@ const (
 
 const (
 	// TokenTypeERC721 is the type of an ERC721 token
-	TokenTypeERC721 = "ERC-721"
+	TokenTypeERC721 TokenType = "ERC-721"
 	// TokenTypeERC1155 is the type of an ERC1155 token
-	TokenTypeERC1155 = "ERC-1155"
+	TokenTypeERC1155 TokenType = "ERC-1155"
+)
+
+const (
+	// MediaTypeVideo represents a video
+	MediaTypeVideo MediaType = "video"
+	// MediaTypeImage represents an image
+	MediaTypeImage MediaType = "image"
+	// MediaTypeSVG represents an SVG
+	MediaTypeSVG MediaType = "svg"
+	// MediaTypeBase64JSON represents a base64 encoded JSON document
+	MediaTypeBase64JSON MediaType = "base64json"
+	// MediaTypeBase64SVG represents a base64 encoded SVG
+	MediaTypeBase64SVG MediaType = "base64svg"
+	// MediaTypeText represents plain text
+	MediaTypeText MediaType = "text"
+	// MediaTypeBase64Text represents a base64 encoded plain text
+	MediaTypeBase64Text MediaType = "base64text"
+	// MediaTypeAudio represents audio
+	MediaTypeAudio MediaType = "audio"
+	// MediaTypeJSON represents audio
+	MediaTypeJSON MediaType = "json"
+	// MediaTypeUnknown represents an unknown media type
+	MediaTypeUnknown MediaType = "unknown"
 )
 
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
+
+// TokenType represents the contract specification of the token
+type TokenType string
+
+// MediaType represents the type of media that a token
+type MediaType string
 
 // Token represents an individual Token token
 type Token struct {
@@ -34,12 +64,13 @@ type Token struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	OwnerUserID    DBID   `bson:"owner_user_id" json:"user_id"`
-	ThumbnailURL   string `bson:"thumbnail_url" json:"thumbnail_url"`
-	PreviewURL     string `bson:"preview_url" json:"preview_url"`
-	VideoURL       string `bson:"video_url" json:"video_url"`
-	Type           string `bson:"type" json:"type"`
+	CollectorsNote string    `bson:"collectors_note" json:"collectors_note"`
+	ThumbnailURL   string    `bson:"thumbnail_url" json:"thumbnail_url"`
+	PreviewURL     string    `bson:"preview_url" json:"preview_url"`
+	MediaURL       string    `bson:"media_url" json:"media_url"`
+	MediaType      MediaType `bson:"media_type" json:"media_type"`
+
+	TokenType TokenType `bson:"type" json:"type"`
 
 	TokenURI        string                 `bson:"token_uri" json:"token_uri"`
 	TokenID         string                 `bson:"token_id" json:"token_id"`
@@ -57,7 +88,6 @@ type CollectionToken struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 
-	OwnerUserID     DBID   `bson:"owner_user_id" json:"user_id"`
 	ContractAddress string `bson:"contract_address"     json:"contract_address"`
 
 	ThumbnailURL  string                 `bson:"thumbnail_url" json:"thumbnail_url"`
@@ -74,7 +104,7 @@ type TokenUpdateInfoInput struct {
 type TokenUpdateImageURLsInput struct {
 	ThumbnailURL string `bson:"thumbnail_url" json:"thumbnail_url"`
 	PreviewURL   string `bson:"preview_url" json:"preview_url"`
-	VideoURL     string `bson:"video_url" json:"video_url"`
+	MediaURL     string `bson:"media_url" json:"media_url"`
 }
 
 // TokenCreateBulk is a helper function to create multiple nfts in one call and returns
@@ -246,7 +276,7 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 
 		go func(token *Token) {
 			defer wg.Done()
-			_, err := mp.upsert(pCtx, bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress)}, token)
+			_, err := mp.upsert(pCtx, bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress), "owner_address": token.OwnerAddress}, token)
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, err)
@@ -262,24 +292,42 @@ func TokenBulkUpsert(pCtx context.Context, pERC721s []*Token, pRuntime *runtime.
 	return nil
 }
 
-// TokenUpdateByIDs will update a given token by its DB ID and owner user ID
-func TokenUpdateByIDs(pCtx context.Context, pID DBID, pUserID DBID,
+// TokenUpdateByID will update a given token by its DB ID and owner user ID
+func TokenUpdateByID(pCtx context.Context, pID DBID, pUserID DBID,
 	pUpdate interface{},
 	pRuntime *runtime.Runtime) error {
 
+	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+
 	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
 
 }
 
-// TokenUpdateByID will update a given token by its DB ID
-func TokenUpdateByID(pCtx context.Context, pID DBID,
-	pUpdate interface{},
-	pRuntime *runtime.Runtime) error {
+// SniffMediaType will attempt to detect the media type for a given array of bytes
+func SniffMediaType(buf []byte) MediaType {
+	contentType := http.DetectContentType(buf[:512])
 
-	mp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
-
-	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	switch {
+	case strings.Contains(contentType, "image"):
+		if strings.Contains(contentType, "svg") {
+			return MediaTypeSVG
+		}
+		return MediaTypeImage
+	case strings.Contains(contentType, "video"):
+		return MediaTypeVideo
+	case strings.Contains(contentType, "audio"):
+		return MediaTypeAudio
+	case strings.Contains(contentType, "json"):
+		return MediaTypeJSON
+	case strings.Contains(contentType, "text/plain"):
+		return MediaTypeText
+	default:
+		return MediaTypeUnknown
+	}
 
 }
