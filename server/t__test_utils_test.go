@@ -36,11 +36,11 @@ type TestUser struct {
 func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 	ctx := context.Background()
 
-	address := fmt.Sprintf("0x%s", util.RandStringBytes(40))
+	address := strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40)))
 	user := &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{strings.ToLower(address)},
+		Addresses:          []string{address},
 	}
 	id, err := persist.UserCreate(ctx, user, r)
 	if err != nil {
@@ -57,7 +57,7 @@ func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
-func setup() *TestConfig {
+func initializeTestEnv() *TestConfig {
 	// Initialize runtime
 	runtime, _ := runtime.GetRuntime(runtime.ConfigLoad())
 
@@ -99,14 +99,15 @@ func assertValidJSONResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
-func assertGalleryErrorResponse(assert *assert.Assertions, resp *http.Response) {
+func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.NotEqual(http.StatusOK, resp.StatusCode, "Status should not be 200")
 	val, ok := resp.Header["Content-Type"]
 	assert.True(ok, "Content-Type header should be set")
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
-func setupTest(t *testing.T) {
-	tc = setup()
+func setupTest(t *testing.T) *assert.Assertions {
+	tc = initializeTestEnv()
 	t.Cleanup(teardown)
+	return assert.New(t)
 }

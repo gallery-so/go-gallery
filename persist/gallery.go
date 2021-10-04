@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/mikeydub/go-gallery/runtime"
@@ -66,12 +67,22 @@ func GalleryCreate(pCtx context.Context, pGallery *GalleryDB,
 // pUpdate is a struct that contains bson tags representing the fields to be updated
 func GalleryUpdate(pCtx context.Context, pIDstr DBID,
 	pOwnerUserID DBID,
-	pUpdate interface{},
+	pUpdate *GalleryUpdateInput,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, galleryColName, pRuntime)
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pOwnerUserID}, pUpdate)
+	npm := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime)
+	ct, err := npm.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
+	if err != nil {
+		return err
+	}
+
+	if int(ct) != len(pUpdate.Collections) {
+		return errors.New("user does not own all collections to be inserted")
+	}
+
+	return mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }
 
 // GalleryAddCollections adds collections to the specified gallery

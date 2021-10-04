@@ -71,7 +71,8 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		userID, _ := getUserIDfromCtx(c)
+		auth := userID == input.UserID
 		colls, err := persist.CollGetByUserID(c, input.UserID, auth, pRuntime)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
@@ -162,7 +163,7 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.CollectionUpdateInfoInput{Name: input.Name, CollectorsNote: input.CollectorsNote}
+		update := &persist.CollectionUpdateInfoInput{Name: sanitizationPolicy.Sanitize(input.Name), CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
 		if err != nil {
@@ -208,13 +209,22 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
+		// TODO magic number
+		if len(input.Nfts) > 1000 {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "collections can have no more than 100 NFTs"})
+			return
+		}
+
 		userID, ok := getUserIDfromCtx(c)
 		if !ok {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		update := &persist.CollectionUpdateNftsInput{Nfts: input.Nfts}
+		// ensure that there are no repeat NFTs
+		withNoRepeats := uniqueDBID(input.Nfts)
+
+		update := &persist.CollectionUpdateNftsInput{Nfts: withNoRepeats}
 
 		err := persist.CollUpdateNFTs(c, input.ID, userID, update, pRuntime)
 		if err != nil {
@@ -271,8 +281,8 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	coll := &persist.CollectionDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
-		Name:           pInput.Name,
-		CollectorsNote: pInput.CollectorsNote,
+		Name:           sanitizationPolicy.Sanitize(pInput.Name),
+		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 
 	collID, err := persist.CollCreate(pCtx, coll, pRuntime)
@@ -287,4 +297,19 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 
 	return collID, nil
 
+}
+
+// uniqueDBID ensures that an array of DBIDs has no repeat items
+func uniqueDBID(a []persist.DBID) []persist.DBID {
+	result := []persist.DBID{}
+	m := map[persist.DBID]bool{}
+
+	for _, val := range a {
+		if _, ok := m[val]; !ok {
+			m[val] = true
+			result = append(result, val)
+		}
+	}
+
+	return result
 }

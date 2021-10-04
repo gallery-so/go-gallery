@@ -28,6 +28,8 @@ const (
 
 	openseaAPIKey = "OPENSEA_API_KEY"
 
+	jwtSecret = "JWT_SECRET"
+
 	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "REDIS_PASS_SECRET_NAME"
 
@@ -55,6 +57,8 @@ type Config struct {
 
 	OpenseaAPIKey string
 
+	JWTSecret string
+
 	RedisURL      string
 	RedisPassword string
 
@@ -79,6 +83,7 @@ func ConfigLoad() *Config {
 	viper.SetDefault(rpcURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault(ipfsURL, "https://ipfs.io")
 	viper.SetDefault(gcloudTokenBucket, "token-bucket")
+	viper.SetDefault(jwtSecret, "Test-Secret")
 
 	viper.SetDefault(redisURL, "localhost:6379")
 

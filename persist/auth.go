@@ -28,7 +28,6 @@ type UserNonce struct {
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
 	Value   string `bson:"value"   json:"value"`
-	UserID  DBID   `bson:"user_id" json:"user_id"`
 	Address string `bson:"address"     json:"address"`
 }
 

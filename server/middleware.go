@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +35,7 @@ func jwtRequired(runtime *runtime.Runtime) gin.HandlerFunc {
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
 			// database that is unique to every user and session
-			valid, userID, err := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
+			valid, userID, err := authJwtParse(jwt, runtime.Config.JWTSecret, runtime)
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
 				return
@@ -64,7 +63,7 @@ func jwtOptional(runtime *runtime.Runtime) gin.HandlerFunc {
 			if len(authHeaders) == 2 {
 				// get string after "Bearer"
 				jwt := authHeaders[1]
-				valid, userID, _ := authJwtParse(jwt, os.Getenv("JWT_SECRET"), runtime)
+				valid, userID, _ := authJwtParse(jwt, runtime.Config.JWTSecret, runtime)
 				c.Set(authContextKey, valid)
 				c.Set(userIDcontextKey, userID)
 			}

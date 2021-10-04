@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/copy"
@@ -15,8 +16,7 @@ import (
 )
 
 func TestGetNftByID_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	note := "very cool nft"
@@ -40,12 +40,11 @@ func TestGetNftByID_Success(t *testing.T) {
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
 	assert.Nil(err)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -53,14 +52,13 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nonexistentNftID := "12345"
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nonexistentNftID))
 	assert.Nil(err)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -68,13 +66,12 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
 		CollectorsNote: "silly note",
-		OwnerUserID:    tc.user1.id,
+		OwnerAddress:   strings.ToLower(tc.user1.address),
 	}, tc.r)
 	assert.Nil(err)
 
@@ -93,19 +90,18 @@ func TestUpdateNftByID_Success(t *testing.T) {
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
 		CollectorsNote: "this is a bad note",
-		OwnerUserID:    tc.user1.id,
+		OwnerAddress:   strings.ToLower(tc.user1.address),
 	}, tc.r)
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
 	resp := updateNFTUnauthedRequest(assert, update)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -113,11 +109,10 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	resp := updateNFTRequest(assert, "", "new nft note", tc.user1.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -125,13 +120,12 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NotFoundError(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	nftID := persist.DBID("no exist :(")
 
 	resp := updateNFTRequest(assert, nftID, "new nft note", tc.user1.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
@@ -139,8 +133,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
-	setupTest(t)
-	assert := assert.New(t)
+	assert := setupTest(t)
 
 	// seed DB with nft
 	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
@@ -149,7 +142,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert.Nil(err)
 
 	resp := updateNFTRequest(assert, nftID, "new nft name", tc.user2.jwt)
-	assertGalleryErrorResponse(assert, resp)
+	assertErrorResponse(assert, resp)
 
 }
 

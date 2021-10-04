@@ -183,12 +183,27 @@ func CollUpdate(pCtx context.Context, pIDstr DBID,
 // by a given authorized user as well as that no other collection contains the NFTs
 // being included in the updated collection. This is to ensure that the NFTs are not
 // being shared between collections.
-func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
+func CollUpdateNFTs(pCtx context.Context, pID DBID,
 	pUserID DBID,
 	pUpdate *CollectionUpdateNftsInput,
 	pRuntime *runtime.Runtime) error {
 
 	mp := newStorage(0, runtime.GalleryDBName, collectionColName, pRuntime)
+
+	nmp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
+
+	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	if err != nil {
+		return err
+	}
+
+	ct, err := nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": user.Addresses}})
+	if err != nil {
+		return err
+	}
+	if int(ct) != len(pUpdate.Nfts) {
+		return errors.New("not all nfts are owned by the user")
+	}
 
 	if err := mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
@@ -200,7 +215,7 @@ func CollUpdateNFTs(pCtx context.Context, pIDstr DBID,
 		return err
 	}
 
-	return mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	return mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
 // CollClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
@@ -214,15 +229,13 @@ func CollClaimNFTs(pCtx context.Context,
 
 	nmp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
 
-	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": bson.M{"$ne": pUserID}}, "nfts", pUpdate.Nfts); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
-			return err
-		}
+	for i, addr := range pWalletAddresses {
+		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
 	nftsToBeRemoved := []*Token{}
 
-	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 
@@ -240,11 +253,10 @@ func CollClaimNFTs(pCtx context.Context,
 	}
 
 	type update struct {
-		OwnerUserID  DBID   `bson:"owner_user_id"`
 		OwnerAddress string `bson:"owner_address"`
 	}
 
-	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_user_id": pUserID, "owner_address": bson.M{"$in": pWalletAddresses}}, update{}); err != nil {
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
 		if _, ok := err.(*DocumentNotFoundError); !ok {
 			return err
 		}
@@ -271,15 +283,30 @@ func CollRemoveNFTsOfAddresses(pCtx context.Context,
 	}
 
 	nmp := newStorage(0, runtime.GalleryDBName, tokenColName, pRuntime)
-	res := []*Token{}
-	nmp.find(pCtx, bson.M{"owner_user_id": pUserID, "owner_address": bson.M{"$in": pAddresses}}, &res)
-	ids := make([]DBID, len(res))
-	for i, nft := range res {
-		ids[i] = nft.ID
+
+	nftsToBeRemoved := []*Token{}
+
+	if err := nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
+		return err
 	}
 
-	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", ids); err != nil {
+	idsToBePulled := make([]DBID, len(nftsToBeRemoved))
+	for i, nft := range nftsToBeRemoved {
+		idsToBePulled[i] = nft.ID
+	}
+
+	if err := mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToBePulled); err != nil {
 		return err
+	}
+
+	type update struct {
+		OwnerAddress string `bson:"owner_address"`
+	}
+
+	if err := nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, &update{}); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
 	}
 
 	if err := mp.cacheDelete(runtime.CollUnassignedRDB, string(pUserID)); err != nil {
@@ -346,7 +373,11 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 
 		result = []*Collection{{Nfts: collNfts}}
 	} else {
-		if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID), &result, opts); err != nil {
+		user, err := UserGetByID(pCtx, pUserID, pRuntime)
+		if err != nil {
+			return nil, err
+		}
+		if err := mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, user.Addresses), &result, opts); err != nil {
 			return nil, err
 		}
 	}
@@ -367,7 +398,7 @@ func CollGetUnassigned(pCtx context.Context, pUserID DBID, skipCache bool, pRunt
 
 }
 
-func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
+func newUnassignedCollectionPipeline(pUserID DBID, pOwnerAddresses []string) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},
@@ -391,7 +422,7 @@ func newUnassignedCollectionPipeline(pUserID DBID) mongo.Pipeline {
 						"$and": []bson.M{
 							{"$not": bson.M{"$in": []string{"$_id", "$$array"}}},
 							{"$eq": []interface{}{"$deleted", false}},
-							{"$eq": []interface{}{"$owner_user_id", pUserID}},
+							{"$in": []interface{}{"$owner_address", pOwnerAddresses}},
 						},
 					},
 				}}},

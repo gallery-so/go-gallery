@@ -50,8 +50,8 @@ var bannedUsernames = map[string]bool{
 }
 
 type userUpdateInput struct {
-	UserNameStr string `json:"username" binding:"username"`
-	BioStr      string `json:"bio"`
+	UserName string `json:"username" binding:"username"`
+	BioStr   string `json:"bio"`
 }
 
 type userGetInput struct {
@@ -111,7 +111,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		if strings.HasSuffix(strings.ToLower(up.UserNameStr), ".eth") {
+		if strings.HasSuffix(strings.ToLower(up.UserName), ".eth") {
 			user, err := persist.UserGetByID(c, userID, pRuntime)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
@@ -119,7 +119,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 			can := false
 			for _, addr := range user.Addresses {
-				if resolves, _ := resolvesENS(c, up.UserNameStr, addr, pRuntime); resolves {
+				if resolves, _ := resolvesENS(c, up.UserName, addr, pRuntime); resolves {
 					can = true
 					break
 				}
@@ -309,11 +309,11 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	output := &userAddAddressOutput{}
 
-	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	nonceValueStr, userID, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
-	if id != "" {
+	if userID != "" {
 		return nil, errors.New("user already exists with a given address")
 	}
 
@@ -349,6 +349,7 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 	if err != nil {
 		return err
 	}
+
 	if len(user.Addresses) < len(pInput.Addresses) {
 		return errors.New("user does not have enough addresses to remove")
 	}
@@ -416,8 +417,8 @@ func userUpdateInfoDB(pCtx context.Context, pUserID persist.DBID, pInput *userUp
 		pCtx,
 		pUserID,
 		&persist.UserUpdateInfoInput{
-			UserNameIdempotent: strings.ToLower(pInput.UserNameStr),
-			UserName:           pInput.UserNameStr,
+			UserNameIdempotent: strings.ToLower(pInput.UserName),
+			UserName:           pInput.UserName,
 			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
 		},
 		pRuntime,
@@ -462,6 +463,7 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	} else {
 		return nonceValue, userID, errors.New("no user found")
 	}
+
 	//------------------
 
 	return nonceValue, userID, nil

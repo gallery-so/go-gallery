@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -72,19 +71,11 @@ func authJwtParse(pJWTtokenStr string,
 	return true, claims.UserID, nil
 }
 
-// GENERATE__PIPELINE
-
-// ADD!! - mark all other JWT's for this address as deleted to exclude them from future use.
-
 func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID,
 	pRuntime *runtime.Runtime) (string, error) {
 
-	// previously we would generate a random string and use that as jwt secret and store
-	// the string in the db with the jwt for verifcation. with stateless auth, we might
-	// use an environment variable like so as the secret. worth considering other options
-	// to increase security
-	issuer := "gallery" // string(pAddressStr)
-	jwtTokenStr, err := jwtGenerate(os.Getenv("JWT_SECRET"),
+	issuer := "gallery"
+	jwtTokenStr, err := jwtGenerate(pRuntime.Config.JWTSecret,
 		issuer,
 		pUserID,
 		pRuntime)

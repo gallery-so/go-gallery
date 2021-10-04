@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -217,5 +218,6 @@ func UserRemoveAddresses(pCtx context.Context, pUserID DBID, pAddresses []string
 		pAddresses[i] = strings.ToLower(addr)
 	}
 
+	log.Println("WEEOO")
 	return mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
