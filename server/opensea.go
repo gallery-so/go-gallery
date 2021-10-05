@@ -258,9 +258,7 @@ func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int, pRuntime *r
 	if err != nil {
 		return nil, err
 	}
-	if pRuntime.Config.OpenseaAPIKey != "" {
-		req.Header.Set("X-API-KEY", pRuntime.Config.OpenseaAPIKey)
-	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
