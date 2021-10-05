@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 
@@ -35,15 +34,7 @@ func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pR
 		return false, err
 	}
 
-	switch {
-	case call.IsInt64():
-		return call.Int64() > 0, nil
-	case call.IsUint64():
-		return call.Uint64() > 0, nil
-	default:
-		return false, errors.New("could not get balanceOf address for contract")
-	}
-
+	return call.Cmp(new(big.Int).SetUint64(0)) == 1, nil
 }
 func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
 	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")

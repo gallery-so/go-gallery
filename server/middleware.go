@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -77,6 +78,34 @@ func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
 		limiter := rateLimiter.GetLimiter(c.ClientIP())
 		if !limiter.Allow() {
 			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "rate limited"})
+			return
+		}
+		c.Next()
+	}
+}
+
+func requireNFTs(contractAddress string, runtime *runtime.Runtime) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := getUserIDfromCtx(c)
+		if ok {
+			user, err := persist.UserGetByID(c, userID, runtime)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				return
+			}
+			has := false
+			for _, addr := range user.Addresses {
+				if res, _ := hasAnyNFT(c, contractAddress, addr, runtime); res {
+					has = res
+					break
+				}
+			}
+			if !has {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: fmt.Sprintf("user must have ID at address %s", contractAddress)})
+				return
+			}
+		} else {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "user must be authenticated"})
 			return
 		}
 		c.Next()
