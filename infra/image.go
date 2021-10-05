@@ -25,12 +25,7 @@ import (
 	"google.golang.org/appengine/image"
 )
 
-type media struct {
-	persist.TokenUpdateImageURLsInput
-	Type persist.MediaType
-}
-
-func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) (*media, error) {
+func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, pRuntime *runtime.Runtime) (*persist.Media, error) {
 	tokens, err := persist.TokenGetByNFTIdentifiers(pCtx, tokenID, contractAddress, pRuntime)
 	if err != nil {
 		return nil, err
@@ -41,7 +36,7 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 
 	token := tokens[0]
 
-	if token.PreviewURL != "" && token.ThumbnailURL != "" {
+	if token.Media.PreviewURL != "" && token.Media.ThumbnailURL != "" {
 		return nil, errors.New("token already has preview and thumbnail URLs")
 	}
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
@@ -66,8 +61,8 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 	if err != nil {
 		return nil, err
 	}
-	update := &media{
-		Type: mediaType,
+	update := &persist.Media{
+		MediaType: mediaType,
 	}
 
 	imageURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
@@ -87,7 +82,7 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 	return update, nil
 }
 
-func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, tokenURI string, pRuntime *runtime.Runtime) (media, error) {
+func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, tokenURI string, pRuntime *runtime.Runtime) (*persist.Media, error) {
 
 	url := ""
 
@@ -109,10 +104,10 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 
 	mediaType, err := downloadAndCache(pCtx, url, name, pRuntime)
 	if err != nil {
-		return media{}, err
+		return nil, err
 	}
-	res := media{
-		Type: mediaType,
+	res := &persist.Media{
+		MediaType: mediaType,
 	}
 
 	imageURL, err := getMediaServingURL(pCtx, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))

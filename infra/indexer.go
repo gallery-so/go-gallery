@@ -57,8 +57,6 @@ type Indexer struct {
 
 	metadatas      map[string]map[string]interface{}
 	uris           map[string]string
-	mediaTypes     map[string]persist.MediaType
-	medias         map[string]media
 	contractStored map[string]bool
 	owners         map[string]ownerAtBlock
 	balances       map[string]map[string]*big.Int
@@ -109,8 +107,6 @@ func NewIndexer(pEvents []EventHash, statsFileName string, pRuntime *runtime.Run
 
 		metadatas:      make(map[string]map[string]interface{}),
 		uris:           make(map[string]string),
-		mediaTypes:     make(map[string]persist.MediaType),
-		medias:         make(map[string]media),
 		balances:       make(map[string]map[string]*big.Int),
 		contractStored: make(map[string]bool),
 		owners:         make(map[string]ownerAtBlock),
@@ -381,29 +377,16 @@ func processTransfer(i *Indexer, transfer *transfer) {
 				i.done <- err
 			}
 			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
-			metadata, mediaType, err := getMetadataFromURI(uriReplaced, i.runtime)
+			metadata, err := getMetadataFromURI(uriReplaced, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("error getting metadata for token")
 				atomic.AddUint64(&i.badURIs, 1)
 				// TODO handle this
 			} else {
 				i.metadatas[key] = metadata
-				i.mediaTypes[key] = mediaType
 			}
 		}
 	}
-	// if _, ok := i.medias[key]; !ok {
-	// 	if metadata, ok := i.metadatas[key]; ok {
-	// 		uri := i.uris[key]
-	// 		media, err := makePreviewsForMetadata(context.TODO(), metadata, transfer.RawContract.Address, transfer.TokenID, uri, i.runtime)
-	// 		if err != nil {
-	// 			logrus.WithError(err).Error("error creating preview for token")
-	// 			// TODO handle this
-	// 		} else {
-	// 			i.medias[key] = media
-	// 		}
-	// 	}
-	// }
 }
 
 func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
@@ -431,11 +414,7 @@ func storedDataToTokens(i *Indexer) {
 		for i, w := range i.previousOwners[k] {
 			previousOwnerAddresses[i] = toRegularAddress(w.owner)
 		}
-		media := i.medias[k]
-		mediaType := i.mediaTypes[k]
-		if media.Type != "" {
-			mediaType = media.Type
-		}
+
 		token := &persist.Token{
 			TokenID:         spl[1],
 			ContractAddress: spl[0],
@@ -445,10 +424,6 @@ func storedDataToTokens(i *Indexer) {
 			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   i.metadatas[k],
 			TokenURI:        i.uris[k],
-			MediaType:       mediaType,
-			PreviewURL:      media.PreviewURL,
-			ThumbnailURL:    media.ThumbnailURL,
-			MediaURL:        media.MediaURL,
 			LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 		}
 		i.tokens <- token
@@ -460,11 +435,7 @@ func storedDataToTokens(i *Indexer) {
 			atomic.StoreInt64(&i.state, -1)
 			i.done <- errors.New("invalid key")
 		}
-		media := i.medias[k]
-		mediaType := i.mediaTypes[k]
-		if media.Type != "" {
-			mediaType = media.Type
-		}
+
 		for addr, balance := range v {
 			token := &persist.Token{
 				TokenID:         spl[1],
@@ -474,10 +445,6 @@ func storedDataToTokens(i *Indexer) {
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   i.metadatas[k],
 				TokenURI:        i.uris[k],
-				MediaType:       mediaType,
-				PreviewURL:      media.PreviewURL,
-				ThumbnailURL:    media.ThumbnailURL,
-				MediaURL:        media.MediaURL,
 				LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 			}
 			i.tokens <- token

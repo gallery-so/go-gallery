@@ -66,11 +66,8 @@ type Token struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	CollectorsNote string    `bson:"collectors_note" json:"collectors_note"`
-	ThumbnailURL   string    `bson:"thumbnail_url" json:"thumbnail_url"`
-	PreviewURL     string    `bson:"preview_url" json:"preview_url"`
-	MediaURL       string    `bson:"media_url" json:"media_url"`
-	MediaType      MediaType `bson:"media_type" json:"media_type"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	Media          Media  `bson:"media" json:"media"`
 
 	TokenType TokenType `bson:"type" json:"type"`
 
@@ -85,6 +82,14 @@ type Token struct {
 	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
 }
 
+// Media represents a token's media content with processed images from metadata
+type Media struct {
+	ThumbnailURL string    `bson:"thumbnail_url" json:"thumbnail_url"`
+	PreviewURL   string    `bson:"preview_url" json:"preview_url"`
+	MediaURL     string    `bson:"media_url" json:"media_url"`
+	MediaType    MediaType `bson:"media_type" json:"media_type"`
+}
+
 // CollectionToken represents a token within a collection
 type CollectionToken struct {
 	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
@@ -92,8 +97,7 @@ type CollectionToken struct {
 
 	ContractAddress string `bson:"contract_address"     json:"contract_address"`
 
-	ThumbnailURL  string                 `bson:"thumbnail_url" json:"thumbnail_url"`
-	PreviewURL    string                 `bson:"preview_url" json:"preview_url"`
+	Media         Media                  `bson:"media" json:"media"`
 	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 }
 

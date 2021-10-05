@@ -501,8 +501,7 @@ func tokenToCollectionToken(token *Token) *CollectionToken {
 		ID:              token.ID,
 		CreationTime:    token.CreationTime,
 		ContractAddress: token.ContractAddress,
-		ThumbnailURL:    token.ThumbnailURL,
-		PreviewURL:      token.PreviewURL,
+		Media:           token.Media,
 		TokenMetadata:   token.TokenMetadata,
 	}
 }
