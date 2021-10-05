@@ -191,14 +191,16 @@ func (i *Indexer) processTransfers() {
 	defer close(i.tokens)
 	count := 0
 	for transfers := range i.transfers {
-		if count%10000 == 0 {
-			logrus.Infof("Processed %d sets of transfers", count)
-			go storedDataToTokens(i)
+		if transfers != nil && len(transfers) > 0 {
+			for _, transfer := range transfers {
+				go processTransfer(i, transfer)
+			}
+			if count%10000 == 0 {
+				logrus.Infof("Processed %d sets of transfers", count)
+				go storedDataToTokens(i)
+			}
+			count++
 		}
-		for _, transfer := range transfers {
-			go processTransfer(i, transfer)
-		}
-		count++
 	}
 	logrus.Info("Transfer channel closed")
 	storedDataToTokens(i)
@@ -331,7 +333,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			uri, err := getERC721TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC721 token")
-				// TODO handle this
+
 			} else {
 				i.uris[key] = uri
 			}
@@ -356,7 +358,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			uri, err := getERC1155TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC1155 token")
-				// TODO handle this
+
 			} else {
 				i.uris[key] = uri
 			}
@@ -390,6 +392,9 @@ func processTransfer(i *Indexer, transfer *transfer) {
 }
 
 func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
+	if t.TokenURI == "" {
+		return errors.New("token URI is empty")
+	}
 	return persist.TokenUpsert(ctx, t, i.runtime)
 }
 
