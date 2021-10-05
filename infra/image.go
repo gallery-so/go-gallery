@@ -17,6 +17,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/nfnt/resize"
 	"github.com/sirupsen/logrus"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"google.golang.org/appengine"
@@ -131,7 +132,7 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	return res, nil
 }
 
-func cacheRawMedia(pCtx context.Context, image []byte, bucket, fileName string) error {
+func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) error {
 
 	ctx, cancel := context.WithTimeout(pCtx, 2*time.Second)
 	defer cancel()
@@ -141,7 +142,7 @@ func cacheRawMedia(pCtx context.Context, image []byte, bucket, fileName string) 
 	}
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	if _, err := sw.Write(image); err != nil {
+	if _, err := sw.Write(img); err != nil {
 		return fmt.Errorf("Could not write file: %v", err)
 	}
 
@@ -188,7 +189,7 @@ func downloadAndCache(pCtx context.Context, url, name string, pRuntime *runtime.
 		}
 	} else if strings.HasPrefix(url, "http") {
 		hc := &http.Client{
-			Timeout: time.Second * 2,
+			Timeout: time.Second * 5,
 		}
 
 		req, err := hc.Get(url)
@@ -209,6 +210,13 @@ func downloadAndCache(pCtx context.Context, url, name string, pRuntime *runtime.
 
 	switch contentType {
 	case persist.MediaTypeImage:
+		jpg, err := jpeg.Decode(buf)
+		if err != nil {
+			return "", err
+		}
+		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		jpeg.Encode(buf, jpg, nil)
 		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeVideo:
 		// thumbnails the video, do we need to store a whole video?
@@ -233,7 +241,14 @@ func downloadAndCache(pCtx context.Context, url, name string, pRuntime *runtime.
 		if err != nil {
 			return "", err
 		}
-		return persist.MediaTypeVideo, cacheRawMedia(pCtx, jp, pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
+		jpg, err := jpeg.Decode(bytes.NewBuffer(jp))
+		if err != nil {
+			return "", err
+		}
+		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		jpeg.Encode(buf, jpg, nil)
+		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), pRuntime.Config.GCloudTokenContentBucket, fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeGIF:
 		// thumbnails a gif, do we need to store the whole gif?
 		asGif, err := gif.DecodeAll(bytes.NewReader(buf.Bytes()))
@@ -241,7 +256,7 @@ func downloadAndCache(pCtx context.Context, url, name string, pRuntime *runtime.
 			return "", err
 		}
 		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, asGif.Image[0], &jpeg.Options{Quality: 30})
+		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
 		if err != nil {
 			return "", err
 		}

@@ -196,8 +196,32 @@ func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]
 // if logging all events is too large and takes too much time, start from the front and go backwards until one is found
 // given that the most recent URI event should be the current URI
 func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (string, error) {
+	contract := common.HexToAddress(pContractAddress)
+	instance, err := contracts.NewIERC1155MetadataURI(contract, pRuntime.InfraClients.ETHClient)
+	if err != nil {
+		return "", err
+	}
+
+	i, err := util.HexToBigInt(pTokenID)
+	if err != nil {
+		return "", err
+	}
+	logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	tokenURI, err := instance.Uri(&bind.CallOpts{
+		Context: ctx,
+	}, i)
+	if err != nil {
+		return "", err
+	}
+	cancel()
+	if tokenURI != "" {
+		return strings.ReplaceAll(tokenURI, "\x00", ""), nil
+	}
+
 	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(pTokenID, 64))}}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
 	def := new(big.Int).SetUint64(defaultERC721Block)
@@ -225,6 +249,7 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Run
 	length := new(big.Int).SetBytes(logs[0].Data[32:64])
 	uri := string(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
 	return uri, nil
+
 }
 
 func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (*big.Int, error) {

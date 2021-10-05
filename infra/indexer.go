@@ -149,7 +149,7 @@ func (i *Indexer) processLogs() {
 		go i.subscribeNewLogs()
 	}()
 
-	go checkForNewBlocks(i)
+	go i.listenForNewBlocks()
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -588,7 +588,7 @@ func (i *Indexer) writeStats() {
 	}
 }
 
-func checkForNewBlocks(i *Indexer) {
+func (i *Indexer) listenForNewBlocks() {
 	for {
 		finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
 		if err != nil {
