@@ -14,31 +14,13 @@ import (
 
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
-func hasAnyNFT(pCtx context.Context, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client := pRuntime.ContractsClient
-
-	addr := common.HexToAddress(userAddr)
-
-	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
-	instance, err := contracts.NewIERC721Caller(contract, client)
-	if err != nil {
-		return false, err
-	}
-
-	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr)
-	if err != nil {
-		return false, err
-	}
-
-	return call.Cmp(new(big.Int).SetUint64(0)) == 1, nil
-}
 func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
 	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 
 	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
-	instance, err := contracts.NewIERC721Caller(contract, client)
+	instance, err := contracts.NewIERC1155Caller(contract, client)
 	if err != nil {
 		return false, err
 	}
@@ -46,12 +28,12 @@ func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.
 	bigIntID := &big.Int{}
 	bigIntID, _ = bigIntID.SetString(id, 10)
 
-	call, err := instance.OwnerOf(&bind.CallOpts{From: addr, Context: pCtx}, bigIntID)
+	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr, bigIntID)
 	if err != nil {
 		return false, err
 	}
 
-	return call.String() == addr.String(), nil
+	return call.Cmp(big.NewInt(0)) > 0, nil
 
 }
 

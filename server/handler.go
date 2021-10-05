@@ -28,7 +28,8 @@ func handlersInit(pRuntime *runtime.Runtime) *gin.Engine {
 	collectionsGroup.GET("/user_get", jwtOptional(pRuntime), getCollectionsByUserID(pRuntime))
 	collectionsGroup.POST("/create", jwtRequired(pRuntime), createCollection(pRuntime))
 	collectionsGroup.POST("/delete", jwtRequired(pRuntime), deleteCollection(pRuntime))
-	collectionsGroup.POST("/update/info", jwtRequired(pRuntime), requireNFT(pRuntime), updateCollectionInfo(pRuntime))
+	// TODO magic number
+	collectionsGroup.POST("/update/info", jwtRequired(pRuntime), requireNFT(pRuntime, "0"), updateCollectionInfo(pRuntime))
 	collectionsGroup.POST("/update/hidden", jwtRequired(pRuntime), updateCollectionHidden(pRuntime))
 	collectionsGroup.POST("/update/nfts", jwtRequired(pRuntime), updateCollectionNfts(pRuntime))
 

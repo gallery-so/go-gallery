@@ -84,7 +84,7 @@ func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func requireNFT(runtime *runtime.Runtime) gin.HandlerFunc {
+func requireNFT(runtime *runtime.Runtime, tokenID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := getUserIDfromCtx(c)
 		if ok {
@@ -95,7 +95,7 @@ func requireNFT(runtime *runtime.Runtime) gin.HandlerFunc {
 			}
 			has := false
 			for _, addr := range user.Addresses {
-				if res, _ := hasAnyNFT(c, addr, runtime); res {
+				if res, _ := hasNFT(c, tokenID, addr, runtime); res {
 					has = res
 					break
 				}
