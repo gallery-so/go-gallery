@@ -9,22 +9,18 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
-func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
+func hasAnyNFT(pCtx context.Context, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
+	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(contractAddress)
+	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
 	instance, err := contracts.NewIERC721Caller(contract, client)
 	if err != nil {
 		return false, err
@@ -45,15 +41,12 @@ func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pR
 	}
 
 }
-func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
+func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
+	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(contractAddress)
+	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
 	instance, err := contracts.NewIERC721Caller(contract, client)
 	if err != nil {
 		return false, err
@@ -72,10 +65,7 @@ func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr st
 }
 
 func resolvesENS(pCtx context.Context, ens string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
+	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 

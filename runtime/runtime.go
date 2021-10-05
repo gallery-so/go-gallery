@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -31,10 +32,11 @@ const (
 
 // Runtime represents the runtime of the application and its services
 type Runtime struct {
-	Config *Config
-	DB     *DB
-	Redis  *Redis
-	Router *gin.Engine
+	Config          *Config
+	DB              *DB
+	Redis           *Redis
+	Router          *gin.Engine
+	ContractsClient *ethclient.Client
 }
 
 // DB is an abstract represenation of a MongoDB database and Client to interact with it
@@ -85,7 +87,7 @@ func GetRuntime(pConfig *Config) (*Runtime, error) {
 		Config: pConfig,
 		DB:     db,
 	}
-
+	runtime.setupContractsClient()
 	runtime.setupRedis()
 	log.Info("redis connected! ✅")
 
@@ -146,6 +148,13 @@ func (r *Runtime) setupRedis() {
 		OpenseaClient:    opensea,
 		UnassignedClient: unassigned,
 	}
+}
+func (r *Runtime) setupContractsClient() {
+	client, err := ethclient.Dial(r.Config.ContractInteractionURL)
+	if err != nil {
+		panic(err)
+	}
+	r.ContractsClient = client
 }
 
 func dbGetCustomTLSConfig(pCerts []byte) (*tls.Config, error) {
