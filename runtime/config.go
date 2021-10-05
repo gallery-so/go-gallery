@@ -19,8 +19,6 @@ const (
 	mongoUseTLS        = "GLRY_MONGO_USE_TLS"
 	mongoDBname        = "GLRY_MONGO_DB_NAME"
 
-	openseaAPIKey = "OPENSEA_API_KEY"
-
 	jwtSecret = "JWT_SECRET"
 
 	contractInteractionURL = "CONTRACT_INTERACTION_URL"
@@ -44,8 +42,6 @@ type Config struct {
 	MongoURL    string
 	MongoDBName string
 	MongoUseTLS bool
-
-	OpenseaAPIKey string
 
 	JWTSecret string
 
@@ -103,9 +99,8 @@ func ConfigLoad() *Config {
 		PortMetrics:    viper.GetInt(portMetrics),
 		AllowedOrigins: viper.GetString(allowedOrigins),
 
-		MongoUseTLS:   viper.GetBool(mongoUseTLS),
-		MongoDBName:   viper.GetString(mongoDBname),
-		OpenseaAPIKey: viper.GetString(openseaAPIKey),
+		MongoUseTLS: viper.GetBool(mongoUseTLS),
+		MongoDBName: viper.GetString(mongoDBname),
 
 		JWTSecret: viper.GetString(jwtSecret),
 
