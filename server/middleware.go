@@ -84,7 +84,7 @@ func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func requireNFTs(runtime *runtime.Runtime) gin.HandlerFunc {
+func requireNFT(runtime *runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := getUserIDfromCtx(c)
 		if ok {
