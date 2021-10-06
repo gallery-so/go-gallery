@@ -21,6 +21,9 @@ const (
 
 	jwtSecret = "JWT_SECRET"
 
+	contractInteractionURL = "CONTRACT_INTERACTION_URL"
+	contractAddress        = "CONTRACT_ADDRESS"
+
 	redisURL            = "GLRY_REDIS_URL"
 	redisPassSecretName = "REDIS_PASS_SECRET_NAME"
 
@@ -41,6 +44,9 @@ type Config struct {
 	MongoUseTLS bool
 
 	JWTSecret string
+
+	ContractInteractionURL string
+	ContractAddress        string
 
 	RedisURL      string
 	RedisPassword string
@@ -65,7 +71,8 @@ func ConfigLoad() *Config {
 	viper.SetDefault(jwtSecret, "Test-Secret")
 
 	viper.SetDefault(redisURL, "localhost:6379")
-
+	viper.SetDefault(contractAddress, "0x970b6AFD5EcDCB4001dB8dBf5E2702e86c857E54")
+	viper.SetDefault(contractInteractionURL, "https://eth-kovan.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
 	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24*3)
 
 	//------------------
@@ -94,7 +101,13 @@ func ConfigLoad() *Config {
 
 		MongoUseTLS: viper.GetBool(mongoUseTLS),
 		MongoDBName: viper.GetString(mongoDBname),
-		RedisURL:    viper.GetString(redisURL),
+
+		JWTSecret: viper.GetString(jwtSecret),
+
+		ContractAddress:        viper.GetString(contractAddress),
+		ContractInteractionURL: viper.GetString(contractInteractionURL),
+
+		RedisURL: viper.GetString(redisURL),
 
 		SentryEndpointStr: viper.GetString(sentryEndpoint),
 		JWTtokenTTLsecInt: int64(viper.GetInt(jwtTokenTTLsecInt)),

@@ -84,7 +84,7 @@ func rateLimited(runtime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func requireNFTs(contractAddress string, runtime *runtime.Runtime) gin.HandlerFunc {
+func requireNFT(runtime *runtime.Runtime, tokenIDs []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := getUserIDfromCtx(c)
 		if ok {
@@ -95,13 +95,13 @@ func requireNFTs(contractAddress string, runtime *runtime.Runtime) gin.HandlerFu
 			}
 			has := false
 			for _, addr := range user.Addresses {
-				if res, _ := hasAnyNFT(c, contractAddress, addr, runtime); res {
-					has = res
+				if res, _ := hasNFTs(c, tokenIDs, addr, runtime); res {
+					has = true
 					break
 				}
 			}
 			if !has {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: fmt.Sprintf("user must have ID at address %s", contractAddress)})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: fmt.Sprintf("user must have ID at address %s", runtime.Config.ContractAddress)})
 				return
 			}
 		} else {

@@ -8,44 +8,19 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/runtime"
 )
 
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
-func hasAnyNFT(pCtx context.Context, contractAddress string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
+func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
+	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewIERC721Caller(contract, client)
-	if err != nil {
-		return false, err
-	}
-
-	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr)
-	if err != nil {
-		return false, err
-	}
-
-	return call.Cmp(new(big.Int).SetUint64(0)) == 1, nil
-}
-func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
-
-	addr := common.HexToAddress(userAddr)
-
-	contract := common.HexToAddress(contractAddress)
-	instance, err := contracts.NewIERC721Caller(contract, client)
+	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
+	instance, err := contracts.NewIERC1155Caller(contract, client)
 	if err != nil {
 		return false, err
 	}
@@ -53,20 +28,50 @@ func hasNFT(pCtx context.Context, contractAddress string, id string, userAddr st
 	bigIntID := &big.Int{}
 	bigIntID, _ = bigIntID.SetString(id, 10)
 
-	call, err := instance.OwnerOf(&bind.CallOpts{From: addr, Context: pCtx}, bigIntID)
+	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr, bigIntID)
 	if err != nil {
 		return false, err
 	}
 
-	return call.String() == addr.String(), nil
+	return call.Cmp(big.NewInt(0)) > 0, nil
+
+}
+
+func hasNFTs(pCtx context.Context, ids []string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
+	client := pRuntime.ContractsClient
+
+	addr := common.HexToAddress(userAddr)
+
+	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
+	instance, err := contracts.NewIERC1155Caller(contract, client)
+	if err != nil {
+		return false, err
+	}
+
+	bigIntIDs := make([]*big.Int, len(ids))
+	addrs := make([]common.Address, len(ids))
+	for i := 0; i < len(ids); i++ {
+		asBigInt := &big.Int{}
+		bigIntIDs[i], _ = asBigInt.SetString(ids[i], 10)
+		addrs[i] = addr
+	}
+
+	call, err := instance.BalanceOfBatch(&bind.CallOpts{From: addr, Context: pCtx}, addrs, bigIntIDs)
+	if err != nil {
+		return false, err
+	}
+	for _, v := range call {
+		if v.Cmp(big.NewInt(0)) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
 
 }
 
 func resolvesENS(pCtx context.Context, ens string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	if err != nil {
-		return false, err
-	}
+	client := pRuntime.ContractsClient
 
 	addr := common.HexToAddress(userAddr)
 

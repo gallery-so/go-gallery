@@ -34,7 +34,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 	assert := setupTest(t)
 
-	resp := getPreflightRequest(assert, "0xbb3f043290841b97b9c92f6bc001a020d4b33255", "")
+	resp := getPreflightRequest(assert, "0x456d569592f15Af845D0dbe984C12BAB8F430e31", "")
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
