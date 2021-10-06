@@ -65,7 +65,7 @@ func init() {
 	b := true
 
 	// sometimes this is not running during tests
-	mClient.Database(galleryDBName).Collection("users").Indexes().CreateOne(context.TODO(), mongo.IndexModel{
+	mongoClient.Database(galleryDBName).Collection(usersCollName).Indexes().CreateOne(context.Background(), mongo.IndexModel{
 		Keys: bson.M{"username_idempotent": 1},
 		Options: &options.IndexOptions{
 			Unique: &b,
