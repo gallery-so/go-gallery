@@ -183,9 +183,9 @@ func (i *Indexer) processLogs() {
 
 		atomic.StoreUint64(&i.lastSyncedBlock, nextBlock.Uint64())
 
-		curBlock.Add(curBlock, big.NewInt(interval))
-		nextBlock.Add(nextBlock, big.NewInt(interval))
-		interval = getBlockInterval(1, 2000, curBlock.Int64())
+		curBlock.Add(curBlock, big.NewInt(int64(interval)))
+		nextBlock.Add(nextBlock, big.NewInt(int64(interval)))
+		interval = getBlockInterval(1, 2000, curBlock.Uint64(), i.mostRecentBlock)
 	}
 
 }
