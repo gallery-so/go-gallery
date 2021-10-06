@@ -14,37 +14,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateCollectionNameByID_Success(t *testing.T) {
-	assert := setupTest(t)
+// func TestUpdateCollectionNameByID_Success(t *testing.T) {
+// 	assert := setupTest(t)
 
-	// seed DB with collection
-	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-	}, tc.r)
-	assert.Nil(err)
+// 	// seed DB with collection
+// 	collID, err := persist.CollCreate(context.Background(), &persist.CollectionDB{
+// 		Name:        "very cool collection",
+// 		OwnerUserID: tc.user1.id,
+// 	}, tc.r)
+// 	assert.Nil(err)
 
-	// build update request body
-	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
-	resp := updateCollectionInfoRequest(assert, update, tc.user1.jwt)
-	assertValidResponse(assert, resp)
+// 	// build update request body
+// 	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
+// 	resp := updateCollectionInfoRequest(assert, update, tc.user1.jwt)
+// 	assertValidResponse(assert, resp)
 
-	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
+// 	// retrieve updated nft
+// 	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
+// 	assert.Nil(err)
+// 	assertValidJSONResponse(assert, resp)
 
-	type CollectionGetResponse struct {
-		Collection *persist.Collection `json:"collection"`
-		Error      string              `json:"error"`
-	}
-	// ensure nft was updated
-	body := CollectionGetResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotNil(body.Collection)
-	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collection.Name)
-}
+// 	type CollectionGetResponse struct {
+// 		Collection *persist.Collection `json:"collection"`
+// 		Error      string              `json:"error"`
+// 	}
+// 	// ensure nft was updated
+// 	body := CollectionGetResponse{}
+// 	util.UnmarshallBody(&body, resp.Body)
+// 	assert.NotNil(body.Collection)
+// 	assert.Empty(body.Error)
+// 	assert.Equal(update.Name, body.Collection.Name)
+// }
 
 func TestCreateCollection_Success(t *testing.T) {
 	assert := setupTest(t)
