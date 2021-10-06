@@ -395,6 +395,10 @@ func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
 	if t.TokenURI == "" {
 		return errors.New("token URI is empty")
 	}
+	if t.OwnerAddress == "0x00000000000000000000000000000000000000" {
+		return errors.New("token owner is empty")
+	}
+	i.done <- fmt.Errorf("token %s received at block %d", t.TokenURI, atomic.LoadUint64(&i.lastSyncedBlock))
 	return persist.TokenUpsert(ctx, t, i.runtime)
 }
 

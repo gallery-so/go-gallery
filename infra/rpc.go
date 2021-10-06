@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultERC721Block = 4900000
+const defaultERC721Block = 5270000
 
 // transfers represents the transfers for a given rpc response
 type transfers struct {
