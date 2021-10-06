@@ -37,6 +37,39 @@ func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.
 
 }
 
+func hasNFTs(pCtx context.Context, ids []string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
+	client := pRuntime.ContractsClient
+
+	addr := common.HexToAddress(userAddr)
+
+	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
+	instance, err := contracts.NewIERC1155Caller(contract, client)
+	if err != nil {
+		return false, err
+	}
+
+	bigIntIDs := make([]*big.Int, len(ids))
+	addrs := make([]common.Address, len(ids))
+	for i := 0; i < len(ids); i++ {
+		asBigInt := &big.Int{}
+		bigIntIDs[i], _ = asBigInt.SetString(ids[i], 10)
+		addrs[i] = addr
+	}
+
+	call, err := instance.BalanceOfBatch(&bind.CallOpts{From: addr, Context: pCtx}, addrs, bigIntIDs)
+	if err != nil {
+		return false, err
+	}
+	for _, v := range call {
+		if v.Cmp(big.NewInt(0)) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+
+}
+
 func resolvesENS(pCtx context.Context, ens string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
 	client := pRuntime.ContractsClient
 
