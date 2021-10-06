@@ -503,5 +503,9 @@ func tokenToCollectionToken(token *Token) *CollectionToken {
 		ContractAddress: token.ContractAddress,
 		Media:           token.Media,
 		TokenMetadata:   token.TokenMetadata,
+		Chain:           token.Chain,
+		Name:            token.Name,
+		Description:     token.Description,
+		OwnerAddress:    token.OwnerAddress,
 	}
 }

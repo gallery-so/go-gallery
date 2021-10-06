@@ -55,6 +55,8 @@ type Indexer struct {
 	mu *sync.RWMutex
 	wg *sync.WaitGroup
 
+	chain persist.Chain
+
 	metadatas      map[string]map[string]interface{}
 	uris           map[string]string
 	contractStored map[string]bool
@@ -79,7 +81,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(pEvents []EventHash, statsFileName string, pRuntime *runtime.Runtime) *Indexer {
+func NewIndexer(pChain persist.Chain, pEvents []EventHash, statsFileName string, pRuntime *runtime.Runtime) *Indexer {
 	finalBlockUint, err := pRuntime.InfraClients.ETHClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -104,6 +106,8 @@ func NewIndexer(pEvents []EventHash, statsFileName string, pRuntime *runtime.Run
 		runtime: pRuntime,
 		mu:      &sync.RWMutex{},
 		wg:      &sync.WaitGroup{},
+
+		chain: pChain,
 
 		metadatas:      make(map[string]map[string]interface{}),
 		uris:           make(map[string]string),
@@ -287,7 +291,7 @@ func (i *Indexer) handleDone() {
 
 func processTransfer(i *Indexer, transfer *transfer) {
 
-	key := transfer.RawContract.Address + "--" + transfer.TokenID
+	key := makeKeyForToken(transfer.RawContract.Address, transfer.TokenID)
 	logrus.Infof("Processing transfer %s", key)
 
 	i.mu.Lock()
@@ -410,11 +414,10 @@ func storedDataToTokens(i *Indexer) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	for k, v := range i.owners {
-		spl := strings.Split(k, "--")
-		if len(spl) != 2 {
-			logrus.Error("invalid key")
+		contractAddress, tokenID, err := parseKeyForToken(k)
+		if err != nil {
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- errors.New("invalid key")
+			i.done <- err
 		}
 		sort.Slice(i.previousOwners[k], func(l, m int) bool {
 			return i.previousOwners[k][l].block < i.previousOwners[k][m].block
@@ -423,37 +426,62 @@ func storedDataToTokens(i *Indexer) {
 		for i, w := range i.previousOwners[k] {
 			previousOwnerAddresses[i] = toRegularAddress(w.owner)
 		}
-
+		metadata := i.metadatas[k]
+		var name, description string
+		if metadata != nil {
+			if v, ok := findFirstFieldFromMetadata(metadata, "name").(string); ok {
+				name = v
+			}
+			if v, ok := findFirstFieldFromMetadata(metadata, "description").(string); ok {
+				description = v
+			}
+		}
 		token := &persist.Token{
-			TokenID:         spl[1],
-			ContractAddress: spl[0],
+			TokenID:         tokenID,
+			ContractAddress: contractAddress,
 			OwnerAddress:    toRegularAddress(v.owner),
 			Amount:          1,
+			Name:            name,
+			Description:     description,
 			PreviousOwners:  previousOwnerAddresses,
 			TokenType:       persist.TokenTypeERC721,
-			TokenMetadata:   i.metadatas[k],
+			TokenMetadata:   metadata,
 			TokenURI:        i.uris[k],
+			Chain:           i.chain,
 			LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 		}
 		i.tokens <- token
 	}
 	for k, v := range i.balances {
-		spl := strings.Split(k, "--")
-		if len(spl) != 2 {
-			logrus.Error("Invalid key")
+		contractAddress, tokenID, err := parseKeyForToken(k)
+		if err != nil {
 			atomic.StoreInt64(&i.state, -1)
-			i.done <- errors.New("invalid key")
+			i.done <- err
 		}
 
+		metadata := i.metadatas[k]
+		var name, description string
+		if metadata != nil {
+			if v, ok := findFirstFieldFromMetadata(metadata, "name").(string); ok {
+				name = v
+			}
+			if v, ok := findFirstFieldFromMetadata(metadata, "description").(string); ok {
+				description = v
+			}
+		}
+		uri := i.uris[k]
 		for addr, balance := range v {
 			token := &persist.Token{
-				TokenID:         spl[1],
-				ContractAddress: spl[0],
+				TokenID:         tokenID,
+				ContractAddress: contractAddress,
 				OwnerAddress:    toRegularAddress(addr),
 				Amount:          balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
-				TokenMetadata:   i.metadatas[k],
-				TokenURI:        i.uris[k],
+				TokenMetadata:   metadata,
+				TokenURI:        uri,
+				Name:            name,
+				Description:     description,
+				Chain:           i.chain,
 				LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 			}
 			i.tokens <- token
@@ -578,6 +606,30 @@ func (i *Indexer) listenForNewBlocks() {
 	}
 }
 
+func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...string) interface{} {
+	for _, field := range fields {
+		if v, ok := metadata[field]; ok {
+			return v
+		}
+		if v, ok := metadata["properties"].(map[string]interface{}); ok {
+			if v, ok := v[field]; ok {
+				return v
+			}
+		}
+		if v, ok := metadata["traits"].(map[string]interface{}); ok {
+			if v, ok := v[field]; ok {
+				return v
+			}
+		}
+		if v, ok := metadata["attributes"].(map[string]interface{}); ok {
+			if v, ok := v[field]; ok {
+				return v
+			}
+		}
+	}
+	return nil
+}
+
 // function that returns a progressively smaller value between min and max for every million block numbers
 func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
 	if blockNumber < 700000 {
@@ -588,4 +640,16 @@ func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
 
 func toRegularAddress(address string) string {
 	return strings.ToLower(fmt.Sprintf("0x%s", address[len(address)-38:]))
+}
+
+func makeKeyForToken(contractAddress, tokenID string) string {
+	return fmt.Sprintf("%s_%s", contractAddress, tokenID)
+}
+
+func parseKeyForToken(key string) (string, string, error) {
+	parts := strings.Split(key, "_")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid key")
+	}
+	return parts[0], parts[1], nil
 }

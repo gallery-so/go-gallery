@@ -21,6 +21,7 @@ const (
 
 	rpcURL  = "RPC_URL"
 	ipfsURL = "IPFS_URL"
+	chain   = "CHAIN"
 
 	mongoURLSecretName = "MONGO_URL_SECRET_NAME"
 	mongoTLSSecretName = "MONGO_TLS_SECRET_NAME"
@@ -47,8 +48,10 @@ type Config struct {
 	InfraPort      int
 	PortMetrics    int
 	AllowedOrigins string
-	RPCURL         string
-	IPFSURL        string
+
+	RPCURL  string
+	IPFSURL string
+	Chain   string
 
 	GCloudTokenContentBucket string
 
@@ -82,9 +85,10 @@ func ConfigLoad() *Config {
 	viper.SetDefault(allowedOrigins, "http://localhost:3000")
 	viper.SetDefault(rpcURL, "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault(ipfsURL, "https://ipfs.io")
+	viper.SetDefault(chain, "ETH")
 	viper.SetDefault(gcloudTokenBucket, "token-bucket")
 	viper.SetDefault(jwtSecret, "Test-Secret")
-
+	viper.SetDefault(mongoUseTLS, false)
 	viper.SetDefault(redisURL, "localhost:6379")
 
 	viper.SetDefault(jwtTokenTTLsecInt, 60*60*24*3)
@@ -107,16 +111,19 @@ func ConfigLoad() *Config {
 	}
 
 	config := &Config{
-		Env:                      viper.GetString(env),
-		InfraEnv:                 viper.GetString(infraEnv),
-		BaseURL:                  viper.GetString(baseURL),
-		InfraBaseURL:             viper.GetString(infraBaseURL),
-		Port:                     viper.GetInt(port),
-		InfraPort:                viper.GetInt(infraPort),
-		PortMetrics:              viper.GetInt(portMetrics),
-		AllowedOrigins:           viper.GetString(allowedOrigins),
-		RPCURL:                   viper.GetString(rpcURL),
-		IPFSURL:                  viper.GetString(ipfsURL),
+		Env:            viper.GetString(env),
+		InfraEnv:       viper.GetString(infraEnv),
+		BaseURL:        viper.GetString(baseURL),
+		InfraBaseURL:   viper.GetString(infraBaseURL),
+		Port:           viper.GetInt(port),
+		InfraPort:      viper.GetInt(infraPort),
+		PortMetrics:    viper.GetInt(portMetrics),
+		AllowedOrigins: viper.GetString(allowedOrigins),
+
+		RPCURL:  viper.GetString(rpcURL),
+		IPFSURL: viper.GetString(ipfsURL),
+		Chain:   viper.GetString(chain),
+
 		GCloudTokenContentBucket: viper.GetString(gcloudTokenBucket),
 
 		MongoUseTLS:   viper.GetBool(mongoUseTLS),

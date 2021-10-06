@@ -49,6 +49,17 @@ const (
 	MediaTypeUnknown MediaType = "unknown"
 )
 
+const (
+	// ChainETH represents the Ethereum blockchain
+	ChainETH Chain = "ETH"
+	// ChainArbitrum represents the Arbitrum blockchain
+	ChainArbitrum Chain = "Arbitrum"
+	// ChainPolygon represents the Polygon/Matic blockchain
+	ChainPolygon Chain = "Polygon"
+	// ChainOptimism represents the Optimism blockchain
+	ChainOptimism Chain = "Optimism"
+)
+
 // TTB represents time til blockchain so that data isn't old in DB
 var TTB = time.Minute * 10
 
@@ -57,6 +68,9 @@ type TokenType string
 
 // MediaType represents the type of media that a token
 type MediaType string
+
+// Chain represents which blockchain a token is on
+type Chain string
 
 // Token represents an individual Token token
 type Token struct {
@@ -70,6 +84,11 @@ type Token struct {
 	Media          Media  `bson:"media" json:"media"`
 
 	TokenType TokenType `bson:"type" json:"type"`
+
+	Chain Chain `bson:"chain" json:"chain"`
+
+	Name        string `bson:"name" json:"name"`
+	Description string `bson:"description" json:"description"`
 
 	TokenURI        string                 `bson:"token_uri" json:"token_uri"`
 	TokenID         string                 `bson:"token_id" json:"token_id"`
@@ -96,6 +115,13 @@ type CollectionToken struct {
 	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
 
 	ContractAddress string `bson:"contract_address"     json:"contract_address"`
+
+	Chain Chain `bson:"chain" json:"chain"`
+
+	Name        string `bson:"name" json:"name"`
+	Description string `bson:"description" json:"description"`
+
+	OwnerAddress string `bson:"owner_address" json:"owner_address"`
 
 	Media         Media                  `bson:"media" json:"media"`
 	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
