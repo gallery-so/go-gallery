@@ -1,22 +1,11 @@
 package main
 
 import (
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/server"
+	"github.com/spf13/viper"
 )
 
 func main() {
-
-	config := runtime.ConfigLoad()
-	portStr := config.Port
-
-	// RUNTIME
-	runtime, err := runtime.GetRuntime(config)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	//-------------
-	// SERVER_INIT
-	server.Init(portStr, runtime)
+	port := viper.GetString("SERVER_PORT")
+	server.Init(port)
 }

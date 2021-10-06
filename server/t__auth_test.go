@@ -16,7 +16,7 @@ func TestAuthVerifySignature_Success(t *testing.T) {
 	sig := "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b"
 	addr := "0x456d569592f15Af845D0dbe984C12BAB8F430e31"
 
-	success, err := authVerifySignatureAllMethods(sig, testNonce, addr, tc.r)
+	success, err := authVerifySignatureAllMethods(sig, testNonce, addr)
 	assert.Nil(err)
 	assert.True(success)
 }
@@ -28,7 +28,7 @@ func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
 	sig := "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b"
 	addr := "0x456d569592f15Af845D0dbe984C12BAB8F430e31"
 
-	success, err := authVerifySignatureAllMethods(sig, testNonce, addr, tc.r)
+	success, err := authVerifySignatureAllMethods(sig, testNonce, addr)
 	assert.NotNil(err)
 	assert.False(success)
 }
@@ -40,7 +40,7 @@ func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 	sig := "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b"
 	addr := "0x456d569592f15Af845D0dbe984C12BAB8F430e32"
 
-	success, err := authVerifySignatureAllMethods(sig, testNonce, addr, tc.r)
+	success, err := authVerifySignatureAllMethods(sig, testNonce, addr)
 	assert.NotNil(err)
 	assert.False(success)
 }

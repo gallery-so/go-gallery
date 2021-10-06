@@ -6,17 +6,50 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/mongodb"
+	"github.com/mikeydub/go-gallery/persist"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
+
+var repos *repositories
+
+var env string
+
+type repositories struct {
+	userRepository       persist.UserRepository
+	nonceRepository      persist.NonceRepository
+	loginRepository      persist.LoginAttemptRepository
+	nftRepository        persist.NFTRepository
+	collectionRepository persist.CollectionRepository
+	galleryRepository    persist.GalleryRepository
+	historyRepository    persist.OwnershipHistoryRepository
+}
+
+func init() {
+	viper.SetDefault("ENV", "local")
+	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
+	viper.SetDefault("JWT_SECRET", "Test-Secret")
+	viper.SetDefault("JWT_TTL", 60*60*24*3)
+
+	// Enable VIPER to read Environment Variables
+	viper.AutomaticEnv()
+
+	env = viper.GetString("ENV")
+	allowedOrigins = viper.GetString("ALLOWED_ORIGINS")
+	jwtSecret = viper.GetString("JWT_SECRET")
+	jwtTTL = viper.GetInt64("JWT_TTL")
+
+	repos = newRepos()
+}
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
+func CoreInit() *gin.Engine {
 	log.Info("initializing server...")
 
-	pRuntime.Router = gin.Default()
-	pRuntime.Router.Use(handleCORS(pRuntime.Config))
+	router := gin.Default()
+	router.Use(handleCORS())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -28,16 +61,28 @@ func CoreInit(pRuntime *runtime.Runtime) *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	return handlersInit(pRuntime)
+	return handlersInit(router)
 }
 
 // Init initializes the server
-func Init(pPortInt int,
-	pRuntime *runtime.Runtime) {
+func Init(port string,
+) {
 
-	CoreInit(pRuntime)
+	router := CoreInit()
 
-	if err := pRuntime.Router.Run(fmt.Sprintf(":%d", pPortInt)); err != nil {
+	if err := router.Run(fmt.Sprintf(":%s", port)); err != nil {
 		panic(err)
+	}
+}
+
+func newRepos() *repositories {
+	return &repositories{
+		nonceRepository:      mongodb.NewNonceMongoRepository(),
+		loginRepository:      mongodb.NewLoginMongoRepository(),
+		collectionRepository: mongodb.NewCollectionMongoRepository(),
+		galleryRepository:    mongodb.NewGalleryMongoRepository(),
+		historyRepository:    mongodb.NewHistoryMongoRepository(),
+		nftRepository:        mongodb.NewNFTMongoRepository(),
+		userRepository:       mongodb.NewUserMongoRepository(),
 	}
 }

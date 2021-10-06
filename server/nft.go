@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -57,7 +56,7 @@ type getOwnershipHistoryOutput struct {
 	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
 }
 
-func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}
 
@@ -68,7 +67,7 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := persist.NftGetByID(c, input.NftID, pRuntime)
+		nfts, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -89,7 +88,7 @@ func getNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 }
 
 // Must specify nft id in json input
-func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateNftByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -99,15 +98,15 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		update := &persist.UpdateNFTInfoInput{CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
 
-		err := persist.NftUpdateByID(c, input.ID, userID, update, pRuntime)
+		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
 			if err.Error() == copy.CouldNotFindDocument {
 				c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
@@ -121,14 +120,14 @@ func updateNftByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
-		nfts, err := persist.NftGetByUserID(c, input.UserID, pRuntime)
+		nfts, err := nftRepository.GetByUserID(c, input.UserID)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
@@ -137,7 +136,7 @@ func getNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getUnassignedNFTByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -145,12 +144,12 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
-		coll, err := persist.CollGetUnassigned(c, userID, input.SkipCache, pRuntime)
+		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
 		if coll == nil || err != nil {
 			coll = &persist.Collection{Nfts: []*persist.CollectionNft{}}
 		}
@@ -159,7 +158,7 @@ func getUnassignedNftsForUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -167,15 +166,15 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		addresses := strings.Split(input.WalletAddresses, ",")
 		if len(addresses) > 0 {
-			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, pRuntime)
+			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 				return
@@ -186,7 +185,7 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, input.SkipCache, pRuntime)
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, input.SkipCache, nftRepo, userRepo, collRepo, historyRepo)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.Nft{}
 		}
@@ -195,8 +194,8 @@ func getNftsFromOpensea(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, pRuntime *runtime.Runtime) (bool, error) {
-	user, err := persist.UserGetByID(pCtx, userID, pRuntime)
+func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, userRepo persist.UserRepository) (bool, error) {
+	user, err := userRepo.GetByID(pCtx, userID)
 	if err != nil {
 		return false, err
 	}

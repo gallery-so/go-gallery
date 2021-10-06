@@ -20,10 +20,10 @@ func TestGetNftByID_Success(t *testing.T) {
 
 	// seed DB with nft
 	name := "very cool nft"
-	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
 		Name:         name,
 		OwnerAddress: strings.ToLower(tc.user1.address),
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
@@ -70,11 +70,11 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
@@ -102,11 +102,11 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
@@ -147,9 +147,9 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.NftCreate(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
 		Name: "very cool nft",
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft name", ID: nftID}

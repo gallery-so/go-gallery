@@ -9,19 +9,12 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 )
 
-// USER_JWT_KEY - is unique per user, and stored in the DB for now.
-// type GLRYuserJWTkey struct {
-// 	VersionInt    int64            `bson:"version"       mapstructure:"version"`
-// 	ID            GLRYuserJWTkeyID `bson:"_id"           mapstructure:"_id"`
-// 	CreationTimeF float64          `bson:"creation_time" mapstructure:"creation_time"`
-// 	BlackListed   bool             `bson:"blacklisted"       mapstructure:"blacklisted"`
-
-// 	ValueStr   string          `bson:"value"   mapstructure:"value"`
-// 	AddressStr GLRYuserAddress `bson:"address" mapstructure:"address"`
-// }
+var (
+	jwtTTL    int64
+	jwtSecret string
+)
 
 // JWT_CLAIMS
 type jwtClaims struct {
@@ -36,10 +29,10 @@ type jwtValidateResponse struct {
 
 // HANDLER
 
-func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func validateJwt() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetBool(authContextKey)
-		userID, _ := getUserIDfromCtx(c)
+		userID := getUserIDfromCtx(c)
 
 		c.JSON(http.StatusOK, jwtValidateResponse{
 			IsValid: auth,
@@ -50,8 +43,7 @@ func validateJwt(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 // VERIFY
 func authJwtParse(pJWTtokenStr string,
-	pJWTsecretKeyStr string,
-	pRuntime *runtime.Runtime) (bool, persist.DBID, error) {
+	pJWTsecretKeyStr string) (bool, persist.DBID, error) {
 
 	claims := jwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
@@ -71,19 +63,13 @@ func authJwtParse(pJWTtokenStr string,
 	return true, claims.UserID, nil
 }
 
-func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID,
-	pRuntime *runtime.Runtime) (string, error) {
+func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
 
 	issuer := "gallery"
-	jwtTokenStr, err := jwtGenerate(pRuntime.Config.JWTSecret,
-		issuer,
-		pUserID,
-		pRuntime)
+	jwtTokenStr, err := jwtGenerate(jwtSecret, issuer, pUserID)
 	if err != nil {
 		return "", err
 	}
-
-	//------------------
 
 	return jwtTokenStr, nil
 }
@@ -93,8 +79,7 @@ func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID,
 
 func jwtGenerate(pSigningKeyStr string,
 	pIssuerStr string,
-	pUserID persist.DBID,
-	pRuntime *runtime.Runtime) (string, error) {
+	pUserID persist.DBID) (string, error) {
 
 	signingKeyBytesLst := []byte(pSigningKeyStr)
 
@@ -103,7 +88,7 @@ func jwtGenerate(pSigningKeyStr string,
 
 	// Create the Claims
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + pRuntime.Config.JWTtokenTTLsecInt //60*60*24*2 // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + jwtTTL //60*60*24*2 // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		jwt.StandardClaims{
