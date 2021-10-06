@@ -159,8 +159,8 @@ func (i *Indexer) processLogs() {
 	topics := [][]common.Hash{events, nil, nil, nil}
 
 	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
-	interval := getBlockInterval(1, 2000, int64(i.lastSyncedBlock))
-	nextBlock := new(big.Int).Add(curBlock, big.NewInt(interval))
+	interval := getBlockInterval(1, 2000, i.lastSyncedBlock, i.mostRecentBlock)
+	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(interval)))
 	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
@@ -631,11 +631,12 @@ func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...strin
 }
 
 // function that returns a progressively smaller value between min and max for every million block numbers
-func getBlockInterval(min int64, max int64, blockNumber int64) int64 {
-	if blockNumber < 700000 {
+func getBlockInterval(min, max, blockNumber, lastBlockNumber uint64) uint64 {
+	blockDivisor := lastBlockNumber / 20
+	if blockNumber < blockDivisor {
 		return max
 	}
-	return (max - min) / (blockNumber / 700000)
+	return (max - min) / (blockNumber / blockDivisor)
 }
 
 func toRegularAddress(address string) string {
