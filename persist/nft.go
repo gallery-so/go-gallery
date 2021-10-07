@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// NftDB represents an nft in the database
-type NftDB struct {
+// NFTDB represents an nft in the database
+type NFTDB struct {
 	Version      int64     `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
@@ -45,8 +45,8 @@ type NftDB struct {
 	AcquisitionDateStr string `bson:"acquisition_date" json:"acquisition_date"`
 }
 
-// Nft represents an nft throughout the application
-type Nft struct {
+// NFT represents an nft throughout the application
+type NFT struct {
 	Version      int64     `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
@@ -87,8 +87,8 @@ type Nft struct {
 	AcquisitionDateStr string `bson:"acquisition_date" json:"acquisition_date"`
 }
 
-// CollectionNft represents and NFT in a collection of NFTs
-type CollectionNft struct {
+// CollectionNFT represents and NFT in a collection of NFTs
+type CollectionNFT struct {
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 
@@ -98,7 +98,7 @@ type CollectionNft struct {
 
 	Name string `bson:"name"                 json:"name"`
 
-	Contract ContractCollectionNft `bson:"contract"     json:"asset_contract"`
+	Contract ContractCollectionNFT `bson:"contract"     json:"asset_contract"`
 
 	// IMAGES - OPENSEA
 	ImageURL          string `bson:"image_url"           json:"image_url"`
@@ -118,8 +118,8 @@ type Contract struct {
 	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
 }
 
-// ContractCollectionNft represents a contract within a collection nft
-type ContractCollectionNft struct {
+// ContractCollectionNFT represents a contract within a collection nft
+type ContractCollectionNFT struct {
 	ContractName  string `bson:"contract_name" json:"name"`
 	ContractImage string `bson:"contract_image_url" json:"image_url"`
 }
@@ -132,15 +132,15 @@ type UpdateNFTInfoInput struct {
 
 // NFTRepository represents the interface for interacting with persisted NFTs
 type NFTRepository interface {
-	CreateBulk(context.Context, []*NftDB) ([]DBID, error)
-	Create(context.Context, *NftDB) (DBID, error)
-	GetByUserID(context.Context, DBID) ([]*Nft, error)
-	GetByAddresses(context.Context, []string) ([]*Nft, error)
-	GetByID(context.Context, DBID) ([]*Nft, error)
-	GetByContractData(context.Context, string, string, string) ([]*Nft, error)
-	GetByOpenseaID(context.Context, int, string) ([]*Nft, error)
+	CreateBulk(context.Context, []*NFTDB) ([]DBID, error)
+	Create(context.Context, *NFTDB) (DBID, error)
+	GetByUserID(context.Context, DBID) ([]*NFT, error)
+	GetByAddresses(context.Context, []string) ([]*NFT, error)
+	GetByID(context.Context, DBID) ([]*NFT, error)
+	GetByContractData(context.Context, string, string, string) ([]*NFT, error)
+	GetByOpenseaID(context.Context, int, string) ([]*NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	BulkUpsert(context.Context, []*NftDB) ([]DBID, error)
-	OpenseaCacheGet(context.Context, []string) ([]*Nft, error)
-	OpenseaCacheSet(context.Context, []string, []*Nft) error
+	BulkUpsert(context.Context, []*NFTDB) ([]DBID, error)
+	OpenseaCacheGet(context.Context, []string) ([]*NFT, error)
+	OpenseaCacheSet(context.Context, []string, []*NFT) error
 }

@@ -176,7 +176,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NftDB{}
+	nftsToBeRemoved := []*persist.NFTDB{}
 
 	if err := c.nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -221,7 +221,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 		pAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NftDB{}
+	nftsToBeRemoved := []*persist.NFTDB{}
 
 	if err := c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -305,12 +305,12 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 	}
 
 	if countColls == 0 {
-		nfts := []*persist.Nft{}
+		nfts := []*persist.NFT{}
 		err = c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
 		if err != nil {
 			return nil, err
 		}
-		collNfts := []*persist.CollectionNft{}
+		collNfts := []*persist.CollectionNFT{}
 		for _, nft := range nfts {
 			collNfts = append(collNfts, nftToCollectionNft(nft))
 		}
@@ -402,8 +402,8 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	}
 }
 
-func nftToCollectionNft(nft *persist.Nft) *persist.CollectionNft {
-	return &persist.CollectionNft{
+func nftToCollectionNft(nft *persist.NFT) *persist.CollectionNFT {
+	return &persist.CollectionNFT{
 		ID:                nft.ID,
 		Name:              nft.Name,
 		CreationTime:      nft.CreationTime,

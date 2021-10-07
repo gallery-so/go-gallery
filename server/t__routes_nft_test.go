@@ -20,7 +20,7 @@ func TestGetNftByID_Success(t *testing.T) {
 
 	// seed DB with nft
 	name := "very cool nft"
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:         name,
 		OwnerAddress: strings.ToLower(tc.user1.address),
 	})
@@ -31,7 +31,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	assertValidJSONResponse(assert, resp)
 
 	type NftGetByIDResponse struct {
-		Nft   persist.Nft `json:"nft"`
+		Nft   persist.NFT `json:"nft"`
 		Error string      `json:"error"`
 	}
 	body := &NftGetByIDResponse{}
@@ -70,7 +70,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
@@ -88,7 +88,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 
 	// ensure nft was updated
 	type NftGetByIDResponse struct {
-		Nft   persist.Nft `json:"nft"`
+		Nft   persist.NFT `json:"nft"`
 		Error string      `json:"error"`
 	}
 	body := &NftGetByIDResponse{}
@@ -102,7 +102,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
@@ -147,7 +147,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NftDB{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name: "very cool nft",
 	})
 	assert.Nil(err)

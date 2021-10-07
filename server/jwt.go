@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// JWT_CLAIMS
 type jwtClaims struct {
 	UserID persist.DBID `json:"user_id"`
 	jwt.StandardClaims
@@ -22,8 +21,6 @@ type jwtValidateResponse struct {
 	IsValid bool         `json:"valid"`
 	UserID  persist.DBID `json:"user_id"`
 }
-
-// HANDLER
 
 func validateJwt() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -37,7 +34,6 @@ func validateJwt() gin.HandlerFunc {
 	}
 }
 
-// VERIFY
 func authJwtParse(pJWTtokenStr string,
 	pJWTsecretKeyStr string) (bool, persist.DBID, error) {
 
@@ -70,19 +66,12 @@ func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 	return jwtTokenStr, nil
 }
 
-// GENERATE
-// ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
-
 func jwtGenerate(
 	pIssuerStr string,
 	pUserID persist.DBID) (string, error) {
 
 	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
 
-	//------------------
-	// CLAIMS
-
-	// Create the Claims
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
 	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") //60*60*24*2 // expire N number of secs from now
 	claims := jwtClaims{
@@ -93,15 +82,10 @@ func jwtGenerate(
 		},
 	}
 
-	//------------------
-
-	// SYMETRIC_SIGNING - same secret is used to both sign and validate tokens
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// SIGN
 	jwtTokenStr, err := token.SignedString(signingKeyBytesLst)
 	if err != nil {
-
 		return "", err
 	}
 
