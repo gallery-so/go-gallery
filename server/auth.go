@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/sirupsen/logrus"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -300,7 +301,9 @@ func authVerifySignature(pSignatureStr string,
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
 	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
 
-	user, _ := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+	user, err := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+
+	logrus.WithError(err).Error("error retrieving user by address for auth preflight")
 
 	userExistsBool := user != nil
 
