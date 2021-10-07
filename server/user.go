@@ -149,12 +149,9 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, _ := getUserIDfromCtx(c)
-
 		output, err := userGetDb(
 			c,
 			input,
-			userID,
 			pRuntime,
 		)
 		if err != nil {
@@ -360,9 +357,7 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 	return persist.CollRemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
 }
 
-func userGetDb(pCtx context.Context, pInput *userGetInput,
-	pAuthedUserID persist.DBID,
-	pRuntime *runtime.Runtime) (*userGetOutput, error) {
+func userGetDb(pCtx context.Context, pInput *userGetInput, pRuntime *runtime.Runtime) (*userGetOutput, error) {
 
 	//------------------
 
@@ -398,10 +393,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
 		CreatedAt:   user.CreationTime.Time(),
-	}
-
-	if pAuthedUserID == user.ID {
-		output.Addresses = user.Addresses
+		Addresses:   user.Addresses,
 	}
 
 	return output, nil
