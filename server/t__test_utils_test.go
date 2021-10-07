@@ -63,8 +63,7 @@ func initializeTestEnv() *TestConfig {
 	ts := httptest.NewServer(CoreInit())
 
 	mclient := newMongoClient()
-	redisClients := newMemstoreClients()
-	repos := newRepos(mclient, redisClients)
+	repos := newRepos()
 	log.Info("test server connected! ✅")
 	return &TestConfig{
 		server:    ts,

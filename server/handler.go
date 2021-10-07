@@ -3,13 +3,11 @@ package server
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
-	"github.com/mikeydub/go-gallery/memstore"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func handlersInit(router *gin.Engine, mgoClient *mongo.Client, ethClient *eth.Client, redisClients *memstore.Clients) *gin.Engine {
+func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
-	repos := newRepos(mgoClient, redisClients)
+	repos := newRepos()
 
 	apiGroupV1 := router.Group("/glry/v1")
 

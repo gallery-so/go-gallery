@@ -51,10 +51,9 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("signature", signatureValidator)
 		v.RegisterValidation("username", usernameValidator)
 	}
-	mclient := newMongoClient()
-	redisClients := newMemstoreClients()
+
 	ethClient := newEthClient()
-	return handlersInit(router, mclient, ethClient, redisClients)
+	return handlersInit(router, ethClient)
 }
 
 // Init initializes the server
@@ -78,7 +77,10 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newRepos(mgoClient *mongo.Client, redisClients *memstore.Clients) *repositories {
+func newRepos() *repositories {
+
+	mgoClient := newMongoClient()
+	redisClients := newMemstoreClients()
 	return &repositories{
 		nonceRepository:      mongodb.NewNonceMongoRepository(mgoClient),
 		loginRepository:      mongodb.NewLoginMongoRepository(mgoClient),
