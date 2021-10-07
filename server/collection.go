@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/mikeydub/go-gallery/mongodb"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/persist/mongodb"
 )
 
 type collectionGetByUserIDInput struct {
