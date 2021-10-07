@@ -26,12 +26,6 @@ import (
 
 const defaultERC721Block = 5270000
 
-// transfers represents the transfers for a given rpc response
-type transfers struct {
-	PageKey   string      `json:"pageKey"`
-	Transfers []*transfer `json:"transfers"`
-}
-
 // transfer represents a transfer from the RPC response
 type transfer struct {
 	Category    string            `json:"category"`
@@ -60,19 +54,14 @@ type tokenContractMetadata struct {
 	Symbol string `json:"symbol"`
 }
 
-type uriWithMetadata struct {
-	uri string
-	md  map[string]interface{}
-}
-
 type tokenWithBlockNumber struct {
 	token       *persist.Token
 	blockNumber string
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
-func getTokenContractMetadata(address string, ethClient *ethclient.Client) (*tokenContractMetadata, error) {
-	contract := common.HexToAddress(address)
+func getTokenContractMetadata(address address, ethClient *ethclient.Client) (*tokenContractMetadata, error) {
+	contract := common.HexToAddress(string(address))
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
 		return nil, err
@@ -97,15 +86,15 @@ func getTokenContractMetadata(address string, ethClient *ethclient.Client) (*tok
 }
 
 // getERC721TokenURI returns metadata URI for a given token address
-func getERC721TokenURI(address, tokenID string, ethClient *ethclient.Client) (string, error) {
+func getERC721TokenURI(address address, tokenID tokenID, ethClient *ethclient.Client) (uri, error) {
 
-	contract := common.HexToAddress(address)
+	contract := common.HexToAddress(string(address))
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
 		return "", err
 	}
 
-	i, err := util.HexToBigInt(tokenID)
+	i, err := util.HexToBigInt(string(tokenID))
 	if err != nil {
 		return "", err
 	}
@@ -120,21 +109,23 @@ func getERC721TokenURI(address, tokenID string, ethClient *ethclient.Client) (st
 		return "", err
 	}
 
-	return strings.ReplaceAll(tokenURI, "\x00", ""), nil
+	return uri(strings.ReplaceAll(tokenURI, "\x00", "")), nil
 
 }
 
 // getMetadataFromURI parses and returns the NFT metadata for a given token URI
-func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]interface{}, error) {
+func getMetadataFromURI(tokenURI uri, ipfsClient *shell.Shell) (metadata, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
 
-	if strings.Contains(tokenURI, "data:application/json;base64,") {
+	asString := string(tokenURI)
+
+	if strings.Contains(string(tokenURI), "data:application/json;base64,") {
 		// decode the base64 encoded json
-		b64data := tokenURI[strings.IndexByte(tokenURI, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(b64data)
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
 			return nil, err
 		}
@@ -146,9 +137,9 @@ func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]in
 		}
 
 		return metadata, nil
-	} else if strings.HasPrefix(tokenURI, "ipfs://") {
+	} else if strings.HasPrefix(asString, "ipfs://") {
 
-		path := strings.TrimPrefix(tokenURI, "ipfs://")
+		path := strings.TrimPrefix(asString, "ipfs://")
 
 		it, err := ipfsClient.Cat(path)
 		if err != nil {
@@ -161,15 +152,15 @@ func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]in
 		if err != nil {
 			return nil, err
 		}
-		metadata := map[string]interface{}{}
+		metadata := metadata{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
 			return nil, err
 		}
 
 		return metadata, nil
-	} else if strings.HasPrefix(tokenURI, "https://") || strings.HasPrefix(tokenURI, "http://") {
-		resp, err := client.Get(tokenURI)
+	} else if strings.HasPrefix(asString, "https://") || strings.HasPrefix(asString, "http://") {
+		resp, err := client.Get(asString)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +172,7 @@ func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]in
 		}
 
 		// parse the json
-		metadata := map[string]interface{}{}
+		metadata := metadata{}
 		err = json.Unmarshal(buf.Bytes(), &metadata)
 		if err != nil {
 			return nil, err
@@ -196,14 +187,14 @@ func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]in
 
 // if logging all events is too large and takes too much time, start from the front and go backwards until one is found
 // given that the most recent URI event should be the current URI
-func getERC1155TokenURI(pContractAddress, pTokenID string, ethClient *ethclient.Client) (string, error) {
-	contract := common.HexToAddress(pContractAddress)
+func getERC1155TokenURI(pContractAddress address, pTokenID tokenID, ethClient *ethclient.Client) (uri, error) {
+	contract := common.HexToAddress(string(pContractAddress))
 	instance, err := contracts.NewIERC1155MetadataURI(contract, ethClient)
 	if err != nil {
 		return "", err
 	}
 
-	i, err := util.HexToBigInt(pTokenID)
+	i, err := util.HexToBigInt(string(pTokenID))
 	if err != nil {
 		return "", err
 	}
@@ -218,10 +209,10 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, ethClient *ethclient.
 	}
 	cancel()
 	if tokenURI != "" {
-		return strings.ReplaceAll(tokenURI, "\x00", ""), nil
+		return uri(strings.ReplaceAll(tokenURI, "\x00", "")), nil
 	}
 
-	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(pTokenID, 64))}}
+	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
@@ -229,7 +220,7 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, ethClient *ethclient.
 
 	logs, err := ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: def,
-		Addresses: []common.Address{common.HexToAddress(pContractAddress)},
+		Addresses: []common.Address{contract},
 		Topics:    topics,
 	})
 	if err != nil {
@@ -248,34 +239,34 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, ethClient *ethclient.
 
 	offset := new(big.Int).SetBytes(logs[0].Data[:32])
 	length := new(big.Int).SetBytes(logs[0].Data[32:64])
-	uri := string(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
+	uri := uri(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
 	return uri, nil
 
 }
 
-func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress, pTokenID string, ethClient *ethclient.Client) (*big.Int, error) {
-	contract := common.HexToAddress(pContractAddress)
-	owner := common.HexToAddress(pOwnerAddress)
+func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress address, pTokenID tokenID, ethClient *ethclient.Client) (*big.Int, error) {
+	contract := common.HexToAddress(string(pContractAddress))
+	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
 	if err != nil {
 		return nil, err
 	}
 
-	i, err := util.HexToBigInt(pTokenID)
+	i, err := util.HexToBigInt(string(pTokenID))
 	if err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	tokenURI, err := instance.BalanceOf(&bind.CallOpts{
+	bal, err := instance.BalanceOf(&bind.CallOpts{
 		Context: ctx,
 	}, owner, i)
 	if err != nil {
 		return nil, err
 	}
 
-	return tokenURI, nil
+	return bal, nil
 }
 
 func padHex(pHex string, pLength int) string {

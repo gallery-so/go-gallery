@@ -43,14 +43,27 @@ const (
 
 // TODO do we need this if we can ensure that each log is proccessed in order
 // TODO if we remove this we can allow token processing to occur without waiting for transfers to be sorted
+
+type address string
+
+type tokenID string
+
+type tokenIdentifiers string
+
+type metadata map[string]interface{}
+
+type tokenBalances map[address]*big.Int
+
+type uri string
+
+type uniqueMetadataHandler func(*Indexer, address, tokenID) (metadata, error)
+
+type uniqueMetadatas map[address]uniqueMetadataHandler
+
 type ownerAtBlock struct {
-	owner string
+	owner address
 	block uint64
 }
-
-type uniqueMetadataHandler func(*Indexer, string, string) (map[string]interface{}, error)
-
-type uniqueMetadatas map[string]uniqueMetadataHandler
 
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
@@ -65,12 +78,12 @@ type Indexer struct {
 
 	chain persist.Chain
 
-	metadatas      map[string]map[string]interface{}
-	uris           map[string]string
-	contractStored map[string]bool
-	owners         map[string]ownerAtBlock
-	balances       map[string]map[string]*big.Int
-	previousOwners map[string][]ownerAtBlock
+	metadatas      map[tokenIdentifiers]metadata
+	uris           map[tokenIdentifiers]uri
+	contractStored map[address]bool
+	owners         map[tokenIdentifiers]ownerAtBlock
+	balances       map[tokenIdentifiers]tokenBalances
+	previousOwners map[tokenIdentifiers][]ownerAtBlock
 
 	eventHashes []EventHash
 
@@ -125,12 +138,12 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain per
 
 		chain: pChain,
 
-		metadatas:      make(map[string]map[string]interface{}),
-		uris:           make(map[string]string),
-		balances:       make(map[string]map[string]*big.Int),
-		contractStored: make(map[string]bool),
-		owners:         make(map[string]ownerAtBlock),
-		previousOwners: make(map[string][]ownerAtBlock),
+		metadatas:      make(map[tokenIdentifiers]metadata),
+		uris:           make(map[tokenIdentifiers]uri),
+		contractStored: make(map[address]bool),
+		owners:         make(map[tokenIdentifiers]ownerAtBlock),
+		balances:       make(map[tokenIdentifiers]tokenBalances),
+		previousOwners: make(map[tokenIdentifiers][]ownerAtBlock),
 
 		lastSyncedBlock: startingBlock,
 		mostRecentBlock: finalBlockUint,
@@ -179,6 +192,7 @@ func (i *Indexer) processLogs() {
 	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
 	interval := getBlockInterval(1, 2000, i.lastSyncedBlock, i.mostRecentBlock)
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(interval)))
+
 	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
@@ -312,16 +326,21 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	key := makeKeyForToken(transfer.RawContract.Address, transfer.TokenID)
 	logrus.Infof("Processing transfer %s", key)
 
+	contractAddress := address(transfer.RawContract.Address)
+	from := address(transfer.From)
+	to := address(transfer.To)
+	tokenID := tokenID(transfer.TokenID)
+
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	if !i.contractStored[transfer.RawContract.Address] {
-		i.contractStored[transfer.RawContract.Address] = true
+	if !i.contractStored[contractAddress] {
+		i.contractStored[contractAddress] = true
 		c := &persist.Contract{
-			Address:     transfer.RawContract.Address,
+			Address:     string(contractAddress),
 			LatestBlock: atomic.LoadUint64(&i.lastSyncedBlock),
 		}
-		cMetadata, err := getTokenContractMetadata(c.Address, i.ethClient)
+		cMetadata, err := getTokenContractMetadata(contractAddress, i.ethClient)
 		if err != nil {
 			logrus.WithError(err).Error("error getting contract metadata")
 		} else {
@@ -335,24 +354,24 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		if it, ok := i.owners[key]; ok {
 			if it.block < transfer.BlockNumber.Uint64() {
 				it.block = transfer.BlockNumber.Uint64()
-				it.owner = transfer.To
+				it.owner = to
 			}
 		} else {
-			i.owners[key] = ownerAtBlock{transfer.From, transfer.BlockNumber.Uint64()}
+			i.owners[key] = ownerAtBlock{from, transfer.BlockNumber.Uint64()}
 		}
 		if it, ok := i.previousOwners[key]; !ok {
 			i.previousOwners[key] = []ownerAtBlock{{
-				owner: transfer.From,
+				owner: from,
 				block: transfer.BlockNumber.Uint64(),
 			}}
 		} else {
 			it = append(it, ownerAtBlock{
-				owner: transfer.From,
+				owner: from,
 				block: transfer.BlockNumber.Uint64(),
 			})
 		}
 		if _, ok := i.uris[key]; !ok {
-			uri, err := getERC721TokenURI(transfer.RawContract.Address, transfer.TokenID, i.ethClient)
+			uri, err := getERC721TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC721 token")
 
@@ -363,21 +382,21 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	case persist.TokenTypeERC1155:
 		balances, ok := i.balances[key]
 		if !ok {
-			balances = make(map[string]*big.Int)
+			balances = make(map[address]*big.Int)
 			i.balances[key] = balances
 		}
-		if it, ok := balances[transfer.From]; ok {
+		if it, ok := balances[from]; ok {
 			it.Sub(it, new(big.Int).SetUint64(transfer.Amount))
 		} else {
-			i.balances[key][transfer.From] = new(big.Int).SetUint64(transfer.Amount)
+			i.balances[key][from] = new(big.Int).SetUint64(transfer.Amount)
 		}
-		if it, ok := balances[transfer.To]; ok {
+		if it, ok := balances[to]; ok {
 			it.Add(it, new(big.Int).SetUint64(transfer.Amount))
 		} else {
-			i.balances[key][transfer.To] = new(big.Int).SetUint64(transfer.Amount)
+			i.balances[key][to] = new(big.Int).SetUint64(transfer.Amount)
 		}
 		if _, ok := i.uris[key]; !ok {
-			uri, err := getERC1155TokenURI(transfer.RawContract.Address, transfer.TokenID, i.ethClient)
+			uri, err := getERC1155TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC1155 token")
 
@@ -392,22 +411,22 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	}
 
 	if _, ok := i.metadatas[key]; !ok {
-		if handler, ok := i.uniqueMetadatas[transfer.RawContract.Address]; ok {
-			metadata, err := handler(i, transfer.RawContract.Address, transfer.TokenID)
+		if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+			metadata, err := handler(i, contractAddress, tokenID)
 			if err != nil {
 				logrus.WithError(err).Error("error getting metadata for token")
 				atomic.AddUint64(&i.badURIs, 1)
 			}
 			i.metadatas[key] = metadata
 		} else {
-			if uri, ok := i.uris[key]; ok {
-				id, err := util.HexToBigInt(transfer.TokenID)
+			if it, ok := i.uris[key]; ok {
+				id, err := util.HexToBigInt(string(tokenID))
 				if err != nil {
 					logrus.WithError(err).Error("error converting token ID to big int")
 					atomic.StoreInt64(&i.state, -1)
 					i.done <- err
 				}
-				uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
+				uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
 				metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient)
 				if err != nil {
 					logrus.WithError(err).Error("error getting metadata for token")
@@ -451,7 +470,7 @@ func storedDataToTokens(i *Indexer) {
 		})
 		previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
 		for i, w := range i.previousOwners[k] {
-			previousOwnerAddresses[i] = toRegularAddress(w.owner)
+			previousOwnerAddresses[i] = string(toRegularAddress(w.owner))
 		}
 		metadata := i.metadatas[k]
 		var name, description string
@@ -464,16 +483,16 @@ func storedDataToTokens(i *Indexer) {
 			}
 		}
 		token := &persist.Token{
-			TokenID:         tokenID,
-			ContractAddress: contractAddress,
-			OwnerAddress:    toRegularAddress(v.owner),
+			TokenID:         string(tokenID),
+			ContractAddress: string(contractAddress),
+			OwnerAddress:    string(toRegularAddress(v.owner)),
 			Amount:          1,
 			Name:            name,
 			Description:     description,
 			PreviousOwners:  previousOwnerAddresses,
 			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   metadata,
-			TokenURI:        i.uris[k],
+			TokenURI:        string(i.uris[k]),
 			Chain:           i.chain,
 			LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
 		}
@@ -499,13 +518,13 @@ func storedDataToTokens(i *Indexer) {
 		uri := i.uris[k]
 		for addr, balance := range v {
 			token := &persist.Token{
-				TokenID:         tokenID,
-				ContractAddress: contractAddress,
-				OwnerAddress:    toRegularAddress(addr),
+				TokenID:         string(tokenID),
+				ContractAddress: string(contractAddress),
+				OwnerAddress:    string(toRegularAddress(addr)),
 				Amount:          balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata,
-				TokenURI:        uri,
+				TokenURI:        string(uri),
 				Name:            name,
 				Description:     description,
 				Chain:           i.chain,
@@ -666,18 +685,18 @@ func getBlockInterval(min, max, blockNumber, lastBlockNumber uint64) uint64 {
 	return (max - min) / (blockNumber / blockDivisor)
 }
 
-func toRegularAddress(address string) string {
-	return strings.ToLower(fmt.Sprintf("0x%s", address[len(address)-38:]))
+func toRegularAddress(addr address) address {
+	return address(strings.ToLower(fmt.Sprintf("0x%s", addr[len(addr)-38:])))
 }
 
-func makeKeyForToken(contractAddress, tokenID string) string {
-	return fmt.Sprintf("%s_%s", contractAddress, tokenID)
+func makeKeyForToken(contractAddress, tokenID string) tokenIdentifiers {
+	return tokenIdentifiers(fmt.Sprintf("%s_%s", contractAddress, tokenID))
 }
 
-func parseKeyForToken(key string) (string, string, error) {
-	parts := strings.Split(key, "_")
+func parseKeyForToken(key tokenIdentifiers) (address, tokenID, error) {
+	parts := strings.Split(string(key), "_")
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid key")
 	}
-	return parts[0], parts[1], nil
+	return address(parts[0]), tokenID(parts[1]), nil
 }
