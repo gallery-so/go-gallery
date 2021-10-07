@@ -9,17 +9,20 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"os/signal"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
@@ -45,12 +48,17 @@ type ownerAtBlock struct {
 	block uint64
 }
 
+type uniqueMetadataHandler func(*Indexer, string, string) (map[string]interface{}, error)
+
+type uniqueMetadatas map[string]uniqueMetadataHandler
+
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type Indexer struct {
 	state int64
 
-	runtime *runtime.Runtime
+	ethClient  *ethclient.Client
+	ipfsClient *shell.Shell
 
 	mu *sync.RWMutex
 	wg *sync.WaitGroup
@@ -78,11 +86,13 @@ type Indexer struct {
 	cancel        chan os.Signal
 
 	badURIs uint64
+
+	uniqueMetadatas uniqueMetadatas
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(pChain persist.Chain, pEvents []EventHash, statsFileName string, pRuntime *runtime.Runtime) *Indexer {
-	finalBlockUint, err := pRuntime.InfraClients.ETHClient.BlockNumber(context.Background())
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain persist.Chain, pEvents []EventHash, statsFileName string, uniqueMetadatas uniqueMetadatas) *Indexer {
+	finalBlockUint, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -101,11 +111,17 @@ func NewIndexer(pChain persist.Chain, pEvents []EventHash, statsFileName string,
 		startingBlock = uint64(stats["last_block"].(float64))
 	}
 
+	cancel := make(chan os.Signal)
+
+	signal.Notify(cancel, syscall.SIGINT, syscall.SIGTERM)
+
 	return &Indexer{
 
-		runtime: pRuntime,
-		mu:      &sync.RWMutex{},
-		wg:      &sync.WaitGroup{},
+		mu: &sync.RWMutex{},
+		wg: &sync.WaitGroup{},
+
+		ethClient:  ethClient,
+		ipfsClient: ipfsClient,
 
 		chain: pChain,
 
@@ -127,7 +143,9 @@ func NewIndexer(pChain persist.Chain, pEvents []EventHash, statsFileName string,
 		tokens:        make(chan *persist.Token),
 		contracts:     make(chan *persist.Contract),
 		done:          make(chan error),
-		cancel:        pRuntime.Cancel,
+		cancel:        cancel,
+
+		uniqueMetadatas: uniqueMetadatas,
 	}
 }
 
@@ -165,7 +183,7 @@ func (i *Indexer) processLogs() {
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-		logsTo, err := i.runtime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
+		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -246,7 +264,7 @@ func (i *Indexer) subscribeNewLogs() {
 
 	topics := [][]common.Hash{events, nil, nil, nil}
 
-	sub, err := i.runtime.InfraClients.ETHClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
+	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: new(big.Int).SetUint64(i.lastSyncedBlock),
 		Topics:    topics,
 	}, i.subscriptions)
@@ -303,7 +321,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			Address:     transfer.RawContract.Address,
 			LatestBlock: atomic.LoadUint64(&i.lastSyncedBlock),
 		}
-		cMetadata, err := getTokenContractMetadata(c.Address, i.runtime)
+		cMetadata, err := getTokenContractMetadata(c.Address, i.ethClient)
 		if err != nil {
 			logrus.WithError(err).Error("error getting contract metadata")
 		} else {
@@ -334,7 +352,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			})
 		}
 		if _, ok := i.uris[key]; !ok {
-			uri, err := getERC721TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
+			uri, err := getERC721TokenURI(transfer.RawContract.Address, transfer.TokenID, i.ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC721 token")
 
@@ -359,7 +377,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			i.balances[key][transfer.To] = new(big.Int).SetUint64(transfer.Amount)
 		}
 		if _, ok := i.uris[key]; !ok {
-			uri, err := getERC1155TokenURI(transfer.RawContract.Address, transfer.TokenID, i.runtime)
+			uri, err := getERC1155TokenURI(transfer.RawContract.Address, transfer.TokenID, i.ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC1155 token")
 
@@ -374,22 +392,29 @@ func processTransfer(i *Indexer, transfer *transfer) {
 	}
 
 	if _, ok := i.metadatas[key]; !ok {
-		if uri, ok := i.uris[key]; ok {
-
-			id, err := util.HexToBigInt(transfer.TokenID)
-			if err != nil {
-				logrus.WithError(err).Error("error converting token ID to big int")
-				atomic.StoreInt64(&i.state, -1)
-				i.done <- err
-			}
-			uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
-			metadata, err := getMetadataFromURI(uriReplaced, i.runtime)
+		if handler, ok := i.uniqueMetadatas[transfer.RawContract.Address]; ok {
+			metadata, err := handler(i, transfer.RawContract.Address, transfer.TokenID)
 			if err != nil {
 				logrus.WithError(err).Error("error getting metadata for token")
 				atomic.AddUint64(&i.badURIs, 1)
-				// TODO handle this
-			} else {
-				i.metadatas[key] = metadata
+			}
+			i.metadatas[key] = metadata
+		} else {
+			if uri, ok := i.uris[key]; ok {
+				id, err := util.HexToBigInt(transfer.TokenID)
+				if err != nil {
+					logrus.WithError(err).Error("error converting token ID to big int")
+					atomic.StoreInt64(&i.state, -1)
+					i.done <- err
+				}
+				uriReplaced := strings.ReplaceAll(uri, "{id}", id.String())
+				metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient)
+				if err != nil {
+					logrus.WithError(err).Error("error getting metadata for token")
+					atomic.AddUint64(&i.badURIs, 1)
+				} else {
+					i.metadatas[key] = metadata
+				}
 			}
 		}
 	}
@@ -403,11 +428,13 @@ func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
 		return errors.New("token owner is empty")
 	}
 	i.done <- fmt.Errorf("token %s received at block %d", t.TokenURI, atomic.LoadUint64(&i.lastSyncedBlock))
-	return persist.TokenUpsert(ctx, t, i.runtime)
+	// return persist.TokenUpsert(ctx, t, i.runtime)
+	return nil
 }
 
 func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contract) error {
-	return persist.ContractUpsertByAddress(ctx, contract.Address, contract, i.runtime)
+	// return persist.ContractUpsertByAddress(ctx, contract.Address, contract, i.runtime)
+	return nil
 }
 
 func storedDataToTokens(i *Indexer) {
@@ -594,7 +621,7 @@ func (i *Indexer) writeStats() {
 
 func (i *Indexer) listenForNewBlocks() {
 	for {
-		finalBlockUint, err := i.runtime.InfraClients.ETHClient.BlockNumber(context.Background())
+		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
 		if err != nil {
 			logrus.Errorf("failed to get block number: %v", err)
 			atomic.StoreInt64(&i.state, -1)

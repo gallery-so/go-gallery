@@ -16,9 +16,10 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
@@ -70,9 +71,9 @@ type tokenWithBlockNumber struct {
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
-func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (*tokenContractMetadata, error) {
+func getTokenContractMetadata(address string, ethClient *ethclient.Client) (*tokenContractMetadata, error) {
 	contract := common.HexToAddress(address)
-	instance, err := contracts.NewIERC721MetadataCaller(contract, pRuntime.InfraClients.ETHClient)
+	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
 		return nil, err
 	}
@@ -96,10 +97,10 @@ func getTokenContractMetadata(address string, pRuntime *runtime.Runtime) (*token
 }
 
 // getERC721TokenURI returns metadata URI for a given token address
-func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (string, error) {
+func getERC721TokenURI(address, tokenID string, ethClient *ethclient.Client) (string, error) {
 
 	contract := common.HexToAddress(address)
-	instance, err := contracts.NewIERC721MetadataCaller(contract, pRuntime.InfraClients.ETHClient)
+	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
 		return "", err
 	}
@@ -124,7 +125,7 @@ func getERC721TokenURI(address, tokenID string, pRuntime *runtime.Runtime) (stri
 }
 
 // getMetadataFromURI parses and returns the NFT metadata for a given token URI
-func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]interface{}, error) {
+func getMetadataFromURI(tokenURI string, ipfsClient *shell.Shell) (map[string]interface{}, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 5,
@@ -149,7 +150,7 @@ func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]
 
 		path := strings.TrimPrefix(tokenURI, "ipfs://")
 
-		it, err := pRuntime.IPFS.Cat(path)
+		it, err := ipfsClient.Cat(path)
 		if err != nil {
 			return nil, err
 		}
@@ -195,9 +196,9 @@ func getMetadataFromURI(tokenURI string, pRuntime *runtime.Runtime) (map[string]
 
 // if logging all events is too large and takes too much time, start from the front and go backwards until one is found
 // given that the most recent URI event should be the current URI
-func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (string, error) {
+func getERC1155TokenURI(pContractAddress, pTokenID string, ethClient *ethclient.Client) (string, error) {
 	contract := common.HexToAddress(pContractAddress)
-	instance, err := contracts.NewIERC1155MetadataURI(contract, pRuntime.InfraClients.ETHClient)
+	instance, err := contracts.NewIERC1155MetadataURI(contract, ethClient)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +227,7 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Run
 
 	def := new(big.Int).SetUint64(defaultERC721Block)
 
-	logs, err := pRuntime.InfraClients.ETHClient.FilterLogs(ctx, ethereum.FilterQuery{
+	logs, err := ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: def,
 		Addresses: []common.Address{common.HexToAddress(pContractAddress)},
 		Topics:    topics,
@@ -252,10 +253,10 @@ func getERC1155TokenURI(pContractAddress, pTokenID string, pRuntime *runtime.Run
 
 }
 
-func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress, pTokenID string, pRuntime *runtime.Runtime) (*big.Int, error) {
+func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress, pTokenID string, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(pContractAddress)
 	owner := common.HexToAddress(pOwnerAddress)
-	instance, err := contracts.NewIERC1155(contract, pRuntime.InfraClients.ETHClient)
+	instance, err := contracts.NewIERC1155(contract, ethClient)
 	if err != nil {
 		return nil, err
 	}
