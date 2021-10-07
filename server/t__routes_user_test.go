@@ -70,20 +70,6 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 	assert.NotEmpty(body.Addresses)
 }
 
-func TestGetUserUnAuthenticated_ShouldNotIncludeAddress(t *testing.T) {
-	assert := setupTest(t)
-
-	userID := tc.user1.id
-	resp, err := http.Get(fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, userID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
-
-	body := persist.User{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(userID, body.ID)
-	assert.Empty(body.Addresses)
-}
-
 func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	assert := setupTest(t)
 
