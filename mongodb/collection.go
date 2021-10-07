@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/redis"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,15 +21,19 @@ const (
 
 // CollectionMongoRepository is a repository that stores collections in a MongoDB database
 type CollectionMongoRepository struct {
-	mp  *storage
-	nmp *storage
+	mp           *storage
+	nmp          *storage
+	nnmp         *storage
+	redisClients *memstore.Clients
 }
 
 // NewCollectionMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionMongoRepository() *CollectionMongoRepository {
+func NewCollectionMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *CollectionMongoRepository {
 	return &CollectionMongoRepository{
-		mp:  newStorage(0, galleryDBName, collectionColName),
-		nmp: newStorage(0, galleryDBName, nftColName),
+		mp:           newStorage(mgoClient, 0, galleryDBName, collectionColName),
+		nmp:          newStorage(mgoClient, 0, galleryDBName, nftColName),
+		nnmp:         newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		redisClients: redisClients,
 	}
 }
 
@@ -50,7 +55,7 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 		}
 	}
 
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pColl.OwnerUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pColl.OwnerUserID)); err != nil {
 		return "", err
 	}
 
@@ -115,7 +120,7 @@ func (c *CollectionMongoRepository) Update(pCtx context.Context, pIDstr persist.
 	pUserID persist.DBID,
 	pUpdate interface{},
 ) error {
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 	return c.mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
@@ -130,13 +135,16 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 	pUpdate *persist.CollectionUpdateNftsInput,
 ) error {
 
-	uRepo := NewUserMongoRepository()
-	user, err := uRepo.GetByID(pCtx, pUserID)
+	users := []*persist.User{}
+	err := c.nnmp.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return err
 	}
+	if len(users) != 1 {
+		return fmt.Errorf("user not found")
+	}
 
-	ct, err := c.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": user.Addresses}})
+	ct, err := c.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
 	if err != nil {
 		return err
 	}
@@ -150,7 +158,7 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 		}
 	}
 
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -195,7 +203,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 		}
 	}
 
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -238,7 +246,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 		}
 	}
 
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -253,7 +261,7 @@ func (c *CollectionMongoRepository) Delete(pCtx context.Context, pIDstr persist.
 
 	update := &persist.CollectionUpdateDeletedInput{Deleted: true}
 
-	if err := redis.Delete(pCtx, redis.CollUnassignedRDB, string(pUserID)); err != nil {
+	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
 	}
 
@@ -273,7 +281,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 	result := []*persist.Collection{}
 
 	if !skipCache {
-		if cachedResult, err := redis.Get(pCtx, redis.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
+		if cachedResult, err := c.redisClients.Get(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
 			err = json.Unmarshal([]byte(cachedResult), &result)
 			if err != nil {
 				return nil, err
@@ -287,9 +295,18 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		return nil, err
 	}
 
+	users := []*persist.User{}
+	err = c.nnmp.find(pCtx, bson.M{"_id": pUserID}, &users)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) != 1 {
+		return nil, fmt.Errorf("user not found")
+	}
+
 	if countColls == 0 {
-		nRepo := NewNFTMongoRepository()
-		nfts, err := nRepo.GetByUserID(pCtx, pUserID)
+		nfts := []*persist.Nft{}
+		err = c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
 		if err != nil {
 			return nil, err
 		}
@@ -300,12 +317,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 		result = []*persist.Collection{{Nfts: collNfts}}
 	} else {
-		uRepo := NewUserMongoRepository()
-		user, err := uRepo.GetByID(pCtx, pUserID)
-		if err != nil {
-			return nil, err
-		}
-		if err := c.mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, user.Addresses), &result, opts); err != nil {
+		if err := c.mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
 			return nil, err
 		}
 	}
@@ -318,7 +330,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		return nil, err
 	}
 
-	if err := redis.Set(pCtx, redis.CollUnassignedRDB, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
+	if err := c.redisClients.Set(pCtx, memstore.CollUnassignedRDB, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
 		return nil, err
 	}
 

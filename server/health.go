@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 type healthcheckResponse struct {
@@ -15,7 +16,7 @@ func healthcheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, healthcheckResponse{
 			Message: "gallery operational",
-			Env:     env,
+			Env:     viper.GetString("ENV"),
 		})
 	}
 }

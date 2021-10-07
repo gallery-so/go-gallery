@@ -112,7 +112,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	resp := getUnassignedNFTsRequest(assert, tc.user1.id)
+	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
@@ -339,12 +339,12 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	return resp
 }
 
-func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID) *http.Response {
+func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID, jwt string) *http.Response {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/nfts/get_unassigned?user_id=%s&skip_cache=false", tc.serverURL, userID),
 		nil)
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	assert.Nil(err)

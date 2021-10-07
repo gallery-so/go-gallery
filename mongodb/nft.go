@@ -7,27 +7,30 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/redis"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
-	nftColName           = "nfts"
-	nftCollectionColName = "nft_collections"
+	nftColName = "nfts"
 )
 
 // NFTMongoRepository is a repository that stores collections in a MongoDB database
 type NFTMongoRepository struct {
-	mp *storage
+	mp           *storage
+	nmp          *storage
+	redisClients *memstore.Clients
 }
 
 // NewNFTMongoRepository creates a new instance of the collection mongo repository
-func NewNFTMongoRepository() *NFTMongoRepository {
+func NewNFTMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *NFTMongoRepository {
 	return &NFTMongoRepository{
-		mp: newStorage(0, galleryDBName, nftColName),
+		mp:           newStorage(mgoClient, 0, galleryDBName, nftColName),
+		nmp:          newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		redisClients: redisClients,
 	}
 }
 
@@ -65,13 +68,16 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 		opts.SetMaxTime(dur)
 	}
 
-	uRepo := NewUserMongoRepository()
-	user, err := uRepo.GetByID(pCtx, pUserID)
+	users := []*persist.User{}
+	err := n.nmp.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return nil, err
 	}
+	if len(users) != 1 {
+		return nil, fmt.Errorf("user not found")
+	}
 
-	return n.GetByAddresses(pCtx, user.Addresses)
+	return n.GetByAddresses(pCtx, users[0].Addresses)
 }
 
 // GetByAddresses finds an nft by its owner user id
@@ -148,13 +154,16 @@ func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int
 // pUpdate is a struct that has bson tags representing the fields to be updated
 func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
-	uRepo := NewUserMongoRepository()
-	user, err := uRepo.GetByID(pCtx, pUserID)
+	users := []*persist.User{}
+	err := n.nmp.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return err
 	}
+	if len(users) != 1 {
+		return fmt.Errorf("user not found")
+	}
 
-	return n.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
+	return n.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": users[0].Addresses}}, pUpdate)
 }
 
 // BulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
@@ -189,7 +198,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 }
 
 // OpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
-func (*NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*persist.Nft) error {
+func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*persist.Nft) error {
 
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = strings.ToLower(v)
@@ -200,17 +209,17 @@ func (*NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresse
 		return err
 	}
 
-	return redis.Set(pCtx, redis.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
+	return n.redisClients.Set(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
 // OpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
-func (*NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []string) ([]*persist.Nft, error) {
+func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []string) ([]*persist.Nft, error) {
 
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = strings.ToLower(v)
 	}
 
-	result, err := redis.Get(pCtx, redis.OpenseaRDB, fmt.Sprint(pWalletAddresses))
+	result, err := n.redisClients.Get(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
 	if err != nil {
 		return nil, err
 	}

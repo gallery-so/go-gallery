@@ -9,14 +9,13 @@ import (
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 const (
 	userIDcontextKey = "user_id"
 	authContextKey   = "authenticated"
 )
-
-var allowedOrigins string
 
 var rateLimiter = NewIPRateLimiter(1, 5)
 
@@ -37,7 +36,7 @@ func jwtRequired() gin.HandlerFunc {
 			jwt := authHeaders[1]
 			// use an env variable as jwt secret as upposed to using a stateful secret stored in
 			// database that is unique to every user and session
-			valid, userID, err := authJwtParse(jwt, jwtSecret)
+			valid, userID, err := authJwtParse(jwt, viper.GetString("JWT_SECRET"))
 			if err != nil {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: err.Error()})
 				return
@@ -65,7 +64,7 @@ func jwtOptional() gin.HandlerFunc {
 			if len(authHeaders) == 2 {
 				// get string after "Bearer"
 				jwt := authHeaders[1]
-				valid, userID, _ := authJwtParse(jwt, jwtSecret)
+				valid, userID, _ := authJwtParse(jwt, viper.GetString("JWT_SECRET"))
 				c.Set(authContextKey, valid)
 				c.Set(userIDcontextKey, userID)
 			} else {
@@ -91,7 +90,7 @@ func rateLimited() gin.HandlerFunc {
 	}
 }
 
-func requireNFT(userRepository persist.UserRepository, tokenIDs []string) gin.HandlerFunc {
+func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := getUserIDfromCtx(c)
 		if userID != "" {
@@ -102,7 +101,7 @@ func requireNFT(userRepository persist.UserRepository, tokenIDs []string) gin.Ha
 			}
 			has := false
 			for _, addr := range user.Addresses {
-				if res, _ := eth.HasNFTs(c, tokenIDs, addr); res {
+				if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
 					has = true
 					break
 				}
@@ -122,9 +121,9 @@ func requireNFT(userRepository persist.UserRepository, tokenIDs []string) gin.Ha
 func handleCORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestOrigin := c.Request.Header.Get("Origin")
-		allowedOrigins := strings.Split(allowedOrigins, ",")
+		allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
 
-		if util.Contains(allowedOrigins, requestOrigin) || (strings.ToLower(env) == "development" && strings.HasPrefix(requestOrigin, "https://gallery-git-") && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+		if util.Contains(allowedOrigins, requestOrigin) || (strings.ToLower(viper.GetString("ENV")) == "development" && strings.HasPrefix(requestOrigin, "https://gallery-git-") && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 

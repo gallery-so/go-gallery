@@ -20,9 +20,17 @@ type UserMongoRepository struct {
 }
 
 // NewUserMongoRepository creates a new instance of the collection mongo repository
-func NewUserMongoRepository() *UserMongoRepository {
+func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
+	b := true
+	mgoClient.Database(galleryDBName).Collection(usersCollName).Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: bson.M{"username_idempotent": 1},
+		Options: &options.IndexOptions{
+			Unique: &b,
+			Sparse: &b,
+		},
+	})
 	return &UserMongoRepository{
-		mp: newStorage(0, galleryDBName, usersCollName),
+		mp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
 	}
 }
 

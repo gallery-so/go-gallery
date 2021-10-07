@@ -9,17 +9,18 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/mongodb"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TestConfig struct {
 	server    *httptest.Server
 	serverURL string
 	repos     *repositories
+	mgoClient *mongo.Client
 	user1     *TestUser
 	user2     *TestUser
 }
@@ -33,7 +34,7 @@ type TestUser struct {
 	username string
 }
 
-func generateTestUser(username string) *TestUser {
+func generateTestUser(repos *repositories, username string) *TestUser {
 	ctx := context.Background()
 
 	address := strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40)))
@@ -61,14 +62,17 @@ func initializeTestEnv() *TestConfig {
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	ts := httptest.NewServer(CoreInit())
 
+	mclient := newMongoClient()
+	redisClients := newMemstoreClients()
+	repos := newRepos(mclient, redisClients)
 	log.Info("test server connected! ✅")
-
 	return &TestConfig{
 		server:    ts,
 		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
-		repos:     newRepos(),
-		user1:     generateTestUser("bob"),
-		user2:     generateTestUser("john"),
+		repos:     repos,
+		mgoClient: mclient,
+		user1:     generateTestUser(repos, "bob"),
+		user2:     generateTestUser(repos, "john"),
 	}
 }
 
@@ -80,7 +84,7 @@ func teardown() {
 }
 
 func clearDB() {
-	mongodb.Drop(context.Background(), "gallery")
+	tc.mgoClient.Database("gallery").Drop(context.Background())
 }
 
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {

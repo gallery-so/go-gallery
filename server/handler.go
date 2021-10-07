@@ -2,14 +2,19 @@ package server
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/eth"
+	"github.com/mikeydub/go-gallery/memstore"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func handlersInit(router *gin.Engine) *gin.Engine {
+func handlersInit(router *gin.Engine, mgoClient *mongo.Client, ethClient *eth.Client, redisClients *memstore.Clients) *gin.Engine {
+
+	repos := newRepos(mgoClient, redisClients)
 
 	apiGroupV1 := router.Group("/glry/v1")
 
 	// AUTH_HANDLERS
-	authHandlersInit(apiGroupV1)
+	authHandlersInit(apiGroupV1, repos, ethClient)
 
 	// GALLERIES
 
@@ -28,7 +33,7 @@ func handlersInit(router *gin.Engine) *gin.Engine {
 	collectionsGroup.POST("/create", jwtRequired(), createCollection(repos.collectionRepository, repos.galleryRepository))
 	collectionsGroup.POST("/delete", jwtRequired(), deleteCollection(repos.collectionRepository))
 	// TODO magic number
-	collectionsGroup.POST("/update/info", jwtRequired(), requireNFT(repos.userRepository, []string{"0"}), updateCollectionInfo(repos.collectionRepository))
+	collectionsGroup.POST("/update/info", jwtRequired(), requireNFT(repos.userRepository, ethClient, []string{"0"}), updateCollectionInfo(repos.collectionRepository))
 	collectionsGroup.POST("/update/hidden", jwtRequired(), updateCollectionHidden(repos.collectionRepository))
 	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository))
 
@@ -48,7 +53,7 @@ func handlersInit(router *gin.Engine) *gin.Engine {
 	return router
 }
 
-func authHandlersInit(parent *gin.RouterGroup) {
+func authHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
 
 	usersGroup := parent.Group("/users")
 
@@ -60,7 +65,7 @@ func authHandlersInit(parent *gin.RouterGroup) {
 	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
 
 	// [GET] /glry/v1/auth/get_preflight?address=:walletAddress
-	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository))
+	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
 
 	// AUTH VALIDATE_JWT
 
@@ -75,7 +80,7 @@ func authHandlersInit(parent *gin.RouterGroup) {
 	// USER_UPDATE
 	// AUTHENTICATED
 
-	usersGroup.POST("/update/info", jwtRequired(), updateUserInfo(repos.userRepository))
+	usersGroup.POST("/update/info", jwtRequired(), updateUserInfo(repos.userRepository, ethClient))
 	usersGroup.POST("/update/addresses/add", jwtRequired(), addUserAddress(repos.userRepository, repos.nonceRepository))
 	usersGroup.POST("/update/addresses/remove", jwtRequired(), removeAddresses(repos.userRepository, repos.collectionRepository))
 

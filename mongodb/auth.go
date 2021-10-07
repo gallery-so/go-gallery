@@ -7,6 +7,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -27,16 +28,16 @@ type NonceMongoRepository struct {
 }
 
 // NewLoginMongoRepository returns a new instance of a login attempt repository
-func NewLoginMongoRepository() *LoginMongoRepository {
+func NewLoginMongoRepository(mgoClient *mongo.Client) *LoginMongoRepository {
 	return &LoginMongoRepository{
-		mp: newStorage(0, galleryDBName, loginAttemptCollName),
+		mp: newStorage(mgoClient, 0, galleryDBName, loginAttemptCollName),
 	}
 }
 
 // NewNonceMongoRepository returns a new instance of a nonce repository
-func NewNonceMongoRepository() *NonceMongoRepository {
+func NewNonceMongoRepository(mgoClient *mongo.Client) *NonceMongoRepository {
 	return &NonceMongoRepository{
-		mp: newStorage(0, galleryDBName, noncesCollName),
+		mp: newStorage(mgoClient, 0, galleryDBName, noncesCollName),
 	}
 }
 

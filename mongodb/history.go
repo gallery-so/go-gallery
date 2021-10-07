@@ -5,6 +5,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/persist"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var historyColName = "history"
@@ -15,9 +16,9 @@ type HistoryMongoRepository struct {
 }
 
 // NewHistoryMongoRepository creates a new instance of the collection mongo repository
-func NewHistoryMongoRepository() *HistoryMongoRepository {
+func NewHistoryMongoRepository(mgoClient *mongo.Client) *HistoryMongoRepository {
 	return &HistoryMongoRepository{
-		mp: newStorage(0, galleryDBName, historyColName),
+		mp: newStorage(mgoClient, 0, galleryDBName, historyColName),
 	}
 }
 

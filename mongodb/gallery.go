@@ -20,10 +20,10 @@ type GalleryMongoRepository struct {
 }
 
 // NewGalleryMongoRepository creates a new instance of the collection mongo repository
-func NewGalleryMongoRepository() *GalleryMongoRepository {
+func NewGalleryMongoRepository(mgoClient *mongo.Client) *GalleryMongoRepository {
 	return &GalleryMongoRepository{
-		mp:  newStorage(0, galleryDBName, galleryColName),
-		nmp: newStorage(0, galleryDBName, collectionColName),
+		mp:  newStorage(mgoClient, 0, galleryDBName, galleryColName),
+		nmp: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 	}
 }
 

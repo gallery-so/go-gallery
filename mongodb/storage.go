@@ -8,77 +8,20 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 const (
 	galleryDBName = "gallery"
 )
 
-var mongoClient *mongo.Client
-
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
-
-func init() {
-
-	viper.SetDefault("ENV", "local")
-
-	viper.AutomaticEnv()
-
-	env := viper.GetString("ENV")
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
-	defer cancel()
-	mgoURL := "mongodb://localhost:27017/"
-	if env != "local" {
-		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
-		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
-		if err != nil {
-			panic(err)
-		}
-		mgoURL = string(secret)
-	}
-
-	mOpts := options.Client().ApplyURI(string(mgoURL))
-
-	mClient, err := mongo.Connect(ctx, mOpts)
-	if err != nil {
-		panic(err)
-	}
-
-	err = mClient.Ping(ctx, readpref.Primary())
-	if err != nil {
-		panic(err)
-	}
-
-	mongoClient = mClient
-
-	b := true
-
-	// sometimes this is not running during tests
-	mongoClient.Database(galleryDBName).Collection(usersCollName).Indexes().CreateOne(context.Background(), mongo.IndexModel{
-		Keys: bson.M{"username_idempotent": 1},
-		Options: &options.IndexOptions{
-			Unique: &b,
-			Sparse: &b,
-		},
-	})
-
-}
-
-// Drop drops a mongodb database
-func Drop(ctx context.Context, dbName string) error {
-	return mongoClient.Database(dbName).Drop(ctx)
-}
 
 // storage represents the currently accessed collection and the version of the "schema"
 type storage struct {
@@ -88,7 +31,7 @@ type storage struct {
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
 // and the specified version
-func newStorage(version int64, dbName, collName string) *storage {
+func newStorage(mongoClient *mongo.Client, version int64, dbName, collName string) *storage {
 	coll := mongoClient.Database(dbName).Collection(collName)
 
 	return &storage{version: version, collection: coll}

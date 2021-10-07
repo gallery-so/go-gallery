@@ -48,7 +48,7 @@ type authUserGetPreflightOutput struct {
 
 // HANDLERS
 
-func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository) gin.HandlerFunc {
+func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &authUserGetPreflightInput{}
@@ -60,7 +60,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		authed := c.GetBool(authContextKey)
 
-		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository)
+		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
 			// TODO log specific error and return user friendly error message instead
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
@@ -258,7 +258,7 @@ func authVerifySignature(pSignatureStr string,
 }
 
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (*authUserGetPreflightOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *eth.Client) (*authUserGetPreflightOutput, error) {
 
 	user, _ := userRepo.GetByAddress(pCtx, pInput.Address)
 
@@ -271,7 +271,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 		if !pPreAuthed {
 			// TODO magic number
-			hasNFT, err := eth.HasNFT(pCtx, "0", pInput.Address)
+			hasNFT, err := ethClient.HasNFT(pCtx, "0", pInput.Address)
 			if err != nil {
 				return nil, err
 			}

@@ -94,7 +94,7 @@ type userAddAddressOutput struct {
 	SignatureValid bool `json:"signature_valid"`
 }
 
-func updateUserInfo(userRepository persist.UserRepository) gin.HandlerFunc {
+func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userUpdateInput{}
@@ -118,7 +118,7 @@ func updateUserInfo(userRepository persist.UserRepository) gin.HandlerFunc {
 			}
 			can := false
 			for _, addr := range user.Addresses {
-				if resolves, _ := eth.ResolvesENS(c, input.UserName, addr); resolves {
+				if resolves, _ := ethClient.ResolvesENS(c, input.UserName, addr); resolves {
 					can = true
 					break
 				}

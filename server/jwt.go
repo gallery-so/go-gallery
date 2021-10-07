@@ -9,11 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
-)
-
-var (
-	jwtTTL    int64
-	jwtSecret string
+	"github.com/spf13/viper"
 )
 
 // JWT_CLAIMS
@@ -66,7 +62,7 @@ func authJwtParse(pJWTtokenStr string,
 func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
 
 	issuer := "gallery"
-	jwtTokenStr, err := jwtGenerate(jwtSecret, issuer, pUserID)
+	jwtTokenStr, err := jwtGenerate(issuer, pUserID)
 	if err != nil {
 		return "", err
 	}
@@ -77,18 +73,18 @@ func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 // GENERATE
 // ADD!! - make sure when creating new JWT tokens for user that the old ones are marked as deleted
 
-func jwtGenerate(pSigningKeyStr string,
+func jwtGenerate(
 	pIssuerStr string,
 	pUserID persist.DBID) (string, error) {
 
-	signingKeyBytesLst := []byte(pSigningKeyStr)
+	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
 
 	//------------------
 	// CLAIMS
 
 	// Create the Claims
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + jwtTTL //60*60*24*2 // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") //60*60*24*2 // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		jwt.StandardClaims{
