@@ -354,7 +354,7 @@ func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []str
 			},
 		}}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "nfts",
+			"from": "tokens",
 			"let":  bson.M{"array": "$nfts"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
@@ -378,7 +378,7 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "nfts",
+			"from": "tokens",
 			"let":  bson.M{"array": "$nfts"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{

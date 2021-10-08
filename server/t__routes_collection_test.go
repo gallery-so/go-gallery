@@ -399,7 +399,7 @@ func seedTokens(assert *assert.Assertions) []persist.DBID {
 		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
-	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
+	nftIDs, err := tc.repos.tokenRepository.CreateBulk(context.Background(), nfts)
 	assert.Nil(err)
 	return nftIDs
 }

@@ -26,7 +26,7 @@ type repositories struct {
 	userRepository       persist.UserRepository
 	nonceRepository      persist.NonceRepository
 	loginRepository      persist.LoginAttemptRepository
-	nftRepository        persist.TokenRepository
+	tokenRepository      persist.TokenRepository
 	collectionRepository persist.CollectionRepository
 	galleryRepository    persist.GalleryRepository
 	historyRepository    persist.OwnershipHistoryRepository
@@ -89,7 +89,7 @@ func newRepos() *repositories {
 		collectionRepository: mongodb.NewCollectionMongoRepository(mgoClient, redisClients),
 		galleryRepository:    mongodb.NewGalleryMongoRepository(mgoClient),
 		historyRepository:    mongodb.NewHistoryMongoRepository(mgoClient),
-		nftRepository:        mongodb.NewTokenMongoRepository(mgoClient),
+		tokenRepository:      mongodb.NewTokenMongoRepository(mgoClient),
 		userRepository:       mongodb.NewUserMongoRepository(mgoClient),
 		accountRepository:    mongodb.NewAccountMongoRepository(mgoClient),
 		contractRepository:   mongodb.NewContractMongoRepository(mgoClient),

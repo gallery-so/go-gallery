@@ -38,9 +38,9 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	nftsGroup := apiGroupV1.Group("/nfts")
 
-	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.nftRepository))
-	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.nftRepository))
-	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.nftRepository))
+	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.tokenRepository))
+	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.tokenRepository))
+	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.tokenRepository))
 	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
 
 	// HEALTH
