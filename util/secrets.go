@@ -1,4 +1,4 @@
-package runtime
+package util
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
-// accessSecret accesses the payload for the given secret version if one
+// AccessSecret accesses the payload for the given secret version if one
 // exists. The version can be a version number as a string (e.g. "5") or an
 // alias (e.g. "latest").
-func accessSecret(pCtx context.Context, pName string) ([]byte, error) {
+func AccessSecret(pCtx context.Context, pName string) ([]byte, error) {
 
 	// Create the client.
 	client, err := secretmanager.NewClient(pCtx)

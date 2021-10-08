@@ -21,62 +21,62 @@ func TestOpenseaSync_Success(t *testing.T) {
 	mike := &persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}}
 	robin := &persist.User{UserName: "robin", UserNameIdempotent: "robin", Addresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}}
 	gianna := &persist.User{UserName: "gianna", UserNameIdempotent: "gianna", Addresses: []string{"0xdd33e6fd03983c970ae5e647df07314435d69f6b"}}
-	robinUserID, err := persist.UserCreate(ctx, robin, tc.r)
+	robinUserID, err := tc.repos.userRepository.Create(ctx, robin)
 	assert.Nil(err)
-	giannaUserID, err := persist.UserCreate(ctx, gianna, tc.r)
+	giannaUserID, err := tc.repos.userRepository.Create(ctx, gianna)
 	assert.Nil(err)
-	mikeUserID, err := persist.UserCreate(ctx, mike, tc.r)
+	mikeUserID, err := tc.repos.userRepository.Create(ctx, mike)
 	assert.Nil(err)
 
-	nft := &persist.NftDB{
+	nft := &persist.NFTDB{
 		OwnerAddress: "0xdd33e6fd03983c970ae5e647df07314435d69f6b",
 		Name:         "kks",
 		OpenseaID:    34147626,
 	}
 
-	nft2 := &persist.NftDB{
+	nft2 := &persist.NFTDB{
 		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
 		Name:         "malsjdlaksjd",
 		OpenseaID:    46062326,
 	}
-	nft3 := &persist.NftDB{
+	nft3 := &persist.NFTDB{
 		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
 		Name:         "asdjasdasd",
 		OpenseaID:    46062320,
 	}
 
-	nft4 := &persist.NftDB{
+	nft4 := &persist.NFTDB{
 		OwnerAddress: strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"),
 		Name:         "asdasdasd",
 		OpenseaID:    46062322,
 	}
 
-	ids, err := persist.NftCreateBulk(ctx, []*persist.NftDB{nft, nft2, nft3, nft4}, tc.r)
+	ids, err := tc.repos.nftRepository.CreateBulk(ctx, []*persist.NFTDB{nft, nft2, nft3, nft4})
 	assert.Nil(err)
 
 	coll := &persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", Nfts: []persist.DBID{ids[3]}}
-	collID, err := persist.CollCreate(ctx, coll, tc.r)
+	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
-	now, err := persist.NftGetByUserID(ctx, giannaUserID, tc.r)
+	now, err := tc.repos.nftRepository.GetByUserID(ctx, giannaUserID)
 	assert.Nil(err)
 	assert.Len(now, 1)
 
-	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, true, tc.r)
+	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, true, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
-	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}, true, tc.r)
+	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}, true, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
-	mikeColl, err := persist.CollGetByID(ctx, collID, true, tc.r)
+	mikeColl, err := tc.repos.collectionRepository.GetByID(ctx, collID, true)
 	assert.Nil(err)
 	assert.Len(mikeColl, 1)
 	assert.Len(mikeColl[0].Nfts, 0)
 
-	nftsByUser, err := persist.NftGetByUserID(ctx, robinUserID, tc.r)
+	nftsByUser, err := tc.repos.nftRepository.GetByUserID(ctx, robinUserID)
 	assert.Nil(err)
 
-	nftsByUserThree, err := persist.NftGetByUserID(ctx, mikeUserID, tc.r)
+	nftsByUserThree, err := tc.repos.nftRepository.GetByUserID(ctx, mikeUserID)
 	assert.Nil(err)
 
 	ids1 := make([]int, len(robinOpenseaNFTs))

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"testing"
@@ -79,7 +80,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.UserName, user.UserName)
 }
@@ -95,7 +96,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.UserName, user.UserName)
 }
@@ -113,13 +114,17 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert := setupTest(t)
 
+	user2, err := tc.repos.userRepository.GetByID(context.Background(), tc.user2.id)
+	assert.Nil(err)
+	log.Println(user2.UserName)
+
 	update := userUpdateInput{
 		UserName: tc.user2.username,
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.NotEqual(update.UserName, user.UserName)
 }
@@ -132,7 +137,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
 
-	user, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.NotEqual(update.UserName, user.UserName)
 }
@@ -144,7 +149,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 		Value:   "TestNonce",
 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
 	}
-	_, err := persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
@@ -159,7 +164,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Empty(errResp.Error)
 
-	updatedUser, err := persist.UserGetByID(context.Background(), tc.user1.id, tc.r)
+	updatedUser, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.Address, updatedUser.Addresses[1])
 }
@@ -171,7 +176,7 @@ func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
 		Value:   "Wrong Nonce",
 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
 	}
-	_, err := persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
@@ -188,13 +193,13 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
 	}
-	_, err := persist.UserCreate(context.Background(), user, tc.r)
+	_, err := tc.repos.userRepository.Create(context.Background(), user)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
 	}
-	_, err = persist.AuthNonceCreate(context.Background(), nonce, tc.r)
+	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
@@ -213,23 +218,23 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 		UserName:           "TestUser",
 		UserNameIdempotent: "testuser",
 	}
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	nft := &persist.NftDB{
+	nft := &persist.NFTDB{
 		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
 		Name:         "test",
 	}
-	nftID, err := persist.NftCreate(context.Background(), nft, tc.r)
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
 
 	coll := &persist.CollectionDB{
 		Nfts:        []persist.DBID{nftID},
 		Name:        "test-coll",
 		OwnerUserID: userID,
 	}
-	collID, err := persist.CollCreate(context.Background(), coll, tc.r)
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	jwt, err := jwtGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
@@ -242,11 +247,11 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	util.UnmarshallBody(errResp, resp.Body)
 	assert.Empty(errResp.Error)
 
-	nfts, err := persist.NftGetByUserID(context.Background(), userID, tc.r)
+	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Empty(nfts)
 
-	colls, err := persist.CollGetByID(context.Background(), collID, true, tc.r)
+	colls, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
 	assert.NotEmpty(colls)
 	assert.Empty(colls[0].Nfts)
@@ -259,10 +264,10 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
 	}
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	jwt, err := jwtGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
@@ -280,10 +285,10 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 	user := &persist.User{
 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
 	}
-	userID, err := persist.UserCreate(context.Background(), user, tc.r)
+	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID, tc.r)
+	jwt, err := jwtGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{

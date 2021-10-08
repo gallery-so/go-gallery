@@ -1,4 +1,4 @@
-package server
+package eth
 
 import (
 	"context"
@@ -8,19 +8,32 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/runtime"
 )
+
+// Client represents an abstraction over the geth ethereum client
+type Client struct {
+	ethClient       *ethclient.Client
+	contractAddress common.Address
+}
+
+// NewEthClient initializes a new eth client
+func NewEthClient(ethClient *ethclient.Client, contractAddress string) *Client {
+	return &Client{
+		ethClient:       ethClient,
+		contractAddress: common.HexToAddress(contractAddress),
+	}
+}
 
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
-func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client := pRuntime.ContractsClient
+// HasNFT checks if a wallet address has a given NFT
+func (c *Client) HasNFT(pCtx context.Context, id string, userAddr string) (bool, error) {
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
-	instance, err := contracts.NewIERC1155Caller(contract, client)
+	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
 	if err != nil {
 		return false, err
 	}
@@ -37,13 +50,12 @@ func hasNFT(pCtx context.Context, id string, userAddr string, pRuntime *runtime.
 
 }
 
-func hasNFTs(pCtx context.Context, ids []string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client := pRuntime.ContractsClient
+// HasNFTs checks if a wallet address has a given set of NFTs
+func (c *Client) HasNFTs(pCtx context.Context, ids []string, userAddr string) (bool, error) {
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(pRuntime.Config.ContractAddress)
-	instance, err := contracts.NewIERC1155Caller(contract, client)
+	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
 	if err != nil {
 		return false, err
 	}
@@ -70,13 +82,12 @@ func hasNFTs(pCtx context.Context, ids []string, userAddr string, pRuntime *runt
 
 }
 
-func resolvesENS(pCtx context.Context, ens string, userAddr string, pRuntime *runtime.Runtime) (bool, error) {
-	client := pRuntime.ContractsClient
+// ResolvesENS checks if an ENS resolves to a given address
+func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr string) (bool, error) {
 
 	addr := common.HexToAddress(userAddr)
 
-	contract := common.HexToAddress(ensContractAddress)
-	instance, err := contracts.NewIENSCaller(contract, client)
+	instance, err := contracts.NewIENSCaller(c.contractAddress, c.ethClient)
 	if err != nil {
 		return false, err
 	}

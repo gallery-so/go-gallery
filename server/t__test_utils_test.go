@@ -10,16 +10,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TestConfig struct {
 	server    *httptest.Server
 	serverURL string
-	r         *runtime.Runtime
+	repos     *repositories
+	mgoClient *mongo.Client
 	user1     *TestUser
 	user2     *TestUser
 }
@@ -33,7 +34,7 @@ type TestUser struct {
 	username string
 }
 
-func generateTestUser(r *runtime.Runtime, username string) *TestUser {
+func generateTestUser(repos *repositories, username string) *TestUser {
 	ctx := context.Background()
 
 	address := strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40)))
@@ -42,15 +43,15 @@ func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 		UserNameIdempotent: strings.ToLower(username),
 		Addresses:          []string{address},
 	}
-	id, err := persist.UserCreate(ctx, user, r)
+	id, err := repos.userRepository.Create(ctx, user)
 	if err != nil {
 		log.Fatal(err)
 	}
-	jwt, err := jwtGeneratePipeline(ctx, id, r)
+	jwt, err := jwtGeneratePipeline(ctx, id)
 	if err != nil {
 		log.Fatal(err)
 	}
-	authNonceRotateDb(ctx, address, id, r)
+	authNonceRotateDb(ctx, address, id, repos.nonceRepository)
 	log.Info(id, username)
 	return &TestUser{id, address, jwt, username}
 }
@@ -58,22 +59,19 @@ func generateTestUser(r *runtime.Runtime, username string) *TestUser {
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
 func initializeTestEnv() *TestConfig {
-	// Initialize runtime
-	runtime, _ := runtime.GetRuntime(runtime.ConfigLoad())
-
-	// Initialize test server
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
-	runtime.Router = gin.Default()
-	ts := httptest.NewServer(CoreInit(runtime))
+	ts := httptest.NewServer(CoreInit())
 
+	mclient := newMongoClient()
+	repos := newRepos()
 	log.Info("test server connected! ✅")
-
 	return &TestConfig{
 		server:    ts,
 		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
-		r:         runtime,
-		user1:     generateTestUser(runtime, "bob"),
-		user2:     generateTestUser(runtime, "john"),
+		repos:     repos,
+		mgoClient: mclient,
+		user1:     generateTestUser(repos, "bob"),
+		user2:     generateTestUser(repos, "john"),
 	}
 }
 
@@ -85,7 +83,7 @@ func teardown() {
 }
 
 func clearDB() {
-	tc.r.DB.MongoDB.Drop(context.Background())
+	tc.mgoClient.Database("gallery").Drop(context.Background())
 }
 
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {

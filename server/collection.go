@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/persist/mongodb"
 )
 
 type collectionGetByUserIDInput struct {
@@ -57,7 +57,7 @@ type collectionDeleteInput struct {
 
 // HANDLERS
 
-func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -70,9 +70,9 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, _ := getUserIDfromCtx(c)
+		userID := getUserIDfromCtx(c)
 		auth := userID == input.UserID
-		colls, err := persist.CollGetByUserID(c, input.UserID, auth, pRuntime)
+		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
 			colls = []*persist.Collection{}
 		}
@@ -82,7 +82,7 @@ func getCollectionsByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -96,7 +96,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-		colls, err := persist.CollGetByID(c, input.ID, auth, pRuntime)
+		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if len(colls) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no collections found with id: %s", input.ID),
@@ -116,7 +116,7 @@ func getCollectionByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 //------------------------------------------------------------
 
-func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func createCollection(collectionsRepository persist.CollectionRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &collectionCreateInput{}
@@ -127,8 +127,8 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
@@ -136,7 +136,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		//------------------
 		// CREATE
 
-		id, err := collectionCreateDb(c, input, userID, pRuntime)
+		id, err := collectionCreateDb(c, input, userID, collectionsRepository, galleryRepository)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{
 				Error: err.Error(),
@@ -148,7 +148,7 @@ func createCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateInfoByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -156,15 +156,15 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		update := &persist.CollectionUpdateInfoInput{Name: sanitizationPolicy.Sanitize(input.Name), CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
 
-		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
+		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -174,7 +174,7 @@ func updateCollectionInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateCollectionHidden(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateHiddenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -182,15 +182,15 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		update := &persist.CollectionUpdateHiddenInput{Hidden: input.Hidden}
 
-		err := persist.CollUpdate(c, input.ID, userID, update, pRuntime)
+		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -200,7 +200,7 @@ func updateCollectionHidden(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateNftsByIDinput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -214,8 +214,8 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
@@ -225,7 +225,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		update := &persist.CollectionUpdateNftsInput{Nfts: withNoRepeats}
 
-		err := persist.CollUpdateNFTs(c, input.ID, userID, update, pRuntime)
+		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
@@ -235,7 +235,7 @@ func updateCollectionNfts(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func deleteCollection(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -245,16 +245,16 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		err := persist.CollDelete(c, input.ID, userID, pRuntime)
+		err := collectionsRepository.Delete(c, input.ID, userID)
 		if err != nil {
 			switch err.(type) {
-			case *persist.DocumentNotFoundError:
+			case *mongodb.DocumentNotFoundError:
 				c.JSON(http.StatusNotFound, errorResponse{
 					Error: err.Error(),
 				})
@@ -275,7 +275,7 @@ func deleteCollection(pRuntime *runtime.Runtime) gin.HandlerFunc {
 // CREATE
 func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	pUserID persist.DBID,
-	pRuntime *runtime.Runtime) (persist.DBID, error) {
+	collectionsRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) (persist.DBID, error) {
 
 	coll := &persist.CollectionDB{
 		OwnerUserID:    pUserID,
@@ -284,12 +284,12 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 
-	collID, err := persist.CollCreate(pCtx, coll, pRuntime)
+	collID, err := collectionsRepo.Create(pCtx, coll)
 	if err != nil {
 		return "", err
 	}
 
-	err = persist.GalleryAddCollections(pCtx, pInput.GalleryID, pUserID, []persist.DBID{collID}, pRuntime)
+	err = galleryRepo.AddCollections(pCtx, pInput.GalleryID, pUserID, []persist.DBID{collID})
 	if err != nil {
 		return "", err
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 )
 
 type galleryGetByUserIDInput struct {
@@ -32,7 +31,7 @@ type galleryGetOutput struct {
 
 // HANDLERS
 
-func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -46,7 +45,7 @@ func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByUserID(c, input.UserID, auth, pRuntime)
+		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.Gallery{}
 		}
@@ -56,7 +55,7 @@ func getGalleriesByUserID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -70,7 +69,7 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := persist.GalleryGetByID(c, input.ID, auth, pRuntime)
+		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
 		if len(galleries) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, errorResponse{
 				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
@@ -88,7 +87,7 @@ func getGalleryByID(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -96,15 +95,15 @@ func updateGallery(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
 			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
 		update := &persist.GalleryUpdateInput{Collections: input.Collections}
 
-		err := persist.GalleryUpdate(c, input.ID, userID, update, pRuntime)
+		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
