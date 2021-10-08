@@ -30,6 +30,8 @@ type repositories struct {
 	collectionRepository persist.CollectionRepository
 	galleryRepository    persist.GalleryRepository
 	historyRepository    persist.OwnershipHistoryRepository
+	accountRepository    persist.AccountRepository
+	contractRepository   persist.ContractRepository
 }
 
 // CoreInit initializes core server functionality. This is abstracted
@@ -89,6 +91,8 @@ func newRepos() *repositories {
 		historyRepository:    mongodb.NewHistoryMongoRepository(mgoClient),
 		nftRepository:        mongodb.NewTokenMongoRepository(mgoClient),
 		userRepository:       mongodb.NewUserMongoRepository(mgoClient),
+		accountRepository:    mongodb.NewAccountMongoRepository(mgoClient),
+		contractRepository:   mongodb.NewContractMongoRepository(mgoClient),
 	}
 }
 

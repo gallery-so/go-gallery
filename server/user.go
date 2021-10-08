@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var bannedUsernames = map[string]bool{
@@ -100,13 +101,13 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 		input := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -204,7 +205,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -231,7 +232,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 

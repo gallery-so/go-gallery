@@ -96,7 +96,7 @@ func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, to
 		if userID != "" {
 			user, err := userRepository.GetByID(c, userID)
 			if err != nil {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 			has := false
@@ -107,11 +107,11 @@ func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, to
 				}
 			}
 			if !has {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "user does not have required NFT"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "user does not have required NFT"})
 				return
 			}
 		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "user must be authenticated"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "user must be authenticated"})
 			return
 		}
 		c.Next()

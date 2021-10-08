@@ -2,13 +2,8 @@ package persist
 
 import (
 	"context"
-	"strings"
-	"time"
 
-	"github.com/mikeydub/go-gallery/runtime"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const accountCollName = "accounts"
@@ -25,41 +20,8 @@ type Account struct {
 	LastSyncedBlock string `bson:"last_synced_block" json:"last_synced_block"`
 }
 
-// AccountUpsertByAddress upserts an account by a given address
-// pUpdate represents a struct with bson tags to specify which fields to update
-func AccountUpsertByAddress(pCtx context.Context, pAddress string, pUpsert *Account,
-	pRuntime *runtime.Runtime) error {
-
-	mp := newStorage(0, runtime.GalleryDBName, accountCollName, pRuntime)
-
-	_, err := mp.upsert(pCtx, bson.M{
-		"address": strings.ToLower(pAddress),
-	}, pUpsert)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AccountGetByAddress returns an account by a given address
-func AccountGetByAddress(pCtx context.Context, pAddress string,
-	pRuntime *runtime.Runtime) ([]*Account, error) {
-
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
-	mp := newStorage(0, runtime.GalleryDBName, usersCollName, pRuntime)
-
-	result := []*Account{}
-	err := mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+// AccountRepository is the interface for interacting with the account persistence layer
+type AccountRepository interface {
+	GetByAddress(context.Context, string) ([]*Account, error)
+	UpsertByAddress(context.Context, string, *Account) error
 }

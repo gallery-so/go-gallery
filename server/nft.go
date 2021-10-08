@@ -37,15 +37,15 @@ type syncBlockchainNftsInput struct {
 }
 
 type getNftsOutput struct {
-	Nfts []*persist.NFT `json:"nfts"`
+	Nfts []*persist.Token `json:"nfts"`
 }
 
 type getNftByIDOutput struct {
-	Nft *persist.NFT `json:"nft"`
+	Nft *persist.Token `json:"nft"`
 }
 
 type getUnassignedNftsOutput struct {
-	Nfts []*persist.CollectionNFT `json:"nfts"`
+	Nfts []*persist.CollectionToken `json:"nfts"`
 }
 
 type updateNftByIDInput struct {
@@ -62,7 +62,7 @@ type getOwnershipHistoryOutput struct {
 	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
 }
 
-func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
+func getNftByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}
 
@@ -95,7 +95,7 @@ func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 }
 
 // Must specify nft id in json input
-func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
+func updateNftByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateNftByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -107,7 +107,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -127,7 +127,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	}
 }
 
-func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
+func getNftsForUser(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -136,7 +136,7 @@ func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID)
 		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.NFT{}
+			nfts = []*persist.Token{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
@@ -153,12 +153,12 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
 		if coll == nil || err != nil {
-			coll = &persist.Collection{Nfts: []*persist.CollectionNFT{}}
+			coll = &persist.Collection{Nfts: []*persist.CollectionToken{}}
 		}
 
 		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})

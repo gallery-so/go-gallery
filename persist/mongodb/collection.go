@@ -31,7 +31,7 @@ type CollectionMongoRepository struct {
 func NewCollectionMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *CollectionMongoRepository {
 	return &CollectionMongoRepository{
 		mp:           newStorage(mgoClient, 0, galleryDBName, collectionColName),
-		nmp:          newStorage(mgoClient, 0, galleryDBName, nftColName),
+		nmp:          newStorage(mgoClient, 0, galleryDBName, tokenColName),
 		nnmp:         newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		redisClients: redisClients,
 	}
@@ -176,7 +176,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.Token{}
 
 	if err := c.nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -221,7 +221,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 		pAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.Token{}
 
 	if err := c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -305,12 +305,12 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 	}
 
 	if countColls == 0 {
-		nfts := []*persist.NFT{}
+		nfts := []*persist.Token{}
 		err = c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
 		if err != nil {
 			return nil, err
 		}
-		collNfts := []*persist.CollectionNFT{}
+		collNfts := []*persist.CollectionToken{}
 		for _, nft := range nfts {
 			collNfts = append(collNfts, nftToCollectionNft(nft))
 		}
@@ -402,15 +402,16 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	}
 }
 
-func nftToCollectionNft(nft *persist.NFT) *persist.CollectionNFT {
-	return &persist.CollectionNFT{
-		ID:                nft.ID,
-		Name:              nft.Name,
-		CreationTime:      nft.CreationTime,
-		ImageURL:          nft.ImageURL,
-		ImageThumbnailURL: nft.ImageThumbnailURL,
-		ImagePreviewURL:   nft.ImagePreviewURL,
-		OwnerAddress:      nft.OwnerAddress,
-		MultipleOwners:    nft.MultipleOwners,
+func nftToCollectionNft(nft *persist.Token) *persist.CollectionToken {
+	return &persist.CollectionToken{
+		ID:              nft.ID,
+		Name:            nft.Name,
+		CreationTime:    nft.CreationTime,
+		ContractAddress: nft.ContractAddress,
+		OwnerAddress:    nft.OwnerAddress,
+		Chain:           nft.Chain,
+		Description:     nft.Description,
+		Media:           nft.Media,
+		TokenMetadata:   nft.TokenMetadata,
 	}
 }

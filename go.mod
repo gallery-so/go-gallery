@@ -6,18 +6,12 @@ require (
 	cloud.google.com/go v0.95.0 // indirect
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.16.1
-	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098 // indirect
+	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.8
-<<<<<<< HEAD
-	github.com/gin-gonic/gin v1.7.4
-	github.com/go-playground/validator/v10 v10.9.0
-	github.com/go-redis/redis v6.15.9+incompatible
-=======
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-playground/validator/v10 v10.8.0
->>>>>>> main
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/ipfs/go-ipfs-api v0.2.0

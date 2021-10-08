@@ -14,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -61,8 +61,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
-			// TODO log specific error and return user friendly error message instead
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 

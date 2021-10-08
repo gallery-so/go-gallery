@@ -40,7 +40,6 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.nftRepository))
 	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.nftRepository))
-	nftsGroup.GET("/opensea_get", rateLimited(), jwtRequired(), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
 	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
 

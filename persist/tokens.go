@@ -4,13 +4,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/runtime"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -147,4 +143,31 @@ type TokenRepository interface {
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+}
+
+// SniffMediaType will attempt to detect the media type for a given array of bytes
+func SniffMediaType(buf []byte) MediaType {
+	contentType := http.DetectContentType(buf[:512])
+	spl := strings.Split(contentType, "/")
+
+	switch spl[0] {
+	case "image":
+		switch spl[1] {
+		case "svg":
+			return MediaTypeSVG
+		case "gif":
+			return MediaTypeGIF
+		default:
+			return MediaTypeImage
+		}
+	case "video":
+		return MediaTypeVideo
+	case "audio":
+		return MediaTypeAudio
+	case "text":
+		return MediaTypeText
+	default:
+		return MediaTypeUnknown
+	}
+
 }

@@ -1,18 +1,33 @@
 package mongodb
 
+import (
+	"context"
+	"errors"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/mikeydub/go-gallery/persist"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
 const (
 	tokenColName = "tokens"
 )
 
 // TokenMongoRepository is a repository that stores tokens in a MongoDB database
 type TokenMongoRepository struct {
-	mp *storage
+	mp  *storage
+	nmp *storage
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
 func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	return &TokenMongoRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, tokenColName),
+		mp:  newStorage(mgoClient, 0, galleryDBName, tokenColName),
+		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
 	}
 }
 
@@ -49,11 +64,6 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress string
 	}
 
 	opts.SetSort(bson.M{"last_updated": -1})
-
-	if pPageNumber > 0 && pMaxCount > 0 {
-		opts.SetSkip(int64((pPageNumber - 1) * pMaxCount))
-		opts.SetLimit(int64(pMaxCount))
-	}
 
 	result := []*persist.Token{}
 
@@ -92,11 +102,6 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 	}
 
 	opts.SetSort(bson.M{"last_updated": -1})
-
-	if pPageNumber > 0 && pMaxCount > 0 {
-		opts.SetSkip(int64((pPageNumber - 1) * pMaxCount))
-		opts.SetLimit(int64(pMaxCount))
-	}
 
 	result := []*persist.Token{}
 
@@ -184,38 +189,16 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Toke
 // UpdateByID will update a given token by its DB ID and owner user ID
 func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
-	user, err := UserGetByID(pCtx, pUserID, pRuntime)
+	users := []*persist.User{}
+	err := t.nmp.find(pCtx, bson.M{"_id": pUserID}, &users, options.Find())
 	if err != nil {
 		return err
 	}
+	if len(users) != 1 {
+		return errors.New("user not found")
+	}
+	user := users[0]
 
 	return t.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
-
-}
-
-// SniffMediaType will attempt to detect the media type for a given array of bytes
-func SniffMediaType(buf []byte) MediaType {
-	contentType := http.DetectContentType(buf[:512])
-	spl := strings.Split(contentType, "/")
-
-	switch spl[0] {
-	case "image":
-		switch spl[1] {
-		case "svg":
-			return MediaTypeSVG
-		case "gif":
-			return MediaTypeGIF
-		default:
-			return MediaTypeImage
-		}
-	case "video":
-		return MediaTypeVideo
-	case "audio":
-		return MediaTypeAudio
-	case "text":
-		return MediaTypeText
-	default:
-		return MediaTypeUnknown
-	}
 
 }

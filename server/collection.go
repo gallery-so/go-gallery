@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
+	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -130,7 +130,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -159,7 +159,7 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -185,7 +185,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -217,7 +217,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gi
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -248,7 +248,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
 			return
 		}
 
@@ -256,7 +256,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 		if err != nil {
 			switch err.(type) {
 			case *mongodb.DocumentNotFoundError:
-				c.JSON(http.StatusNotFound, errorResponse{
+				c.JSON(http.StatusNotFound, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
