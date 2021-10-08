@@ -30,8 +30,7 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserID(repos.collectionRepository))
 	collectionsGroup.POST("/create", jwtRequired(), createCollection(repos.collectionRepository, repos.galleryRepository))
 	collectionsGroup.POST("/delete", jwtRequired(), deleteCollection(repos.collectionRepository))
-	// TODO magic number
-	collectionsGroup.POST("/update/info", jwtRequired(), requireNFT(repos.userRepository, ethClient, []string{"0"}), updateCollectionInfo(repos.collectionRepository))
+	collectionsGroup.POST("/update/info", jwtRequired(), updateCollectionInfo(repos.collectionRepository))
 	collectionsGroup.POST("/update/hidden", jwtRequired(), updateCollectionHidden(repos.collectionRepository))
 	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository))
 

@@ -9,14 +9,11 @@ import (
 	"strings"
 	"time"
 
-	// log "github.com/sirupsen/logrus"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -260,8 +257,10 @@ func authVerifySignature(pSignatureStr string,
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *eth.Client) (*authUserGetPreflightOutput, error) {
 
-	user, _ := userRepo.GetByAddress(pCtx, pInput.Address)
-
+	user, err := userRepo.GetByAddress(pCtx, pInput.Address)
+  
+	logrus.WithError(err).Error("error retrieving user by address for auth preflight")
+  
 	userExistsBool := user != nil
 
 	output := &authUserGetPreflightOutput{

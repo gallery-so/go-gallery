@@ -162,7 +162,6 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 		output, err := userGetDb(
 			c,
 			input,
-			userID,
 			userRepository,
 		)
 		if err != nil {
@@ -366,7 +365,6 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 }
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
-	pAuthedUserID persist.DBID,
 	userRepo persist.UserRepository) (*userGetOutput, error) {
 
 	//------------------
@@ -403,10 +401,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
 		CreatedAt:   user.CreationTime,
-	}
-
-	if pAuthedUserID == user.ID {
-		output.Addresses = user.Addresses
+    Addresses:   user.Addresses,
 	}
 
 	return output, nil
