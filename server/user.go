@@ -157,8 +157,6 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
-
 		output, err := userGetDb(
 			c,
 			input,
@@ -401,7 +399,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
 		CreatedAt:   user.CreationTime,
-    Addresses:   user.Addresses,
+		Addresses:   user.Addresses,
 	}
 
 	return output, nil

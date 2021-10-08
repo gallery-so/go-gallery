@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -258,9 +259,9 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *eth.Client) (*authUserGetPreflightOutput, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pInput.Address)
-  
+
 	logrus.WithError(err).Error("error retrieving user by address for auth preflight")
-  
+
 	userExistsBool := user != nil
 
 	output := &authUserGetPreflightOutput{
