@@ -283,9 +283,8 @@ func (i *Indexer) subscribeNewLogs() {
 		Topics:    topics,
 	}, i.subscriptions)
 	if err != nil {
-		logrus.Errorf("failed to subscribe to logs: %v", err)
-		atomic.StoreInt64(&i.state, -1)
-		i.done <- err
+		i.failWithMessage(err, "error subscribing to logs")
+		return
 	}
 	for {
 		select {
@@ -293,9 +292,8 @@ func (i *Indexer) subscribeNewLogs() {
 			logrus.Infof("Got log at: %d", log.BlockNumber)
 			i.transfers <- logToTransfer(log)
 		case err := <-sub.Err():
-			logrus.Errorf("subscription error: %v", err)
-			atomic.StoreInt64(&i.state, -1)
-			i.done <- err
+			i.failWithMessage(err, "subscription error")
+			return
 		case <-i.done:
 			return
 		}
@@ -354,6 +352,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			if it.block < transfer.BlockNumber.Uint64() {
 				it.block = transfer.BlockNumber.Uint64()
 				it.owner = to
+				i.owners[key] = it
 			}
 		} else {
 			i.owners[key] = ownerAtBlock{from, transfer.BlockNumber.Uint64()}
@@ -398,7 +397,6 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			uri, err := getERC1155TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("error getting URI for ERC1155 token")
-
 			} else {
 				i.uris[key] = uri
 			}
@@ -409,31 +407,28 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		i.done <- errors.New("unknown token type")
 	}
 
-	if it, ok := i.uris[key]; ok {
-		id, err := util.HexToBigInt(string(tokenID))
-		if err != nil {
-			logrus.WithError(err).Error("error converting token ID to big int")
-			atomic.StoreInt64(&i.state, -1)
-			i.done <- err
-		}
-		uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
-		if _, ok := i.metadatas[key]; !ok {
+	if _, ok := i.metadatas[key]; !ok {
+		if it, ok := i.uris[key]; ok {
+			id, err := util.HexToBigInt(string(tokenID))
+			if err != nil {
+				i.failWithMessage(err, "failed to convert token ID to big int")
+				return
+			}
+			uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-				metadata, err := handler(i, uriReplaced, contractAddress, tokenID)
-				if err != nil {
-					logrus.WithError(err).Error("error getting metadata for token")
-					atomic.AddUint64(&i.badURIs, 1)
-				}
-				i.metadatas[key] = metadata
-			} else {
-				metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient)
-				if err != nil {
+				if metadata, err := handler(i, uriReplaced, contractAddress, tokenID); err != nil {
 					logrus.WithError(err).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas[key] = metadata
 				}
-
+			} else {
+				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
+					logrus.WithError(err).Error("error getting metadata for token")
+					atomic.AddUint64(&i.badURIs, 1)
+				} else {
+					i.metadatas[key] = metadata
+				}
 			}
 		}
 	}
@@ -446,7 +441,7 @@ func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
 	if t.OwnerAddress == "0x00000000000000000000000000000000000000" {
 		return errors.New("token owner is empty")
 	}
-	i.done <- fmt.Errorf("token %s received at block %d", t.TokenURI, atomic.LoadUint64(&i.lastSyncedBlock))
+	i.failWithMessage(fmt.Errorf("token %s received at block %d", t.TokenURI, atomic.LoadUint64(&i.lastSyncedBlock)), "token received")
 	// return persist.TokenUpsert(ctx, t, i.runtime)
 	return nil
 }
@@ -462,8 +457,8 @@ func storedDataToTokens(i *Indexer) {
 	for k, v := range i.owners {
 		contractAddress, tokenID, err := parseKeyForToken(k)
 		if err != nil {
-			atomic.StoreInt64(&i.state, -1)
-			i.done <- err
+			i.failWithMessage(err, "failed to parse key for token")
+			return
 		}
 		sort.Slice(i.previousOwners[k], func(l, m int) bool {
 			return i.previousOwners[k][l].block < i.previousOwners[k][m].block
@@ -501,8 +496,8 @@ func storedDataToTokens(i *Indexer) {
 	for k, v := range i.balances {
 		contractAddress, tokenID, err := parseKeyForToken(k)
 		if err != nil {
-			atomic.StoreInt64(&i.state, -1)
-			i.done <- err
+			i.failWithMessage(err, "failed to parse key for token")
+			continue
 		}
 
 		metadata := i.metadatas[k]
@@ -559,7 +554,6 @@ func logToTransfer(pLog types.Log) []*transfer {
 		}
 	case string(TransferSingleEventHash):
 		if len(pLog.Topics) != 4 {
-			logrus.Error("Invalid transfer single event")
 			return nil
 		}
 
@@ -579,7 +573,6 @@ func logToTransfer(pLog types.Log) []*transfer {
 
 	case string(TransferBatchEventHash):
 		if len(pLog.Topics) != 4 {
-			logrus.Error("Invalid transfer batch event")
 			return nil
 		}
 		from := pLog.Topics[2].Hex()
@@ -613,7 +606,7 @@ func (i *Indexer) writeStats() {
 
 	fi, err := os.Create(i.statsFile)
 	if err != nil {
-		logrus.WithError(err).Error("error creating stats file")
+		i.failWithMessage(err, "failed to create stats file")
 		return
 	}
 	defer fi.Close()
@@ -628,13 +621,11 @@ func (i *Indexer) writeStats() {
 	stats["bad_uris"] = atomic.LoadUint64(&i.badURIs)
 	bs, err := json.Marshal(stats)
 	if err != nil {
-		logrus.WithError(err).Error("error marshalling stats")
-		return
+		i.failWithMessage(err, "failed to marshal stats")
 	}
 	_, err = io.Copy(fi, bytes.NewReader(bs))
 	if err != nil {
-		logrus.WithError(err).Error("error writing stats")
-		return
+		i.failWithMessage(err, "failed to write stats")
 	}
 }
 
@@ -642,14 +633,19 @@ func (i *Indexer) listenForNewBlocks() {
 	for {
 		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
 		if err != nil {
-			logrus.Errorf("failed to get block number: %v", err)
-			atomic.StoreInt64(&i.state, -1)
-			i.done <- err
+			i.failWithMessage(err, "failed to get block number")
+			return
 		}
 		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
 		logrus.Infof("final block number: %v", finalBlockUint)
 		time.Sleep(time.Minute)
 	}
+}
+
+func (i *Indexer) failWithMessage(err error, msg string) {
+	logrus.WithError(err).Error(msg)
+	atomic.StoreInt64(&i.state, -1)
+	i.done <- err
 }
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
