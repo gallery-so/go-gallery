@@ -651,6 +651,7 @@ func (i *Indexer) failWithMessage(err error, msg string) {
 func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
 		address(strings.ToLower("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782")): autoglyphs,
+		address(strings.ToLower("0x60F3680350F65Beb2752788cB48aBFCE84a4759E")): colorglyphs,
 	}
 }
 
