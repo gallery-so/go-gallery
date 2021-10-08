@@ -98,7 +98,8 @@ type CollectionNFT struct {
 
 	Name string `bson:"name"                 json:"name"`
 
-	Contract ContractCollectionNFT `bson:"contract"     json:"asset_contract"`
+	Contract            ContractCollectionNft `bson:"contract"     json:"asset_contract"`
+	TokenCollectionName string                `bson:"token_collection_name" json:"token_collection_name"`
 
 	// IMAGES - OPENSEA
 	ImageURL          string `bson:"image_url"           json:"image_url"`
