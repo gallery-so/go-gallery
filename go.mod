@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.95.0 // indirect
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.16.1
+	github.com/ajstarks/svgo v0.0.0-20210927141636-6d70534b1098 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.8

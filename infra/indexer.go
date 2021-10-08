@@ -56,7 +56,7 @@ type tokenBalances map[address]*big.Int
 
 type uri string
 
-type uniqueMetadataHandler func(*Indexer, address, tokenID) (metadata, error)
+type uniqueMetadataHandler func(*Indexer, uri, address, tokenID) (metadata, error)
 
 type uniqueMetadatas map[address]uniqueMetadataHandler
 
@@ -104,7 +104,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain persist.Chain, pEvents []EventHash, statsFileName string, uniqueMetadatas uniqueMetadatas) *Indexer {
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain persist.Chain, pEvents []EventHash, statsFileName string) *Indexer {
 	finalBlockUint, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -158,7 +158,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain per
 		done:          make(chan error),
 		cancel:        cancel,
 
-		uniqueMetadatas: uniqueMetadatas,
+		uniqueMetadatas: getUniqueMetadataHandlers(),
 	}
 }
 
@@ -322,14 +322,13 @@ func (i *Indexer) handleDone() {
 }
 
 func processTransfer(i *Indexer, transfer *transfer) {
-
-	key := makeKeyForToken(transfer.RawContract.Address, transfer.TokenID)
-	logrus.Infof("Processing transfer %s", key)
-
-	contractAddress := address(transfer.RawContract.Address)
-	from := address(transfer.From)
-	to := address(transfer.To)
+	contractAddress := toRegularAddress(address(strings.ToLower(transfer.RawContract.Address)))
+	from := toRegularAddress(address(strings.ToLower(transfer.From)))
+	to := toRegularAddress(address(strings.ToLower(transfer.To)))
 	tokenID := tokenID(transfer.TokenID)
+
+	key := makeKeyForToken(contractAddress, tokenID)
+	logrus.Infof("Processing transfer %s", key)
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -410,23 +409,23 @@ func processTransfer(i *Indexer, transfer *transfer) {
 		i.done <- errors.New("unknown token type")
 	}
 
-	if _, ok := i.metadatas[key]; !ok {
-		if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-			metadata, err := handler(i, contractAddress, tokenID)
-			if err != nil {
-				logrus.WithError(err).Error("error getting metadata for token")
-				atomic.AddUint64(&i.badURIs, 1)
-			}
-			i.metadatas[key] = metadata
-		} else {
-			if it, ok := i.uris[key]; ok {
-				id, err := util.HexToBigInt(string(tokenID))
+	if it, ok := i.uris[key]; ok {
+		id, err := util.HexToBigInt(string(tokenID))
+		if err != nil {
+			logrus.WithError(err).Error("error converting token ID to big int")
+			atomic.StoreInt64(&i.state, -1)
+			i.done <- err
+		}
+		uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
+		if _, ok := i.metadatas[key]; !ok {
+			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+				metadata, err := handler(i, uriReplaced, contractAddress, tokenID)
 				if err != nil {
-					logrus.WithError(err).Error("error converting token ID to big int")
-					atomic.StoreInt64(&i.state, -1)
-					i.done <- err
+					logrus.WithError(err).Error("error getting metadata for token")
+					atomic.AddUint64(&i.badURIs, 1)
 				}
-				uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
+				i.metadatas[key] = metadata
+			} else {
 				metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient)
 				if err != nil {
 					logrus.WithError(err).Error("error getting metadata for token")
@@ -434,6 +433,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 				} else {
 					i.metadatas[key] = metadata
 				}
+
 			}
 		}
 	}
@@ -470,7 +470,7 @@ func storedDataToTokens(i *Indexer) {
 		})
 		previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
 		for i, w := range i.previousOwners[k] {
-			previousOwnerAddresses[i] = string(toRegularAddress(w.owner))
+			previousOwnerAddresses[i] = string(w.owner)
 		}
 		metadata := i.metadatas[k]
 		var name, description string
@@ -485,7 +485,7 @@ func storedDataToTokens(i *Indexer) {
 		token := &persist.Token{
 			TokenID:         string(tokenID),
 			ContractAddress: string(contractAddress),
-			OwnerAddress:    string(toRegularAddress(v.owner)),
+			OwnerAddress:    string(v.owner),
 			Amount:          1,
 			Name:            name,
 			Description:     description,
@@ -520,7 +520,7 @@ func storedDataToTokens(i *Indexer) {
 			token := &persist.Token{
 				TokenID:         string(tokenID),
 				ContractAddress: string(contractAddress),
-				OwnerAddress:    string(toRegularAddress(addr)),
+				OwnerAddress:    string(addr),
 				Amount:          balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata,
@@ -652,6 +652,12 @@ func (i *Indexer) listenForNewBlocks() {
 	}
 }
 
+func getUniqueMetadataHandlers() uniqueMetadatas {
+	return uniqueMetadatas{
+		address(strings.ToLower("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782")): autoglyphs,
+	}
+}
+
 func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...string) interface{} {
 	for _, field := range fields {
 		if v, ok := metadata[field]; ok {
@@ -689,7 +695,7 @@ func toRegularAddress(addr address) address {
 	return address(strings.ToLower(fmt.Sprintf("0x%s", addr[len(addr)-38:])))
 }
 
-func makeKeyForToken(contractAddress, tokenID string) tokenIdentifiers {
+func makeKeyForToken(contractAddress address, tokenID tokenID) tokenIdentifiers {
 	return tokenIdentifiers(fmt.Sprintf("%s_%s", contractAddress, tokenID))
 }
 
