@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/runtime"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 var bannedUsernames = map[string]bool{
@@ -95,31 +94,31 @@ type userAddAddressOutput struct {
 	SignatureValid bool `json:"signature_valid"`
 }
 
-func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		up := &userUpdateInput{}
+		input := &userUpdateInput{}
 
-		if err := c.ShouldBindJSON(up); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+		if err := c.ShouldBindJSON(input); err != nil {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		if strings.HasSuffix(strings.ToLower(up.UserName), ".eth") {
-			user, err := persist.UserGetByID(c, userID, pRuntime)
+		if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
+			user, err := userRepository.GetByID(c, userID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 			can := false
 			for _, addr := range user.Addresses {
-				if resolves, _ := resolvesENS(c, up.UserName, addr, pRuntime); resolves {
+				if resolves, _ := ethClient.ResolvesENS(c, input.UserName, addr); resolves {
 					can = true
 					break
 				}
@@ -130,7 +129,15 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			}
 		}
 
-		err := userUpdateInfoDB(c, userID, up, pRuntime)
+		err := userRepository.UpdateByID(
+			c,
+			userID,
+			&persist.UserUpdateInfoInput{
+				UserNameIdempotent: strings.ToLower(input.UserName),
+				UserName:           input.UserName,
+				Bio:                sanitizationPolicy.Sanitize(input.BioStr),
+			},
+		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -140,7 +147,7 @@ func updateUserInfo(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userGetInput{}
@@ -150,13 +157,10 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, _ := getUserIDfromCtx(c)
-
 		output, err := userGetDb(
 			c,
 			input,
-			userID,
-			pRuntime,
+			userRepository,
 		)
 		if err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
@@ -168,7 +172,7 @@ func getUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -178,7 +182,7 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		output, err := userCreateDb(c, input, pRuntime)
+		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -188,7 +192,7 @@ func createUser(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 	}
 }
-func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -198,13 +202,13 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		output, err := addAddressToUserDB(c, userID, input, pRuntime)
+		output, err := addAddressToUserDB(c, userID, input, userRepository, nonceRepository)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -215,7 +219,7 @@ func addUserAddress(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userRemoveAddressesInput{}
@@ -225,13 +229,13 @@ func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := getUserIDfromCtx(c)
-		if !ok {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
 			return
 		}
 
-		err := removeAddressesFromUserDB(c, userID, input, pRuntime)
+		err := removeAddressesFromUserDB(c, userID, input, userRepository, collRepo)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -243,11 +247,11 @@ func removeAddresses(pRuntime *runtime.Runtime) gin.HandlerFunc {
 }
 
 func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
-	pRuntime *runtime.Runtime) (*userCreateOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
 
-	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
@@ -257,8 +261,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
-		pInput.Address,
-		pRuntime)
+		pInput.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -272,29 +275,28 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		Addresses: []string{strings.ToLower(pInput.Address)},
 	}
 
-	userID, err := persist.UserCreate(pCtx, user, pRuntime)
+	userID, err := userRepo.Create(pCtx, user)
 	if err != nil {
 		return nil, err
 	}
 
 	output.UserID = userID
 
-	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID,
-		pRuntime)
+	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	output.JWTtoken = jwtTokenStr
 
-	err = authNonceRotateDb(pCtx, pInput.Address, userID, pRuntime)
+	err = authNonceRotateDb(pCtx, pInput.Address, userID, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
 	galleryInsert := &persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
-	galleryID, err := persist.GalleryCreate(pCtx, galleryInsert, pRuntime)
+	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
 		return nil, err
 	}
@@ -305,11 +307,11 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 }
 
 func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userAddAddressInput,
-	pRuntime *runtime.Runtime) (*userAddAddressOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (*userAddAddressOutput, error) {
 
 	output := &userAddAddressOutput{}
 
-	nonceValueStr, userID, _ := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	nonceValueStr, userID, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
 		return nil, errors.New("nonce not found for address")
 	}
@@ -320,8 +322,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		dataStr,
-		pInput.Address,
-		pRuntime)
+		pInput.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -331,11 +332,11 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 		return output, nil
 	}
 
-	if err = persist.UserAddAddresses(pCtx, pUserID, []string{pInput.Address}, pRuntime); err != nil {
+	if err = userRepo.AddAddresses(pCtx, pUserID, []string{pInput.Address}); err != nil {
 		return nil, err
 	}
 
-	err = authNonceRotateDb(pCtx, pInput.Address, pUserID, pRuntime)
+	err = authNonceRotateDb(pCtx, pInput.Address, pUserID, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -343,9 +344,9 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 	return output, nil
 }
 func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
-	pRuntime *runtime.Runtime) error {
+	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
 
-	user, err := persist.UserGetByID(pCtx, pUserID, pRuntime)
+	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
@@ -354,16 +355,15 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 		return errors.New("user does not have enough addresses to remove")
 	}
 
-	err = persist.UserRemoveAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
 	if err != nil {
 		return err
 	}
-	return persist.CollRemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses, pRuntime)
+	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
 }
 
 func userGetDb(pCtx context.Context, pInput *userGetInput,
-	pAuthedUserID persist.DBID,
-	pRuntime *runtime.Runtime) (*userGetOutput, error) {
+	userRepo persist.UserRepository) (*userGetOutput, error) {
 
 	//------------------
 
@@ -371,19 +371,19 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 	var err error
 	switch {
 	case pInput.UserID != "":
-		user, err = persist.UserGetByID(pCtx, pInput.UserID, pRuntime)
+		user, err = userRepo.GetByID(pCtx, pInput.UserID)
 		if err != nil {
 			return nil, err
 		}
 		break
 	case pInput.Username != "":
-		user, err = persist.UserGetByUsername(pCtx, pInput.Username, pRuntime)
+		user, err = userRepo.GetByUsername(pCtx, pInput.Username)
 		if err != nil {
 			return nil, err
 		}
 		break
 	case pInput.Address != "":
-		user, err = persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+		user, err = userRepo.GetByAddress(pCtx, pInput.Address)
 		if err != nil {
 			return nil, err
 		}
@@ -398,50 +398,20 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 		UserID:      user.ID,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
-		CreatedAt:   user.CreationTime.Time(),
-	}
-
-	if pAuthedUserID == user.ID {
-		output.Addresses = user.Addresses
+		CreatedAt:   user.CreationTime,
+		Addresses:   user.Addresses,
 	}
 
 	return output, nil
-}
-
-func userUpdateInfoDB(pCtx context.Context, pUserID persist.DBID, pInput *userUpdateInput,
-	pRuntime *runtime.Runtime) error {
-
-	//------------------
-
-	return persist.UserUpdateByID(
-		pCtx,
-		pUserID,
-		&persist.UserUpdateInfoInput{
-			UserNameIdempotent: strings.ToLower(pInput.UserName),
-			UserName:           pInput.UserName,
-			Bio:                sanitizationPolicy.Sanitize(pInput.BioStr),
-		},
-		pRuntime,
-	)
-
-}
-
-// USER_DELETE__PIPELINE
-func userDeleteDb(pCtx context.Context, pUserIDstr persist.DBID,
-	pRuntime *runtime.Runtime) error {
-	return persist.UserDelete(pCtx, pUserIDstr, pRuntime)
 }
 
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
 func getUserWithNonce(pCtx context.Context, pAddress string,
-	pRuntime *runtime.Runtime) (nonceValue string, userID persist.DBID, err error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (nonceValue string, userID persist.DBID, err error) {
 
-	//------------------
-	// GET_NONCE - get latest nonce for this user_address from the DB
-
-	nonce, err := persist.AuthNonceGet(pCtx, pAddress, pRuntime)
+	nonce, err := nonceRepo.Get(pCtx, pAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
@@ -451,10 +421,7 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 		return nonceValue, userID, errors.New("no nonce found")
 	}
 
-	//------------------
-	// GET_ID
-
-	user, err := persist.UserGetByAddress(pCtx, pAddress, pRuntime)
+	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
@@ -463,8 +430,6 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	} else {
 		return nonceValue, userID, errors.New("no user found")
 	}
-
-	//------------------
 
 	return nonceValue, userID, nil
 }

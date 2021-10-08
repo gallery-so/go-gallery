@@ -1,4 +1,4 @@
-package persist
+package mongodb
 
 import "github.com/mikeydub/go-gallery/copy"
 

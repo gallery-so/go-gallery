@@ -10,9 +10,14 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.8
+<<<<<<< HEAD
 	github.com/gin-gonic/gin v1.7.4
 	github.com/go-playground/validator/v10 v10.9.0
 	github.com/go-redis/redis v6.15.9+incompatible
+=======
+	github.com/gin-gonic/gin v1.7.2
+	github.com/go-playground/validator/v10 v10.8.0
+>>>>>>> main
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/ipfs/go-ipfs-api v0.2.0

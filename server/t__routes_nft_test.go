@@ -19,10 +19,11 @@ func TestGetNftByID_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	note := "very cool nft"
-	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
-		CollectorsNote: note,
-	}, tc.r)
+	name := "very cool nft"
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
+		Name:         name,
+		OwnerAddress: strings.ToLower(tc.user1.address),
+	})
 	assert.Nil(err)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
@@ -69,10 +70,11 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
+		Name:           "very cool nft",
 		CollectorsNote: "silly note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	resp := updateNFTRequest(assert, nftID, "new nft note", tc.user1.jwt)
@@ -93,10 +95,11 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
+		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   strings.ToLower(tc.user1.address),
-	}, tc.r)
+	})
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
@@ -136,9 +139,9 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert := setupTest(t)
 
 	// seed DB with nft
-	nftID, err := persist.TokenCreate(context.Background(), &persist.Token{
-		OwnerAddress: tc.user1.address,
-	}, tc.r)
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
+		Name: "very cool nft",
+	})
 	assert.Nil(err)
 
 	resp := updateNFTRequest(assert, nftID, "new nft name", tc.user2.jwt)

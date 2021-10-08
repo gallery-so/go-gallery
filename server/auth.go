@@ -9,15 +9,13 @@ import (
 	"strings"
 	"time"
 
-	// log "github.com/sirupsen/logrus"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/runtime"
 	"github.com/mikeydub/go-gallery/util"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -49,7 +47,7 @@ type authUserGetPreflightOutput struct {
 
 // HANDLERS
 
-func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &authUserGetPreflightInput{}
@@ -61,12 +59,10 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 
 		authed := c.GetBool(authContextKey)
 
-		// GET_PUBLIC_INFO
-		output, err := authUserGetPreflightDb(c, input, authed, pRuntime)
+		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
-			// TODO: log specific error and return user friendly error message instead
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-
+			// TODO log specific error and return user friendly error message instead
+			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
 			return
 		}
 
@@ -74,7 +70,7 @@ func getAuthPreflight(pRuntime *runtime.Runtime) gin.HandlerFunc {
 	}
 }
 
-func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
+func login(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, authLoginRepository persist.LoginAttemptRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -82,29 +78,18 @@ func login(pRuntime *runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		//------------------
-
-		// USER_LOGIN__PIPELINE
 		output, err := authUserLoginAndMemorizeAttemptDb(
 			c,
 			input,
 			c.Request,
-			pRuntime,
+			userRepository,
+			authNonceRepository,
+			authLoginRepository,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
-
-		/*
-			// ADD!! - going forward we should follow this approach, after v1
-			// SET_JWT_COOKIE
-			expirationTime := time.Now().Add(time.Duration(pRuntime.Config.JWTtokenTTLsecInt/60) * time.Minute)
-			http.SetCookie(pResp, &http.Cookie{
-				Name:    "glry_token",
-				Value:   userJWTtokenStr,
-				Expires: expirationTime,
-			})*/
 
 		c.JSON(http.StatusOK, output)
 	}
@@ -122,18 +107,15 @@ func generateNonce() string {
 
 // LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLoginInput,
-	pReq *http.Request,
-	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
+	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
+	loginRepo persist.LoginAttemptRepository) (*authUserLoginOutput, error) {
 
 	//------------------
 	// LOGIN
-	output, err := authUserLoginPipeline(pCtx, pInput, pRuntime)
+	output, err := authUserLoginPipeline(pCtx, pInput, userRepo, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
-
-	//------------------
-	// LOGIN_ATTEMPT
 
 	loginAttempt := &persist.UserLoginAttempt{
 
@@ -145,40 +127,29 @@ func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLog
 		ReqHeaders:  map[string][]string(pReq.Header),
 	}
 
-	// DB
-	_, err = persist.AuthUserLoginAttemptCreate(pCtx, loginAttempt, pRuntime)
+	_, err = loginRepo.Create(pCtx, loginAttempt)
 	if err != nil {
 		return nil, err
 	}
 
-	//------------------
 	return output, err
 }
 
-// USER_LOGIN__PIPELINE
-func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
-	pRuntime *runtime.Runtime) (*authUserLoginOutput, error) {
+func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, userRepo persist.UserRepository,
+	nonceRepo persist.NonceRepository) (*authUserLoginOutput, error) {
 
-	//------------------
-	// OUTPUT
 	output := &authUserLoginOutput{}
 
-	//------------------
-	// USER_CHECK
-	nonceValueStr, userIDstr, err := getUserWithNonce(pCtx, pInput.Address, pRuntime)
+	nonceValueStr, userIDstr, err := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
 	output.UserID = userIDstr
 
-	//------------------
-	// VERIFY_SIGNATURE
-
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
-		pInput.Address,
-		pRuntime)
+		pInput.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -188,23 +159,14 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 		return output, nil
 	}
 
-	//------------------
-	// JWT_GENERATION - signature is valid, so generate JWT key
-	jwtTokenStr, err := jwtGeneratePipeline(
-		pCtx,
-		userIDstr,
-		pRuntime,
-	)
+	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userIDstr)
 	if err != nil {
 		return nil, err
 	}
 
 	output.JWTtoken = jwtTokenStr
 
-	//------------------
-	// NONCE ROTATE
-
-	err = authNonceRotateDb(pCtx, pInput.Address, userIDstr, pRuntime)
+	err = authNonceRotateDb(pCtx, pInput.Address, userIDstr, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -214,15 +176,13 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput,
 
 func authVerifySignatureAllMethods(pSignatureStr string,
 	pNonce string,
-	pAddressStr string,
-	pRuntime *runtime.Runtime) (bool, error) {
+	pAddressStr string) (bool, error) {
 
 	// personal_sign
 	validBool, err := authVerifySignature(pSignatureStr,
 		pNonce,
 		pAddressStr,
-		true,
-		pRuntime)
+		true)
 	if err != nil {
 		return false, err
 	}
@@ -232,8 +192,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 		validBool, err = authVerifySignature(pSignatureStr,
 			pNonce,
 			pAddressStr,
-			false,
-			pRuntime)
+			false)
 		if err != nil {
 			return false, err
 		}
@@ -247,8 +206,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 func authVerifySignature(pSignatureStr string,
 	pDataStr string,
 	pAddress string,
-	pUseDataHeaderBool bool,
-	pRuntime *runtime.Runtime) (bool, error) {
+	pUseDataHeaderBool bool) (bool, error) {
 
 	// eth_sign:
 	// - https://goethereumbook.org/signature-verify/
@@ -299,9 +257,11 @@ func authVerifySignature(pSignatureStr string,
 }
 
 func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightInput, pPreAuthed bool,
-	pRuntime *runtime.Runtime) (*authUserGetPreflightOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *eth.Client) (*authUserGetPreflightOutput, error) {
 
-	user, _ := persist.UserGetByAddress(pCtx, pInput.Address, pRuntime)
+	user, err := userRepo.GetByAddress(pCtx, pInput.Address)
+
+	logrus.WithError(err).Error("error retrieving user by address for auth preflight")
 
 	userExistsBool := user != nil
 
@@ -311,7 +271,8 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	if !userExistsBool {
 
 		if !pPreAuthed {
-			hasNFT, err := hasAnyNFT(pCtx, "0xcD8b86836684B35Fd365c9cFbf5B2b7CFe7BE3A7", pInput.Address, pRuntime)
+			// TODO magic number
+			hasNFT, err := ethClient.HasNFT(pCtx, "0", pInput.Address)
 			if err != nil {
 				return nil, err
 			}
@@ -325,14 +286,14 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 			Value:   generateNonce(),
 		}
 
-		_, err := persist.AuthNonceCreate(pCtx, nonce, pRuntime)
+		err := nonceRepo.Create(pCtx, nonce)
 		if err != nil {
 			return nil, err
 		}
 		output.Nonce = noncePrepend + nonce.Value
 
 	} else {
-		nonce, err := persist.AuthNonceGet(pCtx, pInput.Address, pRuntime)
+		nonce, err := nonceRepo.Get(pCtx, pInput.Address)
 		if err != nil {
 			return nil, err
 		}
@@ -342,14 +303,14 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	return output, nil
 }
 
-func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DBID, pRuntime *runtime.Runtime) error {
+func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
 		Address: strings.ToLower(pAddress),
 	}
 
-	_, err := persist.AuthNonceCreate(pCtx, newNonce, pRuntime)
+	err := nonceRepo.Create(pCtx, newNonce)
 	if err != nil {
 		return err
 	}
