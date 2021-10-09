@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"image/gif"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -24,7 +26,7 @@ import (
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/blobstore"
-	"google.golang.org/appengine/image"
+	appimage "google.golang.org/appengine/image"
 )
 
 func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
@@ -72,11 +74,15 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 		update.ThumbnailURL = imageURL + "=s96"
 		update.PreviewURL = imageURL + "=s256"
 		update.MediaURL = imageURL + "=s1024"
+	} else {
+		logrus.WithError(err).Error("could not get image serving URL")
 	}
 
 	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 	if err == nil {
 		update.MediaURL = videoURL
+	} else {
+		logrus.WithError(err).Error("could not get video serving URL")
 	}
 
 	logrus.WithFields(logrus.Fields{"token": token.ID, "servingURL": imageURL}).Info("processImagesForToken")
@@ -117,11 +123,15 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 		res.ThumbnailURL = imageURL + "=s96"
 		res.PreviewURL = imageURL + "=s256"
 		res.MediaURL = imageURL + "=s1024"
+	} else {
+		logrus.WithError(err).Error("could not get image serving URL")
 	}
 
 	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 	if err == nil {
 		res.MediaURL = videoURL
+	} else {
+		logrus.WithError(err).Error("could not get video serving URL")
 	}
 
 	logrus.WithFields(logrus.Fields{"token": name, "servingURL": imageURL}).Info("processImagesForToken")
@@ -151,6 +161,7 @@ func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) er
 
 func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string, error) {
 	objectName := fmt.Sprintf("gs/%s/%s", bucketID, objectID)
+
 	key, err := blobstore.BlobKeyForFile(pCtx, objectName)
 	if err != nil {
 		return "", err
@@ -163,7 +174,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string
 	if err != nil {
 		return "", err
 	}
-	res, err := image.ServingURL(pCtx, appengine.BlobKey(key), &image.ServingURLOptions{Secure: true})
+	res, err := appimage.ServingURL(pCtx, appengine.BlobKey(key), &appimage.ServingURLOptions{Secure: true})
 	if err != nil {
 		return "", err
 	}
@@ -207,11 +218,18 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	switch contentType {
 	case persist.MediaTypeImage:
+		var img image.Image
 		jpg, err := jpeg.Decode(buf)
-		if err != nil {
-			return "", err
+		if err == nil {
+			img = jpg
+		} else {
+			pg, err := png.Decode(buf)
+			if err != nil {
+				return "", err
+			}
+			img = pg
 		}
-		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
+		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
 		jpeg.Encode(buf, jpg, nil)
 		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))

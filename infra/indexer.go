@@ -74,7 +74,6 @@ type Indexer struct {
 	ipfsClient *shell.Shell
 
 	mu *sync.RWMutex
-	wg *sync.WaitGroup
 
 	chain persist.Chain
 
@@ -131,7 +130,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain per
 	return &Indexer{
 
 		mu: &sync.RWMutex{},
-		wg: &sync.WaitGroup{},
 
 		ethClient:  ethClient,
 		ipfsClient: ipfsClient,
@@ -164,14 +162,12 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, pChain per
 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
-	i.wg.Add(1)
 	i.state = 1
 	go i.processLogs()
 	go i.processTransfers()
 	go i.processTokens()
 	go i.processContracts()
-	go i.handleDone()
-	i.wg.Wait()
+	i.handleDone()
 }
 
 func (i *Indexer) processLogs() {
@@ -301,7 +297,6 @@ func (i *Indexer) subscribeNewLogs() {
 }
 
 func (i *Indexer) handleDone() {
-	defer i.wg.Done()
 	for {
 		select {
 		case <-i.cancel:
@@ -311,8 +306,7 @@ func (i *Indexer) handleDone() {
 		case err := <-i.done:
 			i.writeStats()
 			logrus.Errorf("Indexer done: %v", err)
-			os.Exit(0)
-			return
+			panic(err)
 		case <-time.After(time.Second * 30):
 			i.writeStats()
 		}
@@ -320,9 +314,9 @@ func (i *Indexer) handleDone() {
 }
 
 func processTransfer(i *Indexer, transfer *transfer) {
-	contractAddress := toRegularAddress(address(strings.ToLower(transfer.RawContract.Address)))
-	from := toRegularAddress(address(strings.ToLower(transfer.From)))
-	to := toRegularAddress(address(strings.ToLower(transfer.To)))
+	contractAddress := address(transfer.RawContract.Address)
+	from := toRegularAddress(address(transfer.From))
+	to := toRegularAddress(address(transfer.To))
 	tokenID := tokenID(transfer.TokenID)
 
 	key := makeKeyForToken(contractAddress, tokenID)
@@ -402,9 +396,7 @@ func processTransfer(i *Indexer, transfer *transfer) {
 			}
 		}
 	default:
-		logrus.Error("unknown token type")
-		atomic.StoreInt64(&i.state, -1)
-		i.done <- errors.New("unknown token type")
+		i.failWithMessage(errors.New("token type"), "unknown token type")
 	}
 
 	if _, ok := i.metadatas[key]; !ok {
@@ -415,12 +407,19 @@ func processTransfer(i *Indexer, transfer *transfer) {
 				return
 			}
 			uriReplaced := uri(strings.ReplaceAll(string(it), "{id}", id.String()))
+
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				if metadata, err := handler(i, uriReplaced, contractAddress, tokenID); err != nil {
 					logrus.WithError(err).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas[key] = metadata
+					meta, err := makePreviewsForMetadata(context.TODO(), metadata, string(contractAddress), string(tokenID), string(uriReplaced), i.ipfsClient)
+					if err != nil {
+						logrus.WithError(err).Error(fmt.Printf("error getting previews for token %s", uriReplaced))
+					} else {
+						logrus.WithField("tokenURI", uriReplaced).Infof("%+v", *meta)
+					}
 				}
 			} else {
 				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
@@ -428,6 +427,12 @@ func processTransfer(i *Indexer, transfer *transfer) {
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas[key] = metadata
+					meta, err := makePreviewsForMetadata(context.TODO(), metadata, string(contractAddress), string(tokenID), string(uriReplaced), i.ipfsClient)
+					if err != nil {
+						logrus.WithError(err).Error(fmt.Printf("error getting previews for token %s", uriReplaced))
+					} else {
+						logrus.WithField("tokenURI", uriReplaced).Infof("%+v", *meta)
+					}
 				}
 			}
 		}
@@ -465,7 +470,7 @@ func storedDataToTokens(i *Indexer) {
 		})
 		previousOwnerAddresses := make([]string, len(i.previousOwners[k]))
 		for i, w := range i.previousOwners[k] {
-			previousOwnerAddresses[i] = string(w.owner)
+			previousOwnerAddresses[i] = strings.ToLower(string(w.owner))
 		}
 		metadata := i.metadatas[k]
 		var name, description string
@@ -479,8 +484,8 @@ func storedDataToTokens(i *Indexer) {
 		}
 		token := &persist.Token{
 			TokenID:         string(tokenID),
-			ContractAddress: string(contractAddress),
-			OwnerAddress:    string(v.owner),
+			ContractAddress: strings.ToLower(string(contractAddress)),
+			OwnerAddress:    strings.ToLower(string(v.owner)),
 			Amount:          1,
 			Name:            name,
 			Description:     description,
@@ -514,8 +519,8 @@ func storedDataToTokens(i *Indexer) {
 		for addr, balance := range v {
 			token := &persist.Token{
 				TokenID:         string(tokenID),
-				ContractAddress: string(contractAddress),
-				OwnerAddress:    string(addr),
+				ContractAddress: strings.ToLower(string(contractAddress)),
+				OwnerAddress:    strings.ToLower(string(addr)),
 				Amount:          balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata,

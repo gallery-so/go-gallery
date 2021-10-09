@@ -22,13 +22,13 @@ func main() {
 
 	logrus.Infof("Starting indexer")
 	indexer.Start()
-
 }
 
 func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("CHAIN", "ETH")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.AutomaticEnv()
 }
 
