@@ -71,8 +71,8 @@ func setDefaults() {
 	viper.SetDefault("JWT_TTL", 60*60*24*3)
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("REDIS_URL", "localhost:6379")
-	viper.SetDefault("CONTRACT_ADDRESS", "0x970b6AFD5EcDCB4001dB8dBf5E2702e86c857E54")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-kovan.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
+	viper.SetDefault("CONTRACT_ADDRESS", "0x876e785A1EE39f0655BE10a1440DBde3e53D3F57")
+	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
 
 	viper.AutomaticEnv()
 }
