@@ -28,14 +28,14 @@ import (
  *   #  Fill in the cell completely.
  *
  */
-func autoglyphs(i *Indexer, tokenURI uri, addr address, tid tokenID) (metadata, error) {
+func autoglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, error) {
 	width := 80
 	height := 80
 	buf := &bytes.Buffer{}
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
-	for i, c := range tokenURI {
+	for i, c := range turi {
 		y := int(math.Floor(float64(i)/float64(64))) + 8
 		x := (i % 64) + 8
 		switch c {
@@ -128,8 +128,8 @@ func autoglyphs(i *Indexer, tokenURI uri, addr address, tid tokenID) (metadata, 
 * scheme 9 = greenest address color on reddest address color
 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
  */
-func colorglyphs(i *Indexer, tokenURI uri, addr address, tid tokenID) (metadata, error) {
-	spl := strings.Split(string(tokenURI), " ")
+func colorglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, error) {
+	spl := strings.Split(string(turi), " ")
 	if len(spl) != 3 {
 		panic("invalid colorglyphs tokenURI")
 	}

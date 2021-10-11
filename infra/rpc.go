@@ -102,27 +102,27 @@ func getERC721TokenURI(address address, tokenID tokenID, ethClient *ethclient.Cl
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	tokenURI, err := instance.TokenURI(&bind.CallOpts{
+	turi, err := instance.TokenURI(&bind.CallOpts{
 		Context: ctx,
 	}, i)
 	if err != nil {
 		return "", err
 	}
 
-	return uri(strings.ReplaceAll(tokenURI, "\x00", "")), nil
+	return uri(strings.ReplaceAll(turi, "\x00", "")), nil
 
 }
 
 // getMetadataFromURI parses and returns the NFT metadata for a given token URI
-func getMetadataFromURI(tokenURI uri, ipfsClient *shell.Shell) (metadata, error) {
+func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
 
-	asString := string(tokenURI)
+	asString := string(turi)
 
-	if strings.Contains(string(tokenURI), "data:application/json;base64,") {
+	if strings.Contains(string(turi), "data:application/json;base64,") {
 		// decode the base64 encoded json
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
@@ -130,7 +130,7 @@ func getMetadataFromURI(tokenURI uri, ipfsClient *shell.Shell) (metadata, error)
 			return nil, err
 		}
 
-		metadata := map[string]interface{}{}
+		metadata := metadata{}
 		err = json.Unmarshal(decoded, &metadata)
 		if err != nil {
 			return nil, err
@@ -140,8 +140,9 @@ func getMetadataFromURI(tokenURI uri, ipfsClient *shell.Shell) (metadata, error)
 	} else if strings.HasPrefix(asString, "ipfs://") {
 
 		path := strings.TrimPrefix(asString, "ipfs://")
+		pathMinusExtra := strings.TrimPrefix(path, "ipfs/")
 
-		it, err := ipfsClient.Cat(path)
+		it, err := ipfsClient.Cat(pathMinusExtra)
 		if err != nil {
 			return nil, err
 		}
@@ -201,15 +202,15 @@ func getERC1155TokenURI(pContractAddress address, pTokenID tokenID, ethClient *e
 	logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	tokenURI, err := instance.Uri(&bind.CallOpts{
+	turi, err := instance.Uri(&bind.CallOpts{
 		Context: ctx,
 	}, i)
 	if err != nil {
 		return "", err
 	}
 	cancel()
-	if tokenURI != "" {
-		return uri(strings.ReplaceAll(tokenURI, "\x00", "")), nil
+	if turi != "" {
+		return uri(strings.ReplaceAll(turi, "\x00", "")), nil
 	}
 
 	topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}

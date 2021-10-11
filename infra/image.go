@@ -90,7 +90,7 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 	return update, nil
 }
 
-func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, tokenURI string, ipfsClient *shell.Shell) (*persist.Media, error) {
+func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, turi string, ipfsClient *shell.Shell) (*persist.Media, error) {
 
 	url := ""
 
@@ -105,7 +105,7 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	}
 
 	if url == "" {
-		url = tokenURI
+		url = turi
 	}
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
