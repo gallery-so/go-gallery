@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -52,9 +50,6 @@ const (
 	ChainOptimism Chain = "Optimism"
 )
 
-// TTB represents time til blockchain so that data isn't old in DB
-var TTB = time.Minute * 10
-
 // TokenType represents the contract specification of the token
 type TokenType string
 
@@ -66,11 +61,11 @@ type Chain string
 
 // Token represents an individual Token token
 type Token struct {
-	Version      int64              `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
-	Deleted      bool               `bson:"deleted" json:"-"`
-	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
+	Version      int64     `bson:"version"              json:"version"` // schema version for this model
+	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime time.Time `bson:"created_at"        json:"created_at"`
+	Deleted      bool      `bson:"deleted" json:"-"`
+	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	Media          Media  `bson:"media" json:"media"`
@@ -84,11 +79,13 @@ type Token struct {
 
 	TokenURI        string                 `bson:"token_uri" json:"token_uri"`
 	TokenID         string                 `bson:"token_id" json:"token_id"`
-	Amount          uint64                 `bson:"amount" json:"amount"`
+	Quantity        uint64                 `bson:"quantity" json:"quantity"`
 	OwnerAddress    string                 `bson:"owner_address" json:"owner_address"`
 	PreviousOwners  []string               `bson:"previous_owners" json:"previous_owners"`
 	TokenMetadata   map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
 	ContractAddress string                 `bson:"contract_address" json:"contract_address"`
+
+	ExternalURL string `bson:"external_url" json:"external_url"`
 
 	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
 }
@@ -103,8 +100,8 @@ type Media struct {
 
 // CollectionToken represents a token within a collection
 type CollectionToken struct {
-	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
+	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 
 	ContractAddress string `bson:"contract_address"     json:"contract_address"`
 
