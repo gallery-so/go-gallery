@@ -64,7 +64,7 @@ type getOwnershipHistoryOutput struct {
 	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
 }
 
-func getNftByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}
 
@@ -94,12 +94,12 @@ func getNftByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) 
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
-		c.JSON(http.StatusOK, getNftByIDOutput{Nft: ensureTokenMedia(aeCtx, nfts, ipfsClient)[0]})
+		c.JSON(http.StatusOK, getNftByIDOutput{Nft: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)[0]})
 	}
 }
 
 // Must specify nft id in json input
-func updateNftByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
+func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateNftByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -131,7 +131,7 @@ func updateNftByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	}
 }
 
-func getNftsForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -145,11 +145,11 @@ func getNftsForUser(nftRepository persist.TokenRepository, ipfsClient *shell.She
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: ensureTokenMedia(aeCtx, nfts, ipfsClient)})
+		c.JSON(http.StatusOK, getNftsOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)})
 	}
 }
 
-func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getUnassignedTokensForUser(collectionRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getUnassignedNFTByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -169,7 +169,7 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository,
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, ipfsClient)})
+		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)})
 	}
 }
 
@@ -186,26 +186,58 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 	return true, nil
 }
 
-func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, ipfsClient *shell.Shell) []*persist.Token {
+func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.Token {
+	nftChan := make(chan *persist.Token)
 	for _, nft := range nfts {
-		if nft.Media.MediaURL == "" {
-			media, err := makePreviewsForMetadata(aeCtx, nft.TokenMetadata, nft.ContractAddress, nft.TokenID, nft.TokenURI, ipfsClient)
-			if err == nil {
-				nft.Media = *media
+		go func(n *persist.Token) {
+			if n.Media.MediaURL == "" {
+				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
+				if err == nil {
+					n.Media = *media
+					go func() {
+						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
+						if err != nil {
+							logrus.WithError(err).Error("could not update media for nft")
+						}
+					}()
+				} else {
+					logrus.WithError(err).Error("could not make media for nft")
+				}
 			}
-		}
+			nftChan <- n
+		}(nft)
+	}
+	for i := 0; i < len(nfts); i++ {
+		nft := <-nftChan
+		nfts[i] = nft
 	}
 	return nfts
 }
 
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.CollectionToken, ipfsClient *shell.Shell) []*persist.CollectionToken {
+func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.CollectionToken, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.CollectionToken {
+	nftChan := make(chan *persist.CollectionToken)
 	for _, nft := range nfts {
-		if nft.Media.MediaURL == "" {
-			media, err := makePreviewsForMetadata(aeCtx, nft.TokenMetadata, nft.ContractAddress, nft.TokenID, nft.TokenURI, ipfsClient)
-			if err == nil {
-				nft.Media = *media
+		go func(n *persist.CollectionToken) {
+			if n.Media.MediaURL == "" {
+				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
+				if err == nil {
+					n.Media = *media
+					go func() {
+						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
+						if err != nil {
+							logrus.WithError(err).Error("could not update media for nft")
+						}
+					}()
+				} else {
+					logrus.WithError(err).Error("could not make media for nft")
+				}
 			}
-		}
+			nftChan <- n
+		}(nft)
+	}
+	for i := 0; i < len(nfts); i++ {
+		nft := <-nftChan
+		nfts[i] = nft
 	}
 	return nfts
 }

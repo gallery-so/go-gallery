@@ -165,6 +165,32 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
+// UpdateUnsafe will update a single collection by ID
+// pUpdate will be a struct with bson tags that represent the fields to be updated
+func (c *CollectionMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
+	pUpdate interface{},
+) error {
+
+	return c.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+}
+
+// UpdateNFTsUnsafe will update a collections NFTs ensuring that
+// no other collection contains the NFTs being included in the updated collection.
+// This is to ensure that the NFTs are not
+// being shared between collections.
+func (c *CollectionMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID,
+	pUpdate *persist.CollectionUpdateNftsInput,
+) error {
+
+	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+}
+
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 	pUserID persist.DBID,

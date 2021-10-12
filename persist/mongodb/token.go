@@ -186,6 +186,13 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Toke
 	return err
 }
 
+// UpdateByIDUnsafe will update a given token by its DB ID and owner user ID
+func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
+
+	return t.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+
+}
+
 // UpdateByID will update a given token by its DB ID and owner user ID
 func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 

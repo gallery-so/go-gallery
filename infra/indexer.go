@@ -637,6 +637,7 @@ func (i *Indexer) writeStats() {
 	if err != nil {
 		i.failWithMessage(err, "failed to marshal stats")
 	}
+	os.Truncate(i.statsFile.Name(), 0)
 	_, err = io.Copy(i.statsFile, bytes.NewReader(bs))
 	if err != nil {
 		i.failWithMessage(err, "failed to write stats")

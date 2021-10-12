@@ -60,7 +60,7 @@ type collectionDeleteInput struct {
 
 // HANDLERS
 
-func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -82,7 +82,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, 
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, ipfsClient)
+			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
@@ -90,7 +90,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, 
 	}
 }
 
-func getCollectionByID(collectionsRepository persist.CollectionRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionByID(collectionsRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -117,7 +117,7 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository, ipfsC
 		}
 
 		coll := colls[0]
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, ipfsClient)
+		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
 		return

@@ -123,11 +123,9 @@ type TokenUpdateInfoInput struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
-// TokenUpdateImageURLsInput represents an update to a tokens image properties
-type TokenUpdateImageURLsInput struct {
-	ThumbnailURL string `bson:"thumbnail_url" json:"thumbnail_url"`
-	PreviewURL   string `bson:"preview_url" json:"preview_url"`
-	MediaURL     string `bson:"media_url" json:"media_url"`
+// TokenUpdateMediaInput represents an update to a tokens image properties
+type TokenUpdateMediaInput struct {
+	Media *Media `bson:"media" json:"media"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
@@ -141,6 +139,7 @@ type TokenRepository interface {
 	GetByID(context.Context, DBID) ([]*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
+	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 }
 

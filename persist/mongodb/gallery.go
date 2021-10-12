@@ -58,6 +58,15 @@ func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBI
 	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }
 
+// UpdateUnsafe updates a gallery in the database by ID
+// pUpdate is a struct that contains bson tags representing the fields to be updated
+func (g *GalleryMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
+	pUpdate *persist.GalleryUpdateInput,
+) error {
+
+	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+}
+
 // AddCollections adds collections to the specified gallery
 func (g *GalleryMongoRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
 	return g.mp.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)

@@ -34,7 +34,7 @@ type galleryGetOutput struct {
 
 // HANDLERS
 
-func getGalleriesByUserID(galleryRepository persist.GalleryRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleriesByUserID(galleryRepository persist.GalleryRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -55,7 +55,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository, ipfsClien
 		aeCtx := appengine.NewContext(c.Request)
 		for _, gallery := range galleries {
 			for _, collection := range gallery.Collections {
-				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, ipfsClient)
+				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
 			}
 		}
 
@@ -64,7 +64,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository, ipfsClien
 	}
 }
 
-func getGalleryByID(galleryRepository persist.GalleryRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleryByID(galleryRepository persist.GalleryRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -92,7 +92,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository, ipfsClient *she
 		gallery := galleries[0]
 		aeCtx := appengine.NewContext(c.Request)
 		for _, collection := range gallery.Collections {
-			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, ipfsClient)
+			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
 		}
 
 		c.JSON(http.StatusOK, galleryGetByIDOutput{Gallery: galleries[0]})

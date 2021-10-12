@@ -44,6 +44,7 @@ type GalleryUpdateInput struct {
 type GalleryRepository interface {
 	Create(context.Context, *GalleryDB) (DBID, error)
 	Update(context.Context, DBID, DBID, *GalleryUpdateInput) error
+	UpdateUnsafe(context.Context, DBID, *GalleryUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
 	GetByUserID(context.Context, DBID, bool) ([]*Gallery, error)
 	GetByID(context.Context, DBID, bool) ([]*Gallery, error)

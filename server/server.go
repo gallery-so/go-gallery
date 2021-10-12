@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -61,11 +61,17 @@ func CoreInit() *gin.Engine {
 
 // Init initializes the server
 func Init() {
-	go appengine.Main()
+	// go func() {
+	// 	router := CoreInit()
+	// 	if err := router.Run(fmt.Sprintf(":%s", viper.GetString("PORT"))); err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
 	router := CoreInit()
-	if err := router.Run(fmt.Sprintf(":%s", viper.GetString("PORT"))); err != nil {
-		panic(err)
-	}
+
+	http.Handle("/", router)
+
+	appengine.Main()
 }
 
 func setDefaults() {
@@ -75,6 +81,7 @@ func setDefaults() {
 	viper.SetDefault("JWT_TTL", 60*60*24*3)
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("CONTRACT_ADDRESS", "0x970b6AFD5EcDCB4001dB8dBf5E2702e86c857E54")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-kovan.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")

@@ -80,6 +80,8 @@ type CollectionRepository interface {
 	GetByID(context.Context, DBID, bool) ([]*Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateNFTs(context.Context, DBID, DBID, *CollectionUpdateNftsInput) error
+	UpdateUnsafe(context.Context, DBID, interface{}) error
+	UpdateNFTsUnsafe(context.Context, DBID, *CollectionUpdateNftsInput) error
 	ClaimNFTs(context.Context, DBID, []string, *CollectionUpdateNftsInput) error
 	RemoveNFTsOfAddresses(context.Context, DBID, []string) error
 	Delete(context.Context, DBID, DBID) error
