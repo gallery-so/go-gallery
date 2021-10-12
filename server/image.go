@@ -1,4 +1,4 @@
-package infra
+package server
 
 import (
 	"bytes"
@@ -44,26 +44,32 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 		return nil, errors.New("token already has preview and thumbnail URLs")
 	}
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
+	metadata := token.TokenMetadata
+	imgURL := ""
+	vURL := ""
 
-	url := ""
-
-	if it, ok := token.TokenMetadata["image"]; ok {
-		url = it.(string)
-	} else if it, ok := token.TokenMetadata["image_url"]; ok {
-		url = it.(string)
-	} else if it, ok := token.TokenMetadata["video_url"]; ok {
-		url = it.(string)
-	} else if it, ok := token.TokenMetadata["animation_url"]; ok {
-		url = it.(string)
+	if it, ok := metadata["animation_url"]; ok && it != nil {
+		vURL = it.(string)
+	} else if it, ok := metadata["video_url"]; ok && it != nil {
+		vURL = it.(string)
+	}
+	if it, ok := metadata["image"]; ok && it != nil {
+		imgURL = it.(string)
+	} else if it, ok := metadata["image_url"]; ok && it != nil {
+		imgURL = it.(string)
 	}
 
-	if url == "" {
-		url = token.TokenURI
+	if imgURL == "" {
+		imgURL = token.TokenURI
 	}
 
-	mediaType, err := downloadAndCache(pCtx, url, name, ipfsClient)
+	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)
 	if err != nil {
 		return nil, err
+	}
+	if vURL != "" {
+		mt, _ := downloadAndCache(pCtx, vURL, name, ipfsClient)
+		mediaType = mt
 	}
 	update := &persist.Media{
 		MediaType: mediaType,
@@ -92,28 +98,34 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 
 func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, turi string, ipfsClient *shell.Shell) (*persist.Media, error) {
 
-	url := ""
+	imgURL := ""
+	vURL := ""
 
-	if it, ok := metadata["image"]; ok && it != nil {
-		url = it.(string)
-	} else if it, ok := metadata["image_url"]; ok && it != nil {
-		url = it.(string)
+	if it, ok := metadata["animation_url"]; ok && it != nil {
+		vURL = it.(string)
 	} else if it, ok := metadata["video_url"]; ok && it != nil {
-		url = it.(string)
-	} else if it, ok := metadata["animation_url"]; ok && it != nil {
-		url = it.(string)
+		vURL = it.(string)
+	}
+	if it, ok := metadata["image"]; ok && it != nil {
+		imgURL = it.(string)
+	} else if it, ok := metadata["image_url"]; ok && it != nil {
+		imgURL = it.(string)
 	}
 
-	if url == "" {
-		url = turi
+	if imgURL == "" {
+		imgURL = turi
 	}
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-
-	mediaType, err := downloadAndCache(pCtx, url, name, ipfsClient)
+	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)
 	if err != nil {
 		return nil, err
 	}
+	if vURL != "" {
+		mt, _ := downloadAndCache(pCtx, vURL, name, ipfsClient)
+		mediaType = mt
+	}
+
 	res := &persist.Media{
 		MediaType: mediaType,
 	}

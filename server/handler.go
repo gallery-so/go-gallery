@@ -2,10 +2,11 @@ package server
 
 import (
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 )
 
-func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
+func handlersInit(router *gin.Engine, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
 	repos := newRepos()
 
@@ -18,16 +19,16 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	galleriesGroup := apiGroupV1.Group("/galleries")
 
-	galleriesGroup.GET("/get", jwtOptional(), getGalleryByID(repos.galleryRepository))
-	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserID(repos.galleryRepository))
+	galleriesGroup.GET("/get", jwtOptional(), getGalleryByID(repos.galleryRepository, ipfsClient))
+	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserID(repos.galleryRepository, ipfsClient))
 	galleriesGroup.POST("/update", jwtRequired(), updateGallery(repos.galleryRepository))
 
 	// COLLECTIONS
 
 	collectionsGroup := apiGroupV1.Group("/collections")
 
-	collectionsGroup.GET("/get", jwtOptional(), getCollectionByID(repos.collectionRepository))
-	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserID(repos.collectionRepository))
+	collectionsGroup.GET("/get", jwtOptional(), getCollectionByID(repos.collectionRepository, ipfsClient))
+	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserID(repos.collectionRepository, ipfsClient))
 	collectionsGroup.POST("/create", jwtRequired(), createCollection(repos.collectionRepository, repos.galleryRepository))
 	collectionsGroup.POST("/delete", jwtRequired(), deleteCollection(repos.collectionRepository))
 	collectionsGroup.POST("/update/info", jwtRequired(), updateCollectionInfo(repos.collectionRepository))
@@ -38,10 +39,10 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	nftsGroup := apiGroupV1.Group("/nfts")
 
-	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.tokenRepository))
-	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.tokenRepository))
+	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.tokenRepository, ipfsClient))
+	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.tokenRepository, ipfsClient))
 	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.tokenRepository))
-	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
+	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository, ipfsClient))
 
 	// HEALTH
 	apiGroupV1.GET("/health", healthcheck())

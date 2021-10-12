@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
@@ -20,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"google.golang.org/appengine"
 )
 
 type repositories struct {
@@ -54,12 +56,12 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	ethClient := newEthClient()
-	return handlersInit(router, ethClient)
+	return handlersInit(router, newEthClient(), newIPFSShell())
 }
 
 // Init initializes the server
 func Init() {
+	go appengine.Main()
 	router := CoreInit()
 	if err := router.Run(fmt.Sprintf(":%s", viper.GetString("PORT"))); err != nil {
 		panic(err)
@@ -72,6 +74,7 @@ func setDefaults() {
 	viper.SetDefault("JWT_SECRET", "Test-Secret")
 	viper.SetDefault("JWT_TTL", 60*60*24*3)
 	viper.SetDefault("PORT", 4000)
+	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("CONTRACT_ADDRESS", "0x970b6AFD5EcDCB4001dB8dBf5E2702e86c857E54")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-kovan.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
@@ -152,4 +155,10 @@ func newMemstoreClients() *memstore.Clients {
 		panic(err)
 	}
 	return memstore.NewMemstoreClients(opensea, unassigned)
+}
+
+func newIPFSShell() *shell.Shell {
+	sh := shell.NewShell(viper.GetString("IPFS_URL"))
+	sh.SetTimeout(time.Second * 2)
+	return sh
 }

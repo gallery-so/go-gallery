@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
+	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
@@ -58,7 +60,7 @@ type collectionDeleteInput struct {
 
 // HANDLERS
 
-func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
+func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -78,12 +80,17 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 			colls = []*persist.Collection{}
 		}
 
+		aeCtx := appengine.NewContext(c.Request)
+		for _, coll := range colls {
+			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, ipfsClient)
+		}
+
 		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
 
 	}
 }
 
-func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
+func getCollectionByID(collectionsRepository persist.CollectionRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -108,6 +115,9 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 			colls = colls[:1]
 			// TODO log that this should not be happening
 		}
+
+		coll := colls[0]
+		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, ipfsClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
 		return

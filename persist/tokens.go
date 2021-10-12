@@ -110,6 +110,8 @@ type CollectionToken struct {
 	Name        string `bson:"name" json:"name"`
 	Description string `bson:"description" json:"description"`
 
+	TokenURI     string `bson:"token_uri" json:"token_uri"`
+	TokenID      string `bson:"token_id" json:"token_id"`
 	OwnerAddress string `bson:"owner_address" json:"owner_address"`
 
 	Media         Media                  `bson:"media" json:"media"`

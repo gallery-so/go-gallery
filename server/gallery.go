@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
+	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -32,7 +34,7 @@ type galleryGetOutput struct {
 
 // HANDLERS
 
-func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func getGalleriesByUserID(galleryRepository persist.GalleryRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -50,13 +52,19 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.Gallery{}
 		}
+		aeCtx := appengine.NewContext(c.Request)
+		for _, gallery := range galleries {
+			for _, collection := range gallery.Collections {
+				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, ipfsClient)
+			}
+		}
 
 		c.JSON(http.StatusOK, galleryGetOutput{Galleries: galleries})
 
 	}
 }
 
-func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func getGalleryByID(galleryRepository persist.GalleryRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -80,6 +88,11 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 		if len(galleries) > 1 {
 			galleries = galleries[:1]
 			// TODO log that this should not be happening
+		}
+		gallery := galleries[0]
+		aeCtx := appengine.NewContext(c.Request)
+		for _, collection := range gallery.Collections {
+			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, ipfsClient)
 		}
 
 		c.JSON(http.StatusOK, galleryGetByIDOutput{Gallery: galleries[0]})
