@@ -1,10 +1,13 @@
 package util
 
 import (
-	"errors"
 	"math/big"
 	"strings"
 )
+
+type errInvalidHex struct {
+	Hex string
+}
 
 // NormalizeHexString converts a hex string with 0x prefix to a consistent hex string representation with no prefix
 func NormalizeHexString(hex string) (string, error) {
@@ -12,7 +15,7 @@ func NormalizeHexString(hex string) (string, error) {
 
 	i, ok := new(big.Int).SetString(hex, 16)
 	if !ok {
-		return "", errors.New("invalid hex")
+		return "", errInvalidHex{hex}
 	}
 	return i.Text(16), nil
 }
@@ -23,7 +26,11 @@ func HexToBigInt(hex string) (*big.Int, error) {
 
 	i, ok := new(big.Int).SetString(hex, 16)
 	if !ok {
-		return nil, errors.New("invalid hex")
+		return nil, errInvalidHex{hex}
 	}
 	return i, nil
+}
+
+func (e errInvalidHex) Error() string {
+	return "invalid hex: " + e.Hex
 }

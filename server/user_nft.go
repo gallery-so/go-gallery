@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -44,7 +43,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -66,10 +65,10 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errors.New("nonce not found for address")
+		return nil, errNonceNotFound{pInput.Address}
 	}
 	if id != "" {
-		return nil, errors.New("user already exists with a given address")
+		return nil, errUserExistsWithAddress{Address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
@@ -128,7 +127,7 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 	}
 
 	if len(user.Addresses) < len(pInput.Addresses) {
-		return errors.New("user does not have enough addresses to remove")
+		return errUserCannotRemoveAllAddresses
 	}
 
 	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
