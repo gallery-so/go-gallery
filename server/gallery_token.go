@@ -12,34 +12,34 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type galleryGetByUserIDInput struct {
+type galleryTokenGetByUserIDInput struct {
 	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
 }
-type galleryGetByIDInput struct {
+type galleryTokenGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 
-type galleryGetByIDOutput struct {
-	Gallery *persist.Gallery `json:"gallery"`
+type galleryTokenGetByIDOutput struct {
+	Gallery *persist.GalleryToken `json:"gallery"`
 }
 
-type galleryUpdateInput struct {
+type galleryTokenUpdateInput struct {
 	ID          persist.DBID   `form:"id" json:"id" binding:"required"`
 	Collections []persist.DBID `json:"collections" binding:"required"`
 }
 
-type galleryGetOutput struct {
-	Galleries []*persist.Gallery `json:"galleries"`
+type galleryTokenGetOutput struct {
+	Galleries []*persist.GalleryToken `json:"galleries"`
 }
 
 // HANDLERS
 
-func getGalleriesByUserID(galleryRepository persist.GalleryRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
 
-		input := &galleryGetByUserIDInput{}
+		input := &galleryTokenGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
@@ -50,7 +50,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository, tokenRepo
 		auth := c.GetBool(authContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
 		if len(galleries) == 0 || err != nil {
-			galleries = []*persist.Gallery{}
+			galleries = []*persist.GalleryToken{}
 		}
 		aeCtx := appengine.NewContext(c.Request)
 		for _, gallery := range galleries {
@@ -59,17 +59,17 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository, tokenRepo
 			}
 		}
 
-		c.JSON(http.StatusOK, galleryGetOutput{Galleries: galleries})
+		c.JSON(http.StatusOK, galleryTokenGetOutput{Galleries: galleries})
 
 	}
 }
 
-func getGalleryByID(galleryRepository persist.GalleryRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
 
-		input := &galleryGetByIDInput{}
+		input := &galleryTokenGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
@@ -95,15 +95,15 @@ func getGalleryByID(galleryRepository persist.GalleryRepository, tokenRepository
 			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
 		}
 
-		c.JSON(http.StatusOK, galleryGetByIDOutput{Gallery: galleries[0]})
+		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: galleries[0]})
 		return
 
 	}
 }
 
-func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &galleryUpdateInput{}
+		input := &galleryTokenUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
@@ -115,7 +115,7 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 			return
 		}
 
-		update := &persist.GalleryUpdateInput{Collections: input.Collections}
+		update := &persist.GalleryTokenUpdateInput{Collections: input.Collections}
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {

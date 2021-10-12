@@ -98,8 +98,8 @@ type Media struct {
 	MediaType    MediaType `bson:"media_type" json:"media_type"`
 }
 
-// CollectionToken represents a token within a collection
-type CollectionToken struct {
+// TokenInCollection represents a token within a collection
+type TokenInCollection struct {
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 

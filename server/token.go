@@ -14,59 +14,39 @@ import (
 	"google.golang.org/appengine"
 )
 
-type getNftsByIDInput struct {
+type getTokensByIDInput struct {
 	NftID persist.DBID `json:"id" form:"id" binding:"required"`
 }
 
-type getNftsByUserIDInput struct {
+type getTokensByUserIDInput struct {
 	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
 	Page   int          `json:"page" form:"page"`
 }
 
-type getUnassignedNFTByUserIDInput struct {
+type getUnassignedTokensByUserIDInput struct {
 	SkipCache bool `json:"skip_cache" form:"skip_cache"`
 }
 
-type getOpenseaNftsInput struct {
-	// Comma separated list of wallet addresses
-	WalletAddresses string `json:"addresses" form:"addresses"`
-	SkipCache       bool   `json:"skip_cache" form:"skip_cache"`
-}
-
-type syncBlockchainNftsInput struct {
-	WalletAddresses string `json:"addresses" form:"addresses"`
-	SkipDB          bool   `json:"skip_db" form:"skip_db"`
-}
-
-type getNftsOutput struct {
+type getTokensOutput struct {
 	Nfts []*persist.Token `json:"nfts"`
 }
 
-type getNftByIDOutput struct {
+type getTokenByIDOutput struct {
 	Nft *persist.Token `json:"nft"`
 }
 
-type getUnassignedNftsOutput struct {
-	Nfts []*persist.CollectionToken `json:"nfts"`
+type getUnassignedTokensOutput struct {
+	Nfts []*persist.TokenInCollection `json:"nfts"`
 }
 
-type updateNftByIDInput struct {
+type updateTokenByIDInput struct {
 	ID             persist.DBID `json:"id" binding:"required"`
 	CollectorsNote string       `json:"collectors_note" binding:"required"`
 }
 
-type getOwnershipHistoryInput struct {
-	NftID     persist.DBID `json:"id" form:"id" binding:"required"`
-	SkipCache bool         `json:"skip_cache" form:"skip_cache"`
-}
-
-type getOwnershipHistoryOutput struct {
-	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
-}
-
 func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getNftsByIDInput{}
+		input := &getTokensByIDInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{
@@ -94,14 +74,14 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
-		c.JSON(http.StatusOK, getNftByIDOutput{Nft: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)[0]})
+		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)[0]})
 	}
 }
 
 // Must specify nft id in json input
 func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &updateNftByIDInput{}
+		input := &updateTokenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
@@ -133,7 +113,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 
 func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getNftsByUserIDInput{}
+		input := &getTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
@@ -145,13 +125,13 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)})
+		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)})
 	}
 }
 
-func getUnassignedTokensForUser(collectionRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getUnassignedNFTByUserIDInput{}
+		input := &getUnassignedTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
@@ -164,12 +144,12 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionRepositor
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
 		if coll == nil || err != nil {
-			coll = &persist.Collection{Nfts: []*persist.CollectionToken{}}
+			coll = &persist.CollectionToken{Nfts: []*persist.TokenInCollection{}}
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)})
+		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)})
 	}
 }
 
@@ -214,10 +194,10 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	return nfts
 }
 
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.CollectionToken, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.CollectionToken {
-	nftChan := make(chan *persist.CollectionToken)
+func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.TokenInCollection {
+	nftChan := make(chan *persist.TokenInCollection)
 	for _, nft := range nfts {
-		go func(n *persist.CollectionToken) {
+		go func(n *persist.TokenInCollection) {
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
 				if err == nil {

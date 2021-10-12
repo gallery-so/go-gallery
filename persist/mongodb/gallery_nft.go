@@ -11,8 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const galleryColName = "galleries"
-
 // GalleryMongoRepository is a repository that stores collections in a MongoDB database
 type GalleryMongoRepository struct {
 	mp  *storage
@@ -54,15 +52,6 @@ func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBI
 	if int(ct) != len(pUpdate.Collections) {
 		return errors.New("user does not own all collections to be inserted")
 	}
-
-	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
-}
-
-// UpdateUnsafe updates a gallery in the database by ID
-// pUpdate is a struct that contains bson tags representing the fields to be updated
-func (g *GalleryMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
-	pUpdate *persist.GalleryUpdateInput,
-) error {
 
 	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }

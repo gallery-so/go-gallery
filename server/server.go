@@ -25,15 +25,18 @@ import (
 )
 
 type repositories struct {
-	userRepository       persist.UserRepository
-	nonceRepository      persist.NonceRepository
-	loginRepository      persist.LoginAttemptRepository
-	tokenRepository      persist.TokenRepository
-	collectionRepository persist.CollectionRepository
-	galleryRepository    persist.GalleryRepository
-	historyRepository    persist.OwnershipHistoryRepository
-	accountRepository    persist.AccountRepository
-	contractRepository   persist.ContractRepository
+	userRepository            persist.UserRepository
+	nonceRepository           persist.NonceRepository
+	loginRepository           persist.LoginAttemptRepository
+	nftRepository             persist.NFTRepository
+	tokenRepository           persist.TokenRepository
+	collectionRepository      persist.CollectionRepository
+	collectionTokenRepository persist.CollectionTokenRepository
+	galleryRepository         persist.GalleryRepository
+	galleryTokenRepository    persist.GalleryTokenRepository
+	historyRepository         persist.OwnershipHistoryRepository
+	accountRepository         persist.AccountRepository
+	contractRepository        persist.ContractRepository
 }
 
 // CoreInit initializes core server functionality. This is abstracted
@@ -56,17 +59,11 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	return handlersInit(router, newEthClient(), newIPFSShell())
+	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell())
 }
 
 // Init initializes the server
 func Init() {
-	// go func() {
-	// 	router := CoreInit()
-	// 	if err := router.Run(fmt.Sprintf(":%s", viper.GetString("PORT"))); err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
 	router := CoreInit()
 
 	http.Handle("/", router)
@@ -94,15 +91,18 @@ func newRepos() *repositories {
 	mgoClient := newMongoClient()
 	redisClients := newMemstoreClients()
 	return &repositories{
-		nonceRepository:      mongodb.NewNonceMongoRepository(mgoClient),
-		loginRepository:      mongodb.NewLoginMongoRepository(mgoClient),
-		collectionRepository: mongodb.NewCollectionMongoRepository(mgoClient, redisClients),
-		galleryRepository:    mongodb.NewGalleryMongoRepository(mgoClient),
-		historyRepository:    mongodb.NewHistoryMongoRepository(mgoClient),
-		tokenRepository:      mongodb.NewTokenMongoRepository(mgoClient),
-		userRepository:       mongodb.NewUserMongoRepository(mgoClient),
-		accountRepository:    mongodb.NewAccountMongoRepository(mgoClient),
-		contractRepository:   mongodb.NewContractMongoRepository(mgoClient),
+		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
+		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
+		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, redisClients),
+		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient),
+		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, redisClients),
+		galleryTokenRepository:    mongodb.NewGalleryTokenMongoRepository(mgoClient),
+		galleryRepository:         mongodb.NewGalleryMongoRepository(mgoClient),
+		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
+		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, redisClients),
+		userRepository:            mongodb.NewUserMongoRepository(mgoClient),
+		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
+		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
 	}
 }
 

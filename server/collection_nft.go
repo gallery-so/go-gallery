@@ -6,8 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	shell "github.com/ipfs/go-ipfs-api"
-	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
@@ -45,7 +43,7 @@ type collectionUpdateHiddenByIDInput struct {
 	ID     persist.DBID `json:"id" binding:"required"`
 	Hidden bool         `json:"hidden"`
 }
-type collectionUpdateNftsByIDinput struct {
+type collectionUpdateNftsByIDInput struct {
 	ID   persist.DBID   `json:"id" binding:"required"`
 	Nfts []persist.DBID `json:"nfts" binding:"required"`
 }
@@ -60,7 +58,7 @@ type collectionDeleteInput struct {
 
 // HANDLERS
 
-func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -80,17 +78,12 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository, 
 			colls = []*persist.Collection{}
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)
-		}
-
 		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
 
 	}
 }
 
-func getCollectionByID(collectionsRepository persist.CollectionRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -115,9 +108,6 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository, token
 			colls = colls[:1]
 			// TODO log that this should not be happening
 		}
-
-		coll := colls[0]
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
 		return
@@ -213,7 +203,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 
 func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &collectionUpdateNftsByIDinput{}
+		input := &collectionUpdateNftsByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
@@ -307,19 +297,4 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 
 	return collID, nil
 
-}
-
-// uniqueDBID ensures that an array of DBIDs has no repeat items
-func uniqueDBID(a []persist.DBID) []persist.DBID {
-	result := []persist.DBID{}
-	m := map[persist.DBID]bool{}
-
-	for _, val := range a {
-		if _, ok := m[val]; !ok {
-			m[val] = true
-			result = append(result, val)
-		}
-	}
-
-	return result
 }

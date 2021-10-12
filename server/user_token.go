@@ -173,7 +173,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -183,7 +183,7 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 			return
 		}
 
-		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository)
+		output, err := userCreateDbToken(c, input, userRepository, nonceRepository, galleryRepository)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -220,7 +220,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 	}
 }
 
-func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
+func removeAddressesToken(userRepository persist.UserRepository, collRepo persist.CollectionTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userRemoveAddressesInput{}
@@ -236,7 +236,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		err := removeAddressesFromUserDB(c, userID, input, userRepository, collRepo)
+		err := removeAddressesFromUserDBToken(c, userID, input, userRepository, collRepo)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -247,8 +247,8 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 	}
 }
 
-func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository) (*userCreateOutput, error) {
+func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
 
@@ -295,7 +295,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return nil, err
 	}
 
-	galleryInsert := &persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := &persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
@@ -344,8 +344,8 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	return output, nil
 }
-func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
+func removeAddressesFromUserDBToken(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+	userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
