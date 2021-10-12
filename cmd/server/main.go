@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/mikeydub/go-gallery/server"
+	_ "github.com/mikeydub/go-gallery/server"
+	"google.golang.org/appengine"
 )
 
 func main() {
-	server.Init()
+	appengine.Main()
 }

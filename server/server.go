@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -39,6 +40,15 @@ type repositories struct {
 	contractRepository        persist.ContractRepository
 }
 
+// Init initializes the server
+func init() {
+	router := CoreInit()
+
+	http.Handle("/", router)
+
+	logrus.Infof("AppEngine running in Flex: %t", appengine.IsFlex())
+}
+
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
 func CoreInit() *gin.Engine {
@@ -60,15 +70,6 @@ func CoreInit() *gin.Engine {
 	}
 
 	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell())
-}
-
-// Init initializes the server
-func Init() {
-	router := CoreInit()
-
-	http.Handle("/", router)
-
-	appengine.Main()
 }
 
 func setDefaults() {
