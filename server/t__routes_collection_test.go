@@ -341,7 +341,7 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 
 func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID, jwt string) *http.Response {
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/nfts/get_unassigned?user_id=%s&skip_cache=false", tc.serverURL, userID),
+		fmt.Sprintf("%s/nfts/unassigned/get", tc.serverURL),
 		nil)
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
