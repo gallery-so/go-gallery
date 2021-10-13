@@ -55,10 +55,6 @@ type getOwnershipHistoryOutput struct {
 	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
 }
 
-type errNoNFTsFoundWithID struct {
-	id persist.DBID
-}
-
 type errDoesNotOwnWallets struct {
 	id        persist.DBID
 	addresses []string
@@ -75,23 +71,13 @@ func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 			return
 		}
 
-		nfts, err := nftRepository.GetByID(c, input.NftID)
+		nft, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
-		if len(nfts) == 0 {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoNFTsFoundWithID{id: input.NftID}.Error(),
-			})
-			return
-		}
 
-		if len(nfts) > 1 {
-			nfts = nfts[:1]
-			// TODO log that this should not be happening
-		}
-		c.JSON(http.StatusOK, getNftByIDOutput{Nft: nfts[0]})
+		c.JSON(http.StatusOK, getNftByIDOutput{Nft: nft})
 	}
 }
 
@@ -200,10 +186,6 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
-}
-
-func (e errNoNFTsFoundWithID) Error() string {
-	return fmt.Sprintf("no nfts found with id: %s", e.id)
 }
 
 func (e errDoesNotOwnWallets) Error() string {

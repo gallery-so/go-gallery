@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -23,10 +24,16 @@ var (
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
 
+var errDocumentNotFound = errors.New("document not found")
+
 // storage represents the currently accessed collection and the version of the "schema"
 type storage struct {
 	version    int64
 	collection *mongo.Collection
+}
+
+type errNotStruct struct {
+	entity interface{}
 }
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
@@ -103,7 +110,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return &DocumentNotFoundError{}
+		return errDocumentNotFound
 	}
 
 	return nil
@@ -122,7 +129,7 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return &DocumentNotFoundError{}
+		return errDocumentNotFound
 	}
 
 	return nil
@@ -141,7 +148,7 @@ func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return &DocumentNotFoundError{}
+		return errDocumentNotFound
 	}
 
 	return nil
@@ -159,7 +166,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value bs
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return &DocumentNotFoundError{}
+		return errDocumentNotFound
 	}
 
 	return nil
@@ -251,7 +258,7 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 		val = val.Elem()
 	}
 	if val.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("%v is not a struct, is of type %T", v, v)
+		return nil, errNotStruct{v}
 	}
 	bsonMap := bson.M{}
 	for i := 0; i < val.NumField(); i++ {
@@ -298,4 +305,8 @@ func isValueEmpty(v reflect.Value) bool {
 		return v.IsNil()
 	}
 	return false
+}
+
+func (e errNotStruct) Error() string {
+	return fmt.Sprintf("%v is not a struct, is of type %T", e.entity, e.entity)
 }

@@ -19,6 +19,10 @@ type UserMongoRepository struct {
 	mp *storage
 }
 
+type errUserNotFoundByID struct {
+	id persist.DBID
+}
+
 // NewUserMongoRepository creates a new instance of the collection mongo repository
 func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
 	b := true
@@ -171,4 +175,8 @@ func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID pers
 	}
 
 	return u.mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
+}
+
+func (e errUserNotFoundByID) Error() string {
+	return fmt.Sprintf("user not found by ID: %s", e.id)
 }

@@ -2,7 +2,7 @@ package mongodb
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +21,14 @@ const (
 type TokenMongoRepository struct {
 	mp  *storage
 	nmp *storage
+}
+
+type errTokenNotFoundByIdentifiers struct {
+	tokenID, contractAddress string
+}
+
+type errTokenNotFoundByID struct {
+	id persist.DBID
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
@@ -114,7 +122,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 }
 
 // GetByNFTIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string) (*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -128,11 +136,15 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, errTokenNotFoundByIdentifiers{pTokenID, pAddress}
+	}
+
+	return result[0], nil
 }
 
 // GetByID gets tokens for a given DB ID
-func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -146,7 +158,11 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, errTokenNotFoundByID{pID}
+	}
+
+	return result[0], nil
 }
 
 // BulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
@@ -202,10 +218,18 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 		return err
 	}
 	if len(users) != 1 {
-		return errors.New("user not found")
+		return errUserNotFoundByID{pUserID}
 	}
 	user := users[0]
 
 	return t.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
 
+}
+
+func (e errTokenNotFoundByID) Error() string {
+	return fmt.Sprintf("token not found by ID: %s", e.id)
+}
+
+func (e errTokenNotFoundByIdentifiers) Error() string {
+	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.contractAddress, e.tokenID)
 }

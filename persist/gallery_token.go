@@ -47,5 +47,5 @@ type GalleryTokenRepository interface {
 	UpdateUnsafe(context.Context, DBID, *GalleryTokenUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
 	GetByUserID(context.Context, DBID, bool) ([]*GalleryToken, error)
-	GetByID(context.Context, DBID, bool) ([]*GalleryToken, error)
+	GetByID(context.Context, DBID, bool) (*GalleryToken, error)
 }

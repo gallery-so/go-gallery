@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +17,10 @@ const accountCollName = "accounts"
 // AccountMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type AccountMongoRepository struct {
 	mp *storage
+}
+
+type errAccountNotFoundByAddress struct {
+	address string
 }
 
 // NewAccountMongoRepository returns a new instance of a login attempt repository
@@ -40,7 +45,7 @@ func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress 
 }
 
 // GetByAddress returns an account by a given address
-func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress string) ([]*persist.Account, error) {
+func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress string) (*persist.Account, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -50,10 +55,17 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 
 	result := []*persist.Account{}
 	err := a.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, errAccountNotFoundByAddress{address: pAddress}
+	}
+
+	return result[0], nil
+}
+
+func (e errAccountNotFoundByAddress) Error() string {
+	return fmt.Sprintf("account not found by address: %s", e.address)
 }

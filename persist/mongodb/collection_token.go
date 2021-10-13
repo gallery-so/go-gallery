@@ -19,12 +19,22 @@ const (
 	collectionColName = "collections"
 )
 
+var errUserIDRequired = errors.New("owner user id is required")
+
 // CollectionTokenMongoRepository is a repository that stores collections in a MongoDB database
 type CollectionTokenMongoRepository struct {
 	mp           *storage
 	nmp          *storage
 	nnmp         *storage
 	redisClients *memstore.Clients
+}
+
+type errNotAllNFTsOwnedByUser struct {
+	userID persist.DBID
+}
+
+type errCollectionNotFoundByID struct {
+	id persist.DBID
 }
 
 // NewCollectionTokenMongoRepository creates a new instance of the collection mongo repository
@@ -42,14 +52,14 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 ) (persist.DBID, error) {
 
 	if pColl.OwnerUserID == "" {
-		return "", errors.New("owner_user_id is required")
+		return "", errUserIDRequired
 	}
 
 	if pColl.Nfts == nil {
 		pColl.Nfts = []persist.DBID{}
 	} else {
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
-			if _, ok := err.(*DocumentNotFoundError); !ok {
+			if err != errDocumentNotFound {
 				return "", err
 			}
 		}
@@ -65,9 +75,7 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 
 // GetByUserID will form an aggregation pipeline to get all collections owned by a user
 // and variably show hidden collections depending on the auth status of the caller
-func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID,
-	pShowHidden bool,
-) ([]*persist.CollectionToken, error) {
+func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]*persist.CollectionToken, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -91,9 +99,7 @@ func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUser
 
 // GetByID will form an aggregation pipeline to get a single collection by ID and
 // variably show hidden collections depending on the auth status of the caller
-func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID,
-	pShowHidden bool,
-) ([]*persist.CollectionToken, error) {
+func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (*persist.CollectionToken, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -110,7 +116,11 @@ func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persi
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, errCollectionNotFoundByID{pID}
+	}
+
+	return result[0], nil
 }
 
 // Update will update a single collection by ID, also ensuring that the collection is owned
@@ -141,7 +151,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return err
 	}
 	if len(users) != 1 {
-		return fmt.Errorf("user not found")
+		return errUserNotFoundByID{pUserID}
 	}
 
 	ct, err := c.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
@@ -149,11 +159,11 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return err
 	}
 	if int(ct) != len(pUpdate.Nfts) {
-		return errors.New("not all nfts are owned by the user")
+		return errNotAllNFTsOwnedByUser{pUserID}
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		if err != errDocumentNotFound {
 			return err
 		}
 	}
@@ -183,7 +193,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 ) error {
 
 	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		if err != errDocumentNotFound {
 			return err
 		}
 	}
@@ -214,7 +224,7 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		if err != errDocumentNotFound {
 			return err
 		}
 	}
@@ -224,7 +234,7 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		if err != errDocumentNotFound {
 			return err
 		}
 	}
@@ -267,7 +277,7 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, &update{}); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		if err != errDocumentNotFound {
 			return err
 		}
 	}
@@ -327,7 +337,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return nil, err
 	}
 	if len(users) != 1 {
-		return nil, fmt.Errorf("user not found")
+		return nil, errUserNotFoundByID{pUserID}
 	}
 
 	if countColls == 0 {
@@ -346,9 +356,6 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		if err := c.mp.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
 			return nil, err
 		}
-	}
-	if len(result) != 1 {
-		return nil, errors.New("multiple collections of unassigned nfts found")
 	}
 
 	toCache, err := json.Marshal(result)
@@ -440,4 +447,12 @@ func tokenToCollectionToken(nft *persist.Token) *persist.TokenInCollection {
 		Media:           nft.Media,
 		TokenMetadata:   nft.TokenMetadata,
 	}
+}
+
+func (e errNotAllNFTsOwnedByUser) Error() string {
+	return fmt.Sprintf("not all nfts owned by user: %s", e.userID)
+}
+
+func (e errCollectionNotFoundByID) Error() string {
+	return fmt.Sprintf("collection not found by id: %s", e.id)
 }

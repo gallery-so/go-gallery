@@ -22,6 +22,6 @@ type Account struct {
 
 // AccountRepository is the interface for interacting with the account persistence layer
 type AccountRepository interface {
-	GetByAddress(context.Context, string) ([]*Account, error)
+	GetByAddress(context.Context, string) (*Account, error)
 	UpsertByAddress(context.Context, string, *Account) error
 }

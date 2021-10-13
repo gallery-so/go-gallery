@@ -44,10 +44,6 @@ type updateTokenByIDInput struct {
 	CollectorsNote string       `json:"collectors_note" binding:"required"`
 }
 
-type errNoTokensFoundByID struct {
-	ID persist.DBID
-}
-
 type errCouldNotMakeMedia struct {
 	tokenID         string
 	contractAddress string
@@ -68,25 +64,14 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 			return
 		}
 
-		nfts, err := nftRepository.GetByID(c, input.NftID)
+		token, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
-		if len(nfts) == 0 {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoTokensFoundByID{ID: input.NftID}.Error(),
-			})
-			return
-		}
-
-		if len(nfts) > 1 {
-			nfts = nfts[:1]
-			// TODO log that this should not be happening
-		}
 
 		aeCtx := appengine.NewContext(c.Request)
-		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)[0]})
+		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient)[0]})
 	}
 }
 
@@ -232,10 +217,6 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 		nfts[i] = nft
 	}
 	return nfts
-}
-
-func (e errNoTokensFoundByID) Error() string {
-	return fmt.Sprintf("no tokens found for id %s", e.ID)
 }
 
 func (e errCouldNotMakeMedia) Error() string {

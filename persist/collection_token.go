@@ -73,7 +73,7 @@ type CollectionTokenUpdateDeletedInput struct {
 type CollectionTokenRepository interface {
 	Create(context.Context, *CollectionTokenDB) (DBID, error)
 	GetByUserID(context.Context, DBID, bool) ([]*CollectionToken, error)
-	GetByID(context.Context, DBID, bool) ([]*CollectionToken, error)
+	GetByID(context.Context, DBID, bool) (*CollectionToken, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateNFTs(context.Context, DBID, DBID, *CollectionTokenUpdateNftsInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error

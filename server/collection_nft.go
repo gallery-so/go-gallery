@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -99,19 +98,15 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 		}
 
 		auth := c.GetBool(authContextKey)
-		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
-		if len(colls) == 0 || err != nil {
+		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
+		if err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoCollectionsFoundWithID{id: input.ID}.Error(),
+				Error: err.Error(),
 			})
 			return
 		}
-		if len(colls) > 1 {
-			colls = colls[:1]
-			// TODO log that this should not be happening
-		}
 
-		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
+		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
 		return
 
 	}
@@ -256,19 +251,10 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 
 		err := collectionsRepository.Delete(c, input.ID, userID)
 		if err != nil {
-			switch err.(type) {
-			case *mongodb.DocumentNotFoundError:
-				c.JSON(http.StatusNotFound, util.ErrorResponse{
-					Error: err.Error(),
-				})
-				return
-
-			default:
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-					Error: err.Error(),
-				})
-				return
-			}
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+				Error: err.Error(),
+			})
+			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

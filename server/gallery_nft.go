@@ -69,19 +69,15 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
-		if len(galleries) == 0 || err != nil {
+		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
+		if err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoGalleriesFoundWithID{input.ID}.Error(),
+				Error: err.Error(),
 			})
 			return
 		}
-		if len(galleries) > 1 {
-			galleries = galleries[:1]
-			// TODO log that this should not be happening
-		}
 
-		c.JSON(http.StatusOK, galleryGetByIDOutput{Gallery: galleries[0]})
+		c.JSON(http.StatusOK, galleryGetByIDOutput{Gallery: gallery})
 		return
 
 	}

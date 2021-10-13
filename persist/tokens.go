@@ -135,8 +135,8 @@ type TokenRepository interface {
 	GetByWallet(context.Context, string) ([]*Token, error)
 	GetByUserID(context.Context, DBID) ([]*Token, error)
 	GetByContract(context.Context, string) ([]*Token, error)
-	GetByNFTIdentifiers(context.Context, string, string) ([]*Token, error)
-	GetByID(context.Context, DBID) ([]*Token, error)
+	GetByNFTIdentifiers(context.Context, string, string) (*Token, error)
+	GetByID(context.Context, DBID) (*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error

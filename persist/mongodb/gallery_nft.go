@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -50,7 +49,7 @@ func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBI
 	}
 
 	if int(ct) != len(pUpdate.Collections) {
-		return errors.New("user does not own all collections to be inserted")
+		return errUserDoesNotOwnCollections{pOwnerUserID}
 	}
 
 	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
@@ -83,8 +82,7 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool,
-) ([]*persist.Gallery, error) {
+func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (*persist.Gallery, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -97,7 +95,11 @@ func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID,
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, errGalleryNotFoundByID{pID}
+	}
+
+	return result[0], nil
 }
 
 func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {

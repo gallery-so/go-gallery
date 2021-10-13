@@ -23,6 +23,6 @@ type Contract struct {
 
 // ContractRepository represents a repository for interacting with persisted contracts
 type ContractRepository interface {
-	GetByAddress(context.Context, string) ([]*Contract, error)
+	GetByAddress(context.Context, string) (*Contract, error)
 	UpsertByAddress(pCtx context.Context, pAddress string, pUpsert *Contract) error
 }

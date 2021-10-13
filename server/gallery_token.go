@@ -82,24 +82,20 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 		}
 
 		auth := c.GetBool(authContextKey)
-		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
-		if len(galleries) == 0 || err != nil {
+		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
+		if err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoGalleriesFoundWithID{id: input.ID}.Error(),
+				Error: err.Error(),
 			})
 			return
 		}
-		if len(galleries) > 1 {
-			galleries = galleries[:1]
-			// TODO log that this should not be happening
-		}
-		gallery := galleries[0]
+
 		aeCtx := appengine.NewContext(c.Request)
 		for _, collection := range gallery.Collections {
 			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
 		}
 
-		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: galleries[0]})
+		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: gallery})
 		return
 
 	}
