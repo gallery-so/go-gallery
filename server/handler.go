@@ -2,21 +2,110 @@ package server
 
 import (
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 )
 
-func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
-
-	repos := newRepos()
+func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 
-	// AUTH_HANDLERS
-	authHandlersInit(apiGroupV1, repos, ethClient)
+	nftHandlersInit(apiGroupV1, repos, ethClient)
+	// tokenHandlersInit(apiGroupV1, repos, ethClient, ipfsClient)
+
+	return router
+}
+
+func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+
+	usersGroup := parent.Group("/users")
+
+	authGroup := parent.Group("/auth")
+
+	// AUTH
+	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
+	authGroup.GET("/jwt_valid", jwtOptional(), validateJwt())
+
+	// USER
+
+	usersGroup.POST("/login", login(repos.userRepository, repos.nonceRepository, repos.loginRepository))
+	usersGroup.POST("/update/info", jwtRequired(), updateUserInfo(repos.userRepository, ethClient))
+	usersGroup.POST("/update/addresses/add", jwtRequired(), addUserAddress(repos.userRepository, repos.nonceRepository))
+	usersGroup.POST("/update/addresses/remove", jwtRequired(), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
+	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
+	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository))
+
+}
+
+func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+
+	usersGroup := parent.Group("/users")
+
+	authGroup := parent.Group("/auth")
+
+	// AUTH
+	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
+	authGroup.GET("/jwt_valid", jwtOptional(), validateJwt())
+
+	// USER
+
+	usersGroup.POST("/login", login(repos.userRepository, repos.nonceRepository, repos.loginRepository))
+	usersGroup.POST("/update/info", jwtRequired(), updateUserInfo(repos.userRepository, ethClient))
+	usersGroup.POST("/update/addresses/add", jwtRequired(), addUserAddress(repos.userRepository, repos.nonceRepository))
+	usersGroup.POST("/update/addresses/remove", jwtRequired(), removeAddresses(repos.userRepository, repos.collectionRepository))
+	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
+	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository))
+
+}
+
+func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) {
+
+	// AUTH
+
+	authHandlersInitToken(parent, repos, ethClient)
 
 	// GALLERIES
 
-	galleriesGroup := apiGroupV1.Group("/galleries")
+	galleriesGroup := parent.Group("/galleries")
+
+	galleriesGroup.GET("/get", jwtOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient))
+	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient))
+	galleriesGroup.POST("/update", jwtRequired(), updateGalleryToken(repos.galleryTokenRepository))
+
+	// COLLECTIONS
+
+	collectionsGroup := parent.Group("/collections")
+
+	collectionsGroup.GET("/get", jwtOptional(), getCollectionByIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
+	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
+	collectionsGroup.POST("/create", jwtRequired(), createCollectionToken(repos.collectionTokenRepository, repos.galleryTokenRepository))
+	collectionsGroup.POST("/delete", jwtRequired(), deleteCollectionToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/info", jwtRequired(), updateCollectionInfoToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/hidden", jwtRequired(), updateCollectionHiddenToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionTokensToken(repos.collectionTokenRepository))
+
+	// NFTS
+
+	nftsGroup := parent.Group("/nfts")
+
+	nftsGroup.GET("/get", jwtOptional(), getTokenByID(repos.tokenRepository, ipfsClient))
+	nftsGroup.GET("/user_get", jwtOptional(), getTokensForUser(repos.tokenRepository, ipfsClient))
+	nftsGroup.POST("/update", jwtRequired(), updateTokenByID(repos.tokenRepository))
+	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
+
+	parent.GET("/health", healthcheck())
+
+}
+
+func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+
+	// AUTH
+
+	authHandlersInitNFT(parent, repos, ethClient)
+
+	// GALLERIES
+
+	galleriesGroup := parent.Group("/galleries")
 
 	galleriesGroup.GET("/get", jwtOptional(), getGalleryByID(repos.galleryRepository))
 	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserID(repos.galleryRepository))
@@ -24,7 +113,7 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	// COLLECTIONS
 
-	collectionsGroup := apiGroupV1.Group("/collections")
+	collectionsGroup := parent.Group("/collections")
 
 	collectionsGroup.GET("/get", jwtOptional(), getCollectionByID(repos.collectionRepository))
 	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserID(repos.collectionRepository))
@@ -36,7 +125,7 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 
 	// NFTS
 
-	nftsGroup := apiGroupV1.Group("/nfts")
+	nftsGroup := parent.Group("/nfts")
 
 	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.nftRepository))
 	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.nftRepository))
@@ -44,51 +133,6 @@ func handlersInit(router *gin.Engine, ethClient *eth.Client) *gin.Engine {
 	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/get_unassigned", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
 
-	// HEALTH
-	apiGroupV1.GET("/health", healthcheck())
-
-	return router
-}
-
-func authHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
-
-	usersGroup := parent.Group("/users")
-
-	authGroup := parent.Group("/auth")
-
-	// AUTH_GET_PREFLIGHT
-	// UN-AUTHENTICATED
-
-	// called before login/sugnup calls, mostly to get nonce and also discover if user exists.
-
-	// [GET] /glry/v1/auth/get_preflight?address=:walletAddress
-	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
-
-	// AUTH VALIDATE_JWT
-
-	// [GET] /glry/v1/auth/jwt_valid
-	authGroup.GET("/jwt_valid", jwtOptional(), validateJwt())
-
-	// AUTH_USER_LOGIN
-	// UN-AUTHENTICATED
-
-	usersGroup.POST("/login", login(repos.userRepository, repos.nonceRepository, repos.loginRepository))
-
-	// USER_UPDATE
-	// AUTHENTICATED
-
-	usersGroup.POST("/update/info", jwtRequired(), updateUserInfo(repos.userRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", jwtRequired(), addUserAddress(repos.userRepository, repos.nonceRepository))
-	usersGroup.POST("/update/addresses/remove", jwtRequired(), removeAddresses(repos.userRepository, repos.collectionRepository))
-
-	// USER_GET
-	// AUTHENTICATED/UN-AUTHENTICATED
-
-	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
-
-	// USER_CREATE
-	// UN-AUTHENTICATED
-
-	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository))
+	parent.GET("/health", healthcheck())
 
 }

@@ -1,12 +1,12 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type galleryGetByUserIDInput struct {
@@ -38,7 +38,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 
 		input := &galleryGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -62,7 +62,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 
 		input := &galleryGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -71,8 +71,8 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 		auth := c.GetBool(authContextKey)
 		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
 		if len(galleries) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{
-				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
+			c.JSON(http.StatusNotFound, util.ErrorResponse{
+				Error: errNoGalleriesFoundWithID{input.ID}.Error(),
 			})
 			return
 		}
@@ -91,13 +91,13 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -105,10 +105,10 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

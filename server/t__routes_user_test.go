@@ -159,7 +159,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	errResp := &errorResponse{}
+	errResp := &util.ErrorResponse{}
 	err = util.UnmarshallBody(errResp, resp.Body)
 	assert.Nil(err)
 	assert.Empty(errResp.Error)
@@ -243,7 +243,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	resp := userRemoveAddressesRequest(assert, update, jwt)
 	assertValidJSONResponse(assert, resp)
 
-	errResp := &errorResponse{}
+	errResp := &util.ErrorResponse{}
 	util.UnmarshallBody(errResp, resp.Body)
 	assert.Empty(errResp.Error)
 

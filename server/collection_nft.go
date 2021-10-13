@@ -2,14 +2,17 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
+	"github.com/mikeydub/go-gallery/util"
 )
+
+var errTooManyNFTsInCollection = errors.New("maximum of 1000 NFTs in a collection")
 
 type collectionGetByUserIDInput struct {
 	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
@@ -42,7 +45,7 @@ type collectionUpdateHiddenByIDInput struct {
 	ID     persist.DBID `json:"id" binding:"required"`
 	Hidden bool         `json:"hidden"`
 }
-type collectionUpdateNftsByIDinput struct {
+type collectionUpdateNftsByIDInput struct {
 	ID   persist.DBID   `json:"id" binding:"required"`
 	Nfts []persist.DBID `json:"nfts" binding:"required"`
 }
@@ -64,7 +67,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 
 		input := &collectionGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -89,7 +92,7 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 
 		input := &collectionGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -98,8 +101,8 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 		auth := c.GetBool(authContextKey)
 		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if len(colls) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{
-				Error: fmt.Sprintf("no collections found with id: %s", input.ID),
+			c.JSON(http.StatusNotFound, util.ErrorResponse{
+				Error: errNoCollectionsFoundWithID{id: input.ID}.Error(),
 			})
 			return
 		}
@@ -121,7 +124,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -129,7 +132,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -138,7 +141,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		id, err := collectionCreateDb(c, input, userID, collectionsRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -152,13 +155,13 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 	return func(c *gin.Context) {
 		input := &collectionUpdateInfoByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -166,11 +169,11 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -178,13 +181,13 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 	return func(c *gin.Context) {
 		input := &collectionUpdateHiddenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -192,31 +195,31 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
 func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &collectionUpdateNftsByIDinput{}
+		input := &collectionUpdateNftsByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		// TODO magic number
 		if len(input.Nfts) > 1000 {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "collections can have no more than 100 NFTs"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errTooManyNFTsInCollection.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -227,11 +230,11 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gi
 
 		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -239,7 +242,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 	return func(c *gin.Context) {
 		input := &collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -247,7 +250,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -255,20 +258,20 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 		if err != nil {
 			switch err.(type) {
 			case *mongodb.DocumentNotFoundError:
-				c.JSON(http.StatusNotFound, errorResponse{
+				c.JSON(http.StatusNotFound, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
 
 			default:
-				c.JSON(http.StatusInternalServerError, errorResponse{
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
 					Error: err.Error(),
 				})
 				return
 			}
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -296,19 +299,4 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 
 	return collID, nil
 
-}
-
-// uniqueDBID ensures that an array of DBIDs has no repeat items
-func uniqueDBID(a []persist.DBID) []persist.DBID {
-	result := []persist.DBID{}
-	m := map[persist.DBID]bool{}
-
-	for _, val := range a {
-		if _, ok := m[val]; !ok {
-			m[val] = true
-			result = append(result, val)
-		}
-	}
-
-	return result
 }

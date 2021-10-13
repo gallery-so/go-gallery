@@ -1,6 +1,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -19,17 +21,25 @@ const (
 
 var rateLimiter = NewIPRateLimiter(1, 5)
 
+var errInvalidJWT = errors.New("invalid JWT")
+
+var errRateLimited = errors.New("rate limited")
+
+type errUserDoesNotHaveRequiredNFT struct {
+	userID persist.DBID
+}
+
 func jwtRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: copy.InvalidAuthHeader})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 				return
 			}
 			// get string after "Bearer"
@@ -38,18 +48,18 @@ func jwtRequired() gin.HandlerFunc {
 			// database that is unique to every user and session
 			valid, userID, err := authJwtParse(jwt, viper.GetString("JWT_SECRET"))
 			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 
 			if !valid {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid jwt"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidJWT.Error()})
 				return
 			}
 
 			c.Set(userIDcontextKey, userID)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: copy.InvalidAuthHeader})
 			return
 		}
 		c.Next()
@@ -83,7 +93,7 @@ func rateLimited() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limiter := rateLimiter.GetLimiter(c.ClientIP())
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorResponse{Error: "rate limited"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errRateLimited.Error()})
 			return
 		}
 		c.Next()
@@ -96,7 +106,7 @@ func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, to
 		if userID != "" {
 			user, err := userRepository.GetByID(c, userID)
 			if err != nil {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 			has := false
@@ -107,11 +117,11 @@ func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, to
 				}
 			}
 			if !has {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "user does not have required NFT"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{userID}.Error()})
 				return
 			}
 		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, errorResponse{Error: "user must be authenticated"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 		c.Next()
@@ -142,4 +152,8 @@ func handleCORS() gin.HandlerFunc {
 
 func getUserIDfromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(userIDcontextKey).(persist.DBID)
+}
+
+func (e errUserDoesNotHaveRequiredNFT) Error() string {
+	return fmt.Sprintf("user %s does not have required NFT", e.userID)
 }

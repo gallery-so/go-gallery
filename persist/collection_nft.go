@@ -7,10 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const (
-	collectionColName = "collections"
-)
-
 // CollectionDB is the struct that represents a collection of NFTs in the database
 // CollectionDB will not store the NFTs by value but instead by ID creating a join relationship
 // between collections and NFTS

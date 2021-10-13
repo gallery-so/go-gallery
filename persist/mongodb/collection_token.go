@@ -19,26 +19,26 @@ const (
 	collectionColName = "collections"
 )
 
-// CollectionMongoRepository is a repository that stores collections in a MongoDB database
-type CollectionMongoRepository struct {
+// CollectionTokenMongoRepository is a repository that stores collections in a MongoDB database
+type CollectionTokenMongoRepository struct {
 	mp           *storage
 	nmp          *storage
 	nnmp         *storage
 	redisClients *memstore.Clients
 }
 
-// NewCollectionMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *CollectionMongoRepository {
-	return &CollectionMongoRepository{
+// NewCollectionTokenMongoRepository creates a new instance of the collection mongo repository
+func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *CollectionTokenMongoRepository {
+	return &CollectionTokenMongoRepository{
 		mp:           newStorage(mgoClient, 0, galleryDBName, collectionColName),
-		nmp:          newStorage(mgoClient, 0, galleryDBName, nftColName),
+		nmp:          newStorage(mgoClient, 0, galleryDBName, tokenColName),
 		nnmp:         newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		redisClients: redisClients,
 	}
 }
 
 // Create inserts a single CollectionDB into the database and will return the ID of the inserted document
-func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.CollectionDB,
+func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *persist.CollectionTokenDB,
 ) (persist.DBID, error) {
 
 	if pColl.OwnerUserID == "" {
@@ -65,9 +65,9 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 
 // GetByUserID will form an aggregation pipeline to get all collections owned by a user
 // and variably show hidden collections depending on the auth status of the caller
-func (c *CollectionMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID,
+func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID,
 	pShowHidden bool,
-) ([]*persist.Collection, error) {
+) ([]*persist.CollectionToken, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -75,14 +75,14 @@ func (c *CollectionMongoRepository) GetByUserID(pCtx context.Context, pUserID pe
 		opts.SetMaxTime(dur)
 	}
 
-	result := []*persist.Collection{}
+	result := []*persist.CollectionToken{}
 
 	fil := bson.M{"owner_user_id": pUserID, "deleted": false}
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
 
-	if err := c.mp.aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
+	if err := c.mp.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -91,22 +91,22 @@ func (c *CollectionMongoRepository) GetByUserID(pCtx context.Context, pUserID pe
 
 // GetByID will form an aggregation pipeline to get a single collection by ID and
 // variably show hidden collections depending on the auth status of the caller
-func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DBID,
+func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID,
 	pShowHidden bool,
-) ([]*persist.Collection, error) {
+) ([]*persist.CollectionToken, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
 
-	result := []*persist.Collection{}
+	result := []*persist.CollectionToken{}
 
 	fil := bson.M{"_id": pID, "deleted": false}
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
-	if err := c.mp.aggregate(pCtx, newCollectionPipeline(fil), &result, opts); err != nil {
+	if err := c.mp.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -116,7 +116,7 @@ func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DB
 // Update will update a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 // pUpdate will be a struct with bson tags that represent the fields to be updated
-func (c *CollectionMongoRepository) Update(pCtx context.Context, pIDstr persist.DBID,
+func (c *CollectionTokenMongoRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 	pUserID persist.DBID,
 	pUpdate interface{},
 ) error {
@@ -130,9 +130,9 @@ func (c *CollectionMongoRepository) Update(pCtx context.Context, pIDstr persist.
 // by a given authorized user as well as that no other collection contains the NFTs
 // being included in the updated collection. This is to ensure that the NFTs are not
 // being shared between collections.
-func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID,
+func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID,
 	pUserID persist.DBID,
-	pUpdate *persist.CollectionUpdateNftsInput,
+	pUpdate *persist.CollectionTokenUpdateNftsInput,
 ) error {
 
 	users := []*persist.User{}
@@ -165,18 +165,44 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
+// UpdateUnsafe will update a single collection by ID
+// pUpdate will be a struct with bson tags that represent the fields to be updated
+func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
+	pUpdate interface{},
+) error {
+
+	return c.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+}
+
+// UpdateNFTsUnsafe will update a collections NFTs ensuring that
+// no other collection contains the NFTs being included in the updated collection.
+// This is to ensure that the NFTs are not
+// being shared between collections.
+func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID,
+	pUpdate *persist.CollectionTokenUpdateNftsInput,
+) error {
+
+	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+		if _, ok := err.(*DocumentNotFoundError); !ok {
+			return err
+		}
+	}
+
+	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+}
+
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
-func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
+func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	pUserID persist.DBID,
 	pWalletAddresses []string,
-	pUpdate *persist.CollectionUpdateNftsInput,
+	pUpdate *persist.CollectionTokenUpdateNftsInput,
 ) error {
 
 	for i, addr := range pWalletAddresses {
 		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.Token{}
 
 	if err := c.nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -212,7 +238,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 
 // RemoveNFTsOfAddresses will remove all NFTs from a user's collections that are associated with
 // an array of addresses
-func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
+func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 	pUserID persist.DBID,
 	pAddresses []string,
 ) error {
@@ -221,7 +247,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 		pAddresses[i] = strings.ToLower(addr)
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.Token{}
 
 	if err := c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -255,11 +281,11 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 
 // Delete will delete a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
-func (c *CollectionMongoRepository) Delete(pCtx context.Context, pIDstr persist.DBID,
+func (c *CollectionTokenMongoRepository) Delete(pCtx context.Context, pIDstr persist.DBID,
 	pUserID persist.DBID,
 ) error {
 
-	update := &persist.CollectionUpdateDeletedInput{Deleted: true}
+	update := &persist.CollectionTokenUpdateDeletedInput{Deleted: true}
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
@@ -270,7 +296,7 @@ func (c *CollectionMongoRepository) Delete(pCtx context.Context, pIDstr persist.
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
-func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID, skipCache bool) (*persist.Collection, error) {
+func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID, skipCache bool) (*persist.CollectionToken, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -278,7 +304,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		opts.SetMaxTime(dur)
 	}
 
-	result := []*persist.Collection{}
+	result := []*persist.CollectionToken{}
 
 	if !skipCache {
 		if cachedResult, err := c.redisClients.Get(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
@@ -305,19 +331,19 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 	}
 
 	if countColls == 0 {
-		nfts := []*persist.NFT{}
+		nfts := []*persist.Token{}
 		err = c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
 		if err != nil {
 			return nil, err
 		}
-		collNfts := []*persist.CollectionNFT{}
+		collNfts := []*persist.TokenInCollection{}
 		for _, nft := range nfts {
-			collNfts = append(collNfts, nftToCollectionNft(nft))
+			collNfts = append(collNfts, tokenToCollectionToken(nft))
 		}
 
-		result = []*persist.Collection{{Nfts: collNfts}}
+		result = []*persist.CollectionToken{{Nfts: collNfts}}
 	} else {
-		if err := c.mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
+		if err := c.mp.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
 			return nil, err
 		}
 	}
@@ -338,7 +364,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 }
 
-func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []string) mongo.Pipeline {
+func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []string) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},
@@ -354,7 +380,7 @@ func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []str
 			},
 		}}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "nfts",
+			"from": "tokens",
 			"let":  bson.M{"array": "$nfts"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
@@ -373,12 +399,12 @@ func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []str
 
 }
 
-func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
+func newCollectionTokenPipeline(matchFilter bson.M) mongo.Pipeline {
 
 	return mongo.Pipeline{
 		{{Key: "$match", Value: matchFilter}},
 		{{Key: "$lookup", Value: bson.M{
-			"from": "nfts",
+			"from": "tokens",
 			"let":  bson.M{"array": "$nfts"},
 			"pipeline": mongo.Pipeline{
 				{{Key: "$match", Value: bson.M{
@@ -402,15 +428,16 @@ func newCollectionPipeline(matchFilter bson.M) mongo.Pipeline {
 	}
 }
 
-func nftToCollectionNft(nft *persist.NFT) *persist.CollectionNFT {
-	return &persist.CollectionNFT{
-		ID:                nft.ID,
-		Name:              nft.Name,
-		CreationTime:      nft.CreationTime,
-		ImageURL:          nft.ImageURL,
-		ImageThumbnailURL: nft.ImageThumbnailURL,
-		ImagePreviewURL:   nft.ImagePreviewURL,
-		OwnerAddress:      nft.OwnerAddress,
-		MultipleOwners:    nft.MultipleOwners,
+func tokenToCollectionToken(nft *persist.Token) *persist.TokenInCollection {
+	return &persist.TokenInCollection{
+		ID:              nft.ID,
+		Name:            nft.Name,
+		CreationTime:    nft.CreationTime,
+		ContractAddress: nft.ContractAddress,
+		OwnerAddress:    nft.OwnerAddress,
+		Chain:           nft.Chain,
+		Description:     nft.Description,
+		Media:           nft.Media,
+		TokenMetadata:   nft.TokenMetadata,
 	}
 }

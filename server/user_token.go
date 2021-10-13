@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var bannedUsernames = map[string]bool{
@@ -94,26 +96,43 @@ type userAddAddressOutput struct {
 	SignatureValid bool `json:"signature_valid"`
 }
 
+type errUserNotFound struct {
+	userID   persist.DBID
+	address  string
+	username string
+}
+
+type errNonceNotFound struct {
+	address string
+}
+type errUserExistsWithAddress struct {
+	address string
+}
+
+var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
+var errMustResolveENS = errors.New("one of user's addresses must resolve to ENS to set ENS as username")
+var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
+
 func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
 		if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
 			user, err := userRepository.GetByID(c, userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 				return
 			}
 			can := false
@@ -124,7 +143,7 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 				}
 			}
 			if !can {
-				c.JSON(http.StatusBadRequest, errorResponse{Error: "one of user's addresses must resolve to ENS to set ENS as username"})
+				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errMustResolveENS.Error()})
 				return
 			}
 		}
@@ -139,11 +158,11 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 			},
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
@@ -153,7 +172,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -163,7 +182,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 			userRepository,
 		)
 		if err != nil {
-			c.JSON(http.StatusNotFound, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -172,19 +191,19 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository)
+		output, err := userCreateDbToken(c, input, userRepository, nonceRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -198,19 +217,19 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
 		output, err := addAddressToUserDB(c, userID, input, userRepository, nonceRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -219,44 +238,44 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 	}
 }
 
-func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
+func removeAddressesToken(userRepository persist.UserRepository, collRepo persist.CollectionTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userRemoveAddressesInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
-		err := removeAddressesFromUserDB(c, userID, input, userRepository, collRepo)
+		err := removeAddressesFromUserDBToken(c, userID, input, userRepository, collRepo)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, successOutput{Success: true})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
 	}
 }
 
-func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository) (*userCreateOutput, error) {
+func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errors.New("nonce not found for address")
+		return nil, errNonceNotFound{address: pInput.Address}
 	}
 	if id != "" {
-		return nil, errors.New("user already exists with a given address")
+		return nil, errUserExistsWithAddress{address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
@@ -294,7 +313,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return nil, err
 	}
 
-	galleryInsert := &persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := &persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
@@ -313,10 +332,10 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	nonceValueStr, userID, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errors.New("nonce not found for address")
+		return nil, errNonceNotFound{pInput.Address}
 	}
 	if userID != "" {
-		return nil, errors.New("user already exists with a given address")
+		return nil, errUserExistsWithAddress{pInput.Address}
 	}
 
 	dataStr := nonceValueStr
@@ -343,8 +362,8 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 
 	return output, nil
 }
-func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
+func removeAddressesFromUserDBToken(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
+	userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -352,7 +371,7 @@ func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInpu
 	}
 
 	if len(user.Addresses) < len(pInput.Addresses) {
-		return errors.New("user does not have enough addresses to remove")
+		return errUserCannotRemoveAllAddresses
 	}
 
 	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
@@ -391,7 +410,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 	}
 
 	if user == nil {
-		return nil, errors.New("no user found")
+		return nil, errUserNotFound{pInput.UserID, pInput.Address, pInput.Username}
 	}
 
 	output := &userGetOutput{
@@ -418,7 +437,7 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	if nonce != nil {
 		nonceValue = nonce.Value
 	} else {
-		return nonceValue, userID, errors.New("no nonce found")
+		return nonceValue, userID, errNonceNotFound{pAddress}
 	}
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
@@ -428,8 +447,20 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	if user != nil {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, errors.New("no user found")
+		return nonceValue, userID, errUserNotFound{address: pAddress}
 	}
 
 	return nonceValue, userID, nil
+}
+
+func (e errUserNotFound) Error() string {
+	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.address, e.userID, e.username)
+}
+
+func (e errNonceNotFound) Error() string {
+	return fmt.Sprintf("nonce not found for address: %s", e.address)
+}
+
+func (e errUserExistsWithAddress) Error() string {
+	return fmt.Sprintf("user already exists with address: %s", e.address)
 }

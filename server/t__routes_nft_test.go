@@ -47,7 +47,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 	assert.Nil(err)
 	assertErrorResponse(assert, resp)
 
-	body := errorResponse{}
+	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.NftIDQueryNotProvided, body.Error)
 }
@@ -61,7 +61,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 	assert.Nil(err)
 	assertErrorResponse(assert, resp)
 
-	body := errorResponse{}
+	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(fmt.Sprintf("no nfts found with id: %s", nonexistentNftID), body.Error)
 }
@@ -113,7 +113,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	resp := updateNFTUnauthedRequest(assert, update)
 	assertErrorResponse(assert, resp)
 
-	body := errorResponse{}
+	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.InvalidAuthHeader, body.Error)
 }
@@ -125,7 +125,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
 
-	body := errorResponse{}
+	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.NotEmpty(body.Error)
 }
@@ -138,7 +138,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
 
-	body := errorResponse{}
+	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Equal(copy.CouldNotFindDocument, body.Error)
 }

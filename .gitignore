@@ -4,6 +4,9 @@
 # Misc
 .DS_Store
 *.csv
+.env
+
+stats.json
 
 node_modules/
 yarn.lock

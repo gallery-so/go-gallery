@@ -14,18 +14,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
-// INPUT - USER_LOGIN
+var errAddressSignatureMismatch = errors.New("address does not match signature")
+
 type authUserLoginInput struct {
 	Signature string `json:"signature" binding:"required,medium_string"`
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
-// OUTPUT - USER_LOGIN
 type authUserLoginOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"`
@@ -33,18 +34,18 @@ type authUserLoginOutput struct {
 	Address        string       `json:"address"`
 }
 
-// INPUT - USER_GET_PREFLIGHT
 type authUserGetPreflightInput struct {
 	Address string `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
-// OUTPUT - USER_GET_PREFLIGHT
 type authUserGetPreflightOutput struct {
 	Nonce      string `json:"nonce"`
 	UserExists bool   `json:"user_exists"`
 }
 
-// HANDLERS
+type errAddressDoesNotOwnRequiredNFT struct {
+	address string
+}
 
 func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -52,7 +53,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 		input := &authUserGetPreflightInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -60,8 +61,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
-			// TODO log specific error and return user friendly error message instead
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -73,7 +73,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -86,7 +86,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			authLoginRepository,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, errorResponse{Error: err.Error()})
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 
@@ -94,9 +94,6 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	}
 }
 
-// NONCE
-
-// NONCE_GENERATE
 func generateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonceInt := seededRand.Int()
@@ -104,13 +101,10 @@ func generateNonce() string {
 	return nonceStr
 }
 
-// LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLoginInput,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	loginRepo persist.LoginAttemptRepository) (*authUserLoginOutput, error) {
 
-	//------------------
-	// LOGIN
 	output, err := authUserLoginPipeline(pCtx, pInput, userRepo, nonceRepo)
 	if err != nil {
 		return nil, err
@@ -200,8 +194,6 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 	return validBool, nil
 }
 
-// VERIFY_SIGNATURE
-
 func authVerifySignature(pSignatureStr string,
 	pDataStr string,
 	pAddress string,
@@ -244,7 +236,7 @@ func authVerifySignature(pSignatureStr string,
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
 	if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
-		return false, errors.New("address does not match signature")
+		return false, errAddressSignatureMismatch
 	}
 
 	publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
@@ -276,7 +268,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 				return nil, err
 			}
 			if !hasNFT {
-				return nil, errors.New("user does not own required NFT to signup")
+				return nil, errAddressDoesNotOwnRequiredNFT{pInput.Address}
 			}
 		}
 
@@ -314,4 +306,8 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 		return err
 	}
 	return nil
+}
+
+func (e errAddressDoesNotOwnRequiredNFT) Error() string {
+	return fmt.Sprintf("address %s does not own required NFT", e.address)
 }

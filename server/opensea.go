@@ -29,12 +29,12 @@ type openseaAsset struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 
-	ExternalURL      string            `json:"external_link"`
-	TokenMetadataURL string            `json:"token_metadata_url"`
-	Creator          openseaAccount    `json:"creator"`
-	Owner            openseaAccount    `json:"owner"`
-	Contract         persist.Contract  `json:"asset_contract"`
-	Collection       openseaCollection `json:"collection"`
+	ExternalURL      string              `json:"external_link"`
+	TokenMetadataURL string              `json:"token_metadata_url"`
+	Creator          openseaAccount      `json:"creator"`
+	Owner            openseaAccount      `json:"owner"`
+	Contract         persist.NftContract `json:"asset_contract"`
+	Collection       openseaCollection   `json:"collection"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
@@ -72,6 +72,15 @@ type openseaUser struct {
 
 type openseaCollection struct {
 	Name string `json:"name"`
+}
+
+type errNoNFTForTokenIdentifiers struct {
+	tokenID         string
+	contractAddress string
+}
+
+type errNoSingleNFTForOpenseaID struct {
+	openseaID int
 }
 
 func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []string, skipCache bool,
@@ -190,7 +199,7 @@ func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, p
 		return nil, err
 	}
 	if len(nfts) == 0 {
-		return nil, fmt.Errorf("no NFT found for token id %s and contract address %s", pTokenID, pTokenContractAddress)
+		return nil, errNoNFTForTokenIdentifiers{pTokenID, pTokenContractAddress}
 	}
 	nft := nfts[0]
 
@@ -334,7 +343,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NFTDB, pUser *persis
 					return
 				}
 				if len(dbNFT) == 0 {
-					errChan <- fmt.Errorf("unable to find a single nft with opensea id %d", n.OpenseaID)
+					errChan <- errNoSingleNFTForOpenseaID{n.OpenseaID}
 					return
 				}
 				result.ID = dbNFT[0].ID
@@ -409,4 +418,12 @@ func openseaToGalleryEvents(pCtx context.Context, pEvents *openseaEvents, userRe
 		return ownershipHistory.Owners[i].TimeObtained.After(ownershipHistory.Owners[j].TimeObtained)
 	})
 	return ownershipHistory, nil
+}
+
+func (e errNoNFTForTokenIdentifiers) Error() string {
+	return fmt.Sprintf("no NFT found for token id %s and contract address %s", e.tokenID, e.contractAddress)
+}
+
+func (e errNoSingleNFTForOpenseaID) Error() string {
+	return fmt.Sprintf("no single NFT found for opensea id %d", e.openseaID)
 }

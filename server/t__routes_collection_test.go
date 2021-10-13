@@ -288,11 +288,11 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	nftIDs[1] = nftIDs[2]
 	nftIDs[2] = temp
 
-	update := collectionUpdateNftsByIDinput{ID: collID, Nfts: nftIDs}
+	update := collectionUpdateNftsByIDInput{ID: collID, Nfts: nftIDs}
 	resp := updateCollectionNftsRequest(assert, update, tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
-	errResp := errorResponse{}
+	errResp := util.ErrorResponse{}
 	util.UnmarshallBody(&errResp, resp.Body)
 	assert.Empty(errResp.Error)
 
@@ -401,7 +401,7 @@ func updateCollectionInfoRequest(assert *assert.Assertions, input collectionUpda
 	assert.Nil(err)
 	return resp
 }
-func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpdateNftsByIDinput, jwt string) *http.Response {
+func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpdateNftsByIDInput, jwt string) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 

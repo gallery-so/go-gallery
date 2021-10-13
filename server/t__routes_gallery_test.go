@@ -42,7 +42,7 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 		initialCollectionOrder[1],
 		initialCollectionOrder[0],
 	}
-	update := galleryUpdateInput{Collections: updatedCollectionOrder, ID: id}
+	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
 	updateTestGallery(assert, update)
 
 	// Validate the updated order of the gallery's collections
@@ -56,7 +56,7 @@ func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
-	body := galleryGetOutput{}
+	body := galleryTokenGetOutput{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Galleries, 1)
 	retreivedCollections := body.Galleries[0].Collections

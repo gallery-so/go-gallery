@@ -11,8 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const galleryColName = "galleries"
-
 // GalleryMongoRepository is a repository that stores collections in a MongoDB database
 type GalleryMongoRepository struct {
 	mp  *storage
