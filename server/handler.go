@@ -92,7 +92,7 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	nftsGroup.GET("/user_get", jwtOptional(), getTokensForUser(repos.tokenRepository, ipfsClient))
 	nftsGroup.POST("/update", jwtRequired(), updateTokenByID(repos.tokenRepository))
 	nftsGroup.GET("/unassigned/get", jwtRequired(), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
-	nftsGroup.GET("/unassigned/refresh", jwtRequired(), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
+	nftsGroup.POST("/unassigned/refresh", jwtRequired(), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	parent.GET("/health", healthcheck())
 
@@ -133,7 +133,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.GET("/opensea_get", rateLimited(), jwtRequired(), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
 	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/unassigned/get", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
-	nftsGroup.GET("/unassigned/refresh", jwtRequired(), refreshUnassignedNftsForUser(repos.collectionRepository))
+	nftsGroup.POST("/unassigned/refresh", jwtRequired(), refreshUnassignedNftsForUser(repos.collectionRepository))
 
 	parent.GET("/health", healthcheck())
 
