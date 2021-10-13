@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -82,4 +83,13 @@ type CollectionTokenRepository interface {
 	RemoveNFTsOfAddresses(context.Context, DBID, []string) error
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID, bool) (*CollectionToken, error)
+}
+
+// ErrCollectionNotFoundByID is returned when a collection is not found by ID
+type ErrCollectionNotFoundByID struct {
+	ID DBID
+}
+
+func (e ErrCollectionNotFoundByID) Error() string {
+	return fmt.Sprintf("collection not found by id: %s", e.ID)
 }

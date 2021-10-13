@@ -45,7 +45,7 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 		pColl.Nfts = []persist.DBID{}
 	} else {
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
-			if err != errDocumentNotFound {
+			if err != ErrDocumentNotFound {
 				return "", err
 			}
 		}
@@ -105,7 +105,7 @@ func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DB
 	}
 
 	if len(result) != 1 {
-		return nil, errCollectionNotFoundByID{pID}
+		return nil, persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -151,7 +151,7 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -186,7 +186,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -196,7 +196,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -239,7 +239,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, &update{}); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}

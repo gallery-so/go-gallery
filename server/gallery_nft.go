@@ -38,9 +38,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 
 		input := &galleryGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -62,16 +60,18 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 
 		input := &galleryGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		auth := c.GetBool(authContextKey)
 		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
 		if err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrGalleryNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			c.JSON(status, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -87,13 +87,13 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -101,7 +101,7 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

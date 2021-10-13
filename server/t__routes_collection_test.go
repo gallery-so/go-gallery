@@ -159,7 +159,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 	verifyCollectionExistsInDbForID(assert, collID)
 
 	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
-	assert.Equal(404, resp.StatusCode)
+	assert.Equal(500, resp.StatusCode)
 }
 
 func TestGetHiddenCollections_Success(t *testing.T) {

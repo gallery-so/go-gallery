@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -24,4 +25,13 @@ type Account struct {
 type AccountRepository interface {
 	GetByAddress(context.Context, string) (*Account, error)
 	UpsertByAddress(context.Context, string, *Account) error
+}
+
+// ErrAccountNotFoundByAddress is an error that occurs when an account is not found by an address
+type ErrAccountNotFoundByAddress struct {
+	Address string
+}
+
+func (e ErrAccountNotFoundByAddress) Error() string {
+	return fmt.Sprintf("account not found by address: %s", e.Address)
 }

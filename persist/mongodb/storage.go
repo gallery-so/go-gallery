@@ -24,7 +24,8 @@ var (
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
 
-var errDocumentNotFound = errors.New("document not found")
+// ErrDocumentNotFound represents when a document is not found in the database for an update operation
+var ErrDocumentNotFound = errors.New("document not found")
 
 // storage represents the currently accessed collection and the version of the "schema"
 type storage struct {
@@ -110,7 +111,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errDocumentNotFound
+		return ErrDocumentNotFound
 	}
 
 	return nil
@@ -129,7 +130,7 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errDocumentNotFound
+		return ErrDocumentNotFound
 	}
 
 	return nil
@@ -148,7 +149,7 @@ func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errDocumentNotFound
+		return ErrDocumentNotFound
 	}
 
 	return nil
@@ -166,7 +167,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value bs
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errDocumentNotFound
+		return ErrDocumentNotFound
 	}
 
 	return nil

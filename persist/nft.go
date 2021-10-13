@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -146,4 +147,22 @@ type NFTRepository interface {
 	BulkUpsert(context.Context, []*NFTDB) ([]DBID, error)
 	OpenseaCacheGet(context.Context, []string) ([]*NFT, error)
 	OpenseaCacheSet(context.Context, []string, []*NFT) error
+}
+
+// ErrNFTNotFoundByID is an error that occurs when an NFT is not found by its ID
+type ErrNFTNotFoundByID struct {
+	ID DBID
+}
+
+// ErrNFTNotFoundByContractData is an error that occurs when an NFT is not found by its contract data (token ID and contract address)
+type ErrNFTNotFoundByContractData struct {
+	TokenID, ContractAddress string
+}
+
+func (e ErrNFTNotFoundByID) Error() string {
+	return fmt.Sprintf("could not find NFT with ID: %v", e.ID)
+}
+
+func (e ErrNFTNotFoundByContractData) Error() string {
+	return fmt.Sprintf("could not find NFT with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }

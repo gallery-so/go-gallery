@@ -25,14 +25,6 @@ type NFTMongoRepository struct {
 	redisClients *memstore.Clients
 }
 
-type errNFTNotFoundByID struct {
-	id persist.DBID
-}
-
-type errNFTNotFoundByContractData struct {
-	tokenID, contractAddress string
-}
-
 // NewNFTMongoRepository creates a new instance of the collection mongo repository
 func NewNFTMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *NFTMongoRepository {
 	return &NFTMongoRepository{
@@ -82,7 +74,7 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 		return nil, err
 	}
 	if len(users) != 1 {
-		return nil, errUserNotFoundByID{pUserID}
+		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	return n.GetByAddresses(pCtx, users[0].Addresses)
@@ -120,7 +112,7 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 	}
 
 	if len(result) != 1 {
-		return nil, errNFTNotFoundByID{pID}
+		return nil, persist.ErrNFTNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -140,7 +132,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 	}
 
 	if len(result) != 1 {
-		return nil, errNFTNotFoundByContractData{pTokenID, pContractAddress}
+		return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 
 	return result[0], nil
@@ -174,7 +166,7 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 		return err
 	}
 	if len(users) != 1 {
-		return errUserNotFoundByID{pUserID}
+		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	return n.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": users[0].Addresses}}, pUpdate)
@@ -286,12 +278,4 @@ func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {
 		// 	"as": "owner_users",
 		// }}},
 	}
-}
-
-func (e errNFTNotFoundByID) Error() string {
-	return fmt.Sprintf("could not find NFT with ID: %v", e.id)
-}
-
-func (e errNFTNotFoundByContractData) Error() string {
-	return fmt.Sprintf("could not find NFT with contract address %v and token ID %v", e.contractAddress, e.tokenID)
 }

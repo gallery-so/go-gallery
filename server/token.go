@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/appengine"
@@ -58,15 +58,17 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 		input := &getTokensByIDInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: copy.NftIDQueryNotProvided,
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		token, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrTokenNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -80,15 +82,13 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateTokenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -96,11 +96,11 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
-			if err.Error() == copy.CouldNotFindDocument {
+			if err == mongodb.ErrDocumentNotFound {
 				c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -112,7 +112,7 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 	return func(c *gin.Context) {
 		input := &getTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID)
@@ -130,13 +130,13 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 	return func(c *gin.Context) {
 		input := &getUnassignedTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)

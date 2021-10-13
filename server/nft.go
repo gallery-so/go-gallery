@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -65,15 +65,17 @@ func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 		input := &getNftsByIDInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: copy.NftIDQueryNotProvided,
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		nft, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrNFTNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -86,15 +88,13 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateNftByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -102,11 +102,11 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
-			if err.Error() == copy.CouldNotFindDocument {
-				c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
-				return
+			status := http.StatusInternalServerError
+			if err == mongodb.ErrDocumentNotFound {
+				status = http.StatusNotFound
 			}
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -118,7 +118,7 @@ func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID)
@@ -134,13 +134,13 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 	return func(c *gin.Context) {
 		input := &getUnassignedNFTByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
@@ -156,13 +156,13 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 	return func(c *gin.Context) {
 		input := &getOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -170,11 +170,11 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 		if len(addresses) > 0 {
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
 			if !ownsWallet {
-				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errDoesNotOwnWallets{userID, addresses}.Error()})
+				util.ErrResponse(c, http.StatusBadRequest, errDoesNotOwnWallets{userID, addresses})
 				return
 			}
 		}

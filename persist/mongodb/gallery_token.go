@@ -23,10 +23,6 @@ type errUserDoesNotOwnCollections struct {
 	userID persist.DBID
 }
 
-type errGalleryNotFoundByID struct {
-	id persist.DBID
-}
-
 // NewGalleryTokenMongoRepository creates a new instance of the collection mongo repository
 func NewGalleryTokenMongoRepository(mgoClient *mongo.Client) *GalleryTokenMongoRepository {
 	return &GalleryTokenMongoRepository{
@@ -116,7 +112,7 @@ func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.
 	}
 
 	if len(result) != 1 {
-		return nil, errGalleryNotFoundByID{pID}
+		return nil, persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -162,8 +158,4 @@ func newGalleryTokenPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
 
 func (e errUserDoesNotOwnCollections) Error() string {
 	return fmt.Sprintf("user with ID %v does not own all collections to be inserted", e.userID)
-}
-
-func (e errGalleryNotFoundByID) Error() string {
-	return fmt.Sprintf("gallery not found with ID: %v", e.id)
 }

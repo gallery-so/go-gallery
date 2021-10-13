@@ -119,20 +119,20 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 		input := &userUpdateInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
 		if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
 			user, err := userRepository.GetByID(c, userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
 			can := false
@@ -158,7 +158,7 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 			},
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -172,7 +172,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 		input := &userGetInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -182,7 +182,12 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 			userRepository,
 		)
 		if err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
+			status := http.StatusInternalServerError
+			switch err.(type) {
+			case persist.ErrUserNotFoundByAddress, persist.ErrUserNotFoundByID, persist.ErrUserNotFoundByUsername:
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -197,13 +202,13 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		output, err := userCreateDbToken(c, input, userRepository, nonceRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -217,19 +222,19 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
 		output, err := addAddressToUserDB(c, userID, input, userRepository, nonceRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -244,19 +249,19 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 		input := &userRemoveAddressesInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
 		err := removeAddressesFromUserDBToken(c, userID, input, userRepository, collRepo)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

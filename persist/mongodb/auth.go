@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -25,10 +24,6 @@ type LoginMongoRepository struct {
 // NonceMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type NonceMongoRepository struct {
 	mp *storage
-}
-
-type errNoNonceFound struct {
-	address string
 }
 
 // NewLoginMongoRepository returns a new instance of a login attempt repository
@@ -66,7 +61,7 @@ func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress string) (*pers
 	}
 
 	if len(result) == 0 {
-		return nil, errNoNonceFound{pAddress}
+		return nil, persist.ErrNonceNotFoundForAddress{Address: pAddress}
 	}
 
 	return result[0], nil
@@ -76,8 +71,4 @@ func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress string) (*pers
 func (n *NonceMongoRepository) Create(pCtx context.Context, pNonce *persist.UserNonce) error {
 	_, err := n.mp.insert(pCtx, pNonce)
 	return err
-}
-
-func (e errNoNonceFound) Error() string {
-	return fmt.Sprintf("no nonce found for address: %v", e.address)
 }

@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -37,4 +38,31 @@ type UserRepository interface {
 	Delete(context.Context, DBID) error
 	AddAddresses(context.Context, DBID, []string) error
 	RemoveAddresses(context.Context, DBID, []string) error
+}
+
+// ErrUserNotFoundByID is returned when a user is not found by ID
+type ErrUserNotFoundByID struct {
+	ID DBID
+}
+
+// ErrUserNotFoundByUsername is returned when a user is not found by username
+type ErrUserNotFoundByUsername struct {
+	Username string
+}
+
+// ErrUserNotFoundByAddress is returned when a user is not found by wallet address
+type ErrUserNotFoundByAddress struct {
+	Address string
+}
+
+func (e ErrUserNotFoundByID) Error() string {
+	return fmt.Sprintf("user not found by ID: %s", e.ID)
+}
+
+func (e ErrUserNotFoundByAddress) Error() string {
+	return fmt.Sprintf("user not found by address: %s", e.Address)
+}
+
+func (e ErrUserNotFoundByUsername) Error() string {
+	return fmt.Sprintf("user not found by username: %s", e.Username)
 }

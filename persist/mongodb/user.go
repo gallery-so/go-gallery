@@ -19,10 +19,6 @@ type UserMongoRepository struct {
 	mp *storage
 }
 
-type errUserNotFoundByID struct {
-	id persist.DBID
-}
-
 // NewUserMongoRepository creates a new instance of the collection mongo repository
 func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
 	b := true
@@ -94,11 +90,8 @@ func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID,
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
-	}
-	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByID{ID: userID}
 	}
 
 	return result[0], nil
@@ -121,11 +114,8 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress string
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
-	}
-	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByAddress{Address: pAddress}
 	}
 
 	return result[0], nil
@@ -148,11 +138,8 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
-	}
-	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByUsername{Username: pUsername}
 	}
 
 	return result[0], nil
@@ -175,8 +162,4 @@ func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID pers
 	}
 
 	return u.mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
-}
-
-func (e errUserNotFoundByID) Error() string {
-	return fmt.Sprintf("user not found by ID: %s", e.id)
 }

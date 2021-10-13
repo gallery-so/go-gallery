@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -17,10 +16,6 @@ const accountCollName = "accounts"
 // AccountMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type AccountMongoRepository struct {
 	mp *storage
-}
-
-type errAccountNotFoundByAddress struct {
-	address string
 }
 
 // NewAccountMongoRepository returns a new instance of a login attempt repository
@@ -60,12 +55,8 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 	}
 
 	if len(result) != 1 {
-		return nil, errAccountNotFoundByAddress{address: pAddress}
+		return nil, persist.ErrAccountNotFoundByAddress{Address: pAddress}
 	}
 
 	return result[0], nil
-}
-
-func (e errAccountNotFoundByAddress) Error() string {
-	return fmt.Sprintf("account not found by address: %s", e.address)
 }

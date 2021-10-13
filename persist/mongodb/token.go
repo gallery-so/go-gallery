@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -21,14 +20,6 @@ const (
 type TokenMongoRepository struct {
 	mp  *storage
 	nmp *storage
-}
-
-type errTokenNotFoundByIdentifiers struct {
-	tokenID, contractAddress string
-}
-
-type errTokenNotFoundByID struct {
-	id persist.DBID
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
@@ -137,7 +128,7 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 	}
 
 	if len(result) != 1 {
-		return nil, errTokenNotFoundByIdentifiers{pTokenID, pAddress}
+		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pAddress}
 	}
 
 	return result[0], nil
@@ -159,7 +150,7 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 	}
 
 	if len(result) != 1 {
-		return nil, errTokenNotFoundByID{pID}
+		return nil, persist.ErrTokenNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -218,18 +209,10 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 		return err
 	}
 	if len(users) != 1 {
-		return errUserNotFoundByID{pUserID}
+		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 	user := users[0]
 
 	return t.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
 
-}
-
-func (e errTokenNotFoundByID) Error() string {
-	return fmt.Sprintf("token not found by ID: %s", e.id)
-}
-
-func (e errTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.contractAddress, e.tokenID)
 }

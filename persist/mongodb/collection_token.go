@@ -33,10 +33,6 @@ type errNotAllNFTsOwnedByUser struct {
 	userID persist.DBID
 }
 
-type errCollectionNotFoundByID struct {
-	id persist.DBID
-}
-
 // NewCollectionTokenMongoRepository creates a new instance of the collection mongo repository
 func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *CollectionTokenMongoRepository {
 	return &CollectionTokenMongoRepository{
@@ -59,7 +55,7 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 		pColl.Nfts = []persist.DBID{}
 	} else {
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
-			if err != errDocumentNotFound {
+			if err != ErrDocumentNotFound {
 				return "", err
 			}
 		}
@@ -117,7 +113,7 @@ func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persi
 	}
 
 	if len(result) != 1 {
-		return nil, errCollectionNotFoundByID{pID}
+		return nil, persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -151,7 +147,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return err
 	}
 	if len(users) != 1 {
-		return errUserNotFoundByID{pUserID}
+		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	ct, err := c.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
@@ -163,7 +159,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -193,7 +189,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 ) error {
 
 	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -224,7 +220,7 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -234,7 +230,7 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -277,7 +273,7 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 	}
 
 	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, &update{}); err != nil {
-		if err != errDocumentNotFound {
+		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
@@ -337,7 +333,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return nil, err
 	}
 	if len(users) != 1 {
-		return nil, errUserNotFoundByID{pUserID}
+		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	if countColls == 0 {
@@ -451,8 +447,4 @@ func tokenToCollectionToken(nft *persist.Token) *persist.TokenInCollection {
 
 func (e errNotAllNFTsOwnedByUser) Error() string {
 	return fmt.Sprintf("not all nfts owned by user: %s", e.userID)
-}
-
-func (e errCollectionNotFoundByID) Error() string {
-	return fmt.Sprintf("collection not found by id: %s", e.id)
 }

@@ -96,7 +96,7 @@ func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID,
 	}
 
 	if len(result) != 1 {
-		return nil, errGalleryNotFoundByID{pID}
+		return nil, persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil

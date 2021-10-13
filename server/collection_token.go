@@ -73,9 +73,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 
 		input := &collectionGetByUserIDInputToken{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -103,16 +101,18 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 
 		input := &collectionGetByIDInputToken{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		auth := c.GetBool(authContextKey)
 		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrCollectionNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			c.JSON(status, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
@@ -131,15 +131,13 @@ func createCollectionToken(collectionsRepository persist.CollectionTokenReposito
 
 		input := &collectionCreateInputToken{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -162,13 +160,13 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 	return func(c *gin.Context) {
 		input := &collectionUpdateInfoByIDInputToken{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -176,7 +174,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -188,13 +186,13 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 	return func(c *gin.Context) {
 		input := &collectionUpdateHiddenByIDInputToken{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -202,7 +200,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -214,7 +212,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 	return func(c *gin.Context) {
 		input := &collectionUpdateNftsByIDInputToken{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -226,7 +224,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -237,7 +235,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 
 		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -249,15 +247,13 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 	return func(c *gin.Context) {
 		input := &collectionDeleteInputToken{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 

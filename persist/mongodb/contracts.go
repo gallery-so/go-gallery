@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -17,10 +16,6 @@ const contractsCollName = "contracts"
 // ContractMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type ContractMongoRepository struct {
 	mp *storage
-}
-
-type errContractNotFoundByAddress struct {
-	address string
 }
 
 // NewContractMongoRepository returns a new instance of a login attempt repository
@@ -61,12 +56,8 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress st
 	}
 
 	if len(result) != 0 {
-		return nil, errContractNotFoundByAddress{pAddress}
+		return nil, persist.ErrContractNotFoundByAddress{Address: pAddress}
 	}
 
 	return result[0], nil
-}
-
-func (e errContractNotFoundByAddress) Error() string {
-	return fmt.Sprintf("contract not found by address: %s", e.address)
 }
