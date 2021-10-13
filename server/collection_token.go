@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+var errTooManyTokensInCollection = errors.New("a collection can have no more than 1000 tokens")
 
 type collectionGetByUserIDInputToken struct {
 	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
@@ -56,6 +59,10 @@ type collectionCreateOutputToken struct {
 
 type collectionDeleteInputToken struct {
 	ID persist.DBID `json:"id" binding:"required"`
+}
+
+type errNoCollectionsFoundWithID struct {
+	id persist.DBID
 }
 
 // HANDLERS
@@ -107,7 +114,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if len(colls) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no collections found with id: %s", input.ID),
+				Error: errNoCollectionsFoundWithID{id: input.ID}.Error(),
 			})
 			return
 		}
@@ -138,7 +145,7 @@ func createCollectionToken(collectionsRepository persist.CollectionTokenReposito
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -167,7 +174,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -193,7 +200,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -219,13 +226,13 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 
 		// TODO magic number
 		if len(input.Nfts) > 1000 {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "collections can have no more than 100 NFTs"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errTooManyTokensInCollection.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -256,7 +263,7 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -320,4 +327,8 @@ func uniqueDBID(a []persist.DBID) []persist.DBID {
 	}
 
 	return result
+}
+
+func (e errNoCollectionsFoundWithID) Error() string {
+	return fmt.Sprintf("no collections found with ID %s", e.id)
 }

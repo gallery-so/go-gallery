@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +11,8 @@ import (
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+var errTooManyNFTsInCollection = errors.New("maximum of 1000 NFTs in a collection")
 
 type collectionGetByUserIDInput struct {
 	UserID persist.DBID `form:"user_id" json:"user_id" binding:"required"`
@@ -100,7 +102,7 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if len(colls) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no collections found with id: %s", input.ID),
+				Error: errNoCollectionsFoundWithID{id: input.ID}.Error(),
 			})
 			return
 		}
@@ -130,7 +132,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -159,7 +161,7 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -185,7 +187,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -211,13 +213,13 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gi
 
 		// TODO magic number
 		if len(input.Nfts) > 1000 {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "collections can have no more than 100 NFTs"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errTooManyNFTsInCollection.Error()})
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -248,7 +250,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 

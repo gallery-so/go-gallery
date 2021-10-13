@@ -55,6 +55,15 @@ type getOwnershipHistoryOutput struct {
 	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
 }
 
+type errNoNFTsFoundWithID struct {
+	id persist.DBID
+}
+
+type errDoesNotOwnWallets struct {
+	id        persist.DBID
+	addresses []string
+}
+
 func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getNftsByIDInput{}
@@ -73,7 +82,7 @@ func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 		}
 		if len(nfts) == 0 {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
+				Error: errNoNFTsFoundWithID{id: input.NftID}.Error(),
 			})
 			return
 		}
@@ -99,7 +108,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -145,7 +154,7 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
@@ -167,7 +176,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -179,7 +188,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 				return
 			}
 			if !ownsWallet {
-				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user does not own wallet"})
+				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errDoesNotOwnWallets{userID, addresses}.Error()})
 				return
 			}
 		}
@@ -191,4 +200,12 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
 	}
+}
+
+func (e errNoNFTsFoundWithID) Error() string {
+	return fmt.Sprintf("no nfts found with id: %s", e.id)
+}
+
+func (e errDoesNotOwnWallets) Error() string {
+	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.id, e.addresses)
 }

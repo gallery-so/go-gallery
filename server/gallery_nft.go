@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -73,7 +72,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
 		if len(galleries) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
+				Error: errNoGalleriesFoundWithID{input.ID}.Error(),
 			})
 			return
 		}
@@ -98,7 +97,7 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 

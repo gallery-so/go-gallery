@@ -28,19 +28,33 @@ import (
 	appimage "google.golang.org/appengine/image"
 )
 
+var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
+
+type errTooManyTokensForIdentifiers struct {
+	tokenID, contractAddress string
+}
+
+type errUnsupportedURL struct {
+	url string
+}
+
+type errUnsupportedMediaType struct {
+	mediaType persist.MediaType
+}
+
 func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
 	tokens, err := tokenRepo.GetByNFTIdentifiers(pCtx, tokenID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
 	if len(tokens) > 1 {
-		return nil, errors.New("too many tokens returned for one token ID and contract address")
+		return nil, errTooManyTokensForIdentifiers{tokenID, contractAddress}
 	}
 
 	token := tokens[0]
 
-	if token.Media.PreviewURL != "" && token.Media.ThumbnailURL != "" {
-		return nil, errors.New("token already has preview and thumbnail URLs")
+	if token.Media.PreviewURL != "" && token.Media.ThumbnailURL != "" && token.Media.MediaURL != "" {
+		return nil, errAlreadyHasMedia
 	}
 	metadata := token.TokenMetadata
 	return makePreviewsForMetadata(pCtx, metadata, contractAddress, tokenID, token.TokenURI, ipfsClient)
@@ -126,11 +140,11 @@ func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) er
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	if _, err := sw.Write(img); err != nil {
-		return fmt.Errorf("Could not write file: %v", err)
+		return err
 	}
 
 	if err := sw.Close(); err != nil {
-		return fmt.Errorf("Could not put file: %v", err)
+		return err
 	}
 	return nil
 }
@@ -187,7 +201,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return "", err
 		}
 	} else {
-		return "", errors.New("unsupported url")
+		return "", errUnsupportedURL{url}
 	}
 
 	contentType := persist.SniffMediaType(buf.Bytes())
@@ -246,7 +260,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
-		return "", errors.New("unsupported media type")
+		return "", errUnsupportedMediaType{contentType}
 	}
 
 }
@@ -275,4 +289,16 @@ func scaleVideo(pCtx context.Context, inFileName string, w, h float64) ([]byte, 
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (e errTooManyTokensForIdentifiers) Error() string {
+	return fmt.Sprintf("only one token should be returned for contract address %s and token ID %s", e.contractAddress, e.tokenID)
+}
+
+func (e errUnsupportedURL) Error() string {
+	return fmt.Sprintf("unsupported url %s", e.url)
+}
+
+func (e errUnsupportedMediaType) Error() string {
+	return fmt.Sprintf("unsupported media type %s", e.mediaType)
 }

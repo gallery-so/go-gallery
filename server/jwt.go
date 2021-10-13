@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
@@ -49,7 +48,7 @@ func authJwtParse(pJWTtokenStr string,
 	}
 
 	if !JWTtoken.Valid {
-		return false, "", errors.New("JWT token is invalid")
+		return false, "", errInvalidJWT
 	}
 
 	return true, claims.UserID, nil

@@ -97,19 +97,19 @@ type userAddAddressOutput struct {
 }
 
 type errUserNotFound struct {
-	UserID   persist.DBID
-	Address  string
-	Username string
+	userID   persist.DBID
+	address  string
+	username string
 }
 
 type errNonceNotFound struct {
-	Address string
+	address string
 }
 type errUserExistsWithAddress struct {
-	Address string
+	address string
 }
 
-var errUserIDNotInCtx = errors.New("user id not found in context")
+var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
 var errMustResolveENS = errors.New("one of user's addresses must resolve to ENS to set ENS as username")
 var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
 
@@ -272,10 +272,10 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errNonceNotFound{Address: pInput.Address}
+		return nil, errNonceNotFound{address: pInput.Address}
 	}
 	if id != "" {
-		return nil, errUserExistsWithAddress{Address: pInput.Address}
+		return nil, errUserExistsWithAddress{address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
@@ -447,20 +447,20 @@ func getUserWithNonce(pCtx context.Context, pAddress string,
 	if user != nil {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, errUserNotFound{Address: pAddress}
+		return nonceValue, userID, errUserNotFound{address: pAddress}
 	}
 
 	return nonceValue, userID, nil
 }
 
 func (e errUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.Address, e.UserID, e.Username)
+	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.address, e.userID, e.username)
 }
 
 func (e errNonceNotFound) Error() string {
-	return fmt.Sprintf("nonce not found for address: %s", e.Address)
+	return fmt.Sprintf("nonce not found for address: %s", e.address)
 }
 
 func (e errUserExistsWithAddress) Error() string {
-	return fmt.Sprintf("user already exists with address: %s", e.Address)
+	return fmt.Sprintf("user already exists with address: %s", e.address)
 }

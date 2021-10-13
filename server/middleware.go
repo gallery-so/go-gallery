@@ -1,6 +1,8 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,6 +20,14 @@ const (
 )
 
 var rateLimiter = NewIPRateLimiter(1, 5)
+
+var errInvalidJWT = errors.New("invalid JWT")
+
+var errRateLimited = errors.New("rate limited")
+
+type errUserDoesNotHaveRequiredNFT struct {
+	userID persist.DBID
+}
 
 func jwtRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -43,7 +53,7 @@ func jwtRequired() gin.HandlerFunc {
 			}
 
 			if !valid {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid jwt"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidJWT.Error()})
 				return
 			}
 
@@ -83,7 +93,7 @@ func rateLimited() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limiter := rateLimiter.GetLimiter(c.ClientIP())
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: "rate limited"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errRateLimited.Error()})
 			return
 		}
 		c.Next()
@@ -107,11 +117,11 @@ func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, to
 				}
 			}
 			if !has {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "user does not have required NFT"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{userID}.Error()})
 				return
 			}
 		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "user must be authenticated"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 		c.Next()
@@ -142,4 +152,8 @@ func handleCORS() gin.HandlerFunc {
 
 func getUserIDfromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(userIDcontextKey).(persist.DBID)
+}
+
+func (e errUserDoesNotHaveRequiredNFT) Error() string {
+	return fmt.Sprintf("user %s does not have required NFT", e.userID)
 }

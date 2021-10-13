@@ -20,6 +20,8 @@ import (
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
+var errAddressSignatureMismatch = errors.New("address does not match signature")
+
 // INPUT - USER_LOGIN
 type authUserLoginInput struct {
 	Signature string `json:"signature" binding:"required,medium_string"`
@@ -43,6 +45,10 @@ type authUserGetPreflightInput struct {
 type authUserGetPreflightOutput struct {
 	Nonce      string `json:"nonce"`
 	UserExists bool   `json:"user_exists"`
+}
+
+type errAddressDoesNotOwnRequiredNFT struct {
+	address string
 }
 
 // HANDLERS
@@ -244,7 +250,7 @@ func authVerifySignature(pSignatureStr string,
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
 	if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
-		return false, errors.New("address does not match signature")
+		return false, errAddressSignatureMismatch
 	}
 
 	publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
@@ -276,7 +282,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 				return nil, err
 			}
 			if !hasNFT {
-				return nil, errors.New("user does not own required NFT to signup")
+				return nil, errAddressDoesNotOwnRequiredNFT{pInput.Address}
 			}
 		}
 
@@ -314,4 +320,8 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 		return err
 	}
 	return nil
+}
+
+func (e errAddressDoesNotOwnRequiredNFT) Error() string {
+	return fmt.Sprintf("address %s does not own required NFT", e.address)
 }

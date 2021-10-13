@@ -44,6 +44,19 @@ type updateTokenByIDInput struct {
 	CollectorsNote string       `json:"collectors_note" binding:"required"`
 }
 
+type errNoTokensFoundByID struct {
+	ID persist.DBID
+}
+
+type errCouldNotMakeMedia struct {
+	tokenID         string
+	contractAddress string
+}
+
+type errCouldNotUpdateMedia struct {
+	id persist.DBID
+}
+
 func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensByIDInput{}
@@ -57,13 +70,12 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 
 		nfts, err := nftRepository.GetByID(c, input.NftID)
 		if err != nil {
-			logrus.WithError(err).Error("could not get nft by id")
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
 		if len(nfts) == 0 {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no nfts found with id: %s", input.NftID),
+				Error: errNoTokensFoundByID{ID: input.NftID}.Error(),
 			})
 			return
 		}
@@ -91,7 +103,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -139,7 +151,7 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
@@ -205,11 +217,11 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 					go func() {
 						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
 						if err != nil {
-							logrus.WithError(err).Error("could not update media for nft")
+							logrus.WithError(err).Error(errCouldNotUpdateMedia{n.ID}.Error())
 						}
 					}()
 				} else {
-					logrus.WithError(err).Error("could not make media for nft")
+					logrus.WithError(err).Error(errCouldNotMakeMedia{n.TokenID, n.ContractAddress}.Error())
 				}
 			}
 			nftChan <- n
@@ -220,4 +232,16 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 		nfts[i] = nft
 	}
 	return nfts
+}
+
+func (e errNoTokensFoundByID) Error() string {
+	return fmt.Sprintf("no tokens found for id %s", e.ID)
+}
+
+func (e errCouldNotMakeMedia) Error() string {
+	return fmt.Sprintf("could not make media for token with address: %s at TokenID: %s", e.contractAddress, e.tokenID)
+}
+
+func (e errCouldNotUpdateMedia) Error() string {
+	return fmt.Sprintf("could not update media for token with ID: %s", e.id)
 }

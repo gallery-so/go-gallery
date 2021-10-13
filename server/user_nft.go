@@ -68,7 +68,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return nil, errNonceNotFound{pInput.Address}
 	}
 	if id != "" {
-		return nil, errUserExistsWithAddress{Address: pInput.Address}
+		return nil, errUserExistsWithAddress{address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,

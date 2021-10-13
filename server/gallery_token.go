@@ -32,6 +32,10 @@ type galleryTokenGetOutput struct {
 	Galleries []*persist.GalleryToken `json:"galleries"`
 }
 
+type errNoGalleriesFoundWithID struct {
+	id persist.DBID
+}
+
 // HANDLERS
 
 func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
@@ -81,7 +85,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
 		if len(galleries) == 0 || err != nil {
 			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: fmt.Sprintf("no galleries found with id: %s", input.ID),
+				Error: errNoGalleriesFoundWithID{id: input.ID}.Error(),
 			})
 			return
 		}
@@ -111,7 +115,7 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: "user id not found in context"})
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 
@@ -125,4 +129,8 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func (e errNoGalleriesFoundWithID) Error() string {
+	return fmt.Sprintf("no galleries found with id: %s", e.id)
 }
