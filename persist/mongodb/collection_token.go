@@ -296,7 +296,7 @@ func (c *CollectionTokenMongoRepository) Delete(pCtx context.Context, pIDstr per
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
-func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID, skipCache bool) (*persist.CollectionToken, error) {
+func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (*persist.CollectionToken, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -306,14 +306,12 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 	result := []*persist.CollectionToken{}
 
-	if !skipCache {
-		if cachedResult, err := c.redisClients.Get(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
-			err = json.Unmarshal([]byte(cachedResult), &result)
-			if err != nil {
-				return nil, err
-			}
-			return result[0], nil
+	if cachedResult, err := c.redisClients.Get(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err == nil && cachedResult != "" {
+		err = json.Unmarshal([]byte(cachedResult), &result)
+		if err != nil {
+			return nil, err
 		}
+		return result[0], nil
 	}
 
 	countColls, err := c.mp.count(pCtx, bson.M{"owner_user_id": pUserID})
@@ -362,6 +360,12 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 	return result[0], nil
 
+}
+
+// RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
+// assigned to any collection
+func (c *CollectionTokenMongoRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
+	return c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID))
 }
 
 func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []string) mongo.Pipeline {

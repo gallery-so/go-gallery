@@ -23,10 +23,6 @@ type getTokensByUserIDInput struct {
 	Page   int          `json:"page" form:"page"`
 }
 
-type getUnassignedTokensByUserIDInput struct {
-	SkipCache bool `json:"skip_cache" form:"skip_cache"`
-}
-
 type getTokensOutput struct {
 	Nfts []*persist.Token `json:"nfts"`
 }
@@ -143,18 +139,13 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getUnassignedTokensByUserIDInput{}
-		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
-			return
-		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
-		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
+		coll, err := collectionRepository.GetUnassigned(c, userID)
 		if coll == nil || err != nil {
 			coll = &persist.CollectionToken{Nfts: []*persist.TokenInCollection{}}
 		}
@@ -162,6 +153,23 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 		aeCtx := appengine.NewContext(c.Request)
 
 		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)})
+	}
+}
+
+func refreshUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			return
+		}
+		if err := collectionRepository.RefreshUnassigned(c, userID); err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 
