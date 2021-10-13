@@ -22,13 +22,11 @@ const noncePrepend = "Gallery uses this cryptographic signature in place of a pa
 
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
-// INPUT - USER_LOGIN
 type authUserLoginInput struct {
 	Signature string `json:"signature" binding:"required,medium_string"`
 	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
-// OUTPUT - USER_LOGIN
 type authUserLoginOutput struct {
 	SignatureValid bool         `json:"signature_valid"`
 	JWTtoken       string       `json:"jwt_token"`
@@ -36,12 +34,10 @@ type authUserLoginOutput struct {
 	Address        string       `json:"address"`
 }
 
-// INPUT - USER_GET_PREFLIGHT
 type authUserGetPreflightInput struct {
 	Address string `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
-// OUTPUT - USER_GET_PREFLIGHT
 type authUserGetPreflightOutput struct {
 	Nonce      string `json:"nonce"`
 	UserExists bool   `json:"user_exists"`
@@ -50,8 +46,6 @@ type authUserGetPreflightOutput struct {
 type errAddressDoesNotOwnRequiredNFT struct {
 	address string
 }
-
-// HANDLERS
 
 func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -100,9 +94,6 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	}
 }
 
-// NONCE
-
-// NONCE_GENERATE
 func generateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonceInt := seededRand.Int()
@@ -110,13 +101,10 @@ func generateNonce() string {
 	return nonceStr
 }
 
-// LOGIN_AND_MEMORIZE_ATTEMPT__PIPELINE
 func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLoginInput,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	loginRepo persist.LoginAttemptRepository) (*authUserLoginOutput, error) {
 
-	//------------------
-	// LOGIN
 	output, err := authUserLoginPipeline(pCtx, pInput, userRepo, nonceRepo)
 	if err != nil {
 		return nil, err
@@ -205,8 +193,6 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 
 	return validBool, nil
 }
-
-// VERIFY_SIGNATURE
 
 func authVerifySignature(pSignatureStr string,
 	pDataStr string,
