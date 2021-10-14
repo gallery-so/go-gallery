@@ -182,6 +182,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 				errs <- errOwnerAddressRequired
 				return
 			}
+			nft.OwnerAddress = strings.ToLower(nft.OwnerAddress)
 			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err

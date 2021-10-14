@@ -188,8 +188,12 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := strings.Split(input.WalletAddresses, ",")
-		if len(addresses) > 0 {
+		addresses := []string{}
+		if input.WalletAddresses != "" {
+			addresses = []string{input.WalletAddresses}
+			if strings.Contains(input.WalletAddresses, ",") {
+				addresses = strings.Split(input.WalletAddresses, ",")
+			}
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})

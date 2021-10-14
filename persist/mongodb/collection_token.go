@@ -208,31 +208,33 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 		return err
 	}
 
-	idsToPull := make([]persist.DBID, len(nftsToBeRemoved))
-	for i, nft := range nftsToBeRemoved {
-		idsToPull[i] = nft.ID
-	}
+	if len(nftsToBeRemoved) > 0 {
 
-	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+		idsToPull := make([]persist.DBID, len(nftsToBeRemoved))
+		for i, nft := range nftsToBeRemoved {
+			idsToPull[i] = nft.ID
+		}
+
+		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
+			if _, ok := err.(*DocumentNotFoundError); !ok {
+				return err
+			}
+		}
+
+		type update struct {
+			OwnerAddress string `bson:"owner_address"`
+		}
+
+		if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
+			if _, ok := err.(*DocumentNotFoundError); !ok {
+				return err
+			}
+		}
+
+		if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 			return err
 		}
 	}
-
-	type update struct {
-		OwnerAddress string `bson:"owner_address"`
-	}
-
-	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
-			return err
-		}
-	}
-
-	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
-		return err
-	}
-
 	return nil
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -169,6 +170,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 ) error {
 
 	for i, addr := range pWalletAddresses {
+		logrus.Infof("claiming for address: %s", pWalletAddresses[i])
 		pWalletAddresses[i] = strings.ToLower(addr)
 	}
 
@@ -178,29 +180,35 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 		return err
 	}
 
-	idsToPull := make([]persist.DBID, len(nftsToBeRemoved))
-	for i, nft := range nftsToBeRemoved {
-		idsToPull[i] = nft.ID
+	for _, nft := range nftsToBeRemoved {
+		logrus.Infof("removing nft: %+v", *nft)
 	}
 
-	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
+	if len(nftsToBeRemoved) > 0 {
+		idsToPull := make([]persist.DBID, len(nftsToBeRemoved))
+		for i, nft := range nftsToBeRemoved {
+			idsToPull[i] = nft.ID
+		}
+
+		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
+			if _, ok := err.(*DocumentNotFoundError); !ok {
+				return err
+			}
+		}
+
+		type update struct {
+			OwnerAddress string `bson:"owner_address"`
+		}
+
+		if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
+			if _, ok := err.(*DocumentNotFoundError); !ok {
+				return err
+			}
+		}
+
+		if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 			return err
 		}
-	}
-
-	type update struct {
-		OwnerAddress string `bson:"owner_address"`
-	}
-
-	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}, &update{}); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
-			return err
-		}
-	}
-
-	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
-		return err
 	}
 
 	return nil
