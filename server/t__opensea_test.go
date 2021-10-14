@@ -112,8 +112,6 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	assert.Greater(len(nftsByUserThree), 0)
 
-	assert.NotNil(nftsByUser[0].OwnershipHistory)
-
 }
 
 func TestOpenseaRateLimit_Failure(t *testing.T) {
