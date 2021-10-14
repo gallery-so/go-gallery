@@ -121,7 +121,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
-	statsFile, err := os.Open(statsFileName)
+	statsFile, err := os.OpenFile(statsFileName, os.O_RDWR|os.O_APPEND, os.ModeAppend)
 	startingBlock := uint64(defaultERC721Block)
 	if err == nil {
 		decoder := json.NewDecoder(statsFile)
@@ -178,7 +178,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
-	defer i.statsFile.Close()
+
 	i.state = 1
 	go i.processLogs()
 	go i.processTransfers()
@@ -270,7 +270,7 @@ func (i *Indexer) processTokens() {
 
 	go func() {
 		for {
-			<-time.After(time.Second * 25)
+			<-time.After(time.Second * 10)
 			mu.Lock()
 			i.tokens <- i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
 			mu.Unlock()
@@ -363,11 +363,14 @@ func (i *Indexer) handleDone() {
 		select {
 		case <-i.cancel:
 			i.writeStats()
-			os.Exit(1)
-			return
+			i.statsFile.Close()
+			os.Exit(0)
+			panic("unreachable")
 		case err := <-i.done:
 			i.writeStats()
+			i.statsFile.Close()
 			logrus.Errorf("Indexer done: %v", err)
+			os.Exit(1)
 			panic(err)
 		case <-time.After(time.Second * 30):
 			i.writeStats()
@@ -432,12 +435,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas <- tokenMetadata{key, metadata}
-					// meta, err := makePreviewsForMetadata(context.TODO(), metadata, string(contractAddress), string(tokenID), string(uriReplaced), i.ipfsClient)
-					// if err != nil {
-					// 	logrus.WithError(err).Error(fmt.Printf("error getting previews for token %s", uriReplaced))
-					// } else {
-					// 	logrus.WithField("tokenURI", uriReplaced).Infof("%+v", *meta)
-					// }
 				}
 			} else {
 				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
@@ -445,12 +442,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas <- tokenMetadata{key, metadata}
-					// meta, err := makePreviewsForMetadata(context.TODO(), metadata, string(contractAddress), string(tokenID), string(uriReplaced), i.ipfsClient)
-					// if err != nil {
-					// 	logrus.WithError(err).Error(fmt.Printf("error getting previews for token %s", uriReplaced))
-					// } else {
-					// 	logrus.WithField("tokenURI", uriReplaced).Infof("%+v", *meta)
-					// }
 				}
 			}
 		}()
@@ -637,7 +628,8 @@ func (i *Indexer) writeStats() {
 	if err != nil {
 		i.failWithMessage(err, "failed to marshal stats")
 	}
-	os.Truncate(i.statsFile.Name(), 0)
+	i.statsFile.Truncate(0)
+	i.statsFile.Seek(0, 0)
 	_, err = io.Copy(i.statsFile, bytes.NewReader(bs))
 	if err != nil {
 		i.failWithMessage(err, "failed to write stats")
@@ -672,23 +664,8 @@ func getUniqueMetadataHandlers() uniqueMetadatas {
 
 func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...string) interface{} {
 	for _, field := range fields {
-		if v, ok := metadata[field]; ok {
-			return v
-		}
-		if v, ok := metadata["properties"].(map[string]interface{}); ok {
-			if v, ok := v[field]; ok {
-				return v
-			}
-		}
-		if v, ok := metadata["traits"].(map[string]interface{}); ok {
-			if v, ok := v[field]; ok {
-				return v
-			}
-		}
-		if v, ok := metadata["attributes"].(map[string]interface{}); ok {
-			if v, ok := v[field]; ok {
-				return v
-			}
+		if val := util.GetValueFromMapUnsafe(metadata, field, util.MaxSearchDepth); val != nil {
+			return val
 		}
 	}
 	return nil

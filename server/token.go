@@ -184,7 +184,7 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 		go func(n *persist.Token) {
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
-				if err == nil {
+				if err == nil && media.MediaURL != "" {
 					n.Media = *media
 					go func() {
 						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
@@ -212,7 +212,7 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 		go func(n *persist.TokenInCollection) {
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
-				if err == nil {
+				if err == nil && media.MediaURL != "" {
 					n.Media = *media
 					go func() {
 						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
