@@ -264,14 +264,8 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 		return err
 	}
 
-	type update struct {
-		OwnerAddress string `bson:"owner_address"`
-	}
-
-	if err := c.nmp.update(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}, &update{}); err != nil {
-		if _, ok := err.(*DocumentNotFoundError); !ok {
-			return err
-		}
+	if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
+		return err
 	}
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {

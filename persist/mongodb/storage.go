@@ -229,10 +229,15 @@ func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result inte
 }
 
 // count counts the number of documents in the mongo database which is not deleted
-// result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
 func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
 	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
+}
+
+// delete deletes all documents matching a given filter query
+func (m *storage) delete(ctx context.Context, filter bson.M, opts ...*options.DeleteOptions) error {
+	_, err := m.collection.DeleteMany(ctx, filter, opts...)
+	return err
 }
 
 // createIndex creates a new index in the mongo database
