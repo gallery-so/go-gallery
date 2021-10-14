@@ -146,4 +146,5 @@ type NFTRepository interface {
 	BulkUpsert(context.Context, []*NFTDB) ([]DBID, error)
 	OpenseaCacheGet(context.Context, []string) ([]*NFT, error)
 	OpenseaCacheSet(context.Context, []string, []*NFT) error
+	OpenseaCacheDelete(context.Context, []string) error
 }
