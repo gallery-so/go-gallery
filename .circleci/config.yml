@@ -102,4 +102,4 @@ jobs:
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy App Engine"
-          command: gcloud beta app deploy
+          command: gcloud beta app deploy --quiet
