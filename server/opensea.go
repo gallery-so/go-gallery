@@ -101,7 +101,7 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 		pOwnerWalletAddresses = user.Addresses
 	}
 
-	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, user, nftRepo)
+	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, p
 	return events, nil
 }
 
-func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []string, pUser *persist.User, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
+func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []string, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
 	result := []*persist.NFTDB{}
 	nftsChan := make(chan []*persist.NFTDB)
 	errChan := make(chan error)
@@ -222,7 +222,7 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []strin
 				errChan <- err
 				return
 			}
-			asGlry, err := openseaToDBNfts(pCtx, wa, assets, pUser, nftRepo)
+			asGlry, err := openseaToDBNfts(pCtx, wa, assets, nftRepo)
 			if err != nil {
 				errChan <- err
 				return
@@ -287,13 +287,13 @@ func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int) ([]*opensea
 	return result, nil
 }
 
-func openseaToDBNfts(pCtx context.Context, pWalletAddress string, openseaNfts []*openseaAsset, pUser *persist.User, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
+func openseaToDBNfts(pCtx context.Context, pWalletAddress string, openseaNfts []*openseaAsset, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
 
 	nfts := make([]*persist.NFTDB, len(openseaNfts))
 	nftChan := make(chan *persist.NFTDB)
 	for _, openseaNft := range openseaNfts {
 		go func(nft *openseaAsset) {
-			nftChan <- openseaToDBNft(pCtx, pWalletAddress, nft, pUser.ID, nftRepo)
+			nftChan <- openseaToDBNft(pCtx, pWalletAddress, nft, nftRepo)
 		}(openseaNft)
 	}
 	for i := 0; i < len(openseaNfts); i++ {
@@ -363,7 +363,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NFTDB, pUser *persis
 	return nfts, nil
 }
 
-func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAsset, ownerUserID persist.DBID, nftRepo persist.NFTRepository) *persist.NFTDB {
+func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAsset, nftRepo persist.NFTRepository) *persist.NFTDB {
 
 	result := &persist.NFTDB{
 		OwnerAddress:         pWalletAddress,

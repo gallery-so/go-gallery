@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 const (
 	nftColName = "nfts"
 )
+
+var errOwnerAddressRequired = errors.New("owner address required")
 
 // NFTMongoRepository is a repository that stores collections in a MongoDB database
 type NFTMongoRepository struct {
@@ -175,6 +178,10 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 
 	for _, v := range pNfts {
 		go func(nft *persist.NFTDB) {
+			if nft.OwnerAddress == "" {
+				errs <- errOwnerAddressRequired
+				return
+			}
 			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
