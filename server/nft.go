@@ -19,10 +19,6 @@ type getNftsByUserIDInput struct {
 	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
 }
 
-type getUnassignedNFTByUserIDInput struct {
-	SkipCache bool `json:"skip_cache" form:"skip_cache"`
-}
-
 type getOpenseaNftsInput struct {
 	// Comma separated list of wallet addresses
 	WalletAddresses string `json:"addresses" form:"addresses"`
@@ -132,23 +128,35 @@ func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 
 func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getUnassignedNFTByUserIDInput{}
-		if err := c.ShouldBindQuery(input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
-			return
-		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
-		coll, err := collectionRepository.GetUnassigned(c, userID, input.SkipCache)
+		coll, err := collectionRepository.GetUnassigned(c, userID)
 		if coll == nil || err != nil {
 			coll = &persist.Collection{Nfts: []*persist.CollectionNFT{}}
 		}
 
 		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
+	}
+}
+
+func refreshUnassignedNftsForUser(collectionRepository persist.CollectionRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			return
+		}
+		if err := collectionRepository.RefreshUnassigned(c, userID); err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 

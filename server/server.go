@@ -16,13 +16,11 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"google.golang.org/appengine"
 )
 
 type repositories struct {
@@ -45,8 +43,6 @@ func init() {
 	router := CoreInit()
 
 	http.Handle("/", router)
-
-	logrus.Infof("AppEngine running in Flex: %t", appengine.IsFlex())
 }
 
 // CoreInit initializes core server functionality. This is abstracted
@@ -81,6 +77,7 @@ func setDefaults() {
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
+	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "decrypted/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESS", "0x876e785A1EE39f0655BE10a1440DBde3e53D3F57")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
 

@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/gif"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"cloud.google.com/go/storage"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 
 	"github.com/nfnt/resize"
@@ -76,15 +78,14 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	imgURL := ""
 	vURL := ""
 
-	if it, ok := metadata["animation_url"]; ok && it != nil {
-		vURL = it.(string)
-	} else if it, ok := metadata["video_url"]; ok && it != nil {
-		vURL = it.(string)
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.MaxSearchDepth).(string); ok {
+		vURL = it
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.MaxSearchDepth).(string); ok {
+		vURL = it
 	}
-	if it, ok := metadata["image"]; ok && it != nil {
-		imgURL = it.(string)
-	} else if it, ok := metadata["image_url"]; ok && it != nil {
-		imgURL = it.(string)
+
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.MaxSearchDepth).(string); ok {
+		imgURL = it
 	}
 
 	if imgURL == "" {
@@ -96,7 +97,10 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 		return nil, err
 	}
 	if vURL != "" {
-		mt, _ := downloadAndCache(pCtx, vURL, name, ipfsClient)
+		mt, err := downloadAndCache(pCtx, vURL, name, ipfsClient)
+		if err != nil {
+			return nil, err
+		}
 		mediaType = mt
 	}
 	res.MediaType = mediaType
@@ -181,13 +185,13 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			Timeout: time.Second * 5,
 		}
 
-		req, err := hc.Get(url)
+		resp, err := hc.Get(url)
 		if err != nil {
 			return "", err
 		}
-		defer req.Body.Close()
+		defer resp.Body.Close()
 
-		_, err = io.Copy(buf, req.Body)
+		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
 			return "", err
 		}
@@ -201,7 +205,13 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	case persist.MediaTypeImage:
 		img, _, err := image.Decode(buf)
 		if err != nil {
-			return "", err
+			if png, err := png.Decode(buf); err == nil {
+				img = png
+			} else if jpg, err := jpeg.Decode(buf); err == nil {
+				img = jpg
+			} else {
+				return "", err
+			}
 		}
 		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
