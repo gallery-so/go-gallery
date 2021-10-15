@@ -22,6 +22,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const defaultStartingBlock = 6000000
+
 // EventHash represents an event keccak256 hash
 type EventHash string
 
@@ -154,6 +156,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 func (i *Indexer) Start() {
 
 	i.state = 1
+	go i.listenForNewBlocks()
 	go i.processLogs()
 	go i.processTransfers()
 	go i.processTokens()
@@ -167,8 +170,6 @@ func (i *Indexer) processLogs() {
 		go i.subscribeNewLogs()
 	}()
 
-	go i.listenForNewBlocks()
-
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
 		events[i] = common.HexToHash(string(event))
@@ -177,8 +178,8 @@ func (i *Indexer) processLogs() {
 	topics := [][]common.Hash{events, nil, nil, nil}
 
 	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
-	interval := getBlockInterval(1, 2000, i.lastSyncedBlock, i.mostRecentBlock)
-	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(interval)))
+	// interval := getBlockInterval(1, 2000, i.lastSyncedBlock, i.mostRecentBlock)
+	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(50)))
 
 	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
@@ -192,6 +193,7 @@ func (i *Indexer) processLogs() {
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Error("error getting logs, trying again")
+			time.Sleep(time.Second * 5)
 			continue
 		}
 		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
@@ -200,9 +202,9 @@ func (i *Indexer) processLogs() {
 
 		atomic.StoreUint64(&i.lastSyncedBlock, nextBlock.Uint64())
 
-		curBlock.Add(curBlock, big.NewInt(int64(interval)))
-		nextBlock.Add(nextBlock, big.NewInt(int64(interval)))
-		interval = getBlockInterval(1, 2000, curBlock.Uint64(), atomic.LoadUint64(&i.mostRecentBlock))
+		curBlock.Add(curBlock, big.NewInt(int64(50)))
+		nextBlock.Add(nextBlock, big.NewInt(int64(50)))
+		// interval = getBlockInterval(1, 2000, curBlock.Uint64(), atomic.LoadUint64(&i.mostRecentBlock))
 	}
 
 }
@@ -628,14 +630,14 @@ func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...strin
 	return nil
 }
 
-// function that returns a progressively smaller value between min and max for every million block numbers
-func getBlockInterval(min, max, blockNumber, lastBlockNumber uint64) uint64 {
-	blockDivisor := lastBlockNumber / 20
-	if blockNumber < blockDivisor {
-		return max
-	}
-	return (max - min) / (blockNumber / blockDivisor)
-}
+// // function that returns a progressively smaller value between min and max for every million block numbers
+// func getBlockInterval(min, max, blockNumber, lastBlockNumber uint64) uint64 {
+// 	blockDivisor := lastBlockNumber / 20
+// 	if blockNumber < blockDivisor {
+// 		return max
+// 	}
+// 	return (max - min) / (blockNumber / blockDivisor)
+// }
 
 func toRegularAddress(addr address) address {
 	return address(strings.ToLower(fmt.Sprintf("0x%s", addr[len(addr)-38:])))
