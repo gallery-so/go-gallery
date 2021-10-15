@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -87,7 +88,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 	}
 }
 
-func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func updateGallery(galleryRepository persist.GalleryRepository, backupRepository persist.BackupRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &galleryUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -108,6 +109,16 @@ func updateGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc 
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
+
+		go func(ctx context.Context) {
+			galleries, err := galleryRepository.GetByUserID(ctx, userID, true)
+			if err == nil {
+				for _, gallery := range galleries {
+					backupRepository.Insert(ctx, gallery)
+				}
+			}
+
+		}(c.Copy())
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

@@ -203,7 +203,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 	}
 }
 
-func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
+func updateCollectionNfts(collectionsRepository persist.CollectionRepository, galleryRepository persist.GalleryRepository, backupRepository persist.BackupRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &collectionUpdateNftsByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -233,6 +233,16 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository) gi
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
+
+		go func(ctx context.Context) {
+			galleries, err := galleryRepository.GetByUserID(ctx, userID, true)
+			if err == nil {
+				for _, gallery := range galleries {
+					backupRepository.Insert(ctx, gallery)
+				}
+			}
+
+		}(c.Copy())
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

@@ -3,8 +3,6 @@ package persist
 import (
 	"context"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // CollectionTokenDB is the struct that represents a collection of NFTs in the database
@@ -16,6 +14,7 @@ type CollectionTokenDB struct {
 	ID           DBID      `bson:"_id" json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at" json:"created_at"`
 	Deleted      bool      `bson:"deleted" json:"-"`
+	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
 	GalleryID DBID `bson:"gallery_id" json:"gallery_id"`
 
@@ -33,11 +32,11 @@ type CollectionTokenDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type CollectionToken struct {
-	Version      int64              `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID               `bson:"_id"           json:"id" binding:"required"`
-	CreationTime primitive.DateTime `bson:"created_at" json:"created_at"`
-	Deleted      bool               `bson:"deleted" json:"-"`
-	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
+	Version      int64     `bson:"version"       json:"version"` // schema version for this model
+	ID           DBID      `bson:"_id"           json:"id" binding:"required"`
+	CreationTime time.Time `bson:"created_at" json:"created_at"`
+	Deleted      bool      `bson:"deleted" json:"-"`
+	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
 	Name           string               `bson:"name"          json:"name"`
 	CollectorsNote string               `bson:"collectors_note"   json:"collectors_note"`

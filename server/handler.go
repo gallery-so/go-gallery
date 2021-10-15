@@ -110,7 +110,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 
 	galleriesGroup.GET("/get", jwtOptional(), getGalleryByID(repos.galleryRepository))
 	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserID(repos.galleryRepository))
-	galleriesGroup.POST("/update", jwtRequired(), updateGallery(repos.galleryRepository))
+	galleriesGroup.POST("/update", jwtRequired(), updateGallery(repos.galleryRepository, repos.backupRepository))
 
 	// COLLECTIONS
 
@@ -122,7 +122,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	collectionsGroup.POST("/delete", jwtRequired(), deleteCollection(repos.collectionRepository))
 	collectionsGroup.POST("/update/info", jwtRequired(), updateCollectionInfo(repos.collectionRepository))
 	collectionsGroup.POST("/update/hidden", jwtRequired(), updateCollectionHidden(repos.collectionRepository))
-	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository))
+	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository, repos.galleryRepository, repos.backupRepository))
 
 	// NFTS
 
