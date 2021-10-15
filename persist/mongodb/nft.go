@@ -205,7 +205,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 
 }
 
-// OpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
+// OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
 func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*persist.NFT) error {
 
 	for i, v := range pWalletAddresses {
@@ -220,7 +220,17 @@ func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddres
 	return n.redisClients.Set(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
-// OpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
+// OpenseaCacheDelete deletes a set of nfts from the opensea cache under a given set of wallet addresses
+func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []string) error {
+
+	for i, v := range pWalletAddresses {
+		pWalletAddresses[i] = strings.ToLower(v)
+	}
+
+	return n.redisClients.Delete(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
+}
+
+// OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
 func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []string) ([]*persist.NFT, error) {
 
 	for i, v := range pWalletAddresses {
