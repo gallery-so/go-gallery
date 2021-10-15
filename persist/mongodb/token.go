@@ -3,11 +3,9 @@ package mongodb
 import (
 	"context"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -113,8 +111,8 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 	return result, nil
 }
 
-// GetByNFTIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string) (*persist.Token, error) {
+// GetByTokenIdentifiers gets tokens for a given contract address and token ID
+func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID string, pAddress string) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -128,15 +126,7 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 		return nil, err
 	}
 
-	if len(result) < 1 {
-		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pAddress}
-	}
-
-	if len(result) > 1 {
-		logrus.Errorf("found more than one token for contract address: %s token ID: %s", pAddress, pTokenID)
-	}
-
-	return result[0], nil
+	return result, nil
 }
 
 // GetByID gets tokens for a given DB ID
@@ -163,29 +153,33 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 
 // BulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pERC721s []*persist.Token) error {
+func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persist.Token) error {
 
-	wg := &sync.WaitGroup{}
-	mu := &sync.Mutex{}
-	errs := []error{}
-	wg.Add(len(pERC721s))
+	ids := make(chan persist.DBID)
+	errs := make(chan error)
 
-	for _, v := range pERC721s {
+	for _, v := range pTokens {
 
 		go func(token *persist.Token) {
-			defer wg.Done()
-			_, err := t.mp.upsert(pCtx, bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress), "owner_address": token.OwnerAddress}, token)
+
+			query := bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress), "owner_address": strings.ToLower(token.OwnerAddress)}
+			returnID, err := t.mp.upsert(pCtx, query, token)
 			if err != nil {
-				mu.Lock()
-				errs = append(errs, err)
-				mu.Unlock()
+				errs <- err
+				return
 			}
+			ids <- returnID
 		}(v)
 	}
-	wg.Wait()
 
-	if len(errs) > 0 {
-		return errs[0]
+	result := make([]persist.DBID, len(pTokens))
+	for i := 0; i < len(pTokens); i++ {
+		select {
+		case id := <-ids:
+			result[i] = id
+		case err := <-errs:
+			return err
+		}
 	}
 	return nil
 }
@@ -219,5 +213,26 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 	user := users[0]
 
 	return t.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
+
+}
+
+// MostRecentBlock will find the most recent block stored for all tokens
+func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (uint64, error) {
+
+	opts := options.Find()
+	opts.SetLimit(1)
+	opts.SetSort(bson.M{"latest_block": -1})
+
+	res := []*persist.Token{}
+
+	if err := t.mp.find(pCtx, bson.M{}, &res, opts); err != nil {
+		return 0, err
+	}
+
+	if len(res) < 1 {
+		return 0, nil
+	}
+
+	return res[0].LatestBlock, nil
 
 }

@@ -1,20 +1,15 @@
-package infra
+package indexer
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"os"
-	"os/signal"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -94,7 +89,6 @@ type Indexer struct {
 
 	lastSyncedBlock uint64
 	mostRecentBlock uint64
-	statsFile       *os.File
 
 	metadatas      chan tokenMetadata
 	uris           chan tokenURI
@@ -107,7 +101,6 @@ type Indexer struct {
 	tokens        chan []*persist.Token
 	contracts     chan *persist.Contract
 	done          chan error
-	cancel        chan os.Signal
 
 	badURIs uint64
 
@@ -121,28 +114,11 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
-	statsFile, err := os.OpenFile(statsFileName, os.O_RDWR|os.O_APPEND, os.ModeAppend)
 	startingBlock := uint64(defaultERC721Block)
-	if err == nil {
-		decoder := json.NewDecoder(statsFile)
 
-		var stats map[string]interface{}
-		err = decoder.Decode(&stats)
-		if err != nil {
-			panic(err)
-		}
-		startingBlock = uint64(stats["last_block"].(float64))
-	} else {
-		fi, err := os.Create(statsFileName)
-		if err != nil {
-			panic(err)
-		}
-		statsFile = fi
+	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err != nil && mostRecent > 0 {
+		startingBlock = mostRecent
 	}
-
-	cancel := make(chan os.Signal)
-
-	signal.Notify(cancel, syscall.SIGINT, syscall.SIGTERM)
 
 	return &Indexer{
 
@@ -157,7 +133,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		mostRecentBlock: finalBlockUint,
 
 		eventHashes: pEvents,
-		statsFile:   statsFile,
 
 		metadatas:      make(chan tokenMetadata),
 		uris:           make(chan tokenURI),
@@ -170,7 +145,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		tokens:        make(chan []*persist.Token),
 		contracts:     make(chan *persist.Contract),
 		done:          make(chan error),
-		cancel:        cancel,
 
 		uniqueMetadatas: getUniqueMetadataHandlers(),
 	}
@@ -307,6 +281,22 @@ func (i *Indexer) processTokens() {
 		case previousOwner := <-i.previousOwners:
 			if previousOwners[previousOwner.ti] == nil {
 				previousOwners[previousOwner.ti] = []ownerAtBlock{}
+				contractAddress, tokenID, err := parseTokenIdentifiers(previousOwner.ti)
+				if err == nil && contractAddress != "" && tokenID != "" {
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					if err == nil && len(tokens) == 1 {
+						token := tokens[0]
+						ownersAtBlocks := make([]ownerAtBlock, len(token.PreviousOwners))
+						for i, o := range token.PreviousOwners {
+							ownersAtBlocks[i] = ownerAtBlock{
+								ti:    previousOwner.ti,
+								block: uint64(i),
+								owner: address(o),
+							}
+						}
+						previousOwners[previousOwner.ti] = ownersAtBlocks
+					}
+				}
 			}
 			previousOwners[previousOwner.ti] = append(previousOwners[previousOwner.ti], previousOwner)
 		}
@@ -352,29 +342,16 @@ func (i *Indexer) subscribeNewLogs() {
 		case err := <-sub.Err():
 			i.failWithMessage(err, "subscription error")
 			return
-		case <-i.done:
-			return
 		}
 	}
 }
 
 func (i *Indexer) handleDone() {
 	for {
-		select {
-		case <-i.cancel:
-			i.writeStats()
-			i.statsFile.Close()
-			os.Exit(0)
-			panic("unreachable")
-		case err := <-i.done:
-			i.writeStats()
-			i.statsFile.Close()
-			logrus.Errorf("Indexer done: %v", err)
-			os.Exit(1)
-			panic(err)
-		case <-time.After(time.Second * 30):
-			i.writeStats()
-		}
+		err := <-i.done
+		logrus.Errorf("Indexer done: %v", err)
+		os.Exit(1)
+		panic(err)
 	}
 }
 
@@ -416,10 +393,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			i.failWithMessage(errors.New("token type"), "unknown token type")
 		}
 
-		go func() {
-			i.contracts <- handleContract(i.ethClient, contractAddress, atomic.LoadUint64(&i.lastSyncedBlock))
-		}()
-
 		i.uris <- tokenURI{key, u}
 
 		id, err := util.HexToBigInt(string(tokenID))
@@ -458,6 +431,9 @@ func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
 	if err := i.tokenRepo.Upsert(ctx, t); err != nil {
 		return err
 	}
+	go func() {
+		i.contracts <- handleContract(i.ethClient, address(t.ContractAddress), atomic.LoadUint64(&i.lastSyncedBlock))
+	}()
 	return nil
 }
 
@@ -478,7 +454,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		})
 	}
 	for k, v := range owners {
-		contractAddress, tokenID, err := parseKeyForToken(k)
+		contractAddress, tokenID, err := parseTokenIdentifiers(k)
 		if err != nil {
 			i.failWithMessage(err, "failed to parse key for token")
 			return nil
@@ -514,7 +490,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		j++
 	}
 	for k, v := range balances {
-		contractAddress, tokenID, err := parseKeyForToken(k)
+		contractAddress, tokenID, err := parseTokenIdentifiers(k)
 		if err != nil {
 			i.failWithMessage(err, "failed to parse key for token")
 			return nil
@@ -617,25 +593,6 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 	return result
 }
 
-func (i *Indexer) writeStats() {
-	logrus.Info("Writing Stats...")
-
-	stats := map[string]interface{}{}
-	stats["state"] = atomic.LoadInt64(&i.state)
-	stats["last_block"] = atomic.LoadUint64(&i.lastSyncedBlock)
-	stats["bad_uris"] = atomic.LoadUint64(&i.badURIs)
-	bs, err := json.Marshal(stats)
-	if err != nil {
-		i.failWithMessage(err, "failed to marshal stats")
-	}
-	i.statsFile.Truncate(0)
-	i.statsFile.Seek(0, 0)
-	_, err = io.Copy(i.statsFile, bytes.NewReader(bs))
-	if err != nil {
-		i.failWithMessage(err, "failed to write stats")
-	}
-}
-
 func (i *Indexer) listenForNewBlocks() {
 	for {
 		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
@@ -688,7 +645,7 @@ func makeKeyForToken(contractAddress address, tokenID tokenID) tokenIdentifiers 
 	return tokenIdentifiers(fmt.Sprintf("%s_%s", contractAddress, tokenID))
 }
 
-func parseKeyForToken(key tokenIdentifiers) (address, tokenID, error) {
+func parseTokenIdentifiers(key tokenIdentifiers) (address, tokenID, error) {
 	parts := strings.Split(string(key), "_")
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid key")

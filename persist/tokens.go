@@ -136,12 +136,13 @@ type TokenRepository interface {
 	GetByWallet(context.Context, string) ([]*Token, error)
 	GetByUserID(context.Context, DBID) ([]*Token, error)
 	GetByContract(context.Context, string) ([]*Token, error)
-	GetByNFTIdentifiers(context.Context, string, string) (*Token, error)
+	GetByTokenIdentifiers(context.Context, string, string) ([]*Token, error)
 	GetByID(context.Context, DBID) (*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+	MostRecentBlock(context.Context) (uint64, error)
 }
 
 // ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
