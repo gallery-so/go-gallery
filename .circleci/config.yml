@@ -56,8 +56,11 @@ jobs:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
       - run:
-          name: "Copy app.yamls"
-          command: cp -R decrypted/app-dev.yaml ./app.yaml
+          name: "Copy Backend app.yaml"
+          command: cp -R decrypted/app-dev-backend.yaml ./app-backend.yaml
+      - run:
+          name: "Copy Indexer app.yaml"
+          command: cp -R decrypted/app-dev-indexer.yaml ./app-indexer.yaml 
       - run:
           command: |
               install () {
@@ -101,5 +104,8 @@ jobs:
               fi
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
-          name: "Deploy App Engine"
-          command: gcloud beta app deploy --quiet
+          name: "Deploy Backend"
+          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml
+      - run:
+          name: "Deploy Indexer"
+          command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml

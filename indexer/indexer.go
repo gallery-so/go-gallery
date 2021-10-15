@@ -114,7 +114,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
-	startingBlock := uint64(defaultERC721Block)
+	startingBlock := uint64(defaultStartingBlock)
 
 	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err != nil && mostRecent > 0 {
 		startingBlock = mostRecent

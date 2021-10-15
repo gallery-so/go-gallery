@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultERC721Block = 5270000
+const defaultStartingBlock = 5270000
 
 // transfer represents a transfer from the RPC response
 type transfer struct {
@@ -217,7 +217,7 @@ func getERC1155TokenURI(pContractAddress address, pTokenID tokenID, ethClient *e
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	def := new(big.Int).SetUint64(defaultERC721Block)
+	def := new(big.Int).SetUint64(defaultStartingBlock)
 
 	logs, err := ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: def,
