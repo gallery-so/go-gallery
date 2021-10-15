@@ -132,8 +132,8 @@ func TestOpenseaRateLimit_Failure(t *testing.T) {
 }
 
 func openseaSyncRequest(assert *assert.Assertions, address string, jwt string) *http.Response {
-	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/nfts/opensea/get?addresses=%s&skip_cache=true", tc.serverURL, address),
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/nfts/opensea/refresh?addresses=%s", tc.serverURL, address),
 		nil)
 	assert.Nil(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
