@@ -128,7 +128,7 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 		return nil, err
 	}
 
-	if len(result) != 1 {
+	if len(result) < 1 {
 		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pAddress}
 	}
 

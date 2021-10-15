@@ -135,7 +135,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 		return nil, err
 	}
 
-	if len(result) != 1 {
+	if len(result) < 1 {
 		return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 

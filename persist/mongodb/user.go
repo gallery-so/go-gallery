@@ -143,7 +143,7 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 		return nil, err
 	}
 
-	if len(result) != 1 {
+	if len(result) < 1 {
 		return nil, persist.ErrUserNotFoundByUsername{Username: pUsername}
 	}
 

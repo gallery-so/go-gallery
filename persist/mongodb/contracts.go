@@ -56,7 +56,7 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress st
 		return nil, err
 	}
 
-	if len(result) != 1 {
+	if len(result) < 1 {
 		return nil, persist.ErrContractNotFoundByAddress{Address: pAddress}
 	}
 

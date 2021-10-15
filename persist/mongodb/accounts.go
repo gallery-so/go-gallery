@@ -55,7 +55,7 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 		return nil, err
 	}
 
-	if len(result) != 1 {
+	if len(result) < 1 {
 		return nil, persist.ErrAccountNotFoundByAddress{Address: pAddress}
 	}
 
