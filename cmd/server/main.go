@@ -16,6 +16,6 @@ func main() {
 		appengine.Main()
 	} else {
 		logrus.Info("Running in Default Mode")
-		http.ListenAndServe(":8080", nil)
+		http.ListenAndServe(":4000", nil)
 	}
 }
