@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
 
 	_ "github.com/mikeydub/go-gallery/server"
 	"github.com/sirupsen/logrus"
@@ -10,7 +9,7 @@ import (
 )
 
 func main() {
-	if os.Getenv("SERVER_SOFTWARE") != "" {
+	if appengine.IsAppEngine() {
 		logrus.Info("Running in App Engine Mode")
 		appengine.Main()
 	} else {
