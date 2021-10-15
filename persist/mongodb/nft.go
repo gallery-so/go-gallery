@@ -10,6 +10,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -136,6 +137,10 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 
 	if len(result) != 1 {
 		return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID, ContractAddress: pContractAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one NFT for contract address: %s token ID: %s", pContractAddress, pTokenID)
 	}
 
 	return result[0], nil

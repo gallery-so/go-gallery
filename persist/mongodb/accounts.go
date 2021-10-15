@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -56,6 +57,10 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 
 	if len(result) != 1 {
 		return nil, persist.ErrAccountNotFoundByAddress{Address: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one account for address: %s", pAddress)
 	}
 
 	return result[0], nil

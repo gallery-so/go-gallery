@@ -237,7 +237,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 	}
 
 	if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
-			return err
+		return err
 	}
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
@@ -312,9 +312,6 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		if err := c.mp.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
 			return nil, err
 		}
-	}
-	if len(result) != 1 {
-		return nil, errors.New("multiple collections of unassigned nfts found")
 	}
 
 	toCache, err := json.Marshal(result)

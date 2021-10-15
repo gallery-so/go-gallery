@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -129,6 +130,10 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 
 	if len(result) != 1 {
 		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one token for contract address: %s token ID: %s", pAddress, pTokenID)
 	}
 
 	return result[0], nil

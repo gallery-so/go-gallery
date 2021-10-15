@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -55,8 +56,12 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress st
 		return nil, err
 	}
 
-	if len(result) != 0 {
+	if len(result) != 1 {
 		return nil, persist.ErrContractNotFoundByAddress{Address: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one contract for address: %s", pAddress)
 	}
 
 	return result[0], nil

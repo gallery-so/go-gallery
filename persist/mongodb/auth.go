@@ -60,7 +60,7 @@ func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress string) (*pers
 		return nil, err
 	}
 
-	if len(result) == 0 {
+	if len(result) != 1 {
 		return nil, persist.ErrNonceNotFoundForAddress{Address: pAddress}
 	}
 
