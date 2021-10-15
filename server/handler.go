@@ -110,7 +110,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 
 	galleriesGroup.GET("/get", jwtOptional(), getGalleryByID(repos.galleryRepository))
 	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserID(repos.galleryRepository))
-	galleriesGroup.POST("/update", jwtRequired(), updateGallery(repos.galleryRepository))
+	galleriesGroup.POST("/update", jwtRequired(), updateGallery(repos.galleryRepository, repos.backupRepository))
 
 	// COLLECTIONS
 
@@ -122,7 +122,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	collectionsGroup.POST("/delete", jwtRequired(), deleteCollection(repos.collectionRepository))
 	collectionsGroup.POST("/update/info", jwtRequired(), updateCollectionInfo(repos.collectionRepository))
 	collectionsGroup.POST("/update/hidden", jwtRequired(), updateCollectionHidden(repos.collectionRepository))
-	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository))
+	collectionsGroup.POST("/update/nfts", jwtRequired(), updateCollectionNfts(repos.collectionRepository, repos.galleryRepository, repos.backupRepository))
 
 	// NFTS
 
@@ -130,7 +130,8 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 
 	nftsGroup.GET("/get", jwtOptional(), getNftByID(repos.nftRepository))
 	nftsGroup.GET("/user_get", jwtOptional(), getNftsForUser(repos.nftRepository))
-	nftsGroup.GET("/opensea_get", rateLimited(), jwtRequired(), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
+	nftsGroup.GET("/opensea/get", rateLimited(), jwtRequired(), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
+	nftsGroup.GET("/opensea/refresh", jwtRequired(), refreshOpenseaNFTs(repos.nftRepository, repos.userRepository))
 	nftsGroup.POST("/update", jwtRequired(), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/unassigned/get", jwtRequired(), getUnassignedNftsForUser(repos.collectionRepository))
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(), refreshUnassignedNftsForUser(repos.collectionRepository))

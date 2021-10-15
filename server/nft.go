@@ -22,7 +22,10 @@ type getNftsByUserIDInput struct {
 type getOpenseaNftsInput struct {
 	// Comma separated list of wallet addresses
 	WalletAddresses string `json:"addresses" form:"addresses"`
-	SkipCache       bool   `json:"skip_cache" form:"skip_cache"`
+}
+type refreshOpenseaNftsInput struct {
+	// Comma separated list of wallet addresses
+	WalletAddresses string `json:"addresses" form:"addresses"`
 }
 
 type getNftsOutput struct {
@@ -174,8 +177,12 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := strings.Split(input.WalletAddresses, ",")
-		if len(addresses) > 0 {
+		addresses := []string{}
+		if input.WalletAddresses != "" {
+			addresses = []string{input.WalletAddresses}
+			if strings.Contains(input.WalletAddresses, ",") {
+				addresses = strings.Split(input.WalletAddresses, ",")
+			}
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -187,12 +194,51 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, input.SkipCache, nftRepo, userRepo, collRepo, historyRepo)
+		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
 		if len(nfts) == 0 || err != nil {
 			nfts = []*persist.NFT{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
+	}
+}
+func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &refreshOpenseaNftsInput{}
+		if err := c.ShouldBindQuery(input); err != nil {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		userID := getUserIDfromCtx(c)
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			return
+		}
+
+		addresses := []string{}
+		if input.WalletAddresses != "" {
+			addresses = []string{input.WalletAddresses}
+			if strings.Contains(input.WalletAddresses, ",") {
+				addresses = strings.Split(input.WalletAddresses, ",")
+			}
+			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				return
+			}
+			if !ownsWallet {
+				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errDoesNotOwnWallets{userID, addresses}.Error()})
+				return
+			}
+		}
+
+		if err := nftRepo.OpenseaCacheDelete(c, addresses); err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 

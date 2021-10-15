@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 const (
 	nftColName = "nfts"
 )
+
+var errOwnerAddressRequired = errors.New("owner address required")
 
 // NFTMongoRepository is a repository that stores collections in a MongoDB database
 type NFTMongoRepository struct {
@@ -181,6 +184,11 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 
 	for _, v := range pNfts {
 		go func(nft *persist.NFTDB) {
+			if nft.OwnerAddress == "" {
+				errs <- errOwnerAddressRequired
+				return
+			}
+			nft.OwnerAddress = strings.ToLower(nft.OwnerAddress)
 			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
@@ -203,7 +211,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 
 }
 
-// OpenseaCacheSet adds a set of nfts to the opensea cache under a given wallet address
+// OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
 func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*persist.NFT) error {
 
 	for i, v := range pWalletAddresses {
@@ -218,7 +226,17 @@ func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddres
 	return n.redisClients.Set(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
-// OpenseaCacheGet gets a set of nfts from the opensea cache under a given wallet address
+// OpenseaCacheDelete deletes a set of nfts from the opensea cache under a given set of wallet addresses
+func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []string) error {
+
+	for i, v := range pWalletAddresses {
+		pWalletAddresses[i] = strings.ToLower(v)
+	}
+
+	return n.redisClients.Delete(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
+}
+
+// OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
 func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []string) ([]*persist.NFT, error) {
 
 	for i, v := range pWalletAddresses {
