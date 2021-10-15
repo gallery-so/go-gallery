@@ -90,9 +90,8 @@ func TestCreateCollection_Success(t *testing.T) {
 	assert.Empty(body.Error)
 
 	gallery, err := tc.repos.galleryRepository.GetByID(context.Background(), gid, true)
-	fmt.Println(gallery[0])
 	assert.Nil(err)
-	assert.Len(gallery[0].Collections, 1)
+	assert.Len(gallery.Collections, 1)
 }
 
 func TestGetUnassignedCollection_Success(t *testing.T) {
@@ -137,10 +136,9 @@ func TestDeleteCollection_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// Assert that the collection was deleted
-	collectionsAfterDelete, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, false)
-	assert.Nil(err)
+	_, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, false)
+	assert.NotNil(err)
 
-	assert.True(len(collectionsAfterDelete) == 0)
 }
 
 func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
@@ -161,7 +159,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 	verifyCollectionExistsInDbForID(assert, collID)
 
 	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
-	assert.Equal(404, resp.StatusCode)
+	assert.Equal(500, resp.StatusCode)
 }
 
 func TestGetHiddenCollections_Success(t *testing.T) {
@@ -314,9 +312,9 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 }
 
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {
-	collectionsBeforeDelete, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, false)
+	coll, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, false)
 	assert.Nil(err)
-	assert.Equal(collectionsBeforeDelete[0].ID, collID)
+	assert.Equal(coll.ID, collID)
 }
 
 func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authenticatedUser *TestUser) *http.Response {

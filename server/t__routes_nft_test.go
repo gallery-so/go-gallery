@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +48,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(copy.NftIDQueryNotProvided, body.Error)
+	assert.NotEmpty(body.Error)
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
@@ -63,7 +62,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(fmt.Sprintf("no nfts found with id: %s", nonexistentNftID), body.Error)
+	assert.Equal(fmt.Sprintf("could not find NFT with ID: %s", nonexistentNftID), body.Error)
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
@@ -115,7 +114,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(copy.InvalidAuthHeader, body.Error)
+	assert.Equal(errInvalidAuthHeader.Error(), body.Error)
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
@@ -140,7 +139,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(copy.CouldNotFindDocument, body.Error)
+	assert.Equal("document not found", body.Error)
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {

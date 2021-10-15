@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -72,7 +73,7 @@ type CollectionTokenUpdateDeletedInput struct {
 type CollectionTokenRepository interface {
 	Create(context.Context, *CollectionTokenDB) (DBID, error)
 	GetByUserID(context.Context, DBID, bool) ([]*CollectionToken, error)
-	GetByID(context.Context, DBID, bool) ([]*CollectionToken, error)
+	GetByID(context.Context, DBID, bool) (*CollectionToken, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateNFTs(context.Context, DBID, DBID, *CollectionTokenUpdateNftsInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
@@ -82,4 +83,13 @@ type CollectionTokenRepository interface {
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (*CollectionToken, error)
 	RefreshUnassigned(context.Context, DBID) error
+}
+
+// ErrCollectionNotFoundByID is returned when a collection is not found by ID
+type ErrCollectionNotFoundByID struct {
+	ID DBID
+}
+
+func (e ErrCollectionNotFoundByID) Error() string {
+	return fmt.Sprintf("collection not found by id: %s", e.ID)
 }

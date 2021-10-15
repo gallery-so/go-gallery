@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -67,9 +66,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 
 		input := &collectionGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -92,26 +89,24 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 
 		input := &collectionGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		auth := c.GetBool(authContextKey)
+		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrCollectionNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			c.JSON(status, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
-		colls, err := collectionsRepository.GetByID(c, input.ID, auth)
-		if len(colls) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoCollectionsFoundWithID{id: input.ID}.Error(),
-			})
-			return
-		}
-		if len(colls) > 1 {
-			colls = colls[:1]
-			// TODO log that this should not be happening
-		}
-
-		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: colls[0]})
+		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
 		return
 
 	}
@@ -124,15 +119,13 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		input := &collectionCreateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -155,13 +148,13 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 	return func(c *gin.Context) {
 		input := &collectionUpdateInfoByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -169,7 +162,7 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -181,13 +174,13 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 	return func(c *gin.Context) {
 		input := &collectionUpdateHiddenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -195,7 +188,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -207,7 +200,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 	return func(c *gin.Context) {
 		input := &collectionUpdateNftsByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -219,7 +212,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -230,7 +223,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 
 		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -252,33 +245,22 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 	return func(c *gin.Context) {
 		input := &collectionDeleteInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
 		err := collectionsRepository.Delete(c, input.ID, userID)
 		if err != nil {
-			switch err.(type) {
-			case *mongodb.DocumentNotFoundError:
-				c.JSON(http.StatusNotFound, util.ErrorResponse{
-					Error: err.Error(),
-				})
-				return
-
-			default:
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-					Error: err.Error(),
-				})
-				return
-			}
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
+				Error: err.Error(),
+			})
+			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

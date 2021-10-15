@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/copy"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -25,6 +25,8 @@ var errInvalidJWT = errors.New("invalid JWT")
 
 var errRateLimited = errors.New("rate limited")
 
+var errInvalidAuthHeader = errors.New("invalid auth header format")
+
 type errUserDoesNotHaveRequiredNFT struct {
 	userID persist.DBID
 }
@@ -33,13 +35,13 @@ func jwtRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: copy.InvalidAuthHeader})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
 				return
 			}
 			// get string after "Bearer"
@@ -59,7 +61,7 @@ func jwtRequired() gin.HandlerFunc {
 
 			c.Set(userIDcontextKey, userID)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: copy.InvalidAuthHeader})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
 			return
 		}
 		c.Next()
@@ -147,6 +149,15 @@ func handleCORS() gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+func errLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			logrus.Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
+		}
 	}
 }
 

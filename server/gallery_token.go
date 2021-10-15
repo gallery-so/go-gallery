@@ -45,9 +45,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 
 		input := &galleryTokenGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -75,31 +73,29 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 
 		input := &galleryTokenGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		auth := c.GetBool(authContextKey)
+		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrGalleryNotFoundByID); ok {
+				status = http.StatusNotFound
+			}
+			c.JSON(status, util.ErrorResponse{
 				Error: err.Error(),
 			})
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
-		galleries, err := galleryRepository.GetByID(c, input.ID, auth)
-		if len(galleries) == 0 || err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: errNoGalleriesFoundWithID{id: input.ID}.Error(),
-			})
-			return
-		}
-		if len(galleries) > 1 {
-			galleries = galleries[:1]
-			// TODO log that this should not be happening
-		}
-		gallery := galleries[0]
 		aeCtx := appengine.NewContext(c.Request)
 		for _, collection := range gallery.Collections {
 			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
 		}
 
-		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: galleries[0]})
+		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: gallery})
 		return
 
 	}
@@ -109,13 +105,13 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 	return func(c *gin.Context) {
 		input := &galleryTokenUpdateInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -123,7 +119,7 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -40,7 +41,7 @@ func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress 
 }
 
 // GetByAddress returns an account by a given address
-func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress string) ([]*persist.Account, error) {
+func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress string) (*persist.Account, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -50,10 +51,17 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 
 	result := []*persist.Account{}
 	err := a.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) < 1 {
+		return nil, persist.ErrAccountNotFoundByAddress{Address: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one account for address: %s", pAddress)
+	}
+
+	return result[0], nil
 }

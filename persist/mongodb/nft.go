@@ -10,6 +10,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -77,15 +78,14 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 		return nil, err
 	}
 	if len(users) != 1 {
-		return nil, fmt.Errorf("user not found")
+		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	return n.GetByAddresses(pCtx, users[0].Addresses)
 }
 
 // GetByAddresses finds an nft by its owner user id
-func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []string,
-) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []string) ([]*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -101,7 +101,7 @@ func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []s
 }
 
 // GetByID finds an nft by its id
-func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.NFT, error) {
 
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -115,12 +115,15 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) ([]
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, persist.ErrNFTNotFoundByID{ID: pID}
+	}
+
+	return result[0], nil
 }
 
 // GetByContractData finds an nft by its contract data
-func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, pContractAddress, pWalletAddress string,
-) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, pContractAddress string) (*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -128,11 +131,19 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress, "owner_address": pWalletAddress}), &result, opts); err != nil {
+	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}), &result, opts); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) < 1 {
+		return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID, ContractAddress: pContractAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one NFT for contract address: %s token ID: %s", pContractAddress, pTokenID)
+	}
+
+	return result[0], nil
 }
 
 // GetByOpenseaID finds an nft by its opensea ID
@@ -163,7 +174,7 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 		return err
 	}
 	if len(users) != 1 {
-		return fmt.Errorf("user not found")
+		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
 	return n.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": users[0].Addresses}}, pUpdate)

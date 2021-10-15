@@ -2,12 +2,12 @@ package mongodb
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -114,7 +114,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 }
 
 // GetByNFTIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenID string, pAddress string) (*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -128,11 +128,19 @@ func (t *TokenMongoRepository) GetByNFTIdentifiers(pCtx context.Context, pTokenI
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) < 1 {
+		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one token for contract address: %s token ID: %s", pAddress, pTokenID)
+	}
+
+	return result[0], nil
 }
 
 // GetByID gets tokens for a given DB ID
-func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -146,7 +154,11 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, persist.ErrTokenNotFoundByID{ID: pID}
+	}
+
+	return result[0], nil
 }
 
 // BulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
@@ -202,7 +214,7 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 		return err
 	}
 	if len(users) != 1 {
-		return errors.New("user not found")
+		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 	user := users[0]
 

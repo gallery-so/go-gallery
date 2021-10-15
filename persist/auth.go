@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 	// "github.com/davecgh/go-spew/spew"
 )
@@ -47,4 +48,13 @@ type NonceRepository interface {
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
 type LoginAttemptRepository interface {
 	Create(context.Context, *UserLoginAttempt) (DBID, error)
+}
+
+// ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
+type ErrNonceNotFoundForAddress struct {
+	Address string
+}
+
+func (e ErrNonceNotFoundForAddress) Error() string {
+	return fmt.Sprintf("no nonce found for address: %v", e.Address)
 }

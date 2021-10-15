@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -47,5 +48,14 @@ type GalleryTokenRepository interface {
 	UpdateUnsafe(context.Context, DBID, *GalleryTokenUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
 	GetByUserID(context.Context, DBID, bool) ([]*GalleryToken, error)
-	GetByID(context.Context, DBID, bool) ([]*GalleryToken, error)
+	GetByID(context.Context, DBID, bool) (*GalleryToken, error)
+}
+
+// ErrGalleryNotFoundByID is returned when a gallery is not found by its ID
+type ErrGalleryNotFoundByID struct {
+	ID DBID
+}
+
+func (e ErrGalleryNotFoundByID) Error() string {
+	return fmt.Sprintf("gallery not found with ID: %v", e.ID)
 }

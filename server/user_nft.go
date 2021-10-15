@@ -16,13 +16,13 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 		input := &userAddAddressInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -37,19 +37,19 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 		input := &userRemoveAddressesInput{}
 
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := getUserIDfromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
 		err := removeAddressesFromUserDB(c, userID, input, userRepository, collRepo)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

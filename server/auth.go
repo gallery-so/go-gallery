@@ -53,7 +53,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 		input := &authUserGetPreflightInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -61,7 +61,11 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrNonceNotFoundForAddress); ok {
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -73,7 +77,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	return func(c *gin.Context) {
 		input := &authUserLoginInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
@@ -86,7 +90,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			authLoginRepository,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

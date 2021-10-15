@@ -251,10 +251,9 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Empty(nfts)
 
-	colls, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
-	assert.NotEmpty(colls)
-	assert.Empty(colls[0].Nfts)
+	assert.Empty(res.Nfts)
 
 }
 

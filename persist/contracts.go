@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -23,6 +24,15 @@ type Contract struct {
 
 // ContractRepository represents a repository for interacting with persisted contracts
 type ContractRepository interface {
-	GetByAddress(context.Context, string) ([]*Contract, error)
+	GetByAddress(context.Context, string) (*Contract, error)
 	UpsertByAddress(pCtx context.Context, pAddress string, pUpsert *Contract) error
+}
+
+// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
+type ErrContractNotFoundByAddress struct {
+	Address string
+}
+
+func (e ErrContractNotFoundByAddress) Error() string {
+	return fmt.Sprintf("contract not found by address: %s", e.Address)
 }

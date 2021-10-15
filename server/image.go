@@ -32,10 +32,6 @@ import (
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
 
-type errTooManyTokensForIdentifiers struct {
-	tokenID, contractAddress string
-}
-
 type errUnsupportedURL struct {
 	url string
 }
@@ -45,15 +41,10 @@ type errUnsupportedMediaType struct {
 }
 
 func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
-	tokens, err := tokenRepo.GetByNFTIdentifiers(pCtx, tokenID, contractAddress)
+	token, err := tokenRepo.GetByNFTIdentifiers(pCtx, tokenID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
-	if len(tokens) > 1 {
-		return nil, errTooManyTokensForIdentifiers{tokenID, contractAddress}
-	}
-
-	token := tokens[0]
 
 	if token.Media.PreviewURL != "" && token.Media.ThumbnailURL != "" && token.Media.MediaURL != "" {
 		return nil, errAlreadyHasMedia
@@ -299,10 +290,6 @@ func scaleVideo(pCtx context.Context, inFileName string, w, h float64) ([]byte, 
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func (e errTooManyTokensForIdentifiers) Error() string {
-	return fmt.Sprintf("only one token should be returned for contract address %s and token ID %s", e.contractAddress, e.tokenID)
 }
 
 func (e errUnsupportedURL) Error() string {

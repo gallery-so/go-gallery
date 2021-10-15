@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -40,7 +41,7 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 }
 
 // GetByAddress returns an contract by a given address
-func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress string) ([]*persist.Contract, error) {
+func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress string) (*persist.Contract, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -55,5 +56,13 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress st
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) < 1 {
+		return nil, persist.ErrContractNotFoundByAddress{Address: pAddress}
+	}
+
+	if len(result) > 1 {
+		logrus.Errorf("found more than one contract for address: %s", pAddress)
+	}
+
+	return result[0], nil
 }

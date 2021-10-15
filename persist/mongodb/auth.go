@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -61,8 +60,8 @@ func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress string) (*pers
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, errors.New("no nonce found")
+	if len(result) != 1 {
+		return nil, persist.ErrNonceNotFoundForAddress{Address: pAddress}
 	}
 
 	return result[0], nil

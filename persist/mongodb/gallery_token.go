@@ -2,7 +2,7 @@ package mongodb
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -17,6 +17,10 @@ const galleryColName = "galleries"
 type GalleryTokenMongoRepository struct {
 	mp  *storage
 	nmp *storage
+}
+
+type errUserDoesNotOwnCollections struct {
+	userID persist.DBID
 }
 
 // NewGalleryTokenMongoRepository creates a new instance of the collection mongo repository
@@ -52,7 +56,7 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 	}
 
 	if int(ct) != len(pUpdate.Collections) {
-		return errors.New("user does not own all collections to be inserted")
+		return errUserDoesNotOwnCollections{pOwnerUserID}
 	}
 
 	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
@@ -94,8 +98,7 @@ func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID 
 
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool,
-) ([]*persist.GalleryToken, error) {
+func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (*persist.GalleryToken, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -108,7 +111,11 @@ func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.
 		return nil, err
 	}
 
-	return result, nil
+	if len(result) != 1 {
+		return nil, persist.ErrGalleryNotFoundByID{ID: pID}
+	}
+
+	return result[0], nil
 }
 
 func newGalleryTokenPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
@@ -147,4 +154,8 @@ func newGalleryTokenPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
 			"as":       "collections",
 		}}},
 	}
+}
+
+func (e errUserDoesNotOwnCollections) Error() string {
+	return fmt.Sprintf("user with ID %v does not own all collections to be inserted", e.userID)
 }

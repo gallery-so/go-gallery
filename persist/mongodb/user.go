@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -90,11 +91,8 @@ func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID,
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
-	}
-	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByID{ID: userID}
 	}
 
 	return result[0], nil
@@ -117,11 +115,12 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress string
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByAddress{Address: pAddress}
 	}
+
 	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+		logrus.Errorf("found more than one user for address: %s", pAddress)
 	}
 
 	return result[0], nil
@@ -144,11 +143,12 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no users found")
+	if len(result) < 1 {
+		return nil, persist.ErrUserNotFoundByUsername{Username: pUsername}
 	}
+
 	if len(result) > 1 {
-		return nil, fmt.Errorf("more than one user found when expecting a single result")
+		logrus.Errorf("found more than one user for username: %s", pUsername)
 	}
 
 	return result[0], nil

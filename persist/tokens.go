@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -135,12 +136,22 @@ type TokenRepository interface {
 	GetByWallet(context.Context, string) ([]*Token, error)
 	GetByUserID(context.Context, DBID) ([]*Token, error)
 	GetByContract(context.Context, string) ([]*Token, error)
-	GetByNFTIdentifiers(context.Context, string, string) ([]*Token, error)
-	GetByID(context.Context, DBID) ([]*Token, error)
+	GetByNFTIdentifiers(context.Context, string, string) (*Token, error)
+	GetByID(context.Context, DBID) (*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+}
+
+// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
+type ErrTokenNotFoundByIdentifiers struct {
+	TokenID, ContractAddress string
+}
+
+// ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
+type ErrTokenNotFoundByID struct {
+	ID DBID
 }
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
@@ -168,4 +179,12 @@ func SniffMediaType(buf []byte) MediaType {
 		return MediaTypeUnknown
 	}
 
+}
+
+func (e ErrTokenNotFoundByID) Error() string {
+	return fmt.Sprintf("token not found by ID: %s", e.ID)
+}
+
+func (e ErrTokenNotFoundByIdentifiers) Error() string {
+	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }

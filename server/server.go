@@ -54,7 +54,7 @@ func CoreInit() *gin.Engine {
 	setDefaults()
 
 	router := gin.Default()
-	router.Use(handleCORS())
+	router.Use(handleCORS(), errLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
