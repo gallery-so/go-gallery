@@ -83,13 +83,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	imgURL := ""
 	vURL := ""
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.MaxSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
 		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.MaxSearchDepth).(string); ok {
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
 		vURL = it
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.MaxSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
 		imgURL = it
 	}
 

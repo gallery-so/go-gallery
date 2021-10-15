@@ -177,6 +177,13 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 		go func(n *persist.Token) {
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
+				if media.MediaURL == "" {
+					if it, ok := util.GetValueFromMapUnsafe(n.TokenMetadata, "image", util.DefaultSearchDepth).(string); ok {
+						media.MediaURL = it
+						media.PreviewURL = it
+						media.ThumbnailURL = it
+					}
+				}
 				if err == nil && media.MediaURL != "" {
 					n.Media = *media
 					go func() {
@@ -205,6 +212,13 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 		go func(n *persist.TokenInCollection) {
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
+				if media.MediaURL == "" {
+					if it, ok := util.GetValueFromMapUnsafe(n.TokenMetadata, "image", util.DefaultSearchDepth).(string); ok {
+						media.MediaURL = it
+						media.PreviewURL = it
+						media.ThumbnailURL = it
+					}
+				}
 				if err == nil && media.MediaURL != "" {
 					n.Media = *media
 					go func() {

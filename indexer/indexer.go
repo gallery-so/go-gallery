@@ -623,7 +623,7 @@ func getUniqueMetadataHandlers() uniqueMetadatas {
 
 func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...string) interface{} {
 	for _, field := range fields {
-		if val := util.GetValueFromMapUnsafe(metadata, field, util.MaxSearchDepth); val != nil {
+		if val := util.GetValueFromMapUnsafe(metadata, field, util.DefaultSearchDepth); val != nil {
 			return val
 		}
 	}
