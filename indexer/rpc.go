@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultStartingBlock = 5270000
+const defaultStartingBlock = 6500000
 
 // transfer represents a transfer from the RPC response
 type transfer struct {

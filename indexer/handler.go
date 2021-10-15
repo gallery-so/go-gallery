@@ -73,7 +73,7 @@ func newEthClient() *ethclient.Client {
 	defer cancel()
 
 	dialer := *websocket.DefaultDialer
-	dialer.ReadBufferSize = 1024 * 8
+	dialer.ReadBufferSize = 1024 * 20
 	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
 	if err != nil {
 		panic(err)
