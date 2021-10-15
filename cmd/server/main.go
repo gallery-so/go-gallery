@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"os"
-	"strings"
 
 	_ "github.com/mikeydub/go-gallery/server"
 	"github.com/sirupsen/logrus"
@@ -11,7 +10,7 @@ import (
 )
 
 func main() {
-	if strings.HasSuffix(os.Getenv("SERVER_SOFTWARE"), "Google App Engine/") {
+	if os.Getenv("SERVER_SOFTWARE") != "" {
 		logrus.Info("Running in App Engine Mode")
 		appengine.Main()
 	} else {
