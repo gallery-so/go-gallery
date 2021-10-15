@@ -52,11 +52,6 @@ type tokenContractMetadata struct {
 	Symbol string `json:"symbol"`
 }
 
-type tokenWithBlockNumber struct {
-	token       *persist.Token
-	blockNumber string
-}
-
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
 func getTokenContractMetadata(address address, ethClient *ethclient.Client) (*tokenContractMetadata, error) {
 	contract := common.HexToAddress(string(address))

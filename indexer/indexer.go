@@ -395,14 +395,14 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			i.failWithMessage(errors.New("token type"), "unknown token type")
 		}
 
-		i.uris <- tokenURI{key, u}
-
 		id, err := util.HexToBigInt(string(tokenID))
 		if err != nil {
 			i.failWithMessage(err, "failed to convert token ID to big int")
 			return
 		}
 		uriReplaced := uri(strings.ReplaceAll(string(u), "{id}", id.String()))
+
+		i.uris <- tokenURI{key, uriReplaced}
 		go func() {
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				if metadata, err := handler(i, uriReplaced, contractAddress, tokenID); err != nil {
