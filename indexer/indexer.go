@@ -249,6 +249,11 @@ func (i *Indexer) processTokens() {
 			<-time.After(time.Second * 10)
 			mu.Lock()
 			i.tokens <- i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
+			owners = map[tokenIdentifiers]ownerAtBlock{}
+			previousOwners = map[tokenIdentifiers][]ownerAtBlock{}
+			balances = map[tokenIdentifiers]map[address]*big.Int{}
+			metadatas = map[tokenIdentifiers]tokenMetadata{}
+			uris = map[tokenIdentifiers]tokenURI{}
 			mu.Unlock()
 		}
 	}()
