@@ -118,8 +118,11 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 	startingBlock := uint64(defaultStartingBlock)
 
-	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err != nil && mostRecent > 0 {
+	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err == nil && mostRecent > defaultStartingBlock {
 		startingBlock = mostRecent
+	} else {
+		logrus.Infof("No most recent block found, starting at %d", startingBlock)
+		logrus.WithError(err).Info("No most recent block found")
 	}
 
 	return &Indexer{
@@ -178,10 +181,13 @@ func (i *Indexer) processLogs() {
 	topics := [][]common.Hash{events, nil, nil, nil}
 
 	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
-	// interval := getBlockInterval(1, 2000, i.lastSyncedBlock, i.mostRecentBlock)
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(50)))
-
+	errs := 0
 	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
+		if errs > 5 {
+			nextBlock.Add(curBlock, big.NewInt(int64(5)))
+			time.Sleep(time.Second * 20)
+		}
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
@@ -192,10 +198,15 @@ func (i *Indexer) processLogs() {
 		})
 		cancel()
 		if err != nil {
+			errs++
 			logrus.WithError(err).Error("error getting logs, trying again")
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 10)
 			continue
 		}
+		if errs > 5 {
+			nextBlock.Add(curBlock, big.NewInt(int64(50)))
+		}
+		errs = 0
 		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
 		i.transfers <- logsToTransfer(logsTo)
@@ -204,7 +215,6 @@ func (i *Indexer) processLogs() {
 
 		curBlock.Add(curBlock, big.NewInt(int64(50)))
 		nextBlock.Add(nextBlock, big.NewInt(int64(50)))
-		// interval = getBlockInterval(1, 2000, curBlock.Uint64(), atomic.LoadUint64(&i.mostRecentBlock))
 	}
 
 }

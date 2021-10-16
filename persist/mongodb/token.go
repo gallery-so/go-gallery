@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 const (
 	tokenColName = "tokens"
 )
+
+var errNoTokensFound = errors.New("no tokens found")
 
 // TokenMongoRepository is a repository that stores tokens in a MongoDB database
 type TokenMongoRepository struct {
@@ -230,7 +233,7 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (uint64, er
 	}
 
 	if len(res) < 1 {
-		return 0, nil
+		return 0, errNoTokensFound
 	}
 
 	return res[0].LatestBlock, nil
