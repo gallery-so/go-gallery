@@ -282,6 +282,15 @@ func (i *Indexer) processTokens() {
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
 				balances[balance.ti] = map[address]*big.Int{}
+				contractAddress, tokenID, err := parseTokenIdentifiers(balance.ti)
+				if err == nil && contractAddress != "" && tokenID != "" {
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					if err == nil {
+						for _, token := range tokens {
+							balances[balance.ti][address(token.OwnerAddress)] = new(big.Int).SetUint64(token.Quantity)
+						}
+					}
+				}
 			}
 			if balances[balance.ti][balance.to] == nil {
 				balances[balance.ti][balance.to] = big.NewInt(0)
