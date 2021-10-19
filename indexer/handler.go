@@ -1,12 +1,15 @@
-package main
+package indexer
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/infra"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -17,17 +20,43 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-func main() {
+func init() {
+	router := coreInit()
+	http.Handle("/", router)
+}
+
+func coreInit() *gin.Engine {
 
 	setDefaults()
 
-	events := []infra.EventHash{infra.TransferBatchEventHash, infra.TransferEventHash, infra.TransferSingleEventHash}
+	events := []EventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
 
 	tokenRepo, contractRepo := newRepos()
-	indexer := infra.NewIndexer(newEthClient(), newIPFSShell(), tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	i := NewIndexer(newEthClient(), newIPFSShell(), tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
-	logrus.Infof("Starting indexer")
-	indexer.Start()
+	router := gin.Default()
+
+	logrus.Info("Starting indexer...")
+	go i.Start()
+
+	logrus.Info("Registering handlers...")
+	return handlersInit(router, i)
+}
+
+func handlersInit(router *gin.Engine, i *Indexer) *gin.Engine {
+	router.GET("/status", getStatus(i))
+
+	return router
+}
+
+func getStatus(i *Indexer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"current_block": i.lastSyncedBlock,
+			"recent_block":  i.mostRecentBlock,
+			"bad_uris":      i.badURIs,
+		})
+	}
 }
 
 func setDefaults() {
@@ -43,11 +72,14 @@ func newEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	ethClient, err := ethclient.DialContext(ctx, viper.GetString("RPC_URL"))
+	dialer := *websocket.DefaultDialer
+	dialer.ReadBufferSize = 1024 * 20
+	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
 	if err != nil {
 		panic(err)
 	}
-	return ethClient
+
+	return ethclient.NewClient(rpcClient)
 
 }
 

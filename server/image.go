@@ -41,10 +41,15 @@ type errUnsupportedMediaType struct {
 }
 
 func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
-	token, err := tokenRepo.GetByNFTIdentifiers(pCtx, tokenID, contractAddress)
+	tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
+	if len(tokens) < 1 {
+		return nil, fmt.Errorf("no tokens found for tokenID %s and contractAddress %s", tokenID, contractAddress)
+	}
+
+	token := tokens[0]
 
 	if token.Media.PreviewURL != "" && token.Media.ThumbnailURL != "" && token.Media.MediaURL != "" {
 		return nil, errAlreadyHasMedia
@@ -78,13 +83,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	imgURL := ""
 	vURL := ""
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.MaxSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
 		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.MaxSearchDepth).(string); ok {
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
 		vURL = it
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.MaxSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
 		imgURL = it
 	}
 

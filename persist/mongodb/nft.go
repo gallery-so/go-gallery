@@ -10,7 +10,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -123,7 +122,7 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 }
 
 // GetByContractData finds an nft by its contract data
-func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, pContractAddress string) (*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, pContractAddress string) ([]*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -135,15 +134,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 		return nil, err
 	}
 
-	if len(result) < 1 {
-		return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID, ContractAddress: pContractAddress}
-	}
-
-	if len(result) > 1 {
-		logrus.Errorf("found more than one NFT for contract address: %s token ID: %s", pContractAddress, pTokenID)
-	}
-
-	return result[0], nil
+	return result, nil
 }
 
 // GetByOpenseaID finds an nft by its opensea ID

@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// MaxSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
-const MaxSearchDepth = 5
+// DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
+const DefaultSearchDepth = 5
 
 // Contains checks whether an item exists in a slice
 func Contains(s []string, str string) bool {

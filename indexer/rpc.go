@@ -1,4 +1,4 @@
-package infra
+package indexer
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -23,8 +24,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
-
-const defaultERC721Block = 5270000
 
 // transfer represents a transfer from the RPC response
 type transfer struct {
@@ -54,9 +53,9 @@ type tokenContractMetadata struct {
 	Symbol string `json:"symbol"`
 }
 
-type tokenWithBlockNumber struct {
-	token       *persist.Token
-	blockNumber string
+type errHTTP struct {
+	url    string
+	status string
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
@@ -117,7 +116,7 @@ func getERC721TokenURI(address address, tokenID tokenID, ethClient *ethclient.Cl
 func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 
 	client := &http.Client{
-		Timeout: time.Second * 5,
+		Timeout: time.Second * 15,
 	}
 
 	asString := string(turi)
@@ -166,6 +165,17 @@ func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode > 299 {
+			time.Sleep(time.Second * 10)
+			resp, err = client.Get(asString)
+			if err != nil {
+				return nil, err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode > 299 {
+				return nil, errHTTP{status: resp.Status, url: asString}
+			}
+		}
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
@@ -217,7 +227,7 @@ func getERC1155TokenURI(pContractAddress address, pTokenID tokenID, ethClient *e
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	def := new(big.Int).SetUint64(defaultERC721Block)
+	def := new(big.Int).SetUint64(defaultStartingBlock)
 
 	logs, err := ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: def,
@@ -275,4 +285,8 @@ func padHex(pHex string, pLength int) string {
 		pHex = "0" + pHex
 	}
 	return pHex
+}
+
+func (h errHTTP) Error() string {
+	return fmt.Sprintf("HTTP Error Status - %s | URL - %s", h.status, h.url)
 }

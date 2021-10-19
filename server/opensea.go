@@ -199,12 +199,15 @@ func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, p
 		return nil, err
 	}
 
-	nft, err := nftRepo.GetByContractData(pCtx, pTokenID, pTokenContractAddress)
+	nfts, err := nftRepo.GetByContractData(pCtx, pTokenID, pTokenContractAddress)
 	if err != nil {
 		return nil, err
 	}
+	if len(nfts) < 1 {
+		return nil, fmt.Errorf("no nfts found for token id: %s, contract address: %s", pTokenID, pTokenContractAddress)
+	}
 
-	err = historyRepo.Upsert(pCtx, nft.ID, events)
+	err = historyRepo.Upsert(pCtx, nfts[0].ID, events)
 	if err != nil {
 		return nil, err
 	}
