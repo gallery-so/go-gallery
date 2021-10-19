@@ -333,8 +333,7 @@ func (i *Indexer) processTokens() {
 func (i *Indexer) processContracts() {
 	for contract := range i.contracts {
 		go func(c *persist.Contract) {
-			logrus.Infof("Processing contract %+v", c)
-			// TODO turn contract into persist.Contract
+			logrus.Infof("Processing contract %s", c.Address)
 			err := i.contractReceive(context.Background(), c)
 			if err != nil {
 				logrus.WithError(err).Error("error processing token")

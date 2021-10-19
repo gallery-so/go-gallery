@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -50,6 +51,10 @@ type contract struct {
 type tokenContractMetadata struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
+}
+
+type errHTTP struct {
+	status string
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
@@ -110,7 +115,7 @@ func getERC721TokenURI(address address, tokenID tokenID, ethClient *ethclient.Cl
 func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 
 	client := &http.Client{
-		Timeout: time.Second * 5,
+		Timeout: time.Second * 15,
 	}
 
 	asString := string(turi)
@@ -159,6 +164,17 @@ func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode > 299 {
+			time.Sleep(time.Second * 10)
+			resp, err = client.Get(asString)
+			if err != nil {
+				return nil, err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode > 299 {
+				return nil, errHTTP{status: resp.Status}
+			}
+		}
 		buf := &bytes.Buffer{}
 		_, err = io.Copy(buf, resp.Body)
 		if err != nil {
@@ -268,4 +284,8 @@ func padHex(pHex string, pLength int) string {
 		pHex = "0" + pHex
 	}
 	return pHex
+}
+
+func (h errHTTP) Error() string {
+	return fmt.Sprintf("HTTP Error: %s", h.status)
 }
