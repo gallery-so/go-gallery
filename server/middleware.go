@@ -31,7 +31,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 	userID persist.DBID
 }
 
-func jwtRequired() gin.HandlerFunc {
+func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
@@ -57,6 +57,25 @@ func jwtRequired() gin.HandlerFunc {
 			if !valid {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidJWT.Error()})
 				return
+			}
+
+			if viper.GetBool("REQUIRE_NFTS") {
+				user, err := userRepository.GetByID(c, userID)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+					return
+				}
+				has := false
+				for _, addr := range user.Addresses {
+					if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
+						has = true
+						break
+					}
+				}
+				if !has {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{userID}.Error()})
+					return
+				}
 			}
 
 			c.Set(userIDcontextKey, userID)
@@ -96,34 +115,6 @@ func rateLimited() gin.HandlerFunc {
 		limiter := rateLimiter.GetLimiter(c.ClientIP())
 		if !limiter.Allow() {
 			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errRateLimited.Error()})
-			return
-		}
-		c.Next()
-	}
-}
-
-func requireNFT(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := getUserIDfromCtx(c)
-		if userID != "" {
-			user, err := userRepository.GetByID(c, userID)
-			if err != nil {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-				return
-			}
-			has := false
-			for _, addr := range user.Addresses {
-				if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
-					has = true
-					break
-				}
-			}
-			if !has {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{userID}.Error()})
-				return
-			}
-		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return
 		}
 		c.Next()
