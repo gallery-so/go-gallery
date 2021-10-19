@@ -79,8 +79,9 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "decrypted/service-key.json")
-	viper.SetDefault("CONTRACT_ADDRESS", "0x876e785A1EE39f0655BE10a1440DBde3e53D3F57")
+	viper.SetDefault("CONTRACT_ADDRESS", "0xbfcc93F54aDc944bA4d69C767a7b4edA8B21D884")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
+	viper.SetDefault("REQUIRE_NFTS", false)
 
 	viper.AutomaticEnv()
 }
