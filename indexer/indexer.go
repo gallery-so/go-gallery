@@ -277,7 +277,24 @@ func (i *Indexer) processTokens() {
 					owners[owner.ti] = owner
 				}
 			} else {
-				owners[owner.ti] = owner
+				contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
+				if err == nil && contractAddress != "" && tokenID != "" {
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					if err == nil && len(tokens) == 1 {
+						token := tokens[0]
+						block := token.LatestBlock
+						curOwner := token.OwnerAddress
+						if owner.block > block {
+							owners[owner.ti] = owner
+						} else {
+							owners[owner.ti] = ownerAtBlock{block: block, owner: address(curOwner)}
+						}
+					} else {
+						owners[owner.ti] = owner
+					}
+				} else {
+					logrus.WithError(err).Error("error parsing token identifiers")
+				}
 			}
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
@@ -499,7 +516,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		}
 
 		result[j] = &persist.Token{
-			TokenID:         string(tokenID),
+			TokenID:         removeLeftPaddedZeros(string(tokenID)),
 			ContractAddress: strings.ToLower(string(contractAddress)),
 			OwnerAddress:    strings.ToLower(string(v.owner)),
 			Quantity:        1,
@@ -534,7 +551,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		uri := uris[k]
 		for addr, balance := range v {
 			result[j] = &persist.Token{
-				TokenID:         string(tokenID),
+				TokenID:         removeLeftPaddedZeros(string(tokenID)),
 				ContractAddress: strings.ToLower(string(contractAddress)),
 				OwnerAddress:    strings.ToLower(string(addr)),
 				Quantity:        balance.Uint64(),
@@ -653,17 +670,21 @@ func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...strin
 	return nil
 }
 
-// // function that returns a progressively smaller value between min and max for every million block numbers
-// func getBlockInterval(min, max, blockNumber, lastBlockNumber uint64) uint64 {
-// 	blockDivisor := lastBlockNumber / 20
-// 	if blockNumber < blockDivisor {
-// 		return max
-// 	}
-// 	return (max - min) / (blockNumber / blockDivisor)
-// }
-
 func toRegularAddress(addr address) address {
 	return address(strings.ToLower(fmt.Sprintf("0x%s", addr[len(addr)-38:])))
+}
+
+// a function that removes the left padded zeros from a large hex string
+func removeLeftPaddedZeros(hex string) string {
+	if strings.HasPrefix(hex, "0x") {
+		hex = hex[2:]
+	}
+	for i := 0; i < len(hex); i++ {
+		if hex[i] != '0' {
+			return "0x" + hex[i:]
+		}
+	}
+	return "0x" + hex
 }
 
 func makeKeyForToken(contractAddress address, tokenID tokenID) tokenIdentifiers {

@@ -40,18 +40,24 @@ func coreInit() *gin.Engine {
 	go i.Start()
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i)
+	return handlersInit(router, i, tokenRepo)
 }
 
-func handlersInit(router *gin.Engine, i *Indexer) *gin.Engine {
-	router.GET("/status", getStatus(i))
+func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenRepository) *gin.Engine {
+	router.GET("/status", getStatus(i, tokenRepository))
 
 	return router
 }
 
-func getStatus(i *Indexer) gin.HandlerFunc {
+func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		total, err := tokenRepository.Count(context.Background())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
 		c.JSON(200, gin.H{
+			"total_tokens":  total,
 			"current_block": i.lastSyncedBlock,
 			"recent_block":  i.mostRecentBlock,
 			"bad_uris":      i.badURIs,

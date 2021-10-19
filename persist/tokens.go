@@ -143,6 +143,7 @@ type TokenRepository interface {
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	MostRecentBlock(context.Context) (uint64, error)
+	Count(context.Context) (int64, error)
 }
 
 // ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)

@@ -239,3 +239,15 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (uint64, er
 	return res[0].LatestBlock, nil
 
 }
+
+// Count will find the most recent block stored for all tokens
+func (t *TokenMongoRepository) Count(pCtx context.Context) (int64, error) {
+
+	count, err := t.mp.count(pCtx, bson.M{})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+
+}
