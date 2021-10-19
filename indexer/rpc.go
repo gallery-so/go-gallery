@@ -54,6 +54,7 @@ type tokenContractMetadata struct {
 }
 
 type errHTTP struct {
+	url    string
 	status string
 }
 
@@ -172,7 +173,7 @@ func getMetadataFromURI(turi uri, ipfsClient *shell.Shell) (metadata, error) {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode > 299 {
-				return nil, errHTTP{status: resp.Status}
+				return nil, errHTTP{status: resp.Status, url: asString}
 			}
 		}
 		buf := &bytes.Buffer{}
@@ -287,5 +288,5 @@ func padHex(pHex string, pLength int) string {
 }
 
 func (h errHTTP) Error() string {
-	return fmt.Sprintf("HTTP Error: %s", h.status)
+	return fmt.Sprintf("HTTP Error Status - %s | URL - %s", h.status, h.url)
 }
