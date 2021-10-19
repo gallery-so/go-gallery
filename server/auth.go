@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -266,13 +267,14 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	if !userExistsBool {
 
 		if !pPreAuthed {
-			// TODO magic number
-			hasNFT, err := ethClient.HasNFT(pCtx, "0", pInput.Address)
-			if err != nil {
-				return nil, err
-			}
-			if !hasNFT {
-				return nil, errAddressDoesNotOwnRequiredNFT{pInput.Address}
+			if viper.GetBool("REQUIRE_NFTS") {
+				hasNFT, err := ethClient.HasNFTs(pCtx, requiredNFTs, pInput.Address)
+				if err != nil {
+					return nil, err
+				}
+				if !hasNFT {
+					return nil, errAddressDoesNotOwnRequiredNFT{pInput.Address}
+				}
 			}
 		}
 
