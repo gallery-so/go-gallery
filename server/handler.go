@@ -6,7 +6,7 @@ import (
 	"github.com/mikeydub/go-gallery/eth"
 )
 
-var requiredNFTs = []string{"0", "1", "2", "3", "4", "5", "6", "7"}
+var requiredNFTs = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
 
 func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
