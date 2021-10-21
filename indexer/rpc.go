@@ -83,7 +83,7 @@ func getERC721TokenURI(address persist.Address, tokenID persist.TokenID, ethClie
 		return "", err
 	}
 
-	logrus.Debugf("Token ID: %d\tToken Address: %s", tokenID.String(), contract.Hex())
+	logrus.Debugf("Token ID: %s\tToken Address: %s", tokenID.String(), contract.Hex())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
