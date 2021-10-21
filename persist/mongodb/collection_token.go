@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
@@ -200,13 +199,9 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 	pUserID persist.DBID,
-	pWalletAddresses []string,
+	pWalletAddresses []persist.Address,
 	pUpdate *persist.CollectionTokenUpdateNftsInput,
 ) error {
-
-	for i, addr := range pWalletAddresses {
-		pWalletAddresses[i] = strings.ToLower(addr)
-	}
 
 	nftsToBeRemoved := []*persist.Token{}
 
@@ -221,12 +216,12 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 		}
 
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
-		if err != ErrDocumentNotFound {
+			if err != ErrDocumentNotFound {
 				return err
 			}
 		}
 
-	  if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}); err != nil {
+		if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}); err != nil {
 			return err
 		}
 
@@ -241,11 +236,11 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 // an array of addresses
 func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 	pUserID persist.DBID,
-	pAddresses []string,
+	pAddresses []persist.Address,
 ) error {
 
-	for i, addr := range pAddresses {
-		pAddresses[i] = strings.ToLower(addr)
+	for i, address := range pAddresses {
+		pAddresses[i] = address.Lower()
 	}
 
 	nftsToBeRemoved := []*persist.Token{}
@@ -263,8 +258,8 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 		return err
 	}
 
-  if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
-			return err
+	if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
+		return err
 	}
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
@@ -360,7 +355,7 @@ func (c *CollectionTokenMongoRepository) RefreshUnassigned(pCtx context.Context,
 	return c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID))
 }
 
-func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []string) mongo.Pipeline {
+func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []persist.Address) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},

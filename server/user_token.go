@@ -56,17 +56,17 @@ type userUpdateInput struct {
 }
 
 type userGetInput struct {
-	UserID   persist.DBID `json:"user_id" form:"user_id"`
-	Address  string       `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	Username string       `json:"username" form:"username"`
+	UserID   persist.DBID    `json:"user_id" form:"user_id"`
+	Address  persist.Address `json:"address" form:"address" binding:"eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Username string          `json:"username" form:"username"`
 }
 
 type userGetOutput struct {
-	UserID      persist.DBID `json:"id"`
-	UserNameStr string       `json:"username"`
-	BioStr      string       `json:"bio"`
-	Addresses   []string     `json:"addresses"`
-	CreatedAt   time.Time    `json:"created_at"`
+	UserID      persist.DBID      `json:"id"`
+	UserNameStr string            `json:"username"`
+	BioStr      string            `json:"bio"`
+	Addresses   []persist.Address `json:"addresses"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.
@@ -77,12 +77,12 @@ type userAddAddressInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	Signature string `json:"signature" binding:"required,signature"`
-	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Signature string          `json:"signature" binding:"required,signature"`
+	Address   persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 type userRemoveAddressesInput struct {
-	Addresses []string `json:"addresses"   binding:"required"`
+	Addresses []persist.Address `json:"addresses"   binding:"required"`
 }
 
 type userCreateOutput struct {
@@ -98,15 +98,15 @@ type userAddAddressOutput struct {
 
 type errUserNotFound struct {
 	userID   persist.DBID
-	address  string
+	address  persist.Address
 	username string
 }
 
 type errNonceNotFound struct {
-	address string
+	address persist.Address
 }
 type errUserExistsWithAddress struct {
-	address string
+	address persist.Address
 }
 
 var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
@@ -296,7 +296,7 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 	}
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower(pInput.Address)},
+		Addresses: []persist.Address{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
@@ -356,7 +356,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 		return output, nil
 	}
 
-	if err = userRepo.AddAddresses(pCtx, pUserID, []string{pInput.Address}); err != nil {
+	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address.Lower()}); err != nil {
 		return nil, err
 	}
 
@@ -432,7 +432,7 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func getUserWithNonce(pCtx context.Context, pAddress string,
+func getUserWithNonce(pCtx context.Context, pAddress persist.Address,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (nonceValue string, userID persist.DBID, err error) {
 
 	nonce, err := nonceRepo.Get(pCtx, pAddress)

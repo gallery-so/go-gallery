@@ -19,7 +19,7 @@ type OwnershipHistory struct {
 
 // Owner represents a single owner of an NFT.
 type Owner struct {
-	Address      string    `bson:"address" json:"address"`
+	Address      Address   `bson:"address" json:"address"`
 	UserID       DBID      `bson:"user_id" json:"user_id"`
 	Username     string    `bson:"username" json:"username"`
 	TimeObtained time.Time `bson:"time_obtained" json:"time_obtained"`

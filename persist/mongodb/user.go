@@ -52,9 +52,9 @@ func (u *UserMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID,
 }
 
 // ExistsByAddress returns true if a user exists with the given address
-func (u *UserMongoRepository) ExistsByAddress(pCtx context.Context, pAddress string) (bool, error) {
+func (u *UserMongoRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address) (bool, error) {
 
-	countInt, err := u.mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []string{strings.ToLower(pAddress)}}})
+	countInt, err := u.mp.count(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}})
 
 	if err != nil {
 		return false, err
@@ -75,8 +75,7 @@ func (u *UserMongoRepository) Delete(pCtx context.Context, pUserID persist.DBID,
 }
 
 // GetByID returns a user by a given ID
-func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID,
-) (*persist.User, error) {
+func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID) (*persist.User, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -99,8 +98,7 @@ func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID,
 }
 
 // GetByAddress returns a user by a given wallet address
-func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress string,
-) (*persist.User, error) {
+func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.User, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -109,7 +107,7 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress string
 	}
 
 	result := []*persist.User{}
-	err := u.mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []string{strings.ToLower(pAddress)}}}, &result, opts)
+	err := u.mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress.Lower()}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -127,8 +125,7 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress string
 }
 
 // GetByUsername returns a user by a given username (case insensitive)
-func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string,
-) (*persist.User, error) {
+func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string) (*persist.User, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -155,20 +152,18 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 }
 
 // AddAddresses pushes addresses into a user's address list
-func (u *UserMongoRepository) AddAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []string) error {
+func (u *UserMongoRepository) AddAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
 
-	for i, addr := range pAddresses {
-		pAddresses[i] = strings.ToLower(addr)
+	for i, address := range pAddresses {
+		pAddresses[i] = address.Lower()
 	}
-
 	return u.mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
 
 // RemoveAddresses removes addresses from a user's address list
-func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []string) error {
-	for i, addr := range pAddresses {
-		pAddresses[i] = strings.ToLower(addr)
+func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
+	for i, address := range pAddresses {
+		pAddresses[i] = address.Lower()
 	}
-
 	return u.mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

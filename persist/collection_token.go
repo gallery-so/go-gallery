@@ -78,8 +78,8 @@ type CollectionTokenRepository interface {
 	UpdateNFTs(context.Context, DBID, DBID, *CollectionTokenUpdateNftsInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
 	UpdateNFTsUnsafe(context.Context, DBID, *CollectionTokenUpdateNftsInput) error
-	ClaimNFTs(context.Context, DBID, []string, *CollectionTokenUpdateNftsInput) error
-	RemoveNFTsOfAddresses(context.Context, DBID, []string) error
+	ClaimNFTs(context.Context, DBID, []Address, *CollectionTokenUpdateNftsInput) error
+	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (*CollectionToken, error)
 	RefreshUnassigned(context.Context, DBID) error

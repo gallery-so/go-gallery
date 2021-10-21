@@ -147,14 +147,14 @@ func TestUserAddAddresses_Success(t *testing.T) {
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
-		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
 	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
@@ -174,14 +174,14 @@ func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
 
 	nonce := &persist.UserNonce{
 		Value:   "Wrong Nonce",
-		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
-		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
 	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
@@ -191,20 +191,20 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 	assert := setupTest(t)
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 	_, err := tc.repos.userRepository.Create(context.Background(), user)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
-		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := userAddAddressInput{
-		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
 	resp := userAddAddressesRequest(assert, update, tc.user1.jwt)
 	assertErrorResponse(assert, resp)
@@ -214,7 +214,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert := setupTest(t)
 
 	user := &persist.User{
-		Addresses:          []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		UserName:           "TestUser",
 		UserNameIdempotent: "testuser",
 	}
@@ -222,7 +222,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 
 	nft := &persist.NFTDB{
-		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Name:         "test",
 	}
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
@@ -238,7 +238,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
-		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 	resp := userRemoveAddressesRequest(assert, update, jwt)
 	assertValidJSONResponse(assert, resp)
@@ -261,7 +261,7 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	assert := setupTest(t)
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
@@ -270,7 +270,7 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
-		Addresses: []string{strings.ToLower(tc.user1.address)},
+		Addresses: []persist.Address{tc.user1.address},
 	}
 
 	resp := userRemoveAddressesRequest(assert, update, jwt)
@@ -282,7 +282,7 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 	assert := setupTest(t)
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)

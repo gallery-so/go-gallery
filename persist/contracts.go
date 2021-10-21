@@ -15,22 +15,22 @@ type Contract struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated" json:"last_updated"`
 
-	Address string `bson:"address" json:"address"`
-	Symbol  string `bson:"symbol" json:"symbol"`
-	Name    string `bson:"name" json:"name"`
+	Address Address `bson:"address" json:"address"`
+	Symbol  string  `bson:"symbol" json:"symbol"`
+	Name    string  `bson:"name" json:"name"`
 
-	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
+	LatestBlock BlockNumber `bson:"latest_block" json:"latest_block"`
 }
 
 // ContractRepository represents a repository for interacting with persisted contracts
 type ContractRepository interface {
-	GetByAddress(context.Context, string) (*Contract, error)
-	UpsertByAddress(pCtx context.Context, pAddress string, pUpsert *Contract) error
+	GetByAddress(context.Context, Address) (*Contract, error)
+	UpsertByAddress(context.Context, Address, *Contract) error
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
 type ErrContractNotFoundByAddress struct {
-	Address string
+	Address Address
 }
 
 func (e ErrContractNotFoundByAddress) Error() string {

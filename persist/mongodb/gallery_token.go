@@ -32,8 +32,7 @@ func NewGalleryTokenMongoRepository(mgoClient *mongo.Client) *GalleryTokenMongoR
 }
 
 // Create inserts a new gallery into the database and returns the ID of the new gallery
-func (g *GalleryTokenMongoRepository) Create(pCtx context.Context, pGallery *persist.GalleryTokenDB,
-) (persist.DBID, error) {
+func (g *GalleryTokenMongoRepository) Create(pCtx context.Context, pGallery *persist.GalleryTokenDB) (persist.DBID, error) {
 
 	if pGallery.Collections == nil {
 		pGallery.Collections = []persist.DBID{}

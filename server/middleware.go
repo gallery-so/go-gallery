@@ -31,7 +31,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 	userID persist.DBID
 }
 
-func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []string) gin.HandlerFunc {
+func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {

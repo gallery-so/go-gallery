@@ -34,3 +34,16 @@ func HexToBigInt(hex string) (*big.Int, error) {
 func (e errInvalidHex) Error() string {
 	return "invalid hex: " + e.Hex
 }
+
+// RemoveLeftPaddedZeros is a function that removes the left padded zeros from a large hex string
+func RemoveLeftPaddedZeros(hex string) string {
+	if strings.HasPrefix(hex, "0x") {
+		hex = hex[2:]
+	}
+	for i := 0; i < len(hex); i++ {
+		if hex[i] != '0' {
+			return "0x" + hex[i:]
+		}
+	}
+	return "0x" + hex
+}

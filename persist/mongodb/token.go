@@ -3,7 +3,6 @@ package mongodb
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -57,7 +56,7 @@ func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Tok
 }
 
 // GetByWallet gets tokens for a given wallet address
-func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress string) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -68,7 +67,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress string
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"owner_address": strings.ToLower(pAddress)}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"owner_address": pAddress.Lower()}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +94,7 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 }
 
 // GetByContract gets ERC721 tokens for a given contract
-func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress string) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -106,7 +105,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"contract_address": strings.ToLower(pAddress)}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"contract_address": pAddress.Lower()}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +114,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress stri
 }
 
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID string, pAddress string) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -124,7 +123,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": strings.ToLower(pAddress)}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress.Lower()}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +164,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 		go func(token *persist.Token) {
 
-			query := bson.M{"token_id": token.TokenID, "contract_address": strings.ToLower(token.ContractAddress), "owner_address": strings.ToLower(token.OwnerAddress)}
+			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress.Lower(), "owner_address": token.OwnerAddress.Lower()}
 			returnID, err := t.mp.upsert(pCtx, query, token)
 			if err != nil {
 				errs <- err
@@ -191,7 +190,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Token) error {
 
-	_, err := t.mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": strings.ToLower(pToken.ContractAddress), "owner_address": pToken.OwnerAddress}, pToken)
+	_, err := t.mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress.Lower(), "owner_address": pToken.OwnerAddress.Lower()}, pToken)
 	return err
 }
 
@@ -220,7 +219,7 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 }
 
 // MostRecentBlock will find the most recent block stored for all tokens
-func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (uint64, error) {
+func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
 
 	opts := options.Find()
 	opts.SetLimit(1)

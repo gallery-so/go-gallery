@@ -14,10 +14,10 @@ type User struct {
 	Deleted      bool      `bson:"deleted" json:"-"`
 	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
-	UserName           string   `bson:"username,omitempty"         json:"username"` // mutable
-	UserNameIdempotent string   `bson:"username_idempotent,omitempty" json:"username_idempotent"`
-	Addresses          []string `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	Bio                string   `bson:"bio"  json:"bio"`
+	UserName           string    `bson:"username,omitempty"         json:"username"` // mutable
+	UserNameIdempotent string    `bson:"username_idempotent,omitempty" json:"username_idempotent"`
+	Addresses          []Address `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	Bio                string    `bson:"bio"  json:"bio"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -30,14 +30,14 @@ type UserUpdateInfoInput struct {
 // UserRepository represents the interface for interacting with the persisted state of users
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
-	ExistsByAddress(context.Context, string) (bool, error)
+	ExistsByAddress(context.Context, Address) (bool, error)
 	Create(context.Context, *User) (DBID, error)
 	GetByID(context.Context, DBID) (*User, error)
-	GetByAddress(context.Context, string) (*User, error)
+	GetByAddress(context.Context, Address) (*User, error)
 	GetByUsername(context.Context, string) (*User, error)
 	Delete(context.Context, DBID) error
-	AddAddresses(context.Context, DBID, []string) error
-	RemoveAddresses(context.Context, DBID, []string) error
+	AddAddresses(context.Context, DBID, []Address) error
+	RemoveAddresses(context.Context, DBID, []Address) error
 }
 
 // ErrUserNotFoundByID is returned when a user is not found by ID
@@ -52,7 +52,7 @@ type ErrUserNotFoundByUsername struct {
 
 // ErrUserNotFoundByAddress is returned when a user is not found by wallet address
 type ErrUserNotFoundByAddress struct {
-	Address string
+	Address Address
 }
 
 func (e ErrUserNotFoundByID) Error() string {

@@ -28,10 +28,10 @@ func NewAccountMongoRepository(mgoClient *mongo.Client) *AccountMongoRepository 
 
 // UpsertByAddress upserts an account by a given address
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress string, pUpsert *persist.Account) error {
+func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Account) error {
 
 	_, err := a.mp.upsert(pCtx, bson.M{
-		"address": strings.ToLower(pAddress),
+		"address": strings.ToLower(pAddress.String()),
 	}, pUpsert)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress 
 }
 
 // GetByAddress returns an account by a given address
-func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress string) (*persist.Account, error) {
+func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Account, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -50,7 +50,7 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress str
 	}
 
 	result := []*persist.Account{}
-	err := a.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
+	err := a.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress.String())}, &result, opts)
 	if err != nil {
 		return nil, err
 	}

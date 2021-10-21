@@ -41,8 +41,8 @@ type updateTokenByIDInput struct {
 }
 
 type errCouldNotMakeMedia struct {
-	tokenID         string
-	contractAddress string
+	tokenID         persist.TokenID
+	contractAddress persist.Address
 }
 
 type errCouldNotUpdateMedia struct {
@@ -158,13 +158,13 @@ func refreshUnassignedTokensForUser(collectionRepository persist.CollectionToken
 	}
 }
 
-func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []string, userRepo persist.UserRepository) (bool, error) {
+func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Address, userRepo persist.UserRepository) (bool, error) {
 	user, err := userRepo.GetByID(pCtx, userID)
 	if err != nil {
 		return false, err
 	}
 	for _, walletAddress := range walletAddresses {
-		if !util.Contains(user.Addresses, walletAddress) {
+		if !containsWalletAddresses(user.Addresses, walletAddress) {
 			return false, nil
 		}
 	}
@@ -175,6 +175,12 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	nftChan := make(chan *persist.Token)
 	for _, nft := range nfts {
 		go func(n *persist.Token) {
+			if n.TokenMetadata == nil || len(n.TokenMetadata) == 0 {
+				n.TokenMetadata = map[string]interface{}{}
+				if n.TokenURI != "" {
+					n.TokenMetadata["image"] = n.TokenURI
+				}
+			}
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
 				if media.MediaURL == "" {
@@ -210,6 +216,12 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 	nftChan := make(chan *persist.TokenInCollection)
 	for _, nft := range nfts {
 		go func(n *persist.TokenInCollection) {
+			if n.TokenMetadata == nil || len(n.TokenMetadata) == 0 {
+				n.TokenMetadata = map[string]interface{}{}
+				if n.TokenURI != "" {
+					n.TokenMetadata["image"] = n.TokenURI
+				}
+			}
 			if n.Media.MediaURL == "" {
 				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
 				if media.MediaURL == "" {
@@ -247,4 +259,14 @@ func (e errCouldNotMakeMedia) Error() string {
 
 func (e errCouldNotUpdateMedia) Error() string {
 	return fmt.Sprintf("could not update media for token with ID: %s", e.id)
+}
+
+func containsWalletAddresses(a []persist.Address, b persist.Address) bool {
+	for _, v := range a {
+		if v.Lower() == b.Lower() {
+			return true
+		}
+	}
+
+	return false
 }

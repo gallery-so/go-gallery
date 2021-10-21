@@ -4,9 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
+	"github.com/mikeydub/go-gallery/persist"
 )
 
-var requiredNFTs = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
+var requiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
 
 func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 

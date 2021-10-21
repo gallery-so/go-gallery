@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/persist"
 )
 
 // Client represents an abstraction over the geth ethereum client
@@ -29,19 +30,14 @@ func NewEthClient(ethClient *ethclient.Client, contractAddress string) *Client {
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
 // HasNFT checks if a wallet address has a given NFT
-func (c *Client) HasNFT(pCtx context.Context, id string, userAddr string) (bool, error) {
-
-	addr := common.HexToAddress(userAddr)
+func (c *Client) HasNFT(pCtx context.Context, id persist.TokenID, userAddr persist.Address) (bool, error) {
 
 	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
 	if err != nil {
 		return false, err
 	}
 
-	bigIntID := &big.Int{}
-	bigIntID, _ = bigIntID.SetString(id, 10)
-
-	call, err := instance.BalanceOf(&bind.CallOpts{From: addr, Context: pCtx}, addr, bigIntID)
+	call, err := instance.BalanceOf(&bind.CallOpts{Context: pCtx}, userAddr.Address(), id.BigInt())
 	if err != nil {
 		return false, err
 	}
@@ -51,9 +47,7 @@ func (c *Client) HasNFT(pCtx context.Context, id string, userAddr string) (bool,
 }
 
 // HasNFTs checks if a wallet address has a given set of NFTs
-func (c *Client) HasNFTs(pCtx context.Context, ids []string, userAddr string) (bool, error) {
-
-	addr := common.HexToAddress(userAddr)
+func (c *Client) HasNFTs(pCtx context.Context, ids []persist.TokenID, userAddr persist.Address) (bool, error) {
 
 	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
 	if err != nil {
@@ -63,12 +57,12 @@ func (c *Client) HasNFTs(pCtx context.Context, ids []string, userAddr string) (b
 	bigIntIDs := make([]*big.Int, len(ids))
 	addrs := make([]common.Address, len(ids))
 	for i := 0; i < len(ids); i++ {
-		asBigInt := &big.Int{}
-		bigIntIDs[i], _ = asBigInt.SetString(ids[i], 10)
-		addrs[i] = addr
+
+		bigIntIDs[i] = ids[i].BigInt()
+		addrs[i] = userAddr.Address()
 	}
 
-	call, err := instance.BalanceOfBatch(&bind.CallOpts{From: addr, Context: pCtx}, addrs, bigIntIDs)
+	call, err := instance.BalanceOfBatch(&bind.CallOpts{Context: pCtx}, addrs, bigIntIDs)
 	if err != nil {
 		return false, err
 	}
@@ -83,9 +77,7 @@ func (c *Client) HasNFTs(pCtx context.Context, ids []string, userAddr string) (b
 }
 
 // ResolvesENS checks if an ENS resolves to a given address
-func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr string) (bool, error) {
-
-	addr := common.HexToAddress(userAddr)
+func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr persist.Address) (bool, error) {
 
 	instance, err := contracts.NewIENSCaller(c.contractAddress, c.ethClient)
 	if err != nil {
@@ -98,12 +90,12 @@ func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr string) 
 		asBytes32[i] = nh[i]
 	}
 
-	call, err := instance.Resolver(&bind.CallOpts{From: addr, Context: pCtx}, asBytes32)
+	call, err := instance.Resolver(&bind.CallOpts{Context: pCtx}, asBytes32)
 	if err != nil {
 		return false, err
 	}
 
-	return call.String() == addr.String(), nil
+	return strings.EqualFold(userAddr.String(), call.String()), nil
 
 }
 

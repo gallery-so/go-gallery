@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -23,19 +24,19 @@ const noncePrepend = "Gallery uses this cryptographic signature in place of a pa
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
 type authUserLoginInput struct {
-	Signature string `json:"signature" binding:"required,medium_string"`
-	Address   string `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Signature string          `json:"signature" binding:"required,medium_string"`
+	Address   persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 type authUserLoginOutput struct {
-	SignatureValid bool         `json:"signature_valid"`
-	JWTtoken       string       `json:"jwt_token"`
-	UserID         persist.DBID `json:"user_id"`
-	Address        string       `json:"address"`
+	SignatureValid bool            `json:"signature_valid"`
+	JWTtoken       string          `json:"jwt_token"`
+	UserID         persist.DBID    `json:"user_id"`
+	Address        persist.Address `json:"address"`
 }
 
 type authUserGetPreflightInput struct {
-	Address string `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Address persist.Address `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
 
 type authUserGetPreflightOutput struct {
@@ -44,7 +45,7 @@ type authUserGetPreflightOutput struct {
 }
 
 type errAddressDoesNotOwnRequiredNFT struct {
-	address string
+	address persist.Address
 }
 
 func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
@@ -116,7 +117,7 @@ func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLog
 
 	loginAttempt := &persist.UserLoginAttempt{
 
-		Address:        pInput.Address,
+		Address:        pInput.Address.Lower(),
 		Signature:      pInput.Signature,
 		SignatureValid: output.SignatureValid,
 
@@ -173,7 +174,7 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 
 func authVerifySignatureAllMethods(pSignatureStr string,
 	pNonce string,
-	pAddressStr string) (bool, error) {
+	pAddressStr persist.Address) (bool, error) {
 
 	// personal_sign
 	validBool, err := authVerifySignature(pSignatureStr,
@@ -200,7 +201,7 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 
 func authVerifySignature(pSignatureStr string,
 	pDataStr string,
-	pAddress string,
+	pAddress persist.Address,
 	pUseDataHeaderBool bool) (bool, error) {
 
 	// eth_sign:
@@ -216,8 +217,7 @@ func authVerifySignature(pSignatureStr string,
 		dataStr = nonceWithPrepend
 	}
 
-	dataBytesLst := []byte(dataStr)
-	dataHash := crypto.Keccak256Hash(dataBytesLst)
+	dataHash := crypto.Keccak256Hash([]byte(dataStr))
 
 	sig, err := hexutil.Decode(pSignatureStr)
 	if err != nil {
@@ -239,7 +239,9 @@ func authVerifySignature(pSignatureStr string,
 	}
 
 	pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-	if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
+	log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
+	log.Println("pAddress:", pAddress)
+	if !strings.EqualFold(pubkeyAddressHexStr, pAddress.String()) {
 		return false, errAddressSignatureMismatch
 	}
 
@@ -278,7 +280,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 		}
 
 		nonce := &persist.UserNonce{
-			Address: strings.ToLower(pInput.Address),
+			Address: pInput.Address.Lower(),
 			Value:   generateNonce(),
 		}
 
@@ -299,11 +301,11 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 	return output, nil
 }
 
-func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+func authNonceRotateDb(pCtx context.Context, pAddress persist.Address, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
-		Address: strings.ToLower(pAddress),
+		Address: pAddress.Lower(),
 	}
 
 	err := nonceRepo.Create(pCtx, newNonce)

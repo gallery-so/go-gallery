@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -21,7 +20,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	name := "very cool nft"
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:         name,
-		OwnerAddress: strings.ToLower(tc.user1.address),
+		OwnerAddress: tc.user1.address,
 	})
 	assert.Nil(err)
 
@@ -72,7 +71,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
-		OwnerAddress:   strings.ToLower(tc.user1.address),
+		OwnerAddress:   tc.user1.address,
 	})
 	assert.Nil(err)
 
@@ -104,7 +103,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
-		OwnerAddress:   strings.ToLower(tc.user1.address),
+		OwnerAddress:   tc.user1.address,
 	})
 	assert.Nil(err)
 

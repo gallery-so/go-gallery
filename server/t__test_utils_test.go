@@ -29,7 +29,7 @@ var tc *TestConfig
 
 type TestUser struct {
 	id       persist.DBID
-	address  string
+	address  persist.Address
 	jwt      string
 	username string
 }
@@ -37,11 +37,11 @@ type TestUser struct {
 func generateTestUser(repos *repositories, username string) *TestUser {
 	ctx := context.Background()
 
-	address := strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40)))
+	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40))))
 	user := &persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
-		Addresses:          []string{address},
+		Addresses:          []persist.Address{address},
 	}
 	id, err := repos.userRepository.Create(ctx, user)
 	if err != nil {

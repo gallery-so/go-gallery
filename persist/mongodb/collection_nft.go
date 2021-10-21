@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"log"
 	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
@@ -167,16 +167,16 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 	pUserID persist.DBID,
-	pWalletAddresses []string,
+	pWalletAddresses []persist.Address,
 	pUpdate *persist.CollectionUpdateNftsInput,
 ) error {
 
 	for i, addr := range pWalletAddresses {
-		logrus.Infof("claiming for address: %s", pWalletAddresses[i])
-		pWalletAddresses[i] = strings.ToLower(addr)
+		pWalletAddresses[i] = addr.Lower()
 	}
 
 	nftsToBeRemoved := []*persist.NFTDB{}
+	log.Printf("NFTS TO BE REMOVED %+v\n", pUpdate.Nfts)
 
 	if err := c.nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -214,11 +214,11 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 // an array of addresses
 func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 	pUserID persist.DBID,
-	pAddresses []string,
+	pAddresses []persist.Address,
 ) error {
 
 	for i, addr := range pAddresses {
-		pAddresses[i] = strings.ToLower(addr)
+		pAddresses[i] = addr.Lower()
 	}
 
 	nftsToBeRemoved := []*persist.NFTDB{}
@@ -333,7 +333,7 @@ func (c *CollectionMongoRepository) RefreshUnassigned(pCtx context.Context, pUse
 	return c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID))
 }
 
-func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []string) mongo.Pipeline {
+func newUnassignedCollectionPipeline(pUserID persist.DBID, pOwnerAddresses []persist.Address) mongo.Pipeline {
 	return mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"owner_user_id": pUserID, "deleted": false}}},
 		{{Key: "$group", Value: bson.M{"_id": "unassigned", "nfts": bson.M{"$addToSet": "$nfts"}}}},

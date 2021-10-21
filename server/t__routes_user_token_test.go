@@ -147,14 +147,14 @@ package server
 
 // 	nonce := &persist.UserNonce{
 // 		Value:   "TestNonce",
-// 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+// 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 // 	}
 // 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 // 	assert.Nil(err)
 
 // 	update := userAddAddressInput{
-// 		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-// 		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+// 		Address:   "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
+// 		Signature: "0xe996bb6b7b345a64d6da721f8e74d8ff4ba94d80e0b9348955ba1e9f25c899635b9c685182ae0ee8abee94b1b13f2942ec34ff1537e7c3112a25ae2bd7a40d841b",
 // 	}
 // 	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
 // 	assertValidJSONResponse(assert, resp)
@@ -174,14 +174,14 @@ package server
 
 // 	nonce := &persist.UserNonce{
 // 		Value:   "Wrong Nonce",
-// 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+// 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 // 	}
 // 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 // 	assert.Nil(err)
 
 // 	update := userAddAddressInput{
-// 		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-// 		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+// 		Address:   "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
+// 		Signature: "0xe996bb6b7b345a64d6da721f8e74d8ff4ba94d80e0b9348955ba1e9f25c899635b9c685182ae0ee8abee94b1b13f2942ec34ff1537e7c3112a25ae2bd7a40d841b",
 // 	}
 // 	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
 // 	assertErrorResponse(assert, resp)
@@ -191,20 +191,20 @@ package server
 // 	assert := setupTest(t)
 
 // 	user := &persist.User{
-// 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+// 		Addresses: []string{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
 // 	}
 // 	_, err := tc.repos.userRepository.Create(context.Background(), user)
 
 // 	nonce := &persist.UserNonce{
 // 		Value:   "TestNonce",
-// 		Address: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+// 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 // 	}
 // 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 // 	assert.Nil(err)
 
 // 	update := userAddAddressInput{
-// 		Address:   strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
-// 		Signature: "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b",
+// 		Address:   "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
+// 		Signature: "0xe996bb6b7b345a64d6da721f8e74d8ff4ba94d80e0b9348955ba1e9f25c899635b9c685182ae0ee8abee94b1b13f2942ec34ff1537e7c3112a25ae2bd7a40d841b",
 // 	}
 // 	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
 // 	assertErrorResponse(assert, resp)
@@ -214,7 +214,7 @@ package server
 // 	assert := setupTest(t)
 
 // 	user := &persist.User{
-// 		Addresses:          []string{strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"), strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+// 		Addresses:          []string{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
 // 		UserName:           "TestUser",
 // 		UserNameIdempotent: "testuser",
 // 	}
@@ -222,7 +222,7 @@ package server
 // 	assert.Nil(err)
 
 // 	nft := &persist.Token{
-// 		OwnerAddress: strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"),
+// 		OwnerAddress: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 // 		Name:         "test",
 // 	}
 // 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), nft)
@@ -238,7 +238,7 @@ package server
 // 	assert.Nil(err)
 
 // 	update := userRemoveAddressesInput{
-// 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31")},
+// 		Addresses: []string{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
 // 	}
 // 	resp := userRemoveAddressesRequestToken(assert, update, jwt)
 // 	assertValidJSONResponse(assert, resp)
@@ -262,7 +262,7 @@ package server
 // 	assert := setupTest(t)
 
 // 	user := &persist.User{
-// 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+// 		Addresses: []string{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 // 	}
 // 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 // 	assert.Nil(err)
@@ -271,7 +271,7 @@ package server
 // 	assert.Nil(err)
 
 // 	update := userRemoveAddressesInput{
-// 		Addresses: []string{strings.ToLower(tc.user1.address)},
+// 		Addresses: []string{tc.user1.address},
 // 	}
 
 // 	resp := userRemoveAddressesRequestToken(assert, update, jwt)
@@ -283,7 +283,7 @@ package server
 // 	assert := setupTest(t)
 
 // 	user := &persist.User{
-// 		Addresses: []string{strings.ToLower("0x456d569592f15Af845D0dbe984C12BAB8F430e31"), strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")},
+// 		Addresses: []string{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 // 	}
 // 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 // 	assert.Nil(err)

@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"strings"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"go.mongodb.org/mongo-driver/bson"
@@ -47,14 +46,14 @@ func (l *LoginMongoRepository) Create(pCtx context.Context, pLoginAttempt *persi
 }
 
 // Get returns the most recent nonce for a given address
-func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress string) (*persist.UserNonce, error) {
+func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress persist.Address) (*persist.UserNonce, error) {
 
 	opts := options.Find()
 	opts.SetSort(bson.M{"created_at": -1})
 	opts.SetLimit(1)
 
 	result := []*persist.UserNonce{}
-	err := n.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
+	err := n.mp.find(pCtx, bson.M{"address": pAddress.Lower()}, &result, opts)
 
 	if err != nil {
 		return nil, err
