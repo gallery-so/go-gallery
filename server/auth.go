@@ -314,5 +314,5 @@ func authNonceRotateDb(pCtx context.Context, pAddress string, pUserID persist.DB
 }
 
 func (e errAddressDoesNotOwnRequiredNFT) Error() string {
-	return fmt.Sprintf("address %s does not own required NFT", e.address)
+	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
 }
