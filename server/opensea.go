@@ -365,15 +365,14 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NFTDB, pUser *persis
 
 func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft *openseaAsset, nftRepo persist.NFTRepository) *persist.NFTDB {
 
-	nft.Contract.ContractAddress = nft.Contract.ContractAddress.Lower()
 	result := &persist.NFTDB{
-		OwnerAddress:         pWalletAddress.Lower(),
+		OwnerAddress:         pWalletAddress,
 		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
 		Name:                 nft.Name,
 		Description:          nft.Description,
 		ExternalURL:          nft.ExternalURL,
 		ImageURL:             nft.ImageURL,
-		CreatorAddress:       nft.Creator.Address.Lower(),
+		CreatorAddress:       nft.Creator.Address,
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
 		OpenseaID:            nft.ID,
@@ -407,7 +406,7 @@ func openseaToGalleryEvents(pCtx context.Context, pEvents *openseaEvents, userRe
 			return nil, err
 		}
 		owner.TimeObtained = time
-		owner.Address = event.ToAccount.Address.Lower()
+		owner.Address = event.ToAccount.Address
 		user, err := userRepo.GetByAddress(pCtx, event.ToAccount.Address)
 		if err == nil {
 			owner.UserID = user.ID

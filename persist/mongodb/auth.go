@@ -53,7 +53,7 @@ func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress persist.Addres
 	opts.SetLimit(1)
 
 	result := []*persist.UserNonce{}
-	err := n.mp.find(pCtx, bson.M{"address": pAddress.Lower()}, &result, opts)
+	err := n.mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
 		return nil, err

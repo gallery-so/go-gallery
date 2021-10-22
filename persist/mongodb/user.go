@@ -107,7 +107,7 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persis
 	}
 
 	result := []*persist.User{}
-	err := u.mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress.Lower()}}}, &result, opts)
+	err := u.mp.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -153,17 +153,10 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 
 // AddAddresses pushes addresses into a user's address list
 func (u *UserMongoRepository) AddAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
-
-	for i, address := range pAddresses {
-		pAddresses[i] = address.Lower()
-	}
 	return u.mp.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
 
 // RemoveAddresses removes addresses from a user's address list
 func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
-	for i, address := range pAddresses {
-		pAddresses[i] = address.Lower()
-	}
 	return u.mp.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

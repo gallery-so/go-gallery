@@ -83,7 +83,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	}
 
 	user := &persist.User{
-		Addresses: []persist.Address{pInput.Address.Lower()},
+		Addresses: []persist.Address{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)

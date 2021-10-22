@@ -117,7 +117,7 @@ func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLog
 
 	loginAttempt := &persist.UserLoginAttempt{
 
-		Address:        pInput.Address.Lower(),
+		Address:        pInput.Address,
 		Signature:      pInput.Signature,
 		SignatureValid: output.SignatureValid,
 
@@ -280,7 +280,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 		}
 
 		nonce := &persist.UserNonce{
-			Address: pInput.Address.Lower(),
+			Address: pInput.Address,
 			Value:   generateNonce(),
 		}
 
@@ -305,7 +305,7 @@ func authNonceRotateDb(pCtx context.Context, pAddress persist.Address, pUserID p
 
 	newNonce := &persist.UserNonce{
 		Value:   generateNonce(),
-		Address: pAddress.Lower(),
+		Address: pAddress,
 	}
 
 	err := nonceRepo.Create(pCtx, newNonce)

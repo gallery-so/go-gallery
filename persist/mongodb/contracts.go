@@ -30,7 +30,7 @@ func NewContractMongoRepository(mgoClient *mongo.Client) *ContractMongoRepositor
 func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Contract) error {
 
 	_, err := c.mp.upsert(pCtx, bson.M{
-		"address": pAddress.Lower(),
+		"address": pAddress,
 	}, pUpsert)
 	if err != nil {
 		return err

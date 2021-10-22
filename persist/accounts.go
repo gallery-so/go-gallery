@@ -48,12 +48,7 @@ func (e ErrAccountNotFoundByAddress) Error() string {
 }
 
 func (a Address) String() string {
-	return normalizeAddress(string(a))
-}
-
-// Lower returns the Ethereum address number as a lowercase hex string
-func (a Address) Lower() Address {
-	return Address(strings.ToLower(a.String()))
+	return normalizeAddress(strings.ToLower(string(a)))
 }
 
 // Address returns the ethereum address byte array

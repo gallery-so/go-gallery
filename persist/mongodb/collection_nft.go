@@ -172,7 +172,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 ) error {
 
 	for i, addr := range pWalletAddresses {
-		pWalletAddresses[i] = addr.Lower()
+		pWalletAddresses[i] = addr
 	}
 
 	nftsToBeRemoved := []*persist.NFTDB{}
@@ -218,7 +218,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 ) error {
 
 	for i, addr := range pAddresses {
-		pAddresses[i] = addr.Lower()
+		pAddresses[i] = addr
 	}
 
 	nftsToBeRemoved := []*persist.NFTDB{}

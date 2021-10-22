@@ -240,7 +240,7 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 ) error {
 
 	for i, address := range pAddresses {
-		pAddresses[i] = address.Lower()
+		pAddresses[i] = address
 	}
 
 	nftsToBeRemoved := []*persist.Token{}

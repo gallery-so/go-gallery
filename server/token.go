@@ -263,7 +263,7 @@ func (e errCouldNotUpdateMedia) Error() string {
 
 func containsWalletAddresses(a []persist.Address, b persist.Address) bool {
 	for _, v := range a {
-		if v.Lower() == b.Lower() {
+		if v == b {
 			return true
 		}
 	}

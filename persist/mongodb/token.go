@@ -67,7 +67,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"owner_address": pAddress.Lower()}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"contract_address": pAddress.Lower()}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress.Lower()}, &result, opts)
+	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 		go func(token *persist.Token) {
 
-			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress.Lower(), "owner_address": token.OwnerAddress.Lower()}
+			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress, "owner_address": token.OwnerAddress}
 			returnID, err := t.mp.upsert(pCtx, query, token)
 			if err != nil {
 				errs <- err
@@ -190,7 +190,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Token) error {
 
-	_, err := t.mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress.Lower(), "owner_address": pToken.OwnerAddress.Lower()}, pToken)
+	_, err := t.mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress, "owner_address": pToken.OwnerAddress}, pToken)
 	return err
 }
 

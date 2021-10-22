@@ -495,7 +495,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		}
 		previousOwnerAddresses := make([]persist.Address, len(previousOwners[k]))
 		for i, w := range previousOwners[k] {
-			previousOwnerAddresses[i] = w.owner.Lower()
+			previousOwnerAddresses[i] = w.owner
 		}
 		metadata := metadatas[k]
 		var name, description string
@@ -509,8 +509,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 		result[j] = &persist.Token{
 			TokenID:         tokenID,
-			ContractAddress: contractAddress.Lower(),
-			OwnerAddress:    v.owner.Lower(),
+			ContractAddress: contractAddress,
+			OwnerAddress:    v.owner,
 			Quantity:        1,
 			Name:            name,
 			Description:     description,
@@ -544,8 +544,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		for addr, balance := range v {
 			result[j] = &persist.Token{
 				TokenID:         tokenID,
-				ContractAddress: contractAddress.Lower(),
-				OwnerAddress:    addr.Lower(),
+				ContractAddress: contractAddress,
+				OwnerAddress:    addr,
 				Quantity:        balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
@@ -572,12 +572,12 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			}
 
 			result = append(result, &transfer{
-				from:            persist.Address(pLog.Topics[1].Hex()).Lower(),
-				to:              persist.Address(pLog.Topics[2].Hex()).Lower(),
+				from:            persist.Address(pLog.Topics[1].Hex()),
+				to:              persist.Address(pLog.Topics[2].Hex()),
 				tokenID:         persist.TokenID(pLog.Topics[3].Hex()),
 				amount:          1,
 				blockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				contractAddress: persist.Address(pLog.Address.Hex()).Lower(),
+				contractAddress: persist.Address(pLog.Address.Hex()),
 				tokenType:       persist.TokenTypeERC721,
 			})
 		case string(TransferSingleEventHash):
@@ -586,12 +586,12 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			}
 
 			result = append(result, &transfer{
-				from:            persist.Address(pLog.Topics[2].Hex()).Lower(),
-				to:              persist.Address(pLog.Topics[3].Hex()).Lower(),
+				from:            persist.Address(pLog.Topics[2].Hex()),
+				to:              persist.Address(pLog.Topics[3].Hex()),
 				tokenID:         persist.TokenID(common.BytesToHash(pLog.Data[:len(pLog.Data)/2]).Hex()),
 				amount:          common.BytesToHash(pLog.Data[len(pLog.Data)/2:]).Big().Uint64(),
 				blockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				contractAddress: persist.Address(pLog.Address.Hex()).Lower(),
+				contractAddress: persist.Address(pLog.Address.Hex()),
 				tokenType:       persist.TokenTypeERC1155,
 			})
 
@@ -599,8 +599,8 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			if len(pLog.Topics) != 4 {
 				continue
 			}
-			from := persist.Address(pLog.Topics[2].Hex()).Lower()
-			to := persist.Address(pLog.Topics[3].Hex()).Lower()
+			from := persist.Address(pLog.Topics[2].Hex())
+			to := persist.Address(pLog.Topics[3].Hex())
 			amountOffset := len(pLog.Data) / 2
 			total := amountOffset / 64
 			this := make([]*transfer, total)
@@ -642,8 +642,8 @@ func (i *Indexer) failWithMessage(err error, msg string) {
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
-		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782").Lower(): autoglyphs,
-		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E").Lower(): colorglyphs,
+		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782"): autoglyphs,
+		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E"): colorglyphs,
 	}
 }
 

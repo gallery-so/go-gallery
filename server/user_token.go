@@ -48,6 +48,7 @@ var bannedUsernames = map[string]bool{
 	"support":       true,
 	"feed":          true,
 	"feeds":         true,
+	"membership":    true,
 }
 
 type userUpdateInput struct {
@@ -356,7 +357,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 		return output, nil
 	}
 
-	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address.Lower()}); err != nil {
+	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address}); err != nil {
 		return nil, err
 	}
 

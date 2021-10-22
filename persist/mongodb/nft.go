@@ -82,7 +82,7 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 // GetByAddresses finds an nft by its owner user id
 func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]*persist.NFT, error) {
 	for i, v := range pAddresses {
-		pAddresses[i] = v.Lower()
+		pAddresses[i] = v
 	}
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -129,7 +129,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID pe
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress.Lower()}), &result, opts); err != nil {
+	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress.Lower()}), &result, opts); err != nil {
+	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -183,8 +183,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 				errs <- errOwnerAddressRequired
 				return
 			}
-			nft.OwnerAddress = nft.OwnerAddress.Lower()
-			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress.Lower()}, nft)
+			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
 			}
@@ -209,7 +208,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 // OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
 func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []*persist.NFT) error {
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v.Lower()
+		pWalletAddresses[i] = v
 	}
 
 	toCache, err := json.Marshal(pNfts)
@@ -224,7 +223,7 @@ func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddres
 func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []persist.Address) error {
 
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v.Lower()
+		pWalletAddresses[i] = v
 	}
 
 	return n.redisClients.Delete(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
@@ -234,7 +233,7 @@ func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAdd
 func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []persist.Address) ([]*persist.NFT, error) {
 
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v.Lower()
+		pWalletAddresses[i] = v
 	}
 
 	result, err := n.redisClients.Get(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
