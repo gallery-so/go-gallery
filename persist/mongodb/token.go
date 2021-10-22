@@ -248,9 +248,9 @@ func (t *TokenMongoRepository) Count(pCtx context.Context, countType persist.Tok
 	case persist.CountTypeNoMetadata:
 		filter = bson.M{"token_metadata": nil}
 	case persist.CountTypeERC721:
-		filter = bson.M{"type": persist.TokenTypeERC721}
+		filter = bson.M{"token_type": persist.TokenTypeERC721}
 	case persist.CountTypeERC1155:
-		filter = bson.M{"type": persist.TokenTypeERC1155}
+		filter = bson.M{"token_type": persist.TokenTypeERC1155}
 	}
 	count, err := t.mp.count(pCtx, filter)
 	if err != nil {

@@ -71,7 +71,7 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"total_tokens":  total,
 			"current_block": i.lastSyncedBlock,
 			"recent_block":  i.mostRecentBlock,

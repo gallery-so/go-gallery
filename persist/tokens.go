@@ -116,7 +116,7 @@ type Token struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 	Media          Media  `bson:"media" json:"media"`
 
-	TokenType TokenType `bson:"type" json:"type"`
+	TokenType TokenType `bson:"token_type" json:"token_type"`
 
 	Chain Chain `bson:"chain" json:"chain"`
 

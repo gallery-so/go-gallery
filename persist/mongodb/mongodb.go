@@ -249,6 +249,9 @@ func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result inte
 
 // count counts the number of documents in the mongo database which is not deleted
 func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+	if len(filter) == 0 {
+		return m.collection.EstimatedDocumentCount(ctx)
+	}
 	filter = cleanQuery(filter)
 	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
@@ -273,6 +276,9 @@ func boolin(b bool) *bool {
 
 func structToBsonMap(v interface{}) (bson.M, error) {
 	val := reflect.ValueOf(v)
+	if !val.IsValid() {
+		return nil, fmt.Errorf("invalid value %v", v)
+	}
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
@@ -282,6 +288,9 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 	bsonMap := bson.M{}
 	for i := 0; i < val.NumField(); i++ {
 		fieldVal := val.Field(i)
+		if !fieldVal.IsValid() {
+			continue
+		}
 		tag, ok := val.Type().Field(i).Tag.Lookup("bson")
 		if ok {
 			spl := strings.Split(tag, ",")
@@ -299,7 +308,6 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 			if tag == "-" {
 				continue
 			}
-
 			if fieldVal.CanInterface() {
 				it := fieldVal.Interface()
 				switch fieldVal.Kind() {
@@ -310,6 +318,9 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 				case reflect.Array, reflect.Slice:
 					for i := 0; i < fieldVal.Len(); i++ {
 						indexVal := fieldVal.Index(i)
+						if !indexVal.IsValid() {
+							continue
+						}
 						if indexVal.CanInterface() {
 							indexIt := indexVal.Interface()
 							if stringer, ok := indexIt.(fmt.Stringer); ok {
@@ -322,6 +333,9 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 				case reflect.Map:
 					for _, key := range fieldVal.MapKeys() {
 						keyVal := fieldVal.MapIndex(key)
+						if !keyVal.IsValid() {
+							continue
+						}
 						if keyVal.CanInterface() {
 							keyIt := keyVal.Interface()
 							if stringer, ok := keyIt.(fmt.Stringer); ok {
@@ -342,6 +356,9 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 func cleanQuery(filter bson.M) bson.M {
 	for k, v := range filter {
 		val := reflect.ValueOf(v)
+		if !val.IsValid() {
+			continue
+		}
 		if val.CanInterface() {
 			it := val.Interface()
 			switch val.Kind() {
@@ -352,6 +369,9 @@ func cleanQuery(filter bson.M) bson.M {
 			case reflect.Array, reflect.Slice:
 				for i := 0; i < val.Len(); i++ {
 					indexVal := val.Index(i)
+					if !indexVal.IsValid() {
+						continue
+					}
 					if indexVal.CanInterface() {
 						indexIt := indexVal.Interface()
 						if stringer, ok := indexIt.(fmt.Stringer); ok {
@@ -364,6 +384,9 @@ func cleanQuery(filter bson.M) bson.M {
 			case reflect.Map:
 				for _, key := range val.MapKeys() {
 					keyVal := val.MapIndex(key)
+					if !keyVal.IsValid() {
+						continue
+					}
 					if keyVal.CanInterface() {
 						keyIt := keyVal.Interface()
 						if stringer, ok := keyIt.(fmt.Stringer); ok {
