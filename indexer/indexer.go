@@ -232,7 +232,7 @@ func (i *Indexer) processTokens() {
 					logrus.Infof("Processing token %s-%s", token.ContractAddress, token.TokenID)
 					err := i.tokenReceive(context.Background(), token)
 					if err != nil {
-						logrus.WithError(err).Error("error processing token")
+						logrus.WithError(err).WithFields(logrus.Fields{"id": token.TokenID, "contract": token.ContractAddress}).Error("error processing token")
 					}
 				}
 			}(tokens)
@@ -285,7 +285,7 @@ func (i *Indexer) processTokens() {
 						owners[owner.ti] = owner
 					}
 				} else {
-					logrus.WithError(err).Error("error parsing token identifiers")
+					logrus.WithError(err).WithField("ti", owner.ti).Error("error parsing token identifiers")
 				}
 			}
 		case balance := <-i.balances:
@@ -345,7 +345,7 @@ func (i *Indexer) processContracts() {
 			logrus.Infof("Processing contract %s", c.Address)
 			err := i.contractReceive(context.Background(), c)
 			if err != nil {
-				logrus.WithError(err).Error("error processing token")
+				logrus.WithError(err).WithField("address", c.Address).Error("error processing contract")
 			}
 		}(contract)
 	}
@@ -408,7 +408,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 			uri, err := getERC721TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
-				logrus.WithError(err).Error("error getting URI for ERC721 token")
+				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC721 token")
 			} else {
 				u = uri
 			}
@@ -418,7 +418,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 			uri, err := getERC1155TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
-				logrus.WithError(err).Error("error getting URI for ERC1155 token")
+				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
 			} else {
 				u = uri
 			}
@@ -438,14 +438,14 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 		go func() {
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				if metadata, err := handler(i, uriReplaced, contractAddress, tokenID); err != nil {
-					logrus.WithError(err).Error("error getting metadata for token")
+					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas <- tokenMetadata{key, metadata}
 				}
 			} else {
 				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
-					logrus.WithError(err).Error("error getting metadata for token")
+					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {
 					i.metadatas <- tokenMetadata{key, metadata}
@@ -676,7 +676,7 @@ func makeKeyForToken(contractAddress persist.Address, tokenID persist.TokenID) t
 func parseTokenIdentifiers(key tokenIdentifiers) (persist.Address, persist.TokenID, error) {
 	parts := strings.Split(string(key), "_")
 	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid key")
+		return "", "", fmt.Errorf("invalid key: %s", key)
 	}
 	return persist.Address(parts[0]), persist.TokenID(parts[1]), nil
 }
