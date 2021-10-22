@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -221,9 +220,9 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 
 func getMedia(ctx context.Context, id persist.DBID, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (persist.Media, persist.TokenMetadata) {
 	if metadata == nil || len(metadata) == 0 {
-		if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
-			metadata = m
-		}
+		// if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
+		// 	metadata = m
+		// }
 	}
 	if media.MediaURL == "" {
 		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient)

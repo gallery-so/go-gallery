@@ -98,8 +98,8 @@ func getERC721TokenURI(address persist.Address, tokenID persist.TokenID, ethClie
 
 }
 
-// GetMetadataFromURI parses and returns the NFT metadata for a given token URI
-func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
+// getMetadataFromURI parses and returns the NFT metadata for a given token URI
+func getMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
 
 	client := &http.Client{
 		Timeout: time.Second * 15,
