@@ -15,8 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// TODO use reflect.Value.Kind() to determine if the type is a string and then see if it is stringer and call stringer method on it
-
 const (
 	galleryDBName = "gallery"
 )
@@ -316,7 +314,7 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 							indexIt := indexVal.Interface()
 							if stringer, ok := indexIt.(fmt.Stringer); ok {
 								if indexVal.CanSet() {
-									indexVal.Set(reflect.ValueOf(stringer.String()))
+									indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
 								}
 							}
 						}
@@ -328,7 +326,7 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 							keyIt := keyVal.Interface()
 							if stringer, ok := keyIt.(fmt.Stringer); ok {
 								if keyVal.CanSet() {
-									keyVal.Set(reflect.ValueOf(stringer.String()))
+									keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
 								}
 							}
 						}
@@ -358,7 +356,7 @@ func cleanQuery(filter bson.M) bson.M {
 						indexIt := indexVal.Interface()
 						if stringer, ok := indexIt.(fmt.Stringer); ok {
 							if indexVal.CanSet() {
-								indexVal.Set(reflect.ValueOf(stringer.String()))
+								indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
 							}
 						}
 					}
@@ -370,7 +368,7 @@ func cleanQuery(filter bson.M) bson.M {
 						keyIt := keyVal.Interface()
 						if stringer, ok := keyIt.(fmt.Stringer); ok {
 							if keyVal.CanSet() {
-								keyVal.Set(reflect.ValueOf(stringer.String()))
+								keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
 							}
 						}
 					}
