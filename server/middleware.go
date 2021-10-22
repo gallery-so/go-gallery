@@ -19,7 +19,7 @@ const (
 	authContextKey   = "authenticated"
 )
 
-var rateLimiter = NewIPRateLimiter(1, 5)
+var rateLimiter = newIPRateLimiter(1, 5)
 
 var errInvalidJWT = errors.New("invalid JWT")
 
@@ -28,7 +28,7 @@ var errRateLimited = errors.New("rate limited")
 var errInvalidAuthHeader = errors.New("invalid auth header format")
 
 type errUserDoesNotHaveRequiredNFT struct {
-	userID persist.DBID
+	addresses []string
 }
 
 func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []string) gin.HandlerFunc {
@@ -73,7 +73,7 @@ func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 					}
 				}
 				if !has {
-					c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{userID}.Error()})
+					c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Addresses}.Error()})
 					return
 				}
 			}
@@ -112,7 +112,7 @@ func jwtOptional() gin.HandlerFunc {
 
 func rateLimited() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		limiter := rateLimiter.GetLimiter(c.ClientIP())
+		limiter := rateLimiter.getLimiter(c.ClientIP())
 		if !limiter.Allow() {
 			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errRateLimited.Error()})
 			return
@@ -157,5 +157,5 @@ func getUserIDfromCtx(c *gin.Context) persist.DBID {
 }
 
 func (e errUserDoesNotHaveRequiredNFT) Error() string {
-	return fmt.Sprintf("user %s does not have required NFT", e.userID)
+	return fmt.Sprintf("required tokens not owned by addresses: %v", e.addresses)
 }
