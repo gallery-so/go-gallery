@@ -29,7 +29,7 @@ func coreInit() *gin.Engine {
 
 	setDefaults()
 
-	events := []EventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
 	tokenRepo, contractRepo := newRepos()
 	i := NewIndexer(newEthClient(), newIPFSShell(), tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
@@ -51,7 +51,22 @@ func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenR
 
 func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		total, err := tokenRepository.Count(context.Background())
+		total, err := tokenRepository.Count(context.Background(), persist.CountTypeTotal)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+		noMetadata, err := tokenRepository.Count(context.Background(), persist.CountTypeNoMetadata)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+		erc721, err := tokenRepository.Count(context.Background(), persist.CountTypeERC721)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+		erc1155, err := tokenRepository.Count(context.Background(), persist.CountTypeERC1155)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
@@ -61,6 +76,9 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 			"current_block": i.lastSyncedBlock,
 			"recent_block":  i.mostRecentBlock,
 			"bad_uris":      i.badURIs,
+			"no_metadata":   noMetadata,
+			"erc721":        erc721,
+			"erc1155":       erc1155,
 		})
 	}
 }

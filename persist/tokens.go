@@ -70,6 +70,17 @@ const (
 	URITypeUnknown URIType = "unknown"
 )
 
+const (
+	// CountTypeTotal represents the total count
+	CountTypeTotal TokenCountType = "total"
+	// CountTypeNoMetadata represents the count of tokens without metadata
+	CountTypeNoMetadata TokenCountType = "no-metadata"
+	// CountTypeERC721 represents the count of ERC721 tokens
+	CountTypeERC721 TokenCountType = "erc721"
+	// CountTypeERC1155 represents the count of ERC1155 tokens
+	CountTypeERC1155 TokenCountType = "erc1155"
+)
+
 // TokenType represents the contract specification of the token
 type TokenType string
 
@@ -78,6 +89,9 @@ type MediaType string
 
 // URIType represents the type of a URI
 type URIType string
+
+// TokenCountType represents the query of a token count operation
+type TokenCountType string
 
 // Chain represents which blockchain a token is on
 type Chain string
@@ -175,7 +189,7 @@ type TokenRepository interface {
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
-	Count(context.Context) (int64, error)
+	Count(context.Context, TokenCountType) (int64, error)
 }
 
 // ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)

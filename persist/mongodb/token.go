@@ -240,9 +240,19 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.Bl
 }
 
 // Count will find the most recent block stored for all tokens
-func (t *TokenMongoRepository) Count(pCtx context.Context) (int64, error) {
+func (t *TokenMongoRepository) Count(pCtx context.Context, countType persist.TokenCountType) (int64, error) {
 
-	count, err := t.mp.count(pCtx, bson.M{})
+	filter := bson.M{}
+
+	switch countType {
+	case persist.CountTypeNoMetadata:
+		filter = bson.M{"token_metadata": nil}
+	case persist.CountTypeERC721:
+		filter = bson.M{"type": persist.TokenTypeERC721}
+	case persist.CountTypeERC1155:
+		filter = bson.M{"type": persist.TokenTypeERC1155}
+	}
+	count, err := t.mp.count(pCtx, filter)
 	if err != nil {
 		return 0, err
 	}

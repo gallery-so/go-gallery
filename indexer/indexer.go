@@ -24,18 +24,18 @@ import (
 
 var defaultStartingBlock persist.BlockNumber = 6000000
 
-// EventHash represents an event keccak256 hash
-type EventHash string
+// eventHash represents an event keccak256 hash
+type eventHash string
 
 const (
-	// TransferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
-	TransferEventHash EventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-	// TransferSingleEventHash represents the keccak256 hash of TransferSingle(address,address,address,uint256,uint256)
-	TransferSingleEventHash EventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
-	// TransferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
-	TransferBatchEventHash EventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
-	// URIEventHash represents the keccak256 hash of URI(string,uint256)
-	URIEventHash EventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
+	// transferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
+	transferEventHash eventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+	// transferSingleEventHash represents the keccak256 hash of TransferSingle(address,address,address,uint256,uint256)
+	transferSingleEventHash eventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+	// transferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
+	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
+	// uriEventHash represents the keccak256 hash of URI(string,uint256)
+	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 )
 
 type tokenIdentifiers string
@@ -79,7 +79,7 @@ type Indexer struct {
 
 	chain persist.Chain
 
-	eventHashes []EventHash
+	eventHashes []eventHash
 
 	lastSyncedBlock persist.BlockNumber
 	mostRecentBlock persist.BlockNumber
@@ -102,7 +102,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []EventHash, statsFileName string) *Indexer {
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
 	finalBlockUint, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -566,7 +566,7 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 	result := []*transfer{}
 	for _, pLog := range pLogs {
 		switch pLog.Topics[0].Hex() {
-		case string(TransferEventHash):
+		case string(transferEventHash):
 			if len(pLog.Topics) != 4 {
 				continue
 			}
@@ -580,7 +580,7 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 				contractAddress: persist.Address(pLog.Address.Hex()),
 				tokenType:       persist.TokenTypeERC721,
 			})
-		case string(TransferSingleEventHash):
+		case string(transferSingleEventHash):
 			if len(pLog.Topics) != 4 {
 				continue
 			}
@@ -595,7 +595,7 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 				tokenType:       persist.TokenTypeERC1155,
 			})
 
-		case string(TransferBatchEventHash):
+		case string(transferBatchEventHash):
 			if len(pLog.Topics) != 4 {
 				continue
 			}
