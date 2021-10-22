@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -175,33 +176,15 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	nftChan := make(chan *persist.Token)
 	for _, nft := range nfts {
 		go func(n *persist.Token) {
-			if n.TokenMetadata == nil || len(n.TokenMetadata) == 0 {
-				n.TokenMetadata = map[string]interface{}{}
-				if n.TokenURI != "" {
-					n.TokenMetadata["image"] = n.TokenURI
+			newMedia, newMetadata := getMedia(aeCtx, n.ID, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient)
+			n.Media = newMedia
+			n.TokenMetadata = newMetadata
+			go func() {
+				err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
+				if err != nil {
+					logrus.WithError(err).Error(errCouldNotUpdateMedia{n.ID}.Error())
 				}
-			}
-			if n.Media.MediaURL == "" {
-				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
-				if media.MediaURL == "" {
-					if it, ok := util.GetValueFromMapUnsafe(n.TokenMetadata, "image", util.DefaultSearchDepth).(string); ok {
-						media.MediaURL = it
-						media.PreviewURL = it
-						media.ThumbnailURL = it
-					}
-				}
-				if err == nil && media.MediaURL != "" {
-					n.Media = *media
-					go func() {
-						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
-						if err != nil {
-							logrus.WithError(err).Error("could not update media for nft")
-						}
-					}()
-				} else {
-					logrus.WithError(err).Error("could not make media for nft")
-				}
-			}
+			}()
 			nftChan <- n
 		}(nft)
 	}
@@ -216,33 +199,16 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 	nftChan := make(chan *persist.TokenInCollection)
 	for _, nft := range nfts {
 		go func(n *persist.TokenInCollection) {
-			if n.TokenMetadata == nil || len(n.TokenMetadata) == 0 {
-				n.TokenMetadata = map[string]interface{}{}
-				if n.TokenURI != "" {
-					n.TokenMetadata["image"] = n.TokenURI
+			newMedia, newMetadata := getMedia(aeCtx, n.ID, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient)
+			n.Media = newMedia
+			n.TokenMetadata = newMetadata
+			go func() {
+				err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
+				if err != nil {
+					logrus.WithError(err).Error(errCouldNotUpdateMedia{n.ID}.Error())
 				}
-			}
-			if n.Media.MediaURL == "" {
-				media, err := makePreviewsForMetadata(aeCtx, n.TokenMetadata, n.ContractAddress, n.TokenID, n.TokenURI, ipfsClient)
-				if media.MediaURL == "" {
-					if it, ok := util.GetValueFromMapUnsafe(n.TokenMetadata, "image", util.DefaultSearchDepth).(string); ok {
-						media.MediaURL = it
-						media.PreviewURL = it
-						media.ThumbnailURL = it
-					}
-				}
-				if err == nil && media.MediaURL != "" {
-					n.Media = *media
-					go func() {
-						err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: media})
-						if err != nil {
-							logrus.WithError(err).Error(errCouldNotUpdateMedia{n.ID}.Error())
-						}
-					}()
-				} else {
-					logrus.WithError(err).Error(errCouldNotMakeMedia{n.TokenID, n.ContractAddress}.Error())
-				}
-			}
+			}()
+
 			nftChan <- n
 		}(nft)
 	}
@@ -251,6 +217,28 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 		nfts[i] = nft
 	}
 	return nfts
+}
+
+func getMedia(ctx context.Context, id persist.DBID, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (persist.Media, persist.TokenMetadata) {
+	if metadata == nil || len(metadata) == 0 {
+		if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
+			metadata = m
+		}
+	}
+	if media.MediaURL == "" {
+		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient)
+		if newMedia.MediaURL == "" {
+			if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
+				newMedia.MediaURL = it
+				newMedia.PreviewURL = it
+				newMedia.ThumbnailURL = it
+			}
+		}
+		if err != nil && newMedia.MediaURL != "" {
+			logrus.WithError(err).Error(errCouldNotMakeMedia{tokenID, contractAddress}.Error())
+		}
+	}
+	return media, metadata
 }
 
 func (e errCouldNotMakeMedia) Error() string {

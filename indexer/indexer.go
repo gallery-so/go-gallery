@@ -444,7 +444,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 					i.metadatas <- tokenMetadata{key, metadata}
 				}
 			} else {
-				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
+				if metadata, err := GetMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
 					logrus.WithError(err).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				} else {

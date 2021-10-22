@@ -157,7 +157,8 @@ type TokenUpdateInfoInput struct {
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
-	Media *Media `bson:"media" json:"media"`
+	Media    Media         `bson:"media" json:"media"`
+	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
