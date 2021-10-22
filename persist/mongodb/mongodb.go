@@ -283,14 +283,14 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 	}
 	bsonMap := bson.M{}
 	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
+		fieldVal := val.Field(i)
 		tag, ok := val.Type().Field(i).Tag.Lookup("bson")
 		if ok {
 			spl := strings.Split(tag, ",")
 			if len(spl) > 1 {
 				switch spl[1] {
 				case "omitempty":
-					if isValueEmpty(field) {
+					if isValueEmpty(fieldVal) {
 						continue
 					}
 				case "only_get":
@@ -302,10 +302,37 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 				continue
 			}
 
-			if field.CanInterface() {
-				it := field.Interface()
-				if stringer, ok := it.(fmt.Stringer); field.Kind() == reflect.String && ok {
-					it = stringer.String()
+			if fieldVal.CanInterface() {
+				it := fieldVal.Interface()
+				switch fieldVal.Kind() {
+				case reflect.String:
+					if stringer, ok := it.(fmt.Stringer); ok {
+						it = stringer.String()
+					}
+				case reflect.Array, reflect.Slice:
+					for i := 0; i < fieldVal.Len(); i++ {
+						indexVal := fieldVal.Index(i)
+						if indexVal.CanInterface() {
+							indexIt := indexVal.Interface()
+							if stringer, ok := indexIt.(fmt.Stringer); ok {
+								if indexVal.CanSet() {
+									indexVal.Set(reflect.ValueOf(stringer.String()))
+								}
+							}
+						}
+					}
+				case reflect.Map:
+					for _, key := range fieldVal.MapKeys() {
+						keyVal := fieldVal.MapIndex(key)
+						if keyVal.CanInterface() {
+							keyIt := keyVal.Interface()
+							if stringer, ok := keyIt.(fmt.Stringer); ok {
+								if keyVal.CanSet() {
+									keyVal.Set(reflect.ValueOf(stringer.String()))
+								}
+							}
+						}
+					}
 				}
 				bsonMap[spl[0]] = it
 			}
