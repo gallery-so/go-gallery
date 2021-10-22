@@ -28,7 +28,7 @@ var errRateLimited = errors.New("rate limited")
 var errInvalidAuthHeader = errors.New("invalid auth header format")
 
 type errUserDoesNotHaveRequiredNFT struct {
-	addresses []string
+	addresses []persist.Address
 }
 
 func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
