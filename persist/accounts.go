@@ -3,9 +3,7 @@ package persist
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
-	"runtime/debug"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -77,8 +75,6 @@ func (b BlockNumber) Hex() string {
 
 func normalizeAddress(address string) string {
 	if len(address) != 40 && len(address) != 42 {
-		log.Printf("invalid address: %s len: %d\n", address, len(address))
-		debug.PrintStack()
 		return ""
 	}
 	withoutPrefix := strings.TrimPrefix(address, "0x")
