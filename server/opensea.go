@@ -271,6 +271,9 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 	response := &openseaAssets{}
 	err = util.UnmarshallBody(response, resp.Body)
 	if err != nil {
