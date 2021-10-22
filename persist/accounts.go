@@ -75,7 +75,7 @@ func (b BlockNumber) Hex() string {
 
 func normalizeAddress(address string) string {
 	withoutPrefix := strings.TrimPrefix(address, "0x")
-	if len(address) != 40 {
+	if len(address) < 40 {
 		return ""
 	}
 	return "0x" + withoutPrefix[len(withoutPrefix)-40:]
