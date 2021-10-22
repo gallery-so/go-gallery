@@ -13,8 +13,8 @@ type NFTDB struct {
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 	Deleted      bool      `bson:"deleted" json:"-"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	OwnerAddress   string `bson:"owner_address" json:"owner_address"`
+	CollectorsNote string  `bson:"collectors_note" json:"collectors_note"`
+	OwnerAddress   Address `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -24,7 +24,7 @@ type NFTDB struct {
 	Description         string      `bson:"description"          json:"description"`
 	ExternalURL         string      `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL    string      `bson:"token_metadata_url" json:"token_metadata_url"`
-	CreatorAddress      string      `bson:"creator_address"      json:"creator_address"`
+	CreatorAddress      Address     `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string      `bson:"creator_name" json:"creator_name"`
 	Contract            NftContract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string      `bson:"token_collection_name" json:"token_collection_name"`
@@ -33,7 +33,7 @@ type NFTDB struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaTokenID string `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenSeaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `bson:"image_url"           json:"image_url"`
@@ -56,7 +56,7 @@ type NFT struct {
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 
 	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddress string `bson:"owner_address" json:"owner_address"`
+	OwnerAddress Address `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -66,7 +66,7 @@ type NFT struct {
 	Description         string      `bson:"description"          json:"description"`
 	ExternalURL         string      `bson:"external_url"         json:"external_url"`
 	TokenMetadataURL    string      `bson:"token_metadata_url" json:"token_metadata_url"`
-	CreatorAddress      string      `bson:"creator_address"      json:"creator_address"`
+	CreatorAddress      Address     `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string      `bson:"creator_name" json:"creator_name"`
 	Contract            NftContract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string      `bson:"token_collection_name" json:"token_collection_name"`
@@ -75,7 +75,7 @@ type NFT struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaTokenID string `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenSeaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `bson:"image_url"           json:"image_url"`
@@ -93,7 +93,7 @@ type CollectionNFT struct {
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 
-	OwnerAddress string `bson:"owner_address" json:"owner_address"`
+	OwnerAddress Address `bson:"owner_address" json:"owner_address"`
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
@@ -112,14 +112,14 @@ type CollectionNFT struct {
 
 // NftContract represents a smart contract's information for a given NFT
 type NftContract struct {
-	ContractAddress      string `bson:"contract_address"     json:"address"`
-	ContractName         string `bson:"contract_name" json:"name"`
-	ContractImage        string `bson:"contract_image_url" json:"image_url"`
-	ContractDescription  string `bson:"contract_description" json:"description"`
-	ContractExternalLink string `bson:"contract_external_link" json:"external_link"`
-	ContractSchemaName   string `bson:"contract_schema_name" json:"schema_name"`
-	ContractSymbol       string `bson:"contract_symbol" json:"symbol"`
-	ContractTotalSupply  string `bson:"contract_total_supply" json:"total_supply"`
+	ContractAddress      Address `bson:"contract_address"     json:"address"`
+	ContractName         string  `bson:"contract_name" json:"name"`
+	ContractImage        string  `bson:"contract_image_url" json:"image_url"`
+	ContractDescription  string  `bson:"contract_description" json:"description"`
+	ContractExternalLink string  `bson:"contract_external_link" json:"external_link"`
+	ContractSchemaName   string  `bson:"contract_schema_name" json:"schema_name"`
+	ContractSymbol       string  `bson:"contract_symbol" json:"symbol"`
+	ContractTotalSupply  string  `bson:"contract_total_supply" json:"total_supply"`
 }
 
 // ContractCollectionNFT represents a contract within a collection nft
@@ -139,15 +139,15 @@ type NFTRepository interface {
 	CreateBulk(context.Context, []*NFTDB) ([]DBID, error)
 	Create(context.Context, *NFTDB) (DBID, error)
 	GetByUserID(context.Context, DBID) ([]*NFT, error)
-	GetByAddresses(context.Context, []string) ([]*NFT, error)
+	GetByAddresses(context.Context, []Address) ([]*NFT, error)
 	GetByID(context.Context, DBID) (*NFT, error)
-	GetByContractData(context.Context, string, string) ([]*NFT, error)
-	GetByOpenseaID(context.Context, int, string) ([]*NFT, error)
+	GetByContractData(context.Context, TokenID, Address) ([]*NFT, error)
+	GetByOpenseaID(context.Context, int, Address) ([]*NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	BulkUpsert(context.Context, []*NFTDB) ([]DBID, error)
-	OpenseaCacheGet(context.Context, []string) ([]*NFT, error)
-	OpenseaCacheSet(context.Context, []string, []*NFT) error
-	OpenseaCacheDelete(context.Context, []string) error
+	OpenseaCacheGet(context.Context, []Address) ([]*NFT, error)
+	OpenseaCacheSet(context.Context, []Address, []*NFT) error
+	OpenseaCacheDelete(context.Context, []Address) error
 }
 
 // ErrNFTNotFoundByID is an error that occurs when an NFT is not found by its ID

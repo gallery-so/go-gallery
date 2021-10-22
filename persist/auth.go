@@ -17,8 +17,8 @@ type UserNonce struct {
 	Deleted      bool      `bson:"deleted"       json:"-"`
 	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
-	Value   string `bson:"value"   json:"value"`
-	Address string `bson:"address"     json:"address"`
+	Value   string  `bson:"value"   json:"value"`
+	Address Address `bson:"address"     json:"address"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
@@ -29,11 +29,11 @@ type UserLoginAttempt struct {
 	CreationTime time.Time `bson:"created_at"`
 	Deleted      bool      `bson:"deleted"       json:"-"`
 
-	Address        string `bson:"address"     json:"address"`
-	Signature      string `bson:"signature"`
-	NonceValue     string `bson:"nonce_value"`
-	UserExists     bool   `bson:"user_exists"`
-	SignatureValid bool   `bson:"signature_valid"`
+	Address        Address `bson:"address"     json:"address"`
+	Signature      string  `bson:"signature"`
+	NonceValue     string  `bson:"nonce_value"`
+	UserExists     bool    `bson:"user_exists"`
+	SignatureValid bool    `bson:"signature_valid"`
 
 	ReqHostAddr string              `bson:"req_host_addr"`
 	ReqHeaders  map[string][]string `bson:"req_headers"`
@@ -41,7 +41,7 @@ type UserLoginAttempt struct {
 
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, string) (*UserNonce, error)
+	Get(context.Context, Address) (*UserNonce, error)
 	Create(context.Context, *UserNonce) error
 }
 
@@ -52,7 +52,7 @@ type LoginAttemptRepository interface {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	Address string
+	Address Address
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {

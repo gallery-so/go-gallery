@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
@@ -39,8 +38,7 @@ func NewNFTMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clien
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.NFTDB,
-) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.NFTDB) ([]persist.DBID, error) {
 
 	nfts := make([]interface{}, len(pNfts))
 
@@ -57,14 +55,12 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.N
 }
 
 // Create inserts an NFT into the database
-func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT *persist.NFTDB,
-) (persist.DBID, error) {
+func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT *persist.NFTDB) (persist.DBID, error) {
 	return n.mp.insert(pCtx, pNFT)
 }
 
 // GetByUserID finds an nft by its owner user id
-func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID,
-) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -84,7 +80,10 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 }
 
 // GetByAddresses finds an nft by its owner user id
-func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []string) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]*persist.NFT, error) {
+	for i, v := range pAddresses {
+		pAddresses[i] = v
+	}
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -122,7 +121,7 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 }
 
 // GetByContractData finds an nft by its contract data
-func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, pContractAddress string) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address) ([]*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -138,7 +137,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID, p
 }
 
 // GetByOpenseaID finds an nft by its opensea ID
-func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress string,
+func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address,
 ) ([]*persist.NFT, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -184,7 +183,6 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 				errs <- errOwnerAddressRequired
 				return
 			}
-			nft.OwnerAddress = strings.ToLower(nft.OwnerAddress)
 			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
@@ -208,10 +206,9 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 }
 
 // OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
-func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []string, pNfts []*persist.NFT) error {
-
+func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []*persist.NFT) error {
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = strings.ToLower(v)
+		pWalletAddresses[i] = v
 	}
 
 	toCache, err := json.Marshal(pNfts)
@@ -223,20 +220,20 @@ func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddres
 }
 
 // OpenseaCacheDelete deletes a set of nfts from the opensea cache under a given set of wallet addresses
-func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []string) error {
+func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []persist.Address) error {
 
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = strings.ToLower(v)
+		pWalletAddresses[i] = v
 	}
 
 	return n.redisClients.Delete(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
 }
 
 // OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
-func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []string) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []persist.Address) ([]*persist.NFT, error) {
 
 	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = strings.ToLower(v)
+		pWalletAddresses[i] = v
 	}
 
 	result, err := n.redisClients.Get(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))

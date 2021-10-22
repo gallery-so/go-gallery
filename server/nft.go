@@ -56,7 +56,7 @@ type getOwnershipHistoryOutput struct {
 
 type errDoesNotOwnWallets struct {
 	id        persist.DBID
-	addresses []string
+	addresses []persist.Address
 }
 
 func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
@@ -177,11 +177,14 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := []string{}
+		addresses := []persist.Address{}
 		if input.WalletAddresses != "" {
-			addresses = []string{input.WalletAddresses}
+			addresses = []persist.Address{persist.Address(input.WalletAddresses)}
 			if strings.Contains(input.WalletAddresses, ",") {
-				addresses = strings.Split(input.WalletAddresses, ",")
+				addressesStrings := strings.Split(input.WalletAddresses, ",")
+				for _, address := range addressesStrings {
+					addresses = append(addresses, persist.Address(address))
+				}
 			}
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
@@ -216,11 +219,14 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := []string{}
+		addresses := []persist.Address{}
 		if input.WalletAddresses != "" {
-			addresses = []string{input.WalletAddresses}
+			addresses = []persist.Address{persist.Address(input.WalletAddresses)}
 			if strings.Contains(input.WalletAddresses, ",") {
-				addresses = strings.Split(input.WalletAddresses, ",")
+				addressesStrings := strings.Split(input.WalletAddresses, ",")
+				for _, address := range addressesStrings {
+					addresses = append(addresses, persist.Address(address))
+				}
 			}
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {

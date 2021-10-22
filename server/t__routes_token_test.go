@@ -23,7 +23,7 @@ package server
 // 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
 // 		Name:           name,
 // 		CollectorsNote: "this is a bad note",
-// 		OwnerAddress:   strings.ToLower(tc.user1.address),
+// 		OwnerAddress:   tc.user1.address,
 // 	})
 // 	assert.Nil(err)
 
@@ -74,7 +74,7 @@ package server
 // 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
 // 		Name:           "very cool nft",
 // 		CollectorsNote: "silly note",
-// 		OwnerAddress:   strings.ToLower(tc.user1.address),
+// 		OwnerAddress:   tc.user1.address,
 // 	})
 // 	assert.Nil(err)
 
@@ -99,7 +99,7 @@ package server
 // 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
 // 		Name:           "very cool nft",
 // 		CollectorsNote: "this is a bad note",
-// 		OwnerAddress:   strings.ToLower(tc.user1.address),
+// 		OwnerAddress:   tc.user1.address,
 // 	})
 // 	assert.Nil(err)
 

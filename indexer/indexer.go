@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultStartingBlock = 6000000
+var defaultStartingBlock persist.BlockNumber = 6000000
 
 // EventHash represents an event keccak256 hash
 type EventHash string
@@ -38,41 +38,33 @@ const (
 	URIEventHash EventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 )
 
-// TODO why does CTRL+C not work?
-
-type address string
-
-type tokenID string
-
 type tokenIdentifiers string
 
-type metadata map[string]interface{}
-type uri string
 type tokenMetadata struct {
 	ti tokenIdentifiers
-	md metadata
+	md persist.TokenMetadata
 }
 
 type tokenBalances struct {
 	ti   tokenIdentifiers
-	from address
-	to   address
+	from persist.Address
+	to   persist.Address
 	amt  *big.Int
 }
 
 type tokenURI struct {
 	ti  tokenIdentifiers
-	uri uri
+	uri persist.TokenURI
 }
 
-type uniqueMetadataHandler func(*Indexer, uri, address, tokenID) (metadata, error)
+type uniqueMetadataHandler func(*Indexer, persist.TokenURI, persist.Address, persist.TokenID) (persist.TokenMetadata, error)
 
-type uniqueMetadatas map[address]uniqueMetadataHandler
+type uniqueMetadatas map[persist.Address]uniqueMetadataHandler
 
 type ownerAtBlock struct {
 	ti    tokenIdentifiers
-	owner address
-	block uint64
+	owner persist.Address
+	block persist.BlockNumber
 }
 
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
@@ -89,8 +81,8 @@ type Indexer struct {
 
 	eventHashes []EventHash
 
-	lastSyncedBlock uint64
-	mostRecentBlock uint64
+	lastSyncedBlock persist.BlockNumber
+	mostRecentBlock persist.BlockNumber
 
 	metadatas      chan tokenMetadata
 	uris           chan tokenURI
@@ -116,7 +108,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
-	startingBlock := uint64(defaultStartingBlock)
+	startingBlock := defaultStartingBlock
 
 	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err == nil && mostRecent > defaultStartingBlock {
 		startingBlock = mostRecent
@@ -135,7 +127,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		chain: pChain,
 
 		lastSyncedBlock: startingBlock,
-		mostRecentBlock: finalBlockUint,
+		mostRecentBlock: persist.BlockNumber(finalBlockUint),
 
 		eventHashes: pEvents,
 
@@ -180,10 +172,10 @@ func (i *Indexer) processLogs() {
 
 	topics := [][]common.Hash{events, nil, nil, nil}
 
-	curBlock := new(big.Int).SetUint64(i.lastSyncedBlock)
+	curBlock := i.lastSyncedBlock.BigInt()
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(50)))
 	errs := 0
-	for nextBlock.Cmp(new(big.Int).SetUint64(atomic.LoadUint64(&i.mostRecentBlock))) == -1 {
+	for nextBlock.Cmp(i.mostRecentBlock.BigInt()) == -1 {
 		if errs > 5 {
 			nextBlock.Add(curBlock, big.NewInt(int64(5)))
 			time.Sleep(time.Second * 20)
@@ -211,7 +203,7 @@ func (i *Indexer) processLogs() {
 
 		i.transfers <- logsToTransfer(logsTo)
 
-		atomic.StoreUint64(&i.lastSyncedBlock, nextBlock.Uint64())
+		i.lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
 
 		curBlock.Add(curBlock, big.NewInt(int64(50)))
 		nextBlock.Add(nextBlock, big.NewInt(int64(50)))
@@ -250,7 +242,7 @@ func (i *Indexer) processTokens() {
 	mu := &sync.Mutex{}
 	owners := map[tokenIdentifiers]ownerAtBlock{}
 	previousOwners := map[tokenIdentifiers][]ownerAtBlock{}
-	balances := map[tokenIdentifiers]map[address]*big.Int{}
+	balances := map[tokenIdentifiers]map[persist.Address]*big.Int{}
 	metadatas := map[tokenIdentifiers]tokenMetadata{}
 	uris := map[tokenIdentifiers]tokenURI{}
 
@@ -261,7 +253,7 @@ func (i *Indexer) processTokens() {
 			i.tokens <- i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
 			owners = map[tokenIdentifiers]ownerAtBlock{}
 			previousOwners = map[tokenIdentifiers][]ownerAtBlock{}
-			balances = map[tokenIdentifiers]map[address]*big.Int{}
+			balances = map[tokenIdentifiers]map[persist.Address]*big.Int{}
 			metadatas = map[tokenIdentifiers]tokenMetadata{}
 			uris = map[tokenIdentifiers]tokenURI{}
 			mu.Unlock()
@@ -279,7 +271,7 @@ func (i *Indexer) processTokens() {
 			} else {
 				contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
 				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
 					if err == nil && len(tokens) == 1 {
 						token := tokens[0]
 						block := token.LatestBlock
@@ -287,7 +279,7 @@ func (i *Indexer) processTokens() {
 						if owner.block > block {
 							owners[owner.ti] = owner
 						} else {
-							owners[owner.ti] = ownerAtBlock{block: block, owner: address(curOwner)}
+							owners[owner.ti] = ownerAtBlock{block: block, owner: curOwner}
 						}
 					} else {
 						owners[owner.ti] = owner
@@ -298,13 +290,13 @@ func (i *Indexer) processTokens() {
 			}
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
-				balances[balance.ti] = map[address]*big.Int{}
+				balances[balance.ti] = map[persist.Address]*big.Int{}
 				contractAddress, tokenID, err := parseTokenIdentifiers(balance.ti)
 				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
 					if err == nil {
 						for _, token := range tokens {
-							balances[balance.ti][address(token.OwnerAddress)] = new(big.Int).SetUint64(token.Quantity)
+							balances[balance.ti][token.OwnerAddress] = new(big.Int).SetUint64(token.Quantity)
 						}
 					}
 				}
@@ -326,15 +318,15 @@ func (i *Indexer) processTokens() {
 				previousOwners[previousOwner.ti] = []ownerAtBlock{}
 				contractAddress, tokenID, err := parseTokenIdentifiers(previousOwner.ti)
 				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), string(contractAddress), string(tokenID))
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
 					if err == nil && len(tokens) == 1 {
 						token := tokens[0]
 						ownersAtBlocks := make([]ownerAtBlock, len(token.PreviousOwners))
 						for i, o := range token.PreviousOwners {
 							ownersAtBlocks[i] = ownerAtBlock{
 								ti:    previousOwner.ti,
-								block: uint64(i),
-								owner: address(o),
+								block: persist.BlockNumber(i),
+								owner: o,
 							}
 						}
 						previousOwners[previousOwner.ti] = ownersAtBlocks
@@ -369,7 +361,7 @@ func (i *Indexer) subscribeNewLogs() {
 	topics := [][]common.Hash{events, nil, nil, nil}
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: new(big.Int).SetUint64(i.lastSyncedBlock),
+		FromBlock: i.lastSyncedBlock.BigInt(),
 		Topics:    topics,
 	}, i.subscriptions)
 	if err != nil {
@@ -400,19 +392,19 @@ func (i *Indexer) handleDone() {
 func processTransfers(i *Indexer, transfers []*transfer) {
 
 	for _, transfer := range transfers {
-		contractAddress := address(transfer.RawContract.Address)
-		from := toRegularAddress(address(transfer.From))
-		to := toRegularAddress(address(transfer.To))
-		tokenID := tokenID(transfer.TokenID)
+		contractAddress := transfer.contractAddress
+		from := transfer.from
+		to := transfer.to
+		tokenID := transfer.tokenID
 
 		key := makeKeyForToken(contractAddress, tokenID)
 		logrus.Infof("Processing transfer %s", key)
 
-		var u uri
-		switch persist.TokenType(transfer.Type) {
+		var u persist.TokenURI
+		switch persist.TokenType(transfer.tokenType) {
 		case persist.TokenTypeERC721:
-			i.owners <- ownerAtBlock{key, to, transfer.BlockNumber.Uint64()}
-			i.previousOwners <- ownerAtBlock{key, from, transfer.BlockNumber.Uint64()}
+			i.owners <- ownerAtBlock{key, to, transfer.blockNumber}
+			i.previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
 
 			uri, err := getERC721TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
@@ -422,7 +414,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			}
 
 		case persist.TokenTypeERC1155:
-			i.balances <- tokenBalances{key, from, to, new(big.Int).SetUint64(transfer.Amount)}
+			i.balances <- tokenBalances{key, from, to, new(big.Int).SetUint64(transfer.amount)}
 
 			uri, err := getERC1155TokenURI(contractAddress, tokenID, i.ethClient)
 			if err != nil {
@@ -440,7 +432,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			i.failWithMessage(err, "failed to convert token ID to big int")
 			return
 		}
-		uriReplaced := uri(strings.ReplaceAll(string(u), "{id}", id.String()))
+		uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
 
 		i.uris <- tokenURI{key, uriReplaced}
 		go func() {
@@ -474,7 +466,7 @@ func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
 		return err
 	}
 	go func() {
-		i.contracts <- handleContract(i.ethClient, address(t.ContractAddress), atomic.LoadUint64(&i.lastSyncedBlock))
+		i.contracts <- handleContract(i.ethClient, t.ContractAddress, i.lastSyncedBlock)
 	}()
 	return nil
 }
@@ -483,7 +475,7 @@ func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contrac
 	return i.contractRepo.UpsertByAddress(ctx, contract.Address, contract)
 }
 
-func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[address]*big.Int, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
+func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]*big.Int, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)
@@ -501,9 +493,9 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			i.failWithMessage(err, "failed to parse key for token")
 			return nil
 		}
-		previousOwnerAddresses := make([]string, len(previousOwners[k]))
+		previousOwnerAddresses := make([]persist.Address, len(previousOwners[k]))
 		for i, w := range previousOwners[k] {
-			previousOwnerAddresses[i] = strings.ToLower(string(w.owner))
+			previousOwnerAddresses[i] = w.owner
 		}
 		metadata := metadatas[k]
 		var name, description string
@@ -516,18 +508,18 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		}
 
 		result[j] = &persist.Token{
-			TokenID:         removeLeftPaddedZeros(string(tokenID)),
-			ContractAddress: strings.ToLower(string(contractAddress)),
-			OwnerAddress:    strings.ToLower(string(v.owner)),
+			TokenID:         tokenID,
+			ContractAddress: contractAddress,
+			OwnerAddress:    v.owner,
 			Quantity:        1,
 			Name:            name,
 			Description:     description,
 			PreviousOwners:  previousOwnerAddresses,
 			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   metadata.md,
-			TokenURI:        string(uris[k].uri),
+			TokenURI:        uris[k].uri,
 			Chain:           i.chain,
-			LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
+			LatestBlock:     i.lastSyncedBlock,
 		}
 		j++
 	}
@@ -551,17 +543,17 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		uri := uris[k]
 		for addr, balance := range v {
 			result[j] = &persist.Token{
-				TokenID:         removeLeftPaddedZeros(string(tokenID)),
-				ContractAddress: strings.ToLower(string(contractAddress)),
-				OwnerAddress:    strings.ToLower(string(addr)),
+				TokenID:         tokenID,
+				ContractAddress: contractAddress,
+				OwnerAddress:    addr,
 				Quantity:        balance.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
-				TokenURI:        string(uri.uri),
+				TokenURI:        uri.uri,
 				Name:            name,
 				Description:     description,
 				Chain:           i.chain,
-				LatestBlock:     atomic.LoadUint64(&i.lastSyncedBlock),
+				LatestBlock:     i.lastSyncedBlock,
 			}
 			j++
 		}
@@ -580,15 +572,13 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			}
 
 			result = append(result, &transfer{
-				From:        pLog.Topics[1].Hex(),
-				To:          pLog.Topics[2].Hex(),
-				TokenID:     pLog.Topics[3].Hex(),
-				Amount:      1,
-				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber),
-				RawContract: contract{
-					Address: pLog.Address.Hex(),
-				},
-				Type: persist.TokenTypeERC721,
+				from:            persist.Address(pLog.Topics[1].Hex()),
+				to:              persist.Address(pLog.Topics[2].Hex()),
+				tokenID:         persist.TokenID(pLog.Topics[3].Hex()),
+				amount:          1,
+				blockNumber:     persist.BlockNumber(pLog.BlockNumber),
+				contractAddress: persist.Address(pLog.Address.Hex()),
+				tokenType:       persist.TokenTypeERC721,
 			})
 		case string(TransferSingleEventHash):
 			if len(pLog.Topics) != 4 {
@@ -596,37 +586,33 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			}
 
 			result = append(result, &transfer{
-				From:        pLog.Topics[2].Hex(),
-				To:          pLog.Topics[3].Hex(),
-				TokenID:     common.BytesToHash(pLog.Data[:len(pLog.Data)/2]).Hex(),
-				Amount:      common.BytesToHash(pLog.Data[len(pLog.Data)/2:]).Big().Uint64(),
-				BlockNumber: new(big.Int).SetUint64(pLog.BlockNumber),
-				RawContract: contract{
-					Address: pLog.Address.Hex(),
-				},
-				Type: persist.TokenTypeERC1155,
+				from:            persist.Address(pLog.Topics[2].Hex()),
+				to:              persist.Address(pLog.Topics[3].Hex()),
+				tokenID:         persist.TokenID(common.BytesToHash(pLog.Data[:len(pLog.Data)/2]).Hex()),
+				amount:          common.BytesToHash(pLog.Data[len(pLog.Data)/2:]).Big().Uint64(),
+				blockNumber:     persist.BlockNumber(pLog.BlockNumber),
+				contractAddress: persist.Address(pLog.Address.Hex()),
+				tokenType:       persist.TokenTypeERC1155,
 			})
 
 		case string(TransferBatchEventHash):
 			if len(pLog.Topics) != 4 {
 				continue
 			}
-			from := pLog.Topics[2].Hex()
-			to := pLog.Topics[3].Hex()
+			from := persist.Address(pLog.Topics[2].Hex())
+			to := persist.Address(pLog.Topics[3].Hex())
 			amountOffset := len(pLog.Data) / 2
 			total := amountOffset / 64
 			this := make([]*transfer, total)
 
 			for j := 0; j < total; j++ {
 				this[j] = &transfer{
-					From:    from,
-					To:      to,
-					TokenID: common.BytesToHash(pLog.Data[j*64 : (j+1)*64]).Hex(),
-					Amount:  common.BytesToHash(pLog.Data[(amountOffset)+(j*64) : (amountOffset)+((j+1)*64)]).Big().Uint64(),
-					RawContract: contract{
-						Address: pLog.Address.Hex(),
-					},
-					Type: persist.TokenTypeERC1155,
+					from:            from,
+					to:              to,
+					tokenID:         persist.TokenID(common.BytesToHash(pLog.Data[j*64 : (j+1)*64]).Hex()),
+					amount:          common.BytesToHash(pLog.Data[(amountOffset)+(j*64) : (amountOffset)+((j+1)*64)]).Big().Uint64(),
+					contractAddress: persist.Address(pLog.Address.Hex()),
+					tokenType:       persist.TokenTypeERC1155,
 				}
 			}
 			result = append(result, this...)
@@ -642,7 +628,7 @@ func (i *Indexer) listenForNewBlocks() {
 			i.failWithMessage(err, "failed to get block number")
 			return
 		}
-		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
+		i.mostRecentBlock = persist.BlockNumber(finalBlockUint)
 		logrus.Infof("final block number: %v", finalBlockUint)
 		time.Sleep(time.Minute)
 	}
@@ -656,8 +642,8 @@ func (i *Indexer) failWithMessage(err error, msg string) {
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
-		address(strings.ToLower("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782")): autoglyphs,
-		address(strings.ToLower("0x60F3680350F65Beb2752788cB48aBFCE84a4759E")): colorglyphs,
+		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782"): autoglyphs,
+		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E"): colorglyphs,
 	}
 }
 
@@ -668,10 +654,6 @@ func findFirstFieldFromMetadata(metadata map[string]interface{}, fields ...strin
 		}
 	}
 	return nil
-}
-
-func toRegularAddress(addr address) address {
-	return address(strings.ToLower(fmt.Sprintf("0x%s", addr[len(addr)-38:])))
 }
 
 // a function that removes the left padded zeros from a large hex string
@@ -687,21 +669,21 @@ func removeLeftPaddedZeros(hex string) string {
 	return "0x" + hex
 }
 
-func makeKeyForToken(contractAddress address, tokenID tokenID) tokenIdentifiers {
+func makeKeyForToken(contractAddress persist.Address, tokenID persist.TokenID) tokenIdentifiers {
 	return tokenIdentifiers(fmt.Sprintf("%s_%s", contractAddress, tokenID))
 }
 
-func parseTokenIdentifiers(key tokenIdentifiers) (address, tokenID, error) {
+func parseTokenIdentifiers(key tokenIdentifiers) (persist.Address, persist.TokenID, error) {
 	parts := strings.Split(string(key), "_")
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid key")
 	}
-	return address(parts[0]), tokenID(parts[1]), nil
+	return persist.Address(parts[0]), persist.TokenID(parts[1]), nil
 }
 
-func handleContract(ethClient *ethclient.Client, contractAddress address, lastSyncedBlock uint64) *persist.Contract {
+func handleContract(ethClient *ethclient.Client, contractAddress persist.Address, lastSyncedBlock persist.BlockNumber) *persist.Contract {
 	c := &persist.Contract{
-		Address:     string(contractAddress),
+		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
 	}
 	cMetadata, err := getTokenContractMetadata(contractAddress, ethClient)

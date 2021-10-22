@@ -3,9 +3,13 @@ package persist
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/util"
 )
 
 const (
@@ -51,14 +55,41 @@ const (
 	ChainOptimism Chain = "Optimism"
 )
 
+const (
+	// URITypeIPFS represents an IPFS URI
+	URITypeIPFS URIType = "ipfs"
+	// URITypeHTTP represents an HTTP URI
+	URITypeHTTP URIType = "http"
+	// URITypeIPFSAPI represents an IPFS API URI
+	URITypeIPFSAPI URIType = "ipfs-api"
+	// URITypeBase64JSON represents a base64 encoded JSON document
+	URITypeBase64JSON URIType = "base64json"
+	// URITypeBase64SVG represents a base64 encoded SVG
+	URITypeBase64SVG URIType = "base64svg"
+	// URITypeUnknown represents an unknown URI type
+	URITypeUnknown URIType = "unknown"
+)
+
 // TokenType represents the contract specification of the token
 type TokenType string
 
 // MediaType represents the type of media that a token
 type MediaType string
 
+// URIType represents the type of a URI
+type URIType string
+
 // Chain represents which blockchain a token is on
 type Chain string
+
+// TokenID represents the ID of an Ethereum token
+type TokenID string
+
+// TokenURI represents the URI for an Ethereum token
+type TokenURI string
+
+// TokenMetadata represents the JSON metadata for a token
+type TokenMetadata map[string]interface{}
 
 // Token represents an individual Token token
 type Token struct {
@@ -78,17 +109,17 @@ type Token struct {
 	Name        string `bson:"name" json:"name"`
 	Description string `bson:"description" json:"description"`
 
-	TokenURI        string                 `bson:"token_uri" json:"token_uri"`
-	TokenID         string                 `bson:"token_id" json:"token_id"`
-	Quantity        uint64                 `bson:"quantity" json:"quantity"`
-	OwnerAddress    string                 `bson:"owner_address" json:"owner_address"`
-	PreviousOwners  []string               `bson:"previous_owners" json:"previous_owners"`
-	TokenMetadata   map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
-	ContractAddress string                 `bson:"contract_address" json:"contract_address"`
+	TokenURI        TokenURI      `bson:"token_uri" json:"token_uri"`
+	TokenID         TokenID       `bson:"token_id" json:"token_id"`
+	Quantity        uint64        `bson:"quantity" json:"quantity"`
+	OwnerAddress    Address       `bson:"owner_address" json:"owner_address"`
+	PreviousOwners  []Address     `bson:"previous_owners" json:"previous_owners"`
+	TokenMetadata   TokenMetadata `bson:"token_metadata" json:"token_metadata"`
+	ContractAddress Address       `bson:"contract_address" json:"contract_address"`
 
 	ExternalURL string `bson:"external_url" json:"external_url"`
 
-	LatestBlock uint64 `bson:"latest_block" json:"latest_block"`
+	LatestBlock BlockNumber `bson:"latest_block" json:"latest_block"`
 }
 
 // Media represents a token's media content with processed images from metadata
@@ -104,19 +135,19 @@ type TokenInCollection struct {
 	ID           DBID      `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime time.Time `bson:"created_at"        json:"created_at"`
 
-	ContractAddress string `bson:"contract_address"     json:"contract_address"`
+	ContractAddress Address `bson:"contract_address"     json:"contract_address"`
 
 	Chain Chain `bson:"chain" json:"chain"`
 
 	Name        string `bson:"name" json:"name"`
 	Description string `bson:"description" json:"description"`
 
-	TokenURI     string `bson:"token_uri" json:"token_uri"`
-	TokenID      string `bson:"token_id" json:"token_id"`
-	OwnerAddress string `bson:"owner_address" json:"owner_address"`
+	TokenURI     TokenURI `bson:"token_uri" json:"token_uri"`
+	TokenID      TokenID  `bson:"token_id" json:"token_id"`
+	OwnerAddress Address  `bson:"owner_address" json:"owner_address"`
 
-	Media         Media                  `bson:"media" json:"media"`
-	TokenMetadata map[string]interface{} `bson:"token_metadata" json:"token_metadata"`
+	Media         Media         `bson:"media" json:"media"`
+	TokenMetadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
 }
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
@@ -126,23 +157,24 @@ type TokenUpdateInfoInput struct {
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
-	Media *Media `bson:"media" json:"media"`
+	Media    Media         `bson:"media" json:"media"`
+	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
 	CreateBulk(context.Context, []*Token) ([]DBID, error)
 	Create(context.Context, *Token) (DBID, error)
-	GetByWallet(context.Context, string) ([]*Token, error)
+	GetByWallet(context.Context, Address) ([]*Token, error)
 	GetByUserID(context.Context, DBID) ([]*Token, error)
-	GetByContract(context.Context, string) ([]*Token, error)
-	GetByTokenIdentifiers(context.Context, string, string) ([]*Token, error)
+	GetByContract(context.Context, Address) ([]*Token, error)
+	GetByTokenIdentifiers(context.Context, TokenID, Address) ([]*Token, error)
 	GetByID(context.Context, DBID) (*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	MostRecentBlock(context.Context) (uint64, error)
+	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context) (int64, error)
 }
 
@@ -189,4 +221,40 @@ func (e ErrTokenNotFoundByID) Error() string {
 
 func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
+}
+
+// URL turns a token's URI into a URL
+func (uri TokenURI) URL() (*url.URL, error) {
+	return url.Parse(string(uri))
+}
+
+func (uri TokenURI) String() string {
+	return string(uri)
+}
+
+// Type returns the type of the token URI
+func (uri TokenURI) Type() URIType {
+	asString := uri.String()
+	if strings.Contains(asString, "data:application/json;base64,") {
+		return URITypeBase64JSON
+	} else if strings.HasPrefix(asString, "data:image/svg+xml;base64,") {
+		return URITypeBase64SVG
+	} else if strings.HasPrefix(asString, "ipfs://") {
+		return URITypeIPFS
+	} else if strings.HasPrefix(asString, "https://") || strings.HasPrefix(asString, "http://") {
+		return URITypeHTTP
+	} else if strings.Contains(asString, "ipfs.io/api") {
+		return URITypeIPFSAPI
+	}
+	return URITypeUnknown
+}
+
+func (id TokenID) String() string {
+	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
+}
+
+// BigInt returns the token ID as a big.Int
+func (id TokenID) BigInt() *big.Int {
+	i, _ := new(big.Int).SetString(id.String(), 0)
+	return i
 }

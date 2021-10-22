@@ -40,7 +40,7 @@ type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
 }
 
-func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
+func makePreviewsForToken(pCtx context.Context, contractAddress persist.Address, tokenID persist.TokenID, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
 	tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func makePreviewsForToken(pCtx context.Context, contractAddress, tokenID string,
 	return makePreviewsForMetadata(pCtx, metadata, contractAddress, tokenID, token.TokenURI, ipfsClient)
 }
 
-func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface{}, contractAddress, tokenID, turi string, ipfsClient *shell.Shell) (*persist.Media, error) {
+func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, ipfsClient *shell.Shell) (*persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
@@ -94,7 +94,7 @@ func makePreviewsForMetadata(pCtx context.Context, metadata map[string]interface
 	}
 
 	if imgURL == "" {
-		imgURL = turi
+		imgURL = turi.String()
 	}
 
 	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)

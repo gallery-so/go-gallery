@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
@@ -84,7 +83,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 	}
 
 	user := &persist.User{
-		Addresses: []string{strings.ToLower(pInput.Address)},
+		Addresses: []persist.Address{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)

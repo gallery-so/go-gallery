@@ -39,7 +39,7 @@ type openseaAsset struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	TokenID string `json:"token_id"`
+	TokenID persist.TokenID `json:"token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `json:"image_url"`
@@ -62,8 +62,8 @@ type openseaEvent struct {
 }
 
 type openseaAccount struct {
-	User    openseaUser `json:"user"`
-	Address string      `json:"address"`
+	User    openseaUser     `json:"user"`
+	Address persist.Address `json:"address"`
 }
 
 type openseaUser struct {
@@ -75,15 +75,15 @@ type openseaCollection struct {
 }
 
 type errNoNFTForTokenIdentifiers struct {
-	tokenID         string
-	contractAddress string
+	tokenID         persist.TokenID
+	contractAddress persist.Address
 }
 
 type errNoSingleNFTForOpenseaID struct {
 	openseaID int
 }
 
-func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []string,
+func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
 	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) ([]*persist.NFT, error) {
 
 	nfts, err := nftRepo.OpenseaCacheGet(pCtx, pOwnerWalletAddresses)
@@ -104,10 +104,6 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, nft := range asDBNfts {
-		logrus.Infof("asDBNFT: %+v", *nft)
 	}
 
 	ids, err := nftRepo.BulkUpsert(pCtx, asDBNfts)
@@ -177,7 +173,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NFTDB, userRepo
 	return updatedNfts, nil
 }
 
-func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, pWalletAddress string, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) (*persist.OwnershipHistory, error) {
+func openseaSyncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenContractAddress, pWalletAddress persist.Address, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) (*persist.OwnershipHistory, error) {
 	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
 	events := &persist.OwnershipHistory{}
 	resp, err := http.Get(getURL)
@@ -215,19 +211,16 @@ func openseaSyncHistory(pCtx context.Context, pTokenID, pTokenContractAddress, p
 	return events, nil
 }
 
-func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []string, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
+func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
 	result := []*persist.NFTDB{}
 	nftsChan := make(chan []*persist.NFTDB)
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
-		go func(wa string) {
+		go func(wa persist.Address) {
 			assets, err := openseaFetchAssetsForWallet(wa, 0)
 			if err != nil {
 				errChan <- err
 				return
-			}
-			for _, asset := range assets {
-				logrus.Infof("opensea_asset: %+v", *asset)
 			}
 			asGlry, err := openseaToDBNfts(pCtx, wa, assets, nftRepo)
 			if err != nil {
@@ -251,10 +244,10 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []strin
 }
 
 // recursively fetches all assets for a wallet
-func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int) ([]*openseaAsset, error) {
+func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([]*openseaAsset, error) {
 
 	result := []*openseaAsset{}
-	qsArgsMap := map[string]string{
+	qsArgsMap := map[string]interface{}{
 		"owner":           pWalletAddress,
 		"order_direction": "desc",
 		"offset":          fmt.Sprintf("%d", pOffset),
@@ -294,7 +287,7 @@ func openseaFetchAssetsForWallet(pWalletAddress string, pOffset int) ([]*opensea
 	return result, nil
 }
 
-func openseaToDBNfts(pCtx context.Context, pWalletAddress string, openseaNfts []*openseaAsset, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
+func openseaToDBNfts(pCtx context.Context, pWalletAddress persist.Address, openseaNfts []*openseaAsset, nftRepo persist.NFTRepository) ([]*persist.NFTDB, error) {
 
 	nfts := make([]*persist.NFTDB, len(openseaNfts))
 	nftChan := make(chan *persist.NFTDB)
@@ -370,16 +363,16 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []*persist.NFTDB, pUser *persis
 	return nfts, nil
 }
 
-func openseaToDBNft(pCtx context.Context, pWalletAddress string, nft *openseaAsset, nftRepo persist.NFTRepository) *persist.NFTDB {
+func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft *openseaAsset, nftRepo persist.NFTRepository) *persist.NFTDB {
 
 	result := &persist.NFTDB{
-		OwnerAddress:         strings.ToLower(pWalletAddress),
+		OwnerAddress:         pWalletAddress,
 		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
 		Name:                 nft.Name,
 		Description:          nft.Description,
 		ExternalURL:          nft.ExternalURL,
 		ImageURL:             nft.ImageURL,
-		CreatorAddress:       strings.ToLower(nft.Creator.Address),
+		CreatorAddress:       nft.Creator.Address,
 		AnimationURL:         nft.AnimationURL,
 		OpenSeaTokenID:       nft.TokenID,
 		OpenseaID:            nft.ID,

@@ -18,9 +18,9 @@ func TestOpenseaSync_Success(t *testing.T) {
 	assert := setupTest(t)
 	ctx := context.Background()
 
-	mike := &persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}}
-	robin := &persist.User{UserName: "robin", UserNameIdempotent: "robin", Addresses: []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}}
-	gianna := &persist.User{UserName: "gianna", UserNameIdempotent: "gianna", Addresses: []string{"0xdd33e6fd03983c970ae5e647df07314435d69f6b"}}
+	mike := &persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
+	robin := &persist.User{UserName: "robin", UserNameIdempotent: "robin", Addresses: []persist.Address{persist.Address(strings.ToLower("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"))}}
+	gianna := &persist.User{UserName: "gianna", UserNameIdempotent: "gianna", Addresses: []persist.Address{persist.Address(strings.ToLower("0xdd33e6fd03983c970ae5e647df07314435d69f6b"))}}
 
 	robinUserID, err := tc.repos.userRepository.Create(ctx, robin)
 	assert.Nil(err)
@@ -47,7 +47,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	}
 
 	nft4 := &persist.NFTDB{
-		OwnerAddress: strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"),
+		OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 		Name:         "asdasdasd",
 		OpenseaID:    46062322,
 	}
@@ -63,10 +63,10 @@ func TestOpenseaSync_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Len(now, 1)
 
-	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []string{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []persist.Address{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
-	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []string{strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
 	mikeColl, err := tc.repos.collectionRepository.GetByID(ctx, collID, true)
@@ -131,7 +131,7 @@ func TestOpenseaRateLimit_Failure(t *testing.T) {
 	assert.Equal(output.Error, "rate limited")
 }
 
-func openseaSyncRequest(assert *assert.Assertions, address string, jwt string) *http.Response {
+func openseaSyncRequest(assert *assert.Assertions, address persist.Address, jwt string) *http.Response {
 	req, err := http.NewRequest("POST",
 		fmt.Sprintf("%s/nfts/opensea/refresh?addresses=%s", tc.serverURL, address),
 		nil)

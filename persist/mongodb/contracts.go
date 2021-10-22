@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -28,10 +27,10 @@ func NewContractMongoRepository(mgoClient *mongo.Client) *ContractMongoRepositor
 
 // UpsertByAddress upserts an contract by a given address
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress string, pUpsert *persist.Contract) error {
+func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Contract) error {
 
 	_, err := c.mp.upsert(pCtx, bson.M{
-		"address": strings.ToLower(pAddress),
+		"address": pAddress,
 	}, pUpsert)
 	if err != nil {
 		return err
@@ -41,7 +40,7 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 }
 
 // GetByAddress returns an contract by a given address
-func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress string) (*persist.Contract, error) {
+func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Contract, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
@@ -50,7 +49,7 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress st
 	}
 
 	result := []*persist.Contract{}
-	err := c.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress)}, &result, opts)
+	err := c.mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
 		return nil, err

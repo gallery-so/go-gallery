@@ -91,7 +91,7 @@ def create_nft(nft):
             errored_documents.append({"doc": nft, "error": "no id in opensea asset"})
             return
         nft_id = create_id()
-        contract_document = {"contract_address": nft["contract_address"].lower()}
+        contract_document = {"contract_address": nft["contract_address"]}
         nft_document = {
             "version": 0,
             "_id": nft_id,
@@ -101,7 +101,7 @@ def create_nft(nft):
             "external_url": nft["external_url"],
             "creator_address": nft["creator_address"],
             "creator_name": nft["creator_opensea_name"],
-            "owner_address": user["addresses"][0].lower(),
+            "owner_address": user["addresses"][0],
             "multiple_owners": opensea_asset["owner"]["address"]
             == "0x0000000000000000000000000000000000000000",
             "contract": contract_document,
@@ -149,8 +149,8 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "username": user["username"],
-            "username_idempotent": user["username"].lower(),
-            "addresses": [user["wallet_address"].lower()],
+            "username_idempotent": user["username"],
+            "addresses": [user["wallet_address"]],
         }
 
         if user["id"] in creation_dict:
@@ -165,7 +165,7 @@ with open("glry-users.csv", encoding="utf-8-sig") as usersfile:
             "last_updated": datetime.datetime.utcnow(),
             "deleted": False,
             "user_id": user_id,
-            "address": user["wallet_address"].lower(),
+            "address": user["wallet_address"],
             "value": str(random.randint(1000000000000000000, 9999999999999999999)),
         }
 

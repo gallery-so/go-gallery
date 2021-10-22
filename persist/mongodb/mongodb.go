@@ -98,6 +98,9 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 
 // Update updates a document in the mongo database while filling out the field LastUpdated
 func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
+
+	query = cleanQuery(query)
+
 	now := primitive.NewDateTimeFromTime(time.Now())
 
 	asMap, err := structToBsonMap(update)
@@ -121,6 +124,8 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 // value must be an array
 func (m *storage) push(ctx context.Context, query bson.M, field string, value interface{}) error {
 
+	query = cleanQuery(query)
+
 	push := bson.E{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{push, lastUpdated}
@@ -140,6 +145,8 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 // value must be an array
 func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value interface{}) error {
 
+	query = cleanQuery(query)
+
 	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -158,6 +165,8 @@ func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value
 // pull puls items from an array field for a given queried document(s)
 func (m *storage) pull(ctx context.Context, query bson.M, field string, value bson.M) error {
 
+	query = cleanQuery(query)
+
 	pull := bson.E{Key: "$pull", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -175,7 +184,9 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value bs
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (persist.DBID, error) {
-	returnID := persist.DBID("")
+	query = cleanQuery(query)
+
+	var returnID persist.DBID
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
 	asMap, err := structToBsonMap(upsert)
@@ -211,7 +222,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 // find finds documents in the mongo database which is not deleted
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *storage) find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
-
+	filter = cleanQuery(filter)
 	filter["deleted"] = false
 
 	cur, err := m.collection.Find(ctx, filter, opts...)
@@ -238,12 +249,14 @@ func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result inte
 
 // count counts the number of documents in the mongo database which is not deleted
 func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+	filter = cleanQuery(filter)
 	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
 }
 
 // delete deletes all documents matching a given filter query
 func (m *storage) delete(ctx context.Context, filter bson.M, opts ...*options.DeleteOptions) error {
+	filter = cleanQuery(filter)
 	_, err := m.collection.DeleteMany(ctx, filter, opts...)
 	return err
 }
@@ -268,14 +281,14 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 	}
 	bsonMap := bson.M{}
 	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
+		fieldVal := val.Field(i)
 		tag, ok := val.Type().Field(i).Tag.Lookup("bson")
 		if ok {
 			spl := strings.Split(tag, ",")
 			if len(spl) > 1 {
 				switch spl[1] {
 				case "omitempty":
-					if isValueEmpty(field) {
+					if isValueEmpty(fieldVal) {
 						continue
 					}
 				case "only_get":
@@ -286,12 +299,85 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 			if tag == "-" {
 				continue
 			}
-			if field.CanInterface() {
-				bsonMap[spl[0]] = field.Interface()
+
+			if fieldVal.CanInterface() {
+				it := fieldVal.Interface()
+				switch fieldVal.Kind() {
+				case reflect.String:
+					if stringer, ok := it.(fmt.Stringer); ok {
+						it = stringer.String()
+					}
+				case reflect.Array, reflect.Slice:
+					for i := 0; i < fieldVal.Len(); i++ {
+						indexVal := fieldVal.Index(i)
+						if indexVal.CanInterface() {
+							indexIt := indexVal.Interface()
+							if stringer, ok := indexIt.(fmt.Stringer); ok {
+								if indexVal.CanSet() {
+									indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
+								}
+							}
+						}
+					}
+				case reflect.Map:
+					for _, key := range fieldVal.MapKeys() {
+						keyVal := fieldVal.MapIndex(key)
+						if keyVal.CanInterface() {
+							keyIt := keyVal.Interface()
+							if stringer, ok := keyIt.(fmt.Stringer); ok {
+								if keyVal.CanSet() {
+									keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
+								}
+							}
+						}
+					}
+				}
+				bsonMap[spl[0]] = it
 			}
 		}
 	}
 	return bsonMap, nil
+}
+
+func cleanQuery(filter bson.M) bson.M {
+	for k, v := range filter {
+		val := reflect.ValueOf(v)
+		if val.CanInterface() {
+			it := val.Interface()
+			switch val.Kind() {
+			case reflect.String:
+				if stringer, ok := it.(fmt.Stringer); ok {
+					it = stringer.String()
+				}
+			case reflect.Array, reflect.Slice:
+				for i := 0; i < val.Len(); i++ {
+					indexVal := val.Index(i)
+					if indexVal.CanInterface() {
+						indexIt := indexVal.Interface()
+						if stringer, ok := indexIt.(fmt.Stringer); ok {
+							if indexVal.CanSet() {
+								indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
+							}
+						}
+					}
+				}
+			case reflect.Map:
+				for _, key := range val.MapKeys() {
+					keyVal := val.MapIndex(key)
+					if keyVal.CanInterface() {
+						keyIt := keyVal.Interface()
+						if stringer, ok := keyIt.(fmt.Stringer); ok {
+							if keyVal.CanSet() {
+								keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
+							}
+						}
+					}
+				}
+			}
+			filter[k] = it
+		}
+	}
+	return filter
 }
 
 // a function that returns true if the value is a zero value or nil

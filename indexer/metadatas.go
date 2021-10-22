@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	svg "github.com/ajstarks/svgo"
+	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -28,7 +29,7 @@ import (
  *   #  Fill in the cell completely.
  *
  */
-func autoglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, error) {
+func autoglyphs(i *Indexer, turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenMetadata, error) {
 	width := 80
 	height := 80
 	buf := &bytes.Buffer{}
@@ -64,7 +65,7 @@ func autoglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, erro
 	if err != nil {
 		return nil, err
 	}
-	return metadata{
+	return persist.TokenMetadata{
 		"name":        fmt.Sprintf("Autoglyph #%d", it.Uint64()),
 		"description": "Autoglyphs are the first “on-chain” generative art on the Ethereum blockchain. A completely self-contained mechanism for the creation and ownership of an artwork.",
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
@@ -128,7 +129,7 @@ func autoglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, erro
 * scheme 9 = greenest address color on reddest address color
 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
  */
-func colorglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, error) {
+func colorglyphs(i *Indexer, turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenMetadata, error) {
 	spl := strings.Split(string(turi), " ")
 	if len(spl) != 3 {
 		panic("invalid colorglyphs tokenURI")
@@ -250,7 +251,7 @@ func colorglyphs(i *Indexer, turi uri, addr address, tid tokenID) (metadata, err
 	if err != nil {
 		return nil, err
 	}
-	return metadata{
+	return persist.TokenMetadata{
 		"name":        fmt.Sprintf("Colorglyph #%d", it.Uint64()),
 		"description": fmt.Sprintf("A Colorglyph with color scheme %s. Created by %s.", spl[1], spl[2]),
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
