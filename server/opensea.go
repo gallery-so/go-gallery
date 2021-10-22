@@ -222,6 +222,14 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persi
 				errChan <- err
 				return
 			}
+			if len(assets) == 0 {
+				time.Sleep(time.Second)
+				assets, err = openseaFetchAssetsForWallet(wa, 0)
+				if err != nil {
+					errChan <- err
+					return
+				}
+			}
 			asGlry, err := openseaToDBNfts(pCtx, wa, assets, nftRepo)
 			if err != nil {
 				errChan <- err
