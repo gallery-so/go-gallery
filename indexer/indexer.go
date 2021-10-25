@@ -372,6 +372,7 @@ func (i *Indexer) subscribeNewLogs() {
 		select {
 		case log := <-i.subscriptions:
 			logrus.Infof("Got log at: %d", log.BlockNumber)
+			i.lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
 			i.transfers <- logsToTransfer([]types.Log{log})
 		case err := <-sub.Err():
 			i.failWithMessage(err, "subscription error")

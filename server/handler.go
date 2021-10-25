@@ -12,9 +12,10 @@ var requiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"
 func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
+	// apiGroupV2 := router.Group("/glry/v2")
 
 	nftHandlersInit(apiGroupV1, repos, ethClient)
-	// tokenHandlersInit(apiGroupV1, repos, ethClient, ipfsClient)
+	// tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient)
 
 	return router
 }
