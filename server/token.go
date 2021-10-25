@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -49,7 +51,7 @@ type errCouldNotUpdateMedia struct {
 	id persist.DBID
 }
 
-func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensByIDInput{}
 
@@ -69,7 +71,7 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
-		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient)[0]})
+		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]})
 	}
 }
 
@@ -104,7 +106,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	}
 }
 
-func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -118,11 +120,11 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient)})
+		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient, ethClient)})
 	}
 }
 
-func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		userID := getUserIDfromCtx(c)
@@ -137,7 +139,7 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)})
+		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient)})
 	}
 }
 
@@ -171,13 +173,14 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 	return true, nil
 }
 
-func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.Token {
+func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.Token {
 	nftChan := make(chan *persist.Token)
 	for _, nft := range nfts {
 		go func(n *persist.Token) {
-			newMedia, newMetadata := getMedia(aeCtx, n.ID, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient)
+			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
+			n.TokenURI = newURI
 			go func() {
 				err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
 				if err != nil {
@@ -194,13 +197,14 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	return nfts
 }
 
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) []*persist.TokenInCollection {
+func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.TokenInCollection {
 	nftChan := make(chan *persist.TokenInCollection)
 	for _, nft := range nfts {
 		go func(n *persist.TokenInCollection) {
-			newMedia, newMetadata := getMedia(aeCtx, n.ID, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient)
+			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
+			n.TokenURI = newURI
 			go func() {
 				err := tokenRepo.UpdateByIDUnsafe(aeCtx, n.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
 				if err != nil {
@@ -218,11 +222,18 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 	return nfts
 }
 
-func getMedia(ctx context.Context, id persist.DBID, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (persist.Media, persist.TokenMetadata) {
+func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
+	if tokenURI == "" {
+		if uri, err := indexer.GetTokenURI(tokenType, contractAddress, tokenID, ethClient); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not get token URI for token")
+		} else {
+			tokenURI = uri
+		}
+	}
 	if metadata == nil || len(metadata) == 0 {
-		// if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
-		// 	metadata = m
-		// }
+		if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
+			metadata = m
+		}
 	}
 	if media.MediaURL == "" {
 		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient)
@@ -237,7 +248,7 @@ func getMedia(ctx context.Context, id persist.DBID, media persist.Media, metadat
 			logrus.WithError(err).Error(errCouldNotMakeMedia{tokenID, contractAddress}.Error())
 		}
 	}
-	return media, metadata
+	return media, metadata, tokenURI
 }
 
 func (e errCouldNotMakeMedia) Error() string {

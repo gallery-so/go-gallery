@@ -133,7 +133,7 @@ type Token struct {
 
 	ExternalURL string `bson:"external_url" json:"external_url"`
 
-	LatestBlock BlockNumber `bson:"latest_block" json:"latest_block"`
+	BlockNumber BlockNumber `bson:"block_number" json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
@@ -155,6 +155,8 @@ type TokenInCollection struct {
 
 	Name        string `bson:"name" json:"name"`
 	Description string `bson:"description" json:"description"`
+
+	TokenType TokenType `bson:"token_type" json:"token_type"`
 
 	TokenURI     TokenURI `bson:"token_uri" json:"token_uri"`
 	TokenID      TokenID  `bson:"token_id" json:"token_id"`
@@ -239,7 +241,7 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 
 // URL turns a token's URI into a URL
 func (uri TokenURI) URL() (*url.URL, error) {
-	return url.Parse(string(uri))
+	return url.Parse(uri.String())
 }
 
 func (uri TokenURI) String() string {
@@ -249,18 +251,20 @@ func (uri TokenURI) String() string {
 // Type returns the type of the token URI
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
-	if strings.Contains(asString, "data:application/json;base64,") {
-		return URITypeBase64JSON
-	} else if strings.HasPrefix(asString, "data:image/svg+xml;base64,") {
-		return URITypeBase64SVG
-	} else if strings.HasPrefix(asString, "ipfs://") {
+	switch {
+	case strings.Contains(asString, "ipfs://"):
 		return URITypeIPFS
-	} else if strings.HasPrefix(asString, "https://") || strings.HasPrefix(asString, "http://") {
-		return URITypeHTTP
-	} else if strings.Contains(asString, "ipfs.io/api") {
+	case strings.Contains(asString, "data:application/json;base64,"):
+		return URITypeBase64JSON
+	case strings.Contains(asString, "data:image/svg+xml;base64,"):
+		return URITypeBase64SVG
+	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
+	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
+		return URITypeHTTP
+	default:
+		return URITypeUnknown
 	}
-	return URITypeUnknown
 }
 
 func (id TokenID) String() string {

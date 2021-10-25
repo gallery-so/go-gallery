@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"google.golang.org/appengine"
@@ -38,7 +39,7 @@ type errNoGalleriesFoundWithID struct {
 
 // HANDLERS
 
-func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -57,7 +58,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 		aeCtx := appengine.NewContext(c.Request)
 		for _, gallery := range galleries {
 			for _, collection := range gallery.Collections {
-				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
+				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
 			}
 		}
 
@@ -66,7 +67,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 	}
 }
 
-func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -92,7 +93,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, collection := range gallery.Collections {
-			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient)
+			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
 		}
 
 		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: gallery})

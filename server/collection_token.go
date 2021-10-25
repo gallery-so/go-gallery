@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"google.golang.org/appengine"
@@ -66,7 +67,7 @@ type errNoCollectionsFoundWithID struct {
 
 // HANDLERS
 
-func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -86,7 +87,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient)
+			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient)
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutputtoken{Collections: colls})
@@ -94,7 +95,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 	}
 }
 
-func getCollectionByIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell) gin.HandlerFunc {
+func getCollectionByIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -118,7 +119,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient)
+		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient, ethClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
 		return

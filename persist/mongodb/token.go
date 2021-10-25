@@ -83,14 +83,37 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 		opts.SetMaxTime(dur)
 	}
 
-	result := []*persist.Token{}
-
-	err := t.mp.find(pCtx, bson.M{"owner_user_id": pUserID}, &result, opts)
+	result := []*persist.User{}
+	err := t.nmp.find(pCtx, bson.M{"_id": pUserID}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
+	if len(result) != 1 {
+		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
+	}
+	user := result[0]
+	tokens := []*persist.Token{}
+	resultChan := make(chan []*persist.Token)
+	errChan := make(chan error)
+	for _, v := range user.Addresses {
+		go func(addr persist.Address) {
+			tokensForAddress, err := t.GetByWallet(pCtx, addr)
+			if err != nil {
+				errChan <- err
+			}
+			resultChan <- tokensForAddress
+		}(v)
+	}
 
-	return result, nil
+	for i := 0; i < len(user.Addresses); i++ {
+		select {
+		case tokens := <-resultChan:
+			tokens = append(tokens, tokens...)
+		case err := <-errChan:
+			return nil, err
+		}
+	}
+	return tokens, nil
 }
 
 // GetByContract gets ERC721 tokens for a given contract
@@ -164,7 +187,10 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 		go func(token *persist.Token) {
 
-			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress, "owner_address": token.OwnerAddress}
+			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress}
+			if token.TokenType == persist.TokenTypeERC1155 {
+				query["owner_address"] = token.OwnerAddress
+			}
 			returnID, err := t.mp.upsert(pCtx, query, token)
 			if err != nil {
 				errs <- err
@@ -235,7 +261,7 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.Bl
 		return 0, errNoTokensFound
 	}
 
-	return res[0].LatestBlock, nil
+	return res[0].BlockNumber, nil
 
 }
 

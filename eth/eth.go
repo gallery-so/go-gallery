@@ -15,14 +15,14 @@ import (
 
 // Client represents an abstraction over the geth ethereum client
 type Client struct {
-	ethClient       *ethclient.Client
+	EthClient       *ethclient.Client
 	contractAddress common.Address
 }
 
 // NewEthClient initializes a new eth client
 func NewEthClient(ethClient *ethclient.Client, contractAddress string) *Client {
 	return &Client{
-		ethClient:       ethClient,
+		EthClient:       ethClient,
 		contractAddress: common.HexToAddress(contractAddress),
 	}
 }
@@ -32,7 +32,7 @@ const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 // HasNFT checks if a wallet address has a given NFT
 func (c *Client) HasNFT(pCtx context.Context, id persist.TokenID, userAddr persist.Address) (bool, error) {
 
-	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
+	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.EthClient)
 	if err != nil {
 		return false, err
 	}
@@ -49,7 +49,7 @@ func (c *Client) HasNFT(pCtx context.Context, id persist.TokenID, userAddr persi
 // HasNFTs checks if a wallet address has a given set of NFTs
 func (c *Client) HasNFTs(pCtx context.Context, ids []persist.TokenID, userAddr persist.Address) (bool, error) {
 
-	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.ethClient)
+	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.EthClient)
 	if err != nil {
 		return false, err
 	}
@@ -79,7 +79,7 @@ func (c *Client) HasNFTs(pCtx context.Context, ids []persist.TokenID, userAddr p
 // ResolvesENS checks if an ENS resolves to a given address
 func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr persist.Address) (bool, error) {
 
-	instance, err := contracts.NewIENSCaller(c.contractAddress, c.ethClient)
+	instance, err := contracts.NewIENSCaller(c.contractAddress, c.EthClient)
 	if err != nil {
 		return false, err
 	}

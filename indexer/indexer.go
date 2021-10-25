@@ -45,11 +45,12 @@ type tokenMetadata struct {
 	md persist.TokenMetadata
 }
 
-type tokenBalances struct {
-	ti   tokenIdentifiers
-	from persist.Address
-	to   persist.Address
-	amt  *big.Int
+type tokenBalanceChange struct {
+	ti    tokenIdentifiers
+	from  persist.Address
+	to    persist.Address
+	amt   *big.Int
+	block persist.BlockNumber
 }
 
 type tokenURI struct {
@@ -65,6 +66,12 @@ type ownerAtBlock struct {
 	ti    tokenIdentifiers
 	owner persist.Address
 	block persist.BlockNumber
+}
+
+type balanceAtBlock struct {
+	ti    tokenIdentifiers
+	block persist.BlockNumber
+	amnt  *big.Int
 }
 
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
@@ -87,7 +94,7 @@ type Indexer struct {
 	metadatas      chan tokenMetadata
 	uris           chan tokenURI
 	owners         chan ownerAtBlock
-	balances       chan tokenBalances
+	balances       chan tokenBalanceChange
 	previousOwners chan ownerAtBlock
 
 	subscriptions chan types.Log
@@ -103,18 +110,9 @@ type Indexer struct {
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
 func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
-	finalBlockUint, err := ethClient.BlockNumber(context.Background())
+	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
-	}
-
-	startingBlock := defaultStartingBlock
-
-	if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err == nil && mostRecent > defaultStartingBlock {
-		startingBlock = mostRecent
-	} else {
-		logrus.Infof("No most recent block found, starting at %d", startingBlock)
-		logrus.WithError(err).Info("No most recent block found")
 	}
 
 	return &Indexer{
@@ -126,15 +124,13 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 		chain: pChain,
 
-		lastSyncedBlock: startingBlock,
-		mostRecentBlock: persist.BlockNumber(finalBlockUint),
-
-		eventHashes: pEvents,
+		eventHashes:     pEvents,
+		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
 		metadatas:      make(chan tokenMetadata),
 		uris:           make(chan tokenURI),
 		owners:         make(chan ownerAtBlock),
-		balances:       make(chan tokenBalances),
+		balances:       make(chan tokenBalanceChange),
 		previousOwners: make(chan ownerAtBlock),
 
 		subscriptions: make(chan types.Log),
@@ -161,6 +157,16 @@ func (i *Indexer) Start() {
 
 func (i *Indexer) processLogs() {
 
+	// lastSyncedBlock := defaultStartingBlock
+	lastSyncedBlock := persist.BlockNumber(13014050)
+
+	// if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err == nil && mostRecent > defaultStartingBlock {
+	// 	lastSyncedBlock = mostRecent
+	// } else {
+	// 	logrus.Infof("No most recent block found, starting at %d", startingBlock)
+	// 	logrus.WithError(err).Info("No most recent block found")
+	// }
+
 	defer func() {
 		go i.subscribeNewLogs()
 	}()
@@ -170,9 +176,9 @@ func (i *Indexer) processLogs() {
 		events[i] = common.HexToHash(string(event))
 	}
 
-	topics := [][]common.Hash{events, nil, nil, nil}
+	topics := [][]common.Hash{events}
 
-	curBlock := i.lastSyncedBlock.BigInt()
+	curBlock := lastSyncedBlock.BigInt()
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(50)))
 	errs := 0
 	for nextBlock.Cmp(i.mostRecentBlock.BigInt()) == -1 {
@@ -203,7 +209,8 @@ func (i *Indexer) processLogs() {
 
 		i.transfers <- logsToTransfer(logsTo)
 
-		i.lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
+		lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
+		i.lastSyncedBlock = lastSyncedBlock
 
 		curBlock.Add(curBlock, big.NewInt(int64(50)))
 		nextBlock.Add(nextBlock, big.NewInt(int64(50)))
@@ -215,8 +222,11 @@ func (i *Indexer) processTransfers() {
 
 	defer close(i.tokens)
 	for transfers := range i.transfers {
-		if transfers != nil && len(transfers) > 0 {
-			go processTransfers(i, transfers)
+		result := make([]*transfer, len(transfers))
+		copy(result, transfers)
+		if transfers != nil {
+			logrus.Infof("Processing %d transfers", len(transfers))
+			go processTransfers(i, result)
 		}
 	}
 	logrus.Info("Transfer channel closed")
@@ -242,18 +252,18 @@ func (i *Indexer) processTokens() {
 	mu := &sync.Mutex{}
 	owners := map[tokenIdentifiers]ownerAtBlock{}
 	previousOwners := map[tokenIdentifiers][]ownerAtBlock{}
-	balances := map[tokenIdentifiers]map[persist.Address]*big.Int{}
+	balances := map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
 	metadatas := map[tokenIdentifiers]tokenMetadata{}
 	uris := map[tokenIdentifiers]tokenURI{}
 
 	go func() {
 		for {
-			<-time.After(time.Second * 10)
+			<-time.After(time.Second * 20)
 			mu.Lock()
 			i.tokens <- i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
 			owners = map[tokenIdentifiers]ownerAtBlock{}
 			previousOwners = map[tokenIdentifiers][]ownerAtBlock{}
-			balances = map[tokenIdentifiers]map[persist.Address]*big.Int{}
+			balances = map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
 			metadatas = map[tokenIdentifiers]tokenMetadata{}
 			uris = map[tokenIdentifiers]tokenURI{}
 			mu.Unlock()
@@ -270,48 +280,73 @@ func (i *Indexer) processTokens() {
 				}
 			} else {
 				contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
-				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-					if err == nil && len(tokens) == 1 {
-						token := tokens[0]
-						block := token.LatestBlock
-						curOwner := token.OwnerAddress
-						if owner.block > block {
-							owners[owner.ti] = owner
-						} else {
-							owners[owner.ti] = ownerAtBlock{block: block, owner: curOwner}
-						}
-					} else {
+				if err != nil {
+					i.failWithMessage(err, "error parsing token identifiers")
+					return
+				}
+				tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+				if err == nil && len(tokens) == 1 {
+					token := tokens[0]
+					block := token.BlockNumber
+					curOwner := token.OwnerAddress
+					if owner.block > block {
 						owners[owner.ti] = owner
+					} else {
+						owners[owner.ti] = ownerAtBlock{block: block, owner: curOwner}
 					}
 				} else {
-					logrus.WithError(err).WithField("ti", owner.ti).Error("error parsing token identifiers")
+					owners[owner.ti] = owner
 				}
+
 			}
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
-				balances[balance.ti] = map[persist.Address]*big.Int{}
+				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
 				contractAddress, tokenID, err := parseTokenIdentifiers(balance.ti)
 				if err == nil && contractAddress != "" && tokenID != "" {
 					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
 					if err == nil {
 						for _, token := range tokens {
-							balances[balance.ti][token.OwnerAddress] = new(big.Int).SetUint64(token.Quantity)
+							balances[balance.ti][token.OwnerAddress] = balanceAtBlock{block: token.BlockNumber, amnt: new(big.Int).SetUint64(token.Quantity)}
 						}
 					}
 				}
 			}
-			if balances[balance.ti][balance.to] == nil {
-				balances[balance.ti][balance.to] = big.NewInt(0)
+			balTo := balances[balance.ti][balance.to]
+			balFrom := balances[balance.ti][balance.from]
+			if balTo.amnt == nil {
+				balTo.amnt = big.NewInt(0)
 			}
-			balances[balance.ti][balance.to].Add(balances[balance.ti][balance.to], balance.amt)
-			if balances[balance.ti][balance.from] == nil {
-				balances[balance.ti][balance.from] = big.NewInt(0)
+			if balFrom.amnt == nil {
+				balFrom.amnt = big.NewInt(0)
 			}
-			balances[balance.ti][balance.from].Sub(balances[balance.ti][balance.from], balance.amt)
+			balTo.amnt.Add(balTo.amnt, balance.amt)
+			balFrom.amnt.Sub(balFrom.amnt, balance.amt)
+			balances[balance.ti][balance.from] = balFrom
+			balances[balance.ti][balance.to] = balTo
 		case metadata := <-i.metadatas:
+			if len(metadata.md) == 0 || metadata.md == nil {
+				contractAddress, tokenID, err := parseTokenIdentifiers(metadata.ti)
+				if err == nil {
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+					if err == nil && len(tokens) > 0 {
+						token := tokens[0]
+						metadata.md = token.TokenMetadata
+					}
+				}
+			}
 			metadatas[metadata.ti] = metadata
 		case uri := <-i.uris:
+			if uri.uri.String() == "" {
+				contractAddress, tokenID, err := parseTokenIdentifiers(uri.ti)
+				if err == nil {
+					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+					if err == nil && len(tokens) > 0 {
+						token := tokens[0]
+						uri.uri = token.TokenURI
+					}
+				}
+			}
 			uris[uri.ti] = uri
 		case previousOwner := <-i.previousOwners:
 			if previousOwners[previousOwner.ti] == nil {
@@ -399,30 +434,19 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 		tokenID := transfer.tokenID
 
 		key := makeKeyForToken(contractAddress, tokenID)
-		logrus.Infof("Processing transfer %s", key)
+		logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-		var u persist.TokenURI
+		u, err := GetTokenURI(transfer.tokenType, contractAddress, tokenID, i.ethClient)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
+		}
 		switch persist.TokenType(transfer.tokenType) {
 		case persist.TokenTypeERC721:
 			i.owners <- ownerAtBlock{key, to, transfer.blockNumber}
 			i.previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
 
-			uri, err := getERC721TokenURI(contractAddress, tokenID, i.ethClient)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC721 token")
-			} else {
-				u = uri
-			}
-
 		case persist.TokenTypeERC1155:
-			i.balances <- tokenBalances{key, from, to, new(big.Int).SetUint64(transfer.amount)}
-
-			uri, err := getERC1155TokenURI(contractAddress, tokenID, i.ethClient)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
-			} else {
-				u = uri
-			}
+			i.balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
 
 		default:
 			i.failWithMessage(errors.New("token type"), "unknown token type")
@@ -433,41 +457,42 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			i.failWithMessage(err, "failed to convert token ID to big int")
 			return
 		}
-		uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
 
+		uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
 		i.uris <- tokenURI{key, uriReplaced}
 		go func() {
+			var metadata persist.TokenMetadata
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-				if metadata, err := handler(i, uriReplaced, contractAddress, tokenID); err != nil {
+				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+				if err != nil {
 					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
-				} else {
-					i.metadatas <- tokenMetadata{key, metadata}
 				}
+
 			} else {
-				if metadata, err := getMetadataFromURI(uriReplaced, i.ipfsClient); err != nil {
+				metadata, err = GetMetadataFromURI(uriReplaced, i.ipfsClient)
+				if err != nil {
 					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
-				} else {
-					i.metadatas <- tokenMetadata{key, metadata}
 				}
 			}
+			i.metadatas <- tokenMetadata{key, metadata}
 		}()
 	}
 }
 
 func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
-	if t.TokenURI == "" {
-		return errors.New("token URI is empty")
-	}
-	if t.OwnerAddress == "0x00000000000000000000000000000000000000" {
+	// if t.TokenURI == "" {
+	// 	return errors.New("token URI is empty")
+	// }
+	if t.OwnerAddress == "0x00000000000000000000000000000000000000" || t.OwnerAddress == "" {
 		return errors.New("token owner is empty")
 	}
 	if err := i.tokenRepo.Upsert(ctx, t); err != nil {
 		return err
 	}
 	go func() {
-		i.contracts <- handleContract(i.ethClient, t.ContractAddress, i.lastSyncedBlock)
+		i.contracts <- handleContract(i.ethClient, t.ContractAddress, t.BlockNumber)
 	}()
 	return nil
 }
@@ -476,7 +501,7 @@ func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contrac
 	return i.contractRepo.UpsertByAddress(ctx, contract.Address, contract)
 }
 
-func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]*big.Int, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
+func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)
@@ -520,7 +545,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			TokenMetadata:   metadata.md,
 			TokenURI:        uris[k].uri,
 			Chain:           i.chain,
-			LatestBlock:     i.lastSyncedBlock,
+			BlockNumber:     v.block,
 		}
 		j++
 	}
@@ -547,14 +572,14 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
-				Quantity:        balance.Uint64(),
+				Quantity:        balance.amnt.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
 				Name:            name,
 				Description:     description,
 				Chain:           i.chain,
-				LatestBlock:     i.lastSyncedBlock,
+				BlockNumber:     balance.block,
 			}
 			j++
 		}
@@ -566,9 +591,12 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 func logsToTransfer(pLogs []types.Log) []*transfer {
 	result := []*transfer{}
 	for _, pLog := range pLogs {
-		switch pLog.Topics[0].Hex() {
-		case string(transferEventHash):
-			if len(pLog.Topics) != 4 {
+		logrus.Infof("log %+v", pLog)
+		switch {
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
+
+			if len(pLog.Topics) < 4 {
+				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC721 Transfer topics length")
 				continue
 			}
 
@@ -581,8 +609,9 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 				contractAddress: persist.Address(pLog.Address.Hex()),
 				tokenType:       persist.TokenTypeERC721,
 			})
-		case string(transferSingleEventHash):
-			if len(pLog.Topics) != 4 {
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
+			if len(pLog.Topics) < 4 {
+				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Single Transfer topics length")
 				continue
 			}
 
@@ -596,8 +625,9 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 				tokenType:       persist.TokenTypeERC1155,
 			})
 
-		case string(transferBatchEventHash):
-			if len(pLog.Topics) != 4 {
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
+			if len(pLog.Topics) < 4 {
+				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Batch Transfer topics length")
 				continue
 			}
 			from := persist.Address(pLog.Topics[2].Hex())
@@ -617,6 +647,8 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 				}
 			}
 			result = append(result, this...)
+		default:
+			logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "event_type": pLog.Topics[0]}).Warn("unknown event")
 		}
 	}
 	return result
@@ -689,7 +721,7 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 	}
 	cMetadata, err := getTokenContractMetadata(contractAddress, ethClient)
 	if err != nil {
-		logrus.WithError(err).Error("error getting contract metadata")
+		logrus.WithError(err).WithField("address", contractAddress).Error("error getting contract metadata")
 	} else {
 		c.Name = cMetadata.Name
 		c.Symbol = cMetadata.Symbol

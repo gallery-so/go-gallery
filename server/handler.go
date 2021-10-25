@@ -12,10 +12,10 @@ var requiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"
 func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
-	// apiGroupV2 := router.Group("/glry/v2")
+	apiGroupV2 := router.Group("/glry/v2")
 
 	nftHandlersInit(apiGroupV1, repos, ethClient)
-	// tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient)
 
 	return router
 }
@@ -72,16 +72,16 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 	galleriesGroup := parent.Group("/galleries")
 
-	galleriesGroup.GET("/get", jwtOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient))
-	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient))
+	galleriesGroup.GET("/get", jwtOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
+	galleriesGroup.GET("/user_get", jwtOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	galleriesGroup.POST("/update", jwtRequired(repos.userRepository, ethClient, requiredNFTs), updateGalleryToken(repos.galleryTokenRepository))
 
 	// COLLECTIONS
 
 	collectionsGroup := parent.Group("/collections")
 
-	collectionsGroup.GET("/get", jwtOptional(), getCollectionByIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
-	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
+	collectionsGroup.GET("/get", jwtOptional(), getCollectionByIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
+	collectionsGroup.GET("/user_get", jwtOptional(), getCollectionsByUserIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	collectionsGroup.POST("/create", jwtRequired(repos.userRepository, ethClient, requiredNFTs), createCollectionToken(repos.collectionTokenRepository, repos.galleryTokenRepository))
 	collectionsGroup.POST("/delete", jwtRequired(repos.userRepository, ethClient, requiredNFTs), deleteCollectionToken(repos.collectionTokenRepository))
 	collectionsGroup.POST("/update/info", jwtRequired(repos.userRepository, ethClient, requiredNFTs), updateCollectionInfoToken(repos.collectionTokenRepository))
@@ -92,10 +92,10 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 	nftsGroup := parent.Group("/nfts")
 
-	nftsGroup.GET("/get", jwtOptional(), getTokenByID(repos.tokenRepository, ipfsClient))
-	nftsGroup.GET("/user_get", jwtOptional(), getTokensForUser(repos.tokenRepository, ipfsClient))
+	nftsGroup.GET("/get", jwtOptional(), getTokenByID(repos.tokenRepository, ipfsClient, ethClient.EthClient))
+	nftsGroup.GET("/user_get", jwtOptional(), getTokensForUser(repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	nftsGroup.POST("/update", jwtRequired(repos.userRepository, ethClient, requiredNFTs), updateTokenByID(repos.tokenRepository))
-	nftsGroup.GET("/unassigned/get", jwtRequired(repos.userRepository, ethClient, requiredNFTs), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient))
+	nftsGroup.GET("/unassigned/get", jwtRequired(repos.userRepository, ethClient, requiredNFTs), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(repos.userRepository, ethClient, requiredNFTs), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	parent.GET("/health", healthcheck())

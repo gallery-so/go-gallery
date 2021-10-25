@@ -428,6 +428,9 @@ func tokenToCollectionToken(nft *persist.Token) *persist.TokenInCollection {
 		OwnerAddress:    nft.OwnerAddress,
 		Chain:           nft.Chain,
 		Description:     nft.Description,
+		TokenType:       nft.TokenType,
+		TokenURI:        nft.TokenURI,
+		TokenID:         nft.TokenID,
 		Media:           nft.Media,
 		TokenMetadata:   nft.TokenMetadata,
 	}

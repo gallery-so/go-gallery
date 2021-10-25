@@ -20,7 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-func init() {
+// Init starts the indexer and handles requests
+func Init() {
 	router := coreInit()
 	http.Handle("/", router)
 }
@@ -109,7 +110,7 @@ func newEthClient() *ethclient.Client {
 
 func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 2)
+	sh.SetTimeout(time.Second * 10)
 	return sh
 }
 
@@ -132,7 +133,7 @@ func newMongoClient() *mongo.Client {
 		mgoURL = string(secret)
 	}
 
-	mOpts := options.Client().ApplyURI(string(mgoURL))
+	mOpts := options.Client().ApplyURI(mgoURL)
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {
