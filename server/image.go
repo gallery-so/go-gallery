@@ -9,15 +9,13 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
@@ -173,39 +171,14 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string
 
 func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell) (persist.MediaType, error) {
 
-	// TODO handle when url is ipfs
-	buf := &bytes.Buffer{}
-
-	if strings.HasPrefix(url, "ipfs://") {
-		res, err := ipfsClient.Cat(strings.TrimPrefix(url, "ipfs://"))
-		if err != nil {
-			return "", err
-		}
-		_, err = io.Copy(buf, res)
-		if err != nil {
-			return "", err
-		}
-	} else if strings.HasPrefix(url, "http") {
-		hc := &http.Client{
-			Timeout: time.Second * 5,
-		}
-
-		resp, err := hc.Get(url)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-
-		_, err = io.Copy(buf, resp.Body)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		return "", errUnsupportedURL{url}
+	bs, err := indexer.GetDataFromURI(persist.TokenURI(url), ipfsClient)
+	if err != nil {
+		return "", err
 	}
 
-	contentType := persist.SniffMediaType(buf.Bytes())
-	logrus.Debugf("contentType: %s", contentType)
+	buf := new(bytes.Buffer)
+	contentType := persist.SniffMediaType(bs)
+	logrus.Infof("contentType: %s", contentType)
 	switch contentType {
 	case persist.MediaTypeImage:
 		img, _, err := image.Decode(buf)

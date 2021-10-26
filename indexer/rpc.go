@@ -77,8 +77,26 @@ func getTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
 func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
 
+	bs, err := GetDataFromURI(turi, ipfsClient)
+	if err != nil {
+		return persist.TokenMetadata{}, err
+	}
+	// parse the json
+	metadata := persist.TokenMetadata{}
+	err = json.Unmarshal(bs, &metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return metadata, nil
+
+}
+
+// GetDataFromURI calls URI and returns the data
+func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
+
 	client := &http.Client{
-		Timeout: time.Second * 15,
+		Timeout: time.Second * 10,
 	}
 
 	asString := turi.String()
@@ -92,13 +110,7 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 			return nil, err
 		}
 
-		metadata := persist.TokenMetadata{}
-		err = json.Unmarshal(decoded, &metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		return metadata, nil
+		return decoded, nil
 	case persist.URITypeIPFS:
 		path := strings.TrimPrefix(asString, "ipfs://")
 		pathMinusExtra := strings.TrimPrefix(path, "ipfs/")
@@ -114,13 +126,7 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 		if err != nil {
 			return nil, err
 		}
-		metadata := persist.TokenMetadata{}
-		err = json.Unmarshal(buf.Bytes(), &metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		return metadata, nil
+		return buf.Bytes(), nil
 	case persist.URITypeHTTP:
 		var body io.Reader
 		if strings.Contains(asString, "ipfs/") {
@@ -148,14 +154,7 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 			return nil, err
 		}
 
-		// parse the json
-		metadata := persist.TokenMetadata{}
-		err = json.Unmarshal(buf.Bytes(), &metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		return metadata, nil
+		return buf.Bytes(), nil
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
@@ -173,14 +172,7 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 			return nil, err
 		}
 
-		// parse the json
-		metadata := persist.TokenMetadata{}
-		err = json.Unmarshal(buf.Bytes(), &metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		return metadata, nil
+		return buf.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
