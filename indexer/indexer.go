@@ -157,6 +157,10 @@ func (i *Indexer) Start() {
 func (i *Indexer) processLogs() {
 
 	lastSyncedBlock := defaultStartingBlock
+	recentDBBlock, err := i.tokenRepo.MostRecentBlock(context.Background())
+	if err != nil && recentDBBlock > defaultStartingBlock {
+		lastSyncedBlock = recentDBBlock
+	}
 
 	defer func() {
 		go i.subscribeNewLogs()
