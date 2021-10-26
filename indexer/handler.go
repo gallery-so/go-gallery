@@ -89,6 +89,7 @@ func setDefaults() {
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("CHAIN", "ETH")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
+	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("ENV", "local")
 	viper.AutomaticEnv()
 }
@@ -123,7 +124,8 @@ func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 func newMongoClient() *mongo.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 	defer cancel()
-	mgoURL := "mongodb://localhost:27017/"
+	mgoURL := viper.GetString("MONGO_URL")
+	logrus.Infof("Connecting to mongo at %s", mgoURL)
 	if viper.GetString("ENV") != "local" {
 		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
 		secret, err := util.AccessSecret(context.Background(), mongoSecretName)

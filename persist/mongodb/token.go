@@ -216,7 +216,12 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Token) error {
 
-	_, err := t.mp.upsert(pCtx, bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress, "owner_address": pToken.OwnerAddress}, pToken)
+	query := bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress}
+	if pToken.TokenType == persist.TokenTypeERC1155 {
+		query["owner_address"] = pToken.OwnerAddress
+	}
+
+	_, err := t.mp.upsert(pCtx, query, pToken)
 	return err
 }
 

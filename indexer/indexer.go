@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -127,16 +125,16 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		eventHashes:     pEvents,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
-		metadatas:      make(chan tokenMetadata),
-		uris:           make(chan tokenURI),
-		owners:         make(chan ownerAtBlock),
-		balances:       make(chan tokenBalanceChange),
-		previousOwners: make(chan ownerAtBlock),
+		metadatas:      make(chan tokenMetadata, 100),
+		uris:           make(chan tokenURI, 100),
+		owners:         make(chan ownerAtBlock, 100),
+		balances:       make(chan tokenBalanceChange, 100),
+		previousOwners: make(chan ownerAtBlock, 100),
 
-		subscriptions: make(chan types.Log),
-		transfers:     make(chan []*transfer),
-		tokens:        make(chan []*persist.Token),
-		contracts:     make(chan *persist.Contract),
+		subscriptions: make(chan types.Log, 10),
+		transfers:     make(chan []*transfer, 10),
+		tokens:        make(chan []*persist.Token, 10),
+		contracts:     make(chan *persist.Contract, 10),
 		done:          make(chan error),
 
 		uniqueMetadatas: getUniqueMetadataHandlers(),
@@ -151,21 +149,14 @@ func (i *Indexer) Start() {
 	go i.processLogs()
 	go i.processTransfers()
 	go i.processTokens()
-	go i.processContracts()
+	go i.receiveTokens()
+	go i.receiveContracts()
 	i.handleDone()
 }
 
 func (i *Indexer) processLogs() {
 
-	// lastSyncedBlock := defaultStartingBlock
-	lastSyncedBlock := persist.BlockNumber(13014050)
-
-	// if mostRecent, err := tokenRepo.MostRecentBlock(context.Background()); err == nil && mostRecent > defaultStartingBlock {
-	// 	lastSyncedBlock = mostRecent
-	// } else {
-	// 	logrus.Infof("No most recent block found, starting at %d", startingBlock)
-	// 	logrus.WithError(err).Info("No most recent block found")
-	// }
+	lastSyncedBlock := defaultStartingBlock
 
 	defer func() {
 		go i.subscribeNewLogs()
@@ -222,32 +213,17 @@ func (i *Indexer) processTransfers() {
 
 	defer close(i.tokens)
 	for transfers := range i.transfers {
-		result := make([]*transfer, len(transfers))
-		copy(result, transfers)
-		if transfers != nil {
-			logrus.Infof("Processing %d transfers", len(transfers))
-			go processTransfers(i, result)
+		if transfers == nil {
+			continue
 		}
+		logrus.Infof("Processing %d transfers", len(transfers))
+		processTransfers(i, transfers)
 	}
 	logrus.Info("Transfer channel closed")
 	logrus.Info("Done processing transfers, closing tokens channel")
 }
 
 func (i *Indexer) processTokens() {
-
-	go func() {
-		for tokens := range i.tokens {
-			go func(t []*persist.Token) {
-				for _, token := range t {
-					logrus.Infof("Processing token %s-%s", token.ContractAddress, token.TokenID)
-					err := i.tokenReceive(context.Background(), token)
-					if err != nil {
-						logrus.WithError(err).WithFields(logrus.Fields{"id": token.TokenID, "contract": token.ContractAddress}).Error("error processing token")
-					}
-				}
-			}(tokens)
-		}
-	}()
 
 	mu := &sync.Mutex{}
 	owners := map[tokenIdentifiers]ownerAtBlock{}
@@ -258,14 +234,9 @@ func (i *Indexer) processTokens() {
 
 	go func() {
 		for {
-			<-time.After(time.Second * 20)
+			time.Sleep(time.Second * 20)
 			mu.Lock()
 			i.tokens <- i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
-			owners = map[tokenIdentifiers]ownerAtBlock{}
-			previousOwners = map[tokenIdentifiers][]ownerAtBlock{}
-			balances = map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
-			metadatas = map[tokenIdentifiers]tokenMetadata{}
-			uris = map[tokenIdentifiers]tokenURI{}
 			mu.Unlock()
 		}
 	}()
@@ -274,31 +245,7 @@ func (i *Indexer) processTokens() {
 		mu.Lock()
 		select {
 		case owner := <-i.owners:
-			if it, ok := owners[owner.ti]; ok {
-				if it.block < owner.block {
-					owners[owner.ti] = owner
-				}
-			} else {
-				contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
-				if err != nil {
-					i.failWithMessage(err, "error parsing token identifiers")
-					return
-				}
-				tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-				if err == nil && len(tokens) == 1 {
-					token := tokens[0]
-					block := token.BlockNumber
-					curOwner := token.OwnerAddress
-					if owner.block > block {
-						owners[owner.ti] = owner
-					} else {
-						owners[owner.ti] = ownerAtBlock{block: block, owner: curOwner}
-					}
-				} else {
-					owners[owner.ti] = owner
-				}
-
-			}
+			owners[owner.ti] = owner
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
 				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
@@ -325,28 +272,8 @@ func (i *Indexer) processTokens() {
 			balances[balance.ti][balance.from] = balFrom
 			balances[balance.ti][balance.to] = balTo
 		case metadata := <-i.metadatas:
-			if len(metadata.md) == 0 || metadata.md == nil {
-				contractAddress, tokenID, err := parseTokenIdentifiers(metadata.ti)
-				if err == nil {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-					if err == nil && len(tokens) > 0 {
-						token := tokens[0]
-						metadata.md = token.TokenMetadata
-					}
-				}
-			}
 			metadatas[metadata.ti] = metadata
 		case uri := <-i.uris:
-			if uri.uri.String() == "" {
-				contractAddress, tokenID, err := parseTokenIdentifiers(uri.ti)
-				if err == nil {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-					if err == nil && len(tokens) > 0 {
-						token := tokens[0]
-						uri.uri = token.TokenURI
-					}
-				}
-			}
 			uris[uri.ti] = uri
 		case previousOwner := <-i.previousOwners:
 			if previousOwners[previousOwner.ti] == nil {
@@ -374,15 +301,27 @@ func (i *Indexer) processTokens() {
 	}
 }
 
-func (i *Indexer) processContracts() {
-	for contract := range i.contracts {
-		go func(c *persist.Contract) {
-			logrus.Infof("Processing contract %s", c.Address)
-			err := i.contractReceive(context.Background(), c)
+func (i *Indexer) receiveTokens() {
+
+	for tokens := range i.tokens {
+		for _, token := range tokens {
+			logrus.Infof("Processing token %s-%s", token.ContractAddress, token.TokenID)
+			err := i.tokenReceive(context.Background(), token)
 			if err != nil {
-				logrus.WithError(err).WithField("address", c.Address).Error("error processing contract")
+				logrus.WithError(err).WithFields(logrus.Fields{"id": token.TokenID, "contract": token.ContractAddress}).Error("error processing token")
 			}
-		}(contract)
+		}
+	}
+
+}
+
+func (i *Indexer) receiveContracts() {
+	for contract := range i.contracts {
+		logrus.Infof("Processing contract %s", contract.Address)
+		err := i.contractReceive(context.Background(), contract)
+		if err != nil {
+			logrus.WithError(err).WithField("address", contract.Address).Error("error processing contract")
+		}
 	}
 }
 
@@ -420,7 +359,6 @@ func (i *Indexer) handleDone() {
 	for {
 		err := <-i.done
 		logrus.Errorf("Indexer done: %v", err)
-		os.Exit(1)
 		panic(err)
 	}
 }
@@ -482,9 +420,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 }
 
 func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
-	// if t.TokenURI == "" {
-	// 	return errors.New("token URI is empty")
-	// }
+
 	if t.OwnerAddress == "0x00000000000000000000000000000000000000" || t.OwnerAddress == "" {
 		return errors.New("token owner is empty")
 	}
@@ -508,11 +444,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 	}
 	result := make([]*persist.Token, len(owners)+totalBalances)
 	j := 0
-	for _, v := range previousOwners {
-		sort.Slice(v, func(i, j int) bool {
-			return v[i].block < v[j].block
-		})
-	}
+
 	for k, v := range owners {
 		contractAddress, tokenID, err := parseTokenIdentifiers(k)
 		if err != nil {
@@ -533,6 +465,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			description = w
 		}
 
+		uri := uris[k]
 		result[j] = &persist.Token{
 			TokenID:         tokenID,
 			ContractAddress: contractAddress,
@@ -543,9 +476,17 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			PreviousOwners:  previousOwnerAddresses,
 			TokenType:       persist.TokenTypeERC721,
 			TokenMetadata:   metadata.md,
-			TokenURI:        uris[k].uri,
+			TokenURI:        uri.uri,
 			Chain:           i.chain,
 			BlockNumber:     v.block,
+		}
+		delete(previousOwners, k)
+		delete(owners, k)
+		if uri.uri != "" {
+			delete(uris, k)
+		}
+		if metadata.md != nil && len(metadata.md) > 0 {
+			delete(metadatas, k)
 		}
 		j++
 	}
@@ -583,6 +524,43 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			}
 			j++
 		}
+		delete(balances, k)
+		if uri.uri != "" {
+			delete(uris, k)
+		}
+		if metadata.md != nil && len(metadata.md) > 0 {
+			delete(metadatas, k)
+		}
+	}
+
+	for k, v := range uris {
+		contractAddress, tokenID, err := parseTokenIdentifiers(k)
+		if err != nil {
+			i.failWithMessage(err, "failed to parse key for token")
+			return nil
+		}
+
+		result = append(result, &persist.Token{
+			TokenID:         tokenID,
+			ContractAddress: contractAddress,
+			TokenURI:        v.uri,
+			Chain:           i.chain,
+		})
+		delete(uris, k)
+	}
+
+	for k, v := range metadatas {
+		contractAddress, tokenID, err := parseTokenIdentifiers(k)
+		if err != nil {
+			i.failWithMessage(err, "failed to parse key for token")
+			return nil
+		}
+		result = append(result, &persist.Token{
+			TokenID:         tokenID,
+			ContractAddress: contractAddress,
+			TokenMetadata:   v.md,
+		})
+		delete(metadatas, k)
 	}
 
 	return result

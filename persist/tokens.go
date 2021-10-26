@@ -113,27 +113,27 @@ type Token struct {
 	Deleted      bool      `bson:"deleted" json:"-"`
 	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
-	Media          Media  `bson:"media" json:"media"`
+	CollectorsNote string `bson:"collectors_note,omitempty" json:"collectors_note"`
+	Media          Media  `bson:"media,omitempty" json:"media"`
 
-	TokenType TokenType `bson:"token_type" json:"token_type"`
+	TokenType TokenType `bson:"token_type,omitempty" json:"token_type"`
 
-	Chain Chain `bson:"chain" json:"chain"`
+	Chain Chain `bson:"chain,omitempty" json:"chain"`
 
-	Name        string `bson:"name" json:"name"`
-	Description string `bson:"description" json:"description"`
+	Name        string `bson:"name,omitempty" json:"name"`
+	Description string `bson:"description,omitempty" json:"description"`
 
-	TokenURI        TokenURI      `bson:"token_uri" json:"token_uri"`
+	TokenURI        TokenURI      `bson:"token_uri,omitempty" json:"token_uri"`
 	TokenID         TokenID       `bson:"token_id" json:"token_id"`
-	Quantity        uint64        `bson:"quantity" json:"quantity"`
-	OwnerAddress    Address       `bson:"owner_address" json:"owner_address"`
-	PreviousOwners  []Address     `bson:"previous_owners" json:"previous_owners"`
-	TokenMetadata   TokenMetadata `bson:"token_metadata" json:"token_metadata"`
+	Quantity        uint64        `bson:"quantity,omitempty" json:"quantity"`
+	OwnerAddress    Address       `bson:"owner_address,omitempty" json:"owner_address"`
+	PreviousOwners  []Address     `bson:"previous_owners,omitempty" json:"previous_owners"`
+	TokenMetadata   TokenMetadata `bson:"token_metadata,omitempty" json:"token_metadata"`
 	ContractAddress Address       `bson:"contract_address" json:"contract_address"`
 
-	ExternalURL string `bson:"external_url" json:"external_url"`
+	ExternalURL string `bson:"external_url,omitempty" json:"external_url"`
 
-	BlockNumber BlockNumber `bson:"block_number" json:"block_number"`
+	BlockNumber BlockNumber `bson:"block_number,omitempty" json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
