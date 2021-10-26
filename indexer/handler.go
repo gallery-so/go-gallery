@@ -125,7 +125,6 @@ func newMongoClient() *mongo.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 	defer cancel()
 	mgoURL := viper.GetString("MONGO_URL")
-	logrus.Infof("Connecting to mongo at %s", mgoURL)
 	if viper.GetString("ENV") != "local" {
 		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
 		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
@@ -134,6 +133,8 @@ func newMongoClient() *mongo.Client {
 		}
 		mgoURL = string(secret)
 	}
+
+	logrus.Infof("Connecting to mongo at %s", mgoURL)
 
 	mOpts := options.Client().ApplyURI(mgoURL)
 

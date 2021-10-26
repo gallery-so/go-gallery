@@ -138,15 +138,7 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode > 299 || resp.StatusCode < 200 {
-				time.Sleep(time.Second * 10)
-				resp, err = client.Get(asString)
-				if err != nil {
-					return nil, err
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode > 299 || resp.StatusCode < 200 {
-					return nil, errHTTP{status: resp.Status, url: asString}
-				}
+				return nil, errHTTP{status: resp.Status, url: asString}
 			}
 			body = resp.Body
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -75,6 +76,7 @@ func setDefaults() {
 	viper.SetDefault("JWT_SECRET", "Test-Secret")
 	viper.SetDefault("JWT_TTL", 60*60*24*3)
 	viper.SetDefault("PORT", 4000)
+	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
@@ -110,7 +112,7 @@ func newRepos() *repositories {
 func newMongoClient() *mongo.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
 	defer cancel()
-	mgoURL := "mongodb://localhost:27017/"
+	mgoURL := viper.GetString("MONGO_URL")
 	if viper.GetString("ENV") != "local" {
 		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
 		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
@@ -119,6 +121,7 @@ func newMongoClient() *mongo.Client {
 		}
 		mgoURL = string(secret)
 	}
+	logrus.Infof("Connecting to mongo at %s\n", mgoURL)
 
 	mOpts := options.Client().ApplyURI(string(mgoURL))
 

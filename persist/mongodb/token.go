@@ -107,12 +107,13 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 
 	for i := 0; i < len(user.Addresses); i++ {
 		select {
-		case tokens := <-resultChan:
-			tokens = append(tokens, tokens...)
+		case t := <-resultChan:
+			tokens = append(tokens, t...)
 		case err := <-errChan:
 			return nil, err
 		}
 	}
+
 	return tokens, nil
 }
 
