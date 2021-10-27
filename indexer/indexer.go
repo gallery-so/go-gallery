@@ -20,7 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var defaultStartingBlock persist.BlockNumber = 6000000
+// var defaultStartingBlock persist.BlockNumber = 6000000
+var defaultStartingBlock persist.BlockNumber = 13000000
 
 // eventHash represents an event keccak256 hash
 type eventHash string
@@ -306,17 +307,19 @@ func (i *Indexer) processTokens() {
 }
 
 func (i *Indexer) receiveTokens() {
-
 	for tokens := range i.tokens {
-		for _, token := range tokens {
-			logrus.Infof("Processing token %s-%s", token.ContractAddress, token.TokenID)
-			err := i.tokenReceive(context.Background(), token)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"id": token.TokenID, "contract": token.ContractAddress}).Error("error processing token")
-			}
+		if tokens == nil {
+			continue
+		}
+		if len(tokens) == 0 {
+			continue
+		}
+		logrus.Infof("Processing %d tokens", len(tokens))
+		err := upsertTokens(context.Background(), tokens, i)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"block": tokens[0].BlockNumber}).Error("error processing token")
 		}
 	}
-
 }
 
 func (i *Indexer) receiveContracts() {
@@ -423,16 +426,15 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 	}
 }
 
-func (i *Indexer) tokenReceive(ctx context.Context, t *persist.Token) error {
+func upsertTokens(ctx context.Context, t []*persist.Token, i *Indexer) error {
 
-	if t.OwnerAddress == "0x00000000000000000000000000000000000000" || t.OwnerAddress == "" {
-		return errors.New("token owner is empty")
-	}
-	if err := i.tokenRepo.Upsert(ctx, t); err != nil {
+	if err := i.tokenRepo.BulkUpsert(ctx, t); err != nil {
 		return err
 	}
 	go func() {
-		i.contracts <- handleContract(i.ethClient, t.ContractAddress, t.BlockNumber)
+		for _, token := range t {
+			i.contracts <- handleContract(i.ethClient, token.ContractAddress, token.BlockNumber)
+		}
 	}()
 	return nil
 }
