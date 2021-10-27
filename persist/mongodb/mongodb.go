@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -23,6 +24,8 @@ var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
+
+var mapMutex sync.Mutex
 
 // ErrDocumentNotFound represents when a document is not found in the database for an update operation
 var ErrDocumentNotFound = errors.New("document not found")
@@ -310,97 +313,118 @@ func structToBsonMap(v interface{}) (bson.M, error) {
 			}
 			if fieldVal.CanInterface() {
 				it := fieldVal.Interface()
-				switch fieldVal.Kind() {
-				case reflect.String:
-					if stringer, ok := it.(fmt.Stringer); ok {
-						it = stringer.String()
-					}
-				case reflect.Array, reflect.Slice:
-					for i := 0; i < fieldVal.Len(); i++ {
-						indexVal := fieldVal.Index(i)
-						if !indexVal.IsValid() {
-							continue
-						}
-						if indexVal.CanInterface() {
-							indexIt := indexVal.Interface()
-							if stringer, ok := indexIt.(fmt.Stringer); ok {
-								if indexVal.CanSet() {
-									indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
-								}
-							}
-						}
-					}
-				case reflect.Map:
-					for _, key := range fieldVal.MapKeys() {
-						keyVal := fieldVal.MapIndex(key)
-						if !keyVal.IsValid() {
-							continue
-						}
-						if keyVal.CanInterface() {
-							keyIt := keyVal.Interface()
-							if stringer, ok := keyIt.(fmt.Stringer); ok {
-								if keyVal.CanSet() {
-									keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
-								}
-							}
-						}
-					}
-				}
 				bsonMap[spl[0]] = it
 			}
 		}
 	}
+	setStringerMap(bsonMap, 0)
 	return bsonMap, nil
 }
 
 func cleanQuery(filter bson.M) bson.M {
-	for k, v := range filter {
-		val := reflect.ValueOf(v)
-		if !val.IsValid() {
+	setStringerMap(filter, 0)
+	return filter
+}
+
+func setStringerMap(f bson.M, depth int) {
+	if depth > 10 {
+		return
+	}
+	for k, v := range f {
+		v := reflect.ValueOf(v)
+		if !v.IsValid() {
 			continue
 		}
-		if val.CanInterface() {
-			it := val.Interface()
-			switch val.Kind() {
-			case reflect.String:
-				if stringer, ok := it.(fmt.Stringer); ok {
-					it = stringer.String()
+		switch v.Kind() {
+		case reflect.Array, reflect.Slice:
+			for i := 0; i < v.Len(); i++ {
+				indexVal := v.Index(i)
+				if !indexVal.IsValid() {
+					continue
 				}
-			case reflect.Array, reflect.Slice:
-				for i := 0; i < val.Len(); i++ {
-					indexVal := val.Index(i)
-					if !indexVal.IsValid() {
-						continue
-					}
-					if indexVal.CanInterface() {
-						indexIt := indexVal.Interface()
-						if stringer, ok := indexIt.(fmt.Stringer); ok {
-							if indexVal.CanSet() {
-								indexVal.Set(reflect.ValueOf(stringer.String()).Convert(indexVal.Type()))
-							}
-						}
-					}
-				}
-			case reflect.Map:
-				for _, key := range val.MapKeys() {
-					keyVal := val.MapIndex(key)
-					if !keyVal.IsValid() {
-						continue
-					}
-					if keyVal.CanInterface() {
-						keyIt := keyVal.Interface()
-						if stringer, ok := keyIt.(fmt.Stringer); ok {
-							if keyVal.CanSet() {
-								keyVal.Set(reflect.ValueOf(stringer.String()).Convert(keyVal.Type()))
-							}
-						}
-					}
+				if indexVal.CanSet() {
+					indexVal.Set(setStringerValue(indexVal, depth+1))
 				}
 			}
-			filter[k] = it
+		case reflect.Map:
+			mapMutex.Lock()
+			for _, key := range v.MapKeys() {
+				keyVal := v.MapIndex(key)
+				if !keyVal.IsValid() {
+					continue
+				}
+				v.SetMapIndex(key, setStringerValue(keyVal, depth+1))
+			}
+			mapMutex.Unlock()
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				fieldVal := v.Field(i)
+				if !fieldVal.IsValid() {
+					continue
+				}
+				if fieldVal.CanSet() {
+					fieldVal.Set(setStringerValue(fieldVal, depth+1))
+				}
+			}
+		}
+		if v.CanInterface() {
+			it := v.Interface()
+			if stringer, ok := it.(fmt.Stringer); ok {
+				f[k] = stringer.String()
+			} else {
+				f[k] = it
+			}
 		}
 	}
-	return filter
+}
+func setStringerValue(val reflect.Value, depth int) reflect.Value {
+	if depth > 10 {
+		return val
+	}
+	if !val.IsValid() {
+		return val
+	}
+	switch val.Kind() {
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < val.Len(); i++ {
+			indexVal := val.Index(i)
+			if !indexVal.IsValid() {
+				continue
+			}
+			if indexVal.CanSet() {
+				indexVal.Set(reflect.ValueOf(setStringerValue(indexVal, depth+1)))
+			}
+		}
+	case reflect.Map:
+		mapMutex.Lock()
+		for _, key := range val.MapKeys() {
+			keyVal := val.MapIndex(key)
+			if !keyVal.IsValid() {
+				continue
+			}
+
+			val.SetMapIndex(key, setStringerValue(keyVal, depth+1))
+		}
+		mapMutex.Unlock()
+	case reflect.Struct:
+		for i := 0; i < val.NumField(); i++ {
+			fieldVal := val.Field(i)
+			if !fieldVal.IsValid() {
+				continue
+			}
+			if fieldVal.CanSet() {
+				fieldVal.Set(setStringerValue(fieldVal, depth+1))
+			}
+		}
+	default:
+		if val.CanInterface() {
+			it := val.Interface()
+			if stringer, ok := it.(fmt.Stringer); ok && (val.Kind() == reflect.String || val.Kind() == reflect.Interface) {
+				return reflect.ValueOf(stringer.String()).Convert(val.Type())
+			}
+		}
+	}
+	return val
 }
 
 // a function that returns true if the value is a zero value or nil

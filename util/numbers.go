@@ -37,13 +37,11 @@ func (e errInvalidHex) Error() string {
 
 // RemoveLeftPaddedZeros is a function that removes the left padded zeros from a large hex string
 func RemoveLeftPaddedZeros(hex string) string {
-	if strings.HasPrefix(hex, "0x") {
-		hex = hex[2:]
-	}
+	hex = strings.TrimPrefix(hex, "0x")
 	for i := 0; i < len(hex); i++ {
 		if hex[i] != '0' {
-			return "0x" + hex[i:]
+			return hex[i:]
 		}
 	}
-	return "0x" + hex
+	return hex
 }

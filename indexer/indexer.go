@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -21,7 +22,7 @@ import (
 )
 
 // var defaultStartingBlock persist.BlockNumber = 6000000
-var defaultStartingBlock persist.BlockNumber = 13000000
+var defaultStartingBlock persist.BlockNumber = 13014050
 
 // eventHash represents an event keccak256 hash
 type eventHash string
@@ -87,6 +88,9 @@ type Indexer struct {
 
 	eventHashes []eventHash
 
+	transfersPool *workerpool.WorkerPool
+	tokensPool    *workerpool.WorkerPool
+
 	lastSyncedBlock persist.BlockNumber
 	mostRecentBlock persist.BlockNumber
 
@@ -126,16 +130,19 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		eventHashes:     pEvents,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
-		metadatas:      make(chan tokenMetadata, 100),
-		uris:           make(chan tokenURI, 100),
-		owners:         make(chan ownerAtBlock, 100),
-		balances:       make(chan tokenBalanceChange, 100),
-		previousOwners: make(chan ownerAtBlock, 100),
+		transfersPool: workerpool.New(10),
+		tokensPool:    workerpool.New(10),
 
-		subscriptions: make(chan types.Log, 10),
-		transfers:     make(chan []*transfer, 10),
-		tokens:        make(chan []*persist.Token, 10),
-		contracts:     make(chan *persist.Contract, 10),
+		metadatas:      make(chan tokenMetadata),
+		uris:           make(chan tokenURI),
+		owners:         make(chan ownerAtBlock),
+		balances:       make(chan tokenBalanceChange),
+		previousOwners: make(chan ownerAtBlock),
+
+		subscriptions: make(chan types.Log),
+		transfers:     make(chan []*transfer),
+		tokens:        make(chan []*persist.Token),
+		contracts:     make(chan *persist.Contract),
 		done:          make(chan error),
 
 		uniqueMetadatas: getUniqueMetadataHandlers(),
@@ -222,7 +229,10 @@ func (i *Indexer) processTransfers() {
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
-		processTransfers(i, transfers)
+		i.transfersPool.Submit(func() {
+			processTransfers(i, transfers)
+		})
+
 	}
 	logrus.Info("Transfer channel closed")
 	logrus.Info("Done processing transfers, closing tokens channel")
@@ -250,19 +260,50 @@ func (i *Indexer) processTokens() {
 		mu.Lock()
 		select {
 		case owner := <-i.owners:
-			owners[owner.ti] = owner
+			if on, ok := owners[owner.ti]; !ok {
+				owners[owner.ti] = owner
+			} else {
+				if on.block < owner.block {
+					owners[owner.ti] = owner
+				}
+			}
+			owner = owners[owner.ti]
+			contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
+			if err != nil {
+				i.failWithMessage(err, "failed to parse token identifiers")
+				return
+			}
+			tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+			if err == nil && len(tokens) == 1 {
+				token := tokens[0]
+				if token.BlockNumber < owner.block {
+					owners[owner.ti] = owner
+				} else {
+					owners[owner.ti] = ownerAtBlock{
+						ti:    owner.ti,
+						block: token.BlockNumber,
+						owner: token.OwnerAddress,
+					}
+				}
+			}
 		case balance := <-i.balances:
 			if balances[balance.ti] == nil {
 				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
 				contractAddress, tokenID, err := parseTokenIdentifiers(balance.ti)
-				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-					if err == nil {
-						for _, token := range tokens {
-							balances[balance.ti][token.OwnerAddress] = balanceAtBlock{block: token.BlockNumber, amnt: new(big.Int).SetUint64(token.Quantity)}
+				if err != nil {
+					i.failWithMessage(err, "failed to parse token identifiers")
+					return
+				}
+				tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+				if err == nil {
+					for _, token := range tokens {
+						asBigInt, ok := new(big.Int).SetString(token.Quantity.String(), 16)
+						if ok {
+							balances[balance.ti][token.OwnerAddress] = balanceAtBlock{block: token.BlockNumber, amnt: asBigInt}
 						}
 					}
 				}
+
 			}
 			balTo := balances[balance.ti][balance.to]
 			balFrom := balances[balance.ti][balance.from]
@@ -284,21 +325,24 @@ func (i *Indexer) processTokens() {
 			if previousOwners[previousOwner.ti] == nil {
 				previousOwners[previousOwner.ti] = []ownerAtBlock{}
 				contractAddress, tokenID, err := parseTokenIdentifiers(previousOwner.ti)
-				if err == nil && contractAddress != "" && tokenID != "" {
-					tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
-					if err == nil && len(tokens) == 1 {
-						token := tokens[0]
-						ownersAtBlocks := make([]ownerAtBlock, len(token.PreviousOwners))
-						for i, o := range token.PreviousOwners {
-							ownersAtBlocks[i] = ownerAtBlock{
-								ti:    previousOwner.ti,
-								block: persist.BlockNumber(i),
-								owner: o,
-							}
-						}
-						previousOwners[previousOwner.ti] = ownersAtBlocks
-					}
+				if err != nil {
+					i.failWithMessage(err, "error parsing token identifiers")
+					return
 				}
+				tokens, err := i.tokenRepo.GetByTokenIdentifiers(context.Background(), tokenID, contractAddress)
+				if err == nil && len(tokens) == 1 {
+					token := tokens[0]
+					ownersAtBlocks := make([]ownerAtBlock, len(token.PreviousOwners))
+					for i, o := range token.PreviousOwners {
+						ownersAtBlocks[i] = ownerAtBlock{
+							ti:    previousOwner.ti,
+							block: o.Block,
+							owner: o.Address,
+						}
+					}
+					previousOwners[previousOwner.ti] = ownersAtBlocks
+				}
+
 			}
 			previousOwners[previousOwner.ti] = append(previousOwners[previousOwner.ti], previousOwner)
 		}
@@ -315,10 +359,13 @@ func (i *Indexer) receiveTokens() {
 			continue
 		}
 		logrus.Infof("Processing %d tokens", len(tokens))
-		err := upsertTokens(context.Background(), tokens, i)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"block": tokens[0].BlockNumber}).Error("error processing token")
-		}
+
+		i.tokensPool.Submit(func() {
+			err := upsertTokens(context.Background(), tokens, i)
+			if err != nil {
+				i.failWithMessage(err, "failed to upsert tokens")
+			}
+		})
 	}
 }
 
@@ -432,15 +479,24 @@ func upsertTokens(ctx context.Context, t []*persist.Token, i *Indexer) error {
 		return err
 	}
 	go func() {
+		contracts := make(map[persist.Address]bool)
 		for _, token := range t {
+			if _, ok := contracts[token.ContractAddress]; ok {
+				continue
+			}
 			i.contracts <- handleContract(i.ethClient, token.ContractAddress, token.BlockNumber)
+			contracts[token.ContractAddress] = true
 		}
 	}()
 	return nil
 }
 
 func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contract) error {
-	return i.contractRepo.UpsertByAddress(ctx, contract.Address, contract)
+	err := i.contractRepo.UpsertByAddress(ctx, contract.Address, contract)
+	if err != nil {
+		panic(err)
+	}
+	return err
 }
 
 func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
@@ -457,9 +513,9 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			i.failWithMessage(err, "failed to parse key for token")
 			return nil
 		}
-		previousOwnerAddresses := make([]persist.Address, len(previousOwners[k]))
+		previousOwnerAddresses := make([]persist.AddressAtBlock, len(previousOwners[k]))
 		for i, w := range previousOwners[k] {
-			previousOwnerAddresses[i] = w.owner
+			previousOwnerAddresses[i] = persist.AddressAtBlock{Address: w.owner, Block: w.block}
 		}
 		metadata := metadatas[k]
 		var name, description string
@@ -476,7 +532,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			TokenID:         tokenID,
 			ContractAddress: contractAddress,
 			OwnerAddress:    v.owner,
-			Quantity:        1,
+			Quantity:        persist.HexString("1"),
 			Name:            name,
 			Description:     description,
 			PreviousOwners:  previousOwnerAddresses,
@@ -519,7 +575,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
-				Quantity:        balance.amnt.Uint64(),
+				Quantity:        persist.HexString(balance.amnt.Text(16)),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
@@ -575,12 +631,11 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 func logsToTransfer(pLogs []types.Log) []*transfer {
 	result := []*transfer{}
 	for _, pLog := range pLogs {
-		logrus.Infof("log %+v", pLog)
 		switch {
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
 
 			if len(pLog.Topics) < 4 {
-				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC721 Transfer topics length")
+				// logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC721 Transfer topics length")
 				continue
 			}
 
@@ -595,7 +650,7 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 			})
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
-				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Single Transfer topics length")
+				// logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Single Transfer topics length")
 				continue
 			}
 
@@ -611,7 +666,7 @@ func logsToTransfer(pLogs []types.Log) []*transfer {
 
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
 			if len(pLog.Topics) < 4 {
-				logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Batch Transfer topics length")
+				// logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "topics": pLog.Topics}).Warn("wrong ERC1155 Batch Transfer topics length")
 				continue
 			}
 			from := persist.Address(pLog.Topics[2].Hex())
