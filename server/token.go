@@ -250,6 +250,8 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 					newMedia.PreviewURL = it
 					newMedia.ThumbnailURL = it
 				}
+			} else {
+				media = *newMedia
 			}
 			if err != nil && newMedia.MediaURL != "" {
 				logrus.WithError(err).Error(errCouldNotMakeMedia{tokenID, contractAddress}.Error())

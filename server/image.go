@@ -67,11 +67,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res.ThumbnailURL = imageURL + "=s96"
 		res.PreviewURL = imageURL + "=s256"
 		res.MediaURL = imageURL + "=s1024"
+		res.MediaType = persist.MediaTypeImage
 	}
 
 	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 	if err == nil {
 		res.MediaURL = videoURL
+		res.MediaType = persist.MediaTypeVideo
 	}
 
 	if res.MediaURL != "" {
@@ -100,11 +102,10 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		return nil, err
 	}
 	if vURL != "" {
-		mt, err := downloadAndCache(pCtx, vURL, name, ipfsClient)
+		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient)
 		if err != nil {
 			return nil, err
 		}
-		mediaType = mt
 	}
 	res.MediaType = mediaType
 
@@ -173,27 +174,30 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	bs, err := indexer.GetDataFromURI(persist.TokenURI(url), ipfsClient)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not get data from url %s: %s", url, err.Error())
 	}
 
-	buf := new(bytes.Buffer)
+	buf := bytes.NewBuffer(bs)
 	contentType := persist.SniffMediaType(bs)
-	logrus.Infof("contentType: %s", contentType)
 	switch contentType {
 	case persist.MediaTypeImage:
 		img, _, err := image.Decode(buf)
 		if err != nil {
+			logrus.WithError(err).Error("could not decode image")
 			if png, err := png.Decode(buf); err == nil {
 				img = png
 			} else if jpg, err := jpeg.Decode(buf); err == nil {
 				img = jpg
 			} else {
-				return "", err
+				return "", fmt.Errorf("could not decode image as jpg or png %s", err.Error())
 			}
 		}
 		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
-		jpeg.Encode(buf, img, nil)
+		err = jpeg.Encode(buf, img, nil)
+		if err != nil {
+			return "", fmt.Errorf("could not encode image as jpeg: %s", err.Error())
+		}
 		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeVideo:
 		// thumbnails the video, do we need to store a whole video?
@@ -208,7 +212,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return "", err
 		}
 
-		scaled, err := scaleVideo(pCtx, file.Name(), 640, 480)
+		scaled, err := scaleVideo(pCtx, file.Name(), 1280, 720)
 		if err != nil {
 			return "", err
 		}
@@ -239,7 +243,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
-		return "", errUnsupportedMediaType{contentType}
+		return persist.MediaTypeUnknown, errUnsupportedMediaType{contentType}
 	}
 
 }

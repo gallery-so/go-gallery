@@ -52,6 +52,8 @@ func init() {
 func CoreInit() *gin.Engine {
 	log.Info("initializing server...")
 
+	log.SetReportCaller(true)
+
 	setDefaults()
 
 	router := gin.Default()
@@ -170,6 +172,6 @@ func newMemstoreClients() *memstore.Clients {
 
 func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 2)
+	sh.SetTimeout(time.Second * 5)
 	return sh
 }

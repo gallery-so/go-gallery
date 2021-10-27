@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -121,12 +120,11 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 		}
 		defer it.Close()
 
-		buf := &bytes.Buffer{}
-		_, err = io.Copy(buf, it)
+		bytes, err := io.ReadAll(it)
 		if err != nil {
 			return nil, err
 		}
-		return buf.Bytes(), nil
+		return bytes, nil
 	case persist.URITypeHTTP:
 		var body io.Reader
 		if strings.Contains(asString, "ipfs/") {
@@ -148,13 +146,12 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			}
 			body = resp.Body
 		}
-		buf := &bytes.Buffer{}
-		_, err := io.Copy(buf, body)
+		bytes, err := io.ReadAll(body)
 		if err != nil {
 			return nil, err
 		}
 
-		return buf.Bytes(), nil
+		return bytes, nil
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
@@ -166,13 +163,12 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			return nil, err
 		}
 		defer it.Close()
-		buf := &bytes.Buffer{}
-		_, err = io.Copy(buf, it)
+		bytes, err := io.ReadAll(it)
 		if err != nil {
 			return nil, err
 		}
 
-		return buf.Bytes(), nil
+		return bytes, nil
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
