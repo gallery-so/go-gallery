@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -120,7 +121,7 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 		}
 		defer it.Close()
 
-		bytes, err := io.ReadAll(it)
+		bytes, err := ioutil.ReadAll(it)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +147,7 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			}
 			body = resp.Body
 		}
-		bytes, err := io.ReadAll(body)
+		bytes, err := ioutil.ReadAll(body)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +164,7 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			return nil, err
 		}
 		defer it.Close()
-		bytes, err := io.ReadAll(it)
+		bytes, err := ioutil.ReadAll(it)
 		if err != nil {
 			return nil, err
 		}
