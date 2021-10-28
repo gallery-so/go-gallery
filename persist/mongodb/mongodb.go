@@ -327,7 +327,7 @@ func cleanQuery(filter bson.M) bson.M {
 }
 
 func setStringerMap(f bson.M, depth int) {
-	if depth > 10 {
+	if depth > 5 {
 		return
 	}
 	for k, v := range f {
@@ -369,7 +369,7 @@ func setStringerMap(f bson.M, depth int) {
 		}
 		if v.CanInterface() {
 			it := v.Interface()
-			if stringer, ok := it.(fmt.Stringer); ok {
+			if stringer, ok := it.(fmt.Stringer); ok && v.Type().Name() != "Time" {
 				f[k] = stringer.String()
 			} else {
 				f[k] = it
@@ -378,7 +378,7 @@ func setStringerMap(f bson.M, depth int) {
 	}
 }
 func setStringerValue(val reflect.Value, depth int) reflect.Value {
-	if depth > 10 {
+	if depth > 5 {
 		return val
 	}
 	if !val.IsValid() {
@@ -392,7 +392,7 @@ func setStringerValue(val reflect.Value, depth int) reflect.Value {
 				continue
 			}
 			if indexVal.CanSet() {
-				indexVal.Set(reflect.ValueOf(setStringerValue(indexVal, depth+1)))
+				indexVal.Set(setStringerValue(indexVal, depth+1))
 			}
 		}
 	case reflect.Map:
