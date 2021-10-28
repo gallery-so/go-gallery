@@ -3,7 +3,6 @@ package persist
 import (
 	"context"
 	"fmt"
-	"time"
 	// "github.com/davecgh/go-spew/spew"
 )
 
@@ -12,10 +11,10 @@ import (
 type UserNonce struct {
 	Version int64 `bson:"version" mapstructure:"version"`
 
-	ID           DBID      `bson:"_id"           json:"id"`
-	CreationTime time.Time `bson:"created_at" json:"created_at"`
-	Deleted      bool      `bson:"deleted"       json:"-"`
-	LastUpdated  time.Time `bson:"last_updated" json:"last_updated"`
+	ID           DBID            `bson:"_id,id"           json:"id"`
+	CreationTime CreationTime    `bson:"created_at,creation_time" json:"created_at"`
+	Deleted      bool            `bson:"deleted"       json:"-"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
 	Value   string  `bson:"value"   json:"value"`
 	Address Address `bson:"address"     json:"address"`
@@ -24,10 +23,10 @@ type UserNonce struct {
 // UserLoginAttempt represents a single attempt for a user to login despite the success
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
-	Version      int64     `bson:"version"`
-	ID           DBID      `bson:"_id"`
-	CreationTime time.Time `bson:"created_at"`
-	Deleted      bool      `bson:"deleted"       json:"-"`
+	Version      int64        `bson:"version"`
+	ID           DBID         `bson:"_id,id"`
+	CreationTime CreationTime `bson:"created_at,creation_time"`
+	Deleted      bool         `bson:"deleted"       json:"-"`
 
 	Address        Address `bson:"address"     json:"address"`
 	Signature      string  `bson:"signature"`

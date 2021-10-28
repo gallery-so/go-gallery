@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,12 +20,23 @@ const (
 	galleryDBName = "gallery"
 )
 
+const bsonDateFormat = "2006-01-02T15:04:05.999Z"
+
 var (
 	collectionUnassignedTTL time.Duration = time.Minute * 1
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
 
-var mapMutex sync.Mutex
+var addressType = reflect.TypeOf(persist.Address(""))
+
+var creationTimeType = reflect.TypeOf(persist.CreationTime(time.Time{}))
+
+var lastUpdatedTimeType = reflect.TypeOf(persist.LastUpdatedTime(time.Time{}))
+
+var idType = reflect.TypeOf(persist.GenerateID())
+
+// CustomRegistry is the custom mongo BSON encoding/decoding registry
+var CustomRegistry = createCustomRegistry().Build()
 
 // ErrDocumentNotFound represents when a document is not found in the database for an update operation
 var ErrDocumentNotFound = errors.New("document not found")
@@ -37,7 +48,7 @@ type storage struct {
 }
 
 type errNotStruct struct {
-	entity interface{}
+	iAmNotAStruct interface{}
 }
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name
@@ -51,16 +62,7 @@ func newStorage(mongoClient *mongo.Client, version int64, dbName, collName strin
 // Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (persist.DBID, error) {
 
-	now := primitive.NewDateTimeFromTime(time.Now())
-	asMap, err := structToBsonMap(insert)
-	if err != nil {
-		return "", err
-	}
-	asMap["created_at"] = now
-	asMap["last_updated"] = now
-	asMap["_id"] = persist.GenerateID()
-
-	res, err := m.collection.InsertOne(ctx, asMap, opts...)
+	res, err := m.collection.InsertOne(ctx, insert, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -71,20 +73,7 @@ func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*optio
 // InsertMany inserts many documents into a mongo database while filling out the fields id, creation time, and last updated for each
 func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]persist.DBID, error) {
 
-	mapsToInsert := make([]interface{}, len(insert))
-	for i, k := range insert {
-		now := primitive.NewDateTimeFromTime(time.Now())
-		asMap, err := structToBsonMap(k)
-		if err != nil {
-			return nil, err
-		}
-		asMap["created_at"] = now
-		asMap["last_updated"] = now
-		asMap["_id"] = persist.GenerateID()
-		mapsToInsert[i] = asMap
-	}
-
-	res, err := m.collection.InsertMany(ctx, mapsToInsert, opts...)
+	res, err := m.collection.InsertMany(ctx, insert, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,17 +91,7 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 // Update updates a document in the mongo database while filling out the field LastUpdated
 func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
 
-	query = cleanQuery(query)
-
-	now := primitive.NewDateTimeFromTime(time.Now())
-
-	asMap, err := structToBsonMap(update)
-	if err != nil {
-		return err
-	}
-	asMap["last_updated"] = now
-
-	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: asMap}}, opts...)
+	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
 	if err != nil {
 		return err
 	}
@@ -126,8 +105,6 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 // push pushes items into an array field for a given queried document(s)
 // value must be an array
 func (m *storage) push(ctx context.Context, query bson.M, field string, value interface{}) error {
-
-	query = cleanQuery(query)
 
 	push := bson.E{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
@@ -148,8 +125,6 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 // value must be an array
 func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value interface{}) error {
 
-	query = cleanQuery(query)
-
 	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -168,8 +143,6 @@ func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value
 // pull puls items from an array field for a given queried document(s)
 func (m *storage) pull(ctx context.Context, query bson.M, field string, value bson.M) error {
 
-	query = cleanQuery(query)
-
 	pull := bson.E{Key: "$pull", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -187,14 +160,19 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value bs
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (persist.DBID, error) {
-	query = cleanQuery(query)
 
 	var returnID persist.DBID
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
-	asMap, err := structToBsonMap(upsert)
+	asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert)
 	if err != nil {
-		return "", err
+		return returnID, err
+	}
+
+	asMap := bson.M{}
+	err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+	if err != nil {
+		return returnID, err
 	}
 	asMap["last_updated"] = now
 	if _, ok := asMap["created_at"]; !ok {
@@ -202,14 +180,13 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	}
 
 	if id, ok := asMap["_id"]; ok && id != "" {
-		returnID = id.(persist.DBID)
+		returnID = persist.DBID(id.(string))
 	}
 
 	delete(asMap, "_id")
 	for k := range query {
 		delete(asMap, k)
 	}
-
 	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap}, opts...)
 	if err != nil {
 		return "", err
@@ -225,7 +202,6 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 // find finds documents in the mongo database which is not deleted
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *storage) find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
-	filter = cleanQuery(filter)
 	filter["deleted"] = false
 
 	cur, err := m.collection.Find(ctx, filter, opts...)
@@ -255,14 +231,12 @@ func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.Cou
 	if len(filter) == 0 {
 		return m.collection.EstimatedDocumentCount(ctx)
 	}
-	filter = cleanQuery(filter)
 	filter["deleted"] = false
 	return m.collection.CountDocuments(ctx, filter, opts...)
 }
 
 // delete deletes all documents matching a given filter query
 func (m *storage) delete(ctx context.Context, filter bson.M, opts ...*options.DeleteOptions) error {
-	filter = cleanQuery(filter)
 	_, err := m.collection.DeleteMany(ctx, filter, opts...)
 	return err
 }
@@ -277,154 +251,56 @@ func boolin(b bool) *bool {
 	return &b
 }
 
-func structToBsonMap(v interface{}) (bson.M, error) {
-	val := reflect.ValueOf(v)
-	if !val.IsValid() {
-		return nil, fmt.Errorf("invalid value %v", v)
+func addressEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != addressType {
+		return bsoncodec.ValueEncoderError{Name: "AddressEncodeValue", Types: []reflect.Type{addressType}, Received: val}
 	}
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-	if val.Kind() != reflect.Struct {
-		return nil, errNotStruct{v}
-	}
-	bsonMap := bson.M{}
-	for i := 0; i < val.NumField(); i++ {
-		fieldVal := val.Field(i)
-		if !fieldVal.IsValid() {
-			continue
-		}
-		tag, ok := val.Type().Field(i).Tag.Lookup("bson")
-		if ok {
-			spl := strings.Split(tag, ",")
-			if len(spl) > 1 {
-				switch spl[1] {
-				case "omitempty":
-					if isValueEmpty(fieldVal) {
-						continue
-					}
-				case "only_get":
-					continue
-				}
-
-			}
-			if tag == "-" {
-				continue
-			}
-			if fieldVal.CanInterface() {
-				it := fieldVal.Interface()
-				bsonMap[spl[0]] = it
-			}
-		}
-	}
-	setStringerMap(bsonMap, 0)
-	return bsonMap, nil
+	s := val.Interface().(persist.Address).String()
+	return vw.WriteString(s)
 }
 
-func cleanQuery(filter bson.M) bson.M {
-	setStringerMap(filter, 0)
-	return filter
+func creationTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != creationTimeType {
+		return bsoncodec.ValueEncoderError{Name: "CreationTimeEncodeValue", Types: []reflect.Type{creationTimeType}, Received: val}
+	}
+	s := time.Time(val.Interface().(persist.CreationTime))
+	if s.IsZero() {
+		return vw.WriteDateTime(time.Now().UnixNano() / int64(time.Millisecond))
+	}
+	return vw.WriteDateTime(s.UnixNano() / int64(time.Millisecond))
 }
 
-func setStringerMap(f bson.M, depth int) {
-	if depth > 5 {
-		return
+func lastUpdatedTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != lastUpdatedTimeType {
+		return bsoncodec.ValueEncoderError{Name: "LastUpdatedTimeEncodeValue", Types: []reflect.Type{lastUpdatedTimeType}, Received: val}
 	}
-	for k, v := range f {
-		v := reflect.ValueOf(v)
-		if !v.IsValid() {
-			continue
-		}
-		switch v.Kind() {
-		case reflect.Array, reflect.Slice:
-			for i := 0; i < v.Len(); i++ {
-				indexVal := v.Index(i)
-				if !indexVal.IsValid() {
-					continue
-				}
-				if indexVal.CanSet() {
-					indexVal.Set(setStringerValue(indexVal, depth+1))
-				}
-			}
-		case reflect.Map:
-			mapMutex.Lock()
-			for _, key := range v.MapKeys() {
-				keyVal := v.MapIndex(key)
-				if !keyVal.IsValid() {
-					continue
-				}
-				v.SetMapIndex(key, setStringerValue(keyVal, depth+1))
-			}
-			mapMutex.Unlock()
-		case reflect.Struct:
-			for i := 0; i < v.NumField(); i++ {
-				fieldVal := v.Field(i)
-				if !fieldVal.IsValid() {
-					continue
-				}
-				if fieldVal.CanSet() {
-					fieldVal.Set(setStringerValue(fieldVal, depth+1))
-				}
-			}
-		}
-		if v.CanInterface() {
-			it := v.Interface()
-			if stringer, ok := it.(fmt.Stringer); ok && v.Type().Name() != "Time" {
-				f[k] = stringer.String()
-			} else {
-				f[k] = it
-			}
-		}
-	}
+	return vw.WriteDateTime(time.Now().UnixNano() / int64(time.Millisecond))
 }
-func setStringerValue(val reflect.Value, depth int) reflect.Value {
-	if depth > 5 {
-		return val
-	}
-	if !val.IsValid() {
-		return val
-	}
-	switch val.Kind() {
-	case reflect.Array, reflect.Slice:
-		for i := 0; i < val.Len(); i++ {
-			indexVal := val.Index(i)
-			if !indexVal.IsValid() {
-				continue
-			}
-			if indexVal.CanSet() {
-				indexVal.Set(setStringerValue(indexVal, depth+1))
-			}
-		}
-	case reflect.Map:
-		mapMutex.Lock()
-		for _, key := range val.MapKeys() {
-			keyVal := val.MapIndex(key)
-			if !keyVal.IsValid() {
-				continue
-			}
 
-			val.SetMapIndex(key, setStringerValue(keyVal, depth+1))
-		}
-		mapMutex.Unlock()
-	case reflect.Struct:
-		for i := 0; i < val.NumField(); i++ {
-			fieldVal := val.Field(i)
-			if !fieldVal.IsValid() {
-				continue
-			}
-			if fieldVal.CanSet() {
-				fieldVal.Set(setStringerValue(fieldVal, depth+1))
-			}
-		}
-	default:
-		if val.CanInterface() {
-			it := val.Interface()
-			if stringer, ok := it.(fmt.Stringer); ok && (val.Kind() == reflect.String || val.Kind() == reflect.Interface) {
-				return reflect.ValueOf(stringer.String()).Convert(val.Type())
-			}
-		}
+func idEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Type() != idType {
+		return bsoncodec.ValueEncoderError{Name: "IDEncodeValue", Types: []reflect.Type{idType}, Received: val}
 	}
-	return val
+	s := val.Interface().(persist.DBID)
+
+	if s == "" {
+		s = persist.GenerateID()
+	}
+	return vw.WriteString(string(s))
+
+}
+
+func createCustomRegistry() *bsoncodec.RegistryBuilder {
+	var primitiveCodecs bson.PrimitiveCodecs
+	rb := bsoncodec.NewRegistryBuilder()
+	bsoncodec.DefaultValueEncoders{}.RegisterDefaultEncoders(rb)
+	bsoncodec.DefaultValueDecoders{}.RegisterDefaultDecoders(rb)
+	rb.RegisterTypeEncoder(addressType, bsoncodec.ValueEncoderFunc(addressEncodeValue))
+	rb.RegisterTypeEncoder(idType, bsoncodec.ValueEncoderFunc(idEncodeValue))
+	rb.RegisterTypeEncoder(creationTimeType, bsoncodec.ValueEncoderFunc(creationTimeEncodeValue))
+	rb.RegisterTypeEncoder(lastUpdatedTimeType, bsoncodec.ValueEncoderFunc(lastUpdatedTimeEncodeValue))
+	primitiveCodecs.RegisterPrimitiveCodecs(rb)
+	return rb
 }
 
 // a function that returns true if the value is a zero value or nil
@@ -447,5 +323,5 @@ func isValueEmpty(v reflect.Value) bool {
 }
 
 func (e errNotStruct) Error() string {
-	return fmt.Sprintf("%v is not a struct, is of type %T", e.entity, e.entity)
+	return fmt.Sprintf("%v is not a struct, is of type %T", e.iAmNotAStruct, e.iAmNotAStruct)
 }

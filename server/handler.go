@@ -92,7 +92,7 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 	nftsGroup := parent.Group("/nfts")
 
-	nftsGroup.GET("/get", jwtOptional(), getTokenByID(repos.tokenRepository, ipfsClient, ethClient.EthClient))
+	nftsGroup.GET("/get", jwtOptional(), getTokens(repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	nftsGroup.GET("/user_get", jwtOptional(), getTokensForUser(repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	nftsGroup.POST("/update", jwtRequired(repos.userRepository, ethClient, requiredNFTs), updateTokenByID(repos.tokenRepository))
 	nftsGroup.GET("/unassigned/get", jwtRequired(repos.userRepository, ethClient, requiredNFTs), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))

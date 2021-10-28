@@ -126,6 +126,7 @@ func newMongoClient() *mongo.Client {
 	logrus.Infof("Connecting to mongo at %s\n", mgoURL)
 
 	mOpts := options.Client().ApplyURI(string(mgoURL))
+	mOpts.SetRegistry(mongodb.CustomRegistry)
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {

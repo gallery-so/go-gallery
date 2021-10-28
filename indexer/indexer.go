@@ -130,8 +130,8 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		eventHashes:     pEvents,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
-		transfersPool: workerpool.New(20),
-		tokensPool:    workerpool.New(20),
+		transfersPool: workerpool.New(50),
+		tokensPool:    workerpool.New(50),
 
 		metadatas:      make(chan tokenMetadata),
 		uris:           make(chan tokenURI),
@@ -166,8 +166,8 @@ func (i *Indexer) processLogs() {
 
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(context.Background())
-	if err == nil && recentDBBlock > defaultStartingBlock {
-		lastSyncedBlock = recentDBBlock
+	if err == nil && recentDBBlock-5000 > defaultStartingBlock {
+		lastSyncedBlock = recentDBBlock - 5000
 	}
 
 	defer func() {
@@ -229,9 +229,15 @@ func (i *Indexer) processTransfers() {
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
-		i.transfersPool.Submit(func() {
+		toQueue := func() {
 			processTransfers(i, transfers)
-		})
+		}
+
+		if i.tokensPool.WaitingQueueSize() > 10 {
+			i.tokensPool.SubmitWait(toQueue)
+		} else {
+			i.tokensPool.Submit(toQueue)
+		}
 
 	}
 	logrus.Info("Transfer channel closed")
@@ -333,12 +339,17 @@ func (i *Indexer) processTokens() {
 				if err == nil && len(tokens) == 1 {
 					token := tokens[0]
 					ownersAtBlocks := make([]ownerAtBlock, len(token.PreviousOwners))
+					checker := map[persist.BlockNumber]persist.Address{}
 					for i, o := range token.PreviousOwners {
+						if _, ok := checker[o.Block]; ok {
+							continue
+						}
 						ownersAtBlocks[i] = ownerAtBlock{
 							ti:    previousOwner.ti,
 							block: o.Block,
 							owner: o.Address,
 						}
+						checker[o.Block] = o.Address
 					}
 					previousOwners[previousOwner.ti] = ownersAtBlocks
 				}
@@ -358,14 +369,21 @@ func (i *Indexer) receiveTokens() {
 		if len(tokens) == 0 {
 			continue
 		}
-		logrus.Infof("Processing %d tokens", len(tokens))
-
-		i.tokensPool.Submit(func() {
-			err := upsertTokens(context.Background(), tokens, i)
+		toQueue := func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			defer cancel()
+			err := upsertTokens(ctx, tokens, i)
 			if err != nil {
-				i.failWithMessage(err, "failed to upsert tokens")
+				panic(err)
 			}
-		})
+		}
+		logrus.Infof("Processing %d tokens", len(tokens))
+		if i.tokensPool.WaitingQueueSize() > 10 {
+			i.tokensPool.SubmitWait(toQueue)
+		} else {
+			i.tokensPool.Submit(toQueue)
+		}
+
 	}
 }
 
@@ -471,6 +489,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			i.metadatas <- tokenMetadata{key, metadata}
 		}()
 	}
+
 }
 
 func upsertTokens(ctx context.Context, t []*persist.Token, i *Indexer) error {

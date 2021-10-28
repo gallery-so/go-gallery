@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
@@ -63,11 +62,11 @@ type userGetInput struct {
 }
 
 type userGetOutput struct {
-	UserID      persist.DBID      `json:"id"`
-	UserNameStr string            `json:"username"`
-	BioStr      string            `json:"bio"`
-	Addresses   []persist.Address `json:"addresses"`
-	CreatedAt   time.Time         `json:"created_at"`
+	UserID      persist.DBID         `json:"id"`
+	UserNameStr string               `json:"username"`
+	BioStr      string               `json:"bio"`
+	Addresses   []persist.Address    `json:"addresses"`
+	CreatedAt   persist.CreationTime `json:"created_at"`
 }
 
 // INPUT - USER_CREATE - initial user creation is just an empty user, to store it in the DB.

@@ -17,8 +17,11 @@ import (
 	"google.golang.org/appengine"
 )
 
-type getTokensByIDInput struct {
-	NftID persist.DBID `json:"id" form:"id" binding:"required"`
+type getTokensInput struct {
+	ID              persist.DBID    `form:"id"`
+	WalletAddress   persist.Address `form:"address"`
+	ContractAddress persist.Address `form:"contract_address"`
+	TokenID         persist.TokenID `form:"token_id"`
 }
 
 type getTokensByUserIDInput struct {
@@ -30,7 +33,7 @@ type getTokensOutput struct {
 	Nfts []*persist.Token `json:"nfts"`
 }
 
-type getTokenByIDOutput struct {
+type getTokenOutput struct {
 	Nft *persist.Token `json:"nft"`
 }
 
@@ -52,16 +55,25 @@ type errCouldNotUpdateMedia struct {
 	id persist.DBID
 }
 
-func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+type errInvalidInput struct {
+	reason string
+}
+
+func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := &getTokensByIDInput{}
+		input := &getTokensInput{}
 
 		if err := c.ShouldBindQuery(input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		token, err := nftRepository.GetByID(c, input.NftID)
+		if input.ID == "" && input.WalletAddress == "" && input.ContractAddress == "" && input.TokenID == "" {
+			util.ErrResponse(c, http.StatusBadRequest, errInvalidInput{reason: "must specify at least one of id, wallet_address, contract_address, token_id"})
+			return
+		}
+
+		token, err := getTokenFromDB(c, input, nftRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrTokenNotFoundByID); ok {
@@ -72,7 +84,26 @@ func getTokenByID(nftRepository persist.TokenRepository, ipfsClient *shell.Shell
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
-		c.JSON(http.StatusOK, getTokenByIDOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]})
+
+		if token != nil {
+			c.JSON(http.StatusOK, getTokenOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]})
+			return
+		}
+		tokens, err := getTokensFromDB(c, input, nftRepository)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
+			return
+		}
+		if tokens != nil {
+			c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, tokens, nftRepository, ipfsClient, ethClient)})
+			return
+		}
+
+		c.JSON(http.StatusNotFound, util.ErrorResponse{Error: "no tokens found"})
 	}
 }
 
@@ -261,12 +292,42 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 	return media, metadata, tokenURI
 }
 
+func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (*persist.Token, error) {
+	switch {
+	case input.ID != "":
+		return tokenRepo.GetByID(pCtx, input.ID)
+	}
+	return nil, nil
+}
+func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) ([]*persist.Token, error) {
+	switch {
+	case input.ID != "":
+		token, err := tokenRepo.GetByID(pCtx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		return []*persist.Token{token}, nil
+	case input.WalletAddress != "":
+		return tokenRepo.GetByWallet(pCtx, input.WalletAddress)
+	case input.TokenID != "" && input.ContractAddress != "":
+		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress)
+	case input.ContractAddress != "":
+		return tokenRepo.GetByContract(pCtx, input.ContractAddress)
+	}
+	return nil, nil
+
+}
+
 func (e errCouldNotMakeMedia) Error() string {
 	return fmt.Sprintf("could not make media for token with address: %s at TokenID: %s", e.contractAddress, e.tokenID)
 }
 
 func (e errCouldNotUpdateMedia) Error() string {
 	return fmt.Sprintf("could not update media for token with ID: %s", e.id)
+}
+
+func (e errInvalidInput) Error() string {
+	return fmt.Sprintf("invalid input: %s", e.reason)
 }
 
 func containsWalletAddresses(a []persist.Address, b persist.Address) bool {

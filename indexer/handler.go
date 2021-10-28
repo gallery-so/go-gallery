@@ -33,6 +33,12 @@ func coreInit() *gin.Engine {
 
 	setDefaults()
 
+	// fi, err := os.OpenFile("logs.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// redirectStderr(fi)
+
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
 	tokenRepo, contractRepo := newRepos()
@@ -140,6 +146,7 @@ func newMongoClient() *mongo.Client {
 	logrus.Infof("Connecting to mongo at %s", mgoURL)
 
 	mOpts := options.Client().ApplyURI(mgoURL)
+	mOpts.SetRegistry(mongodb.CustomRegistry)
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {
