@@ -130,8 +130,8 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		eventHashes:     pEvents,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
-		transfersPool: workerpool.New(10),
-		tokensPool:    workerpool.New(10),
+		transfersPool: workerpool.New(20),
+		tokensPool:    workerpool.New(20),
 
 		metadatas:      make(chan tokenMetadata),
 		uris:           make(chan tokenURI),
