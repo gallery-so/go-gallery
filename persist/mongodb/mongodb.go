@@ -360,7 +360,7 @@ func creationTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, 
 	s := time.Time(val.Interface().(persist.CreationTime))
 	primDate := primitive.NewDateTimeFromTime(s)
 	if s.IsZero() {
-		return vw.WriteDateTime(int64(primDate))
+		return vw.WriteDateTime(int64(primitive.NewDateTimeFromTime(time.Now())))
 	}
 	return vw.WriteDateTime(int64(primDate))
 }
