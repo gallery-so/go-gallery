@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -27,11 +28,15 @@ var (
 	openseaAssetsTTL        time.Duration = time.Minute * 5
 )
 
+var errInvalidValue = errors.New("cannot encode invalid element")
+
 var addressType = reflect.TypeOf(persist.Address(""))
 
 var creationTimeType = reflect.TypeOf(persist.CreationTime(time.Time{}))
 
 var lastUpdatedTimeType = reflect.TypeOf(persist.LastUpdatedTime(time.Time{}))
+
+var tokenMetadataType = reflect.TypeOf(persist.TokenMetadata{})
 
 var idType = reflect.TypeOf(persist.GenerateID())
 
@@ -259,6 +264,95 @@ func addressEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val r
 	return vw.WriteString(s)
 }
 
+func tokenMetadataEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
+	if !val.IsValid() || val.Kind() != reflect.Map || val.Type().Key().Kind() != reflect.String || val.Type() != tokenMetadataType {
+		return bsoncodec.ValueEncoderError{Name: "MetadataEncodeValue", Types: []reflect.Type{tokenMetadataType}, Kinds: []reflect.Kind{reflect.Map}, Received: val}
+	}
+
+	if val.IsNil() {
+		// If we have a nill map but we can't WriteNull, that means we're probably trying to encode
+		// to a TopLevel document. We can't currently tell if this is what actually happened, but if
+		// there's a deeper underlying problem, the error will also be returned from WriteDocument,
+		// so just continue. The operations on a map reflection value are valid, so we can call
+		// MapKeys within mapEncodeValue without a problem.
+		err := vw.WriteNull()
+		if err == nil {
+			return nil
+		}
+	}
+
+	dw, err := vw.WriteDocument()
+	if err != nil {
+		return err
+	}
+
+	return mapEncodeValue(ec, dw, val, nil)
+}
+
+// mapEncodeValue handles encoding of the values of a map. The collisionFn returns
+// true if the provided key exists, this is mainly used for inline maps in the
+// struct codec.
+func mapEncodeValue(ec bsoncodec.EncodeContext, dw bsonrw.DocumentWriter, val reflect.Value, collisionFn func(string) bool) error {
+
+	elemType := val.Type().Elem()
+	encoder, err := ec.LookupEncoder(elemType)
+	if err != nil && elemType.Kind() != reflect.Interface {
+		return err
+	}
+
+	keys := val.MapKeys()
+	for _, key := range keys {
+		if collisionFn != nil && collisionFn(key.String()) {
+			return fmt.Errorf("Key %s of inlined map conflicts with a struct field name", key)
+		}
+
+		currEncoder, currVal, lookupErr := lookupElementEncoder(ec, encoder, val.MapIndex(key))
+		if lookupErr != nil && lookupErr != errInvalidValue {
+			return lookupErr
+		}
+
+		vw, err := dw.WriteDocumentElement(strings.ReplaceAll(strings.ReplaceAll(key.String(), ".", ""), "$", ""))
+		if err != nil {
+			return err
+		}
+
+		if lookupErr == errInvalidValue {
+			err = vw.WriteNull()
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		if enc, ok := currEncoder.(bsoncodec.ValueEncoder); ok {
+			err = enc.EncodeValue(ec, vw, currVal)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = encoder.EncodeValue(ec, vw, currVal)
+		if err != nil {
+			return err
+		}
+	}
+
+	return dw.WriteDocumentEnd()
+}
+
+func lookupElementEncoder(ec bsoncodec.EncodeContext, origEncoder bsoncodec.ValueEncoder, currVal reflect.Value) (bsoncodec.ValueEncoder, reflect.Value, error) {
+	if origEncoder != nil || (currVal.Kind() != reflect.Interface) {
+		return origEncoder, currVal, nil
+	}
+	currVal = currVal.Elem()
+	if !currVal.IsValid() {
+		return nil, currVal, errInvalidValue
+	}
+	currEncoder, err := ec.LookupEncoder(currVal.Type())
+
+	return currEncoder, currVal, err
+}
+
 func creationTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
 	if !val.IsValid() || val.Type() != creationTimeType {
 		return bsoncodec.ValueEncoderError{Name: "CreationTimeEncodeValue", Types: []reflect.Type{creationTimeType}, Received: val}
@@ -280,7 +374,7 @@ func lastUpdatedTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWrite
 
 func dateTimeDecodeValue(ec bsoncodec.DecodeContext, vw bsonrw.ValueReader, val reflect.Value) error {
 	if !val.IsValid() || !val.CanSet() || (val.Type() != lastUpdatedTimeType && val.Type() != creationTimeType) {
-		return bsoncodec.ValueDecoderError{Name: "LastUpdatedTimeEncodeValue", Types: []reflect.Type{lastUpdatedTimeType, creationTimeType}, Received: val}
+		return bsoncodec.ValueDecoderError{Name: "DateTimeDecodeValue", Types: []reflect.Type{lastUpdatedTimeType, creationTimeType}, Received: val}
 	}
 	dt, err := vw.ReadDateTime()
 	if err != nil {
@@ -319,6 +413,7 @@ func createCustomRegistry() *bsoncodec.RegistryBuilder {
 	rb.RegisterTypeEncoder(lastUpdatedTimeType, bsoncodec.ValueEncoderFunc(lastUpdatedTimeEncodeValue))
 	rb.RegisterTypeDecoder(lastUpdatedTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
 	rb.RegisterTypeDecoder(creationTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
+	rb.RegisterTypeEncoder(tokenMetadataType, bsoncodec.ValueEncoderFunc(tokenMetadataEncodeValue))
 	primitiveCodecs.RegisterPrimitiveCodecs(rb)
 	return rb
 }

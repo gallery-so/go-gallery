@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//---------------------------------------------------
 func TestOpenseaSync_Success(t *testing.T) {
 	assert := setupTest(t)
 	ctx := context.Background()
