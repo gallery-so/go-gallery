@@ -11,8 +11,8 @@ import (
 type UserNonce struct {
 	Version int64 `bson:"version" mapstructure:"version"`
 
-	ID           DBID            `bson:"_id,id"           json:"id"`
-	CreationTime CreationTime    `bson:"created_at,creation_time" json:"created_at"`
+	ID           DBID            `bson:"_id"           json:"id"`
+	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted"       json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
@@ -24,8 +24,8 @@ type UserNonce struct {
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
 	Version      int64        `bson:"version"`
-	ID           DBID         `bson:"_id,id"`
-	CreationTime CreationTime `bson:"created_at,creation_time"`
+	ID           DBID         `bson:"_id"`
+	CreationTime CreationTime `bson:"created_at"`
 	Deleted      bool         `bson:"deleted"       json:"-"`
 
 	Address        Address `bson:"address"     json:"address"`

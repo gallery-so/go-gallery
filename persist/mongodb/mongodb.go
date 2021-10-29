@@ -264,17 +264,35 @@ func creationTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, 
 		return bsoncodec.ValueEncoderError{Name: "CreationTimeEncodeValue", Types: []reflect.Type{creationTimeType}, Received: val}
 	}
 	s := time.Time(val.Interface().(persist.CreationTime))
+	primDate := primitive.NewDateTimeFromTime(s)
 	if s.IsZero() {
-		return vw.WriteDateTime(time.Now().UnixNano() / int64(time.Millisecond))
+		return vw.WriteDateTime(int64(primDate))
 	}
-	return vw.WriteDateTime(s.UnixNano() / int64(time.Millisecond))
+	return vw.WriteDateTime(int64(primDate))
 }
 
 func lastUpdatedTimeEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
 	if !val.IsValid() || val.Type() != lastUpdatedTimeType {
 		return bsoncodec.ValueEncoderError{Name: "LastUpdatedTimeEncodeValue", Types: []reflect.Type{lastUpdatedTimeType}, Received: val}
 	}
-	return vw.WriteDateTime(time.Now().UnixNano() / int64(time.Millisecond))
+	return vw.WriteDateTime(int64(primitive.NewDateTimeFromTime(time.Now())))
+}
+
+func dateTimeDecodeValue(ec bsoncodec.DecodeContext, vw bsonrw.ValueReader, val reflect.Value) error {
+	if !val.IsValid() || !val.CanSet() || (val.Type() != lastUpdatedTimeType && val.Type() != creationTimeType) {
+		return bsoncodec.ValueDecoderError{Name: "LastUpdatedTimeEncodeValue", Types: []reflect.Type{lastUpdatedTimeType, creationTimeType}, Received: val}
+	}
+	dt, err := vw.ReadDateTime()
+	if err != nil {
+		return err
+	}
+	switch val.Type() {
+	case creationTimeType:
+		val.Set(reflect.ValueOf(persist.CreationTime(primitive.DateTime(dt).Time())))
+	case lastUpdatedTimeType:
+		val.Set(reflect.ValueOf(persist.LastUpdatedTime(primitive.DateTime(dt).Time())))
+	}
+	return nil
 }
 
 func idEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter, val reflect.Value) error {
@@ -299,6 +317,8 @@ func createCustomRegistry() *bsoncodec.RegistryBuilder {
 	rb.RegisterTypeEncoder(idType, bsoncodec.ValueEncoderFunc(idEncodeValue))
 	rb.RegisterTypeEncoder(creationTimeType, bsoncodec.ValueEncoderFunc(creationTimeEncodeValue))
 	rb.RegisterTypeEncoder(lastUpdatedTimeType, bsoncodec.ValueEncoderFunc(lastUpdatedTimeEncodeValue))
+	rb.RegisterTypeDecoder(lastUpdatedTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
+	rb.RegisterTypeDecoder(creationTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
 	primitiveCodecs.RegisterPrimitiveCodecs(rb)
 	return rb
 }

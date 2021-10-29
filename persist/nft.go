@@ -8,8 +8,8 @@ import (
 // NFTDB represents an nft in the database
 type NFTDB struct {
 	Version      int64        `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID         `bson:"_id,id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at,creation_time"        json:"created_at"`
+	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool         `bson:"deleted" json:"-"`
 
 	CollectorsNote string  `bson:"collectors_note" json:"collectors_note"`
@@ -48,8 +48,8 @@ type NFTDB struct {
 // NFT represents an nft throughout the application
 type NFT struct {
 	Version      int64        `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID         `bson:"_id,id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at,creation_time"        json:"created_at"`
+	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
 	Deleted      bool         `bson:"deleted" json:"-"`
 
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
@@ -89,8 +89,8 @@ type NFT struct {
 
 // CollectionNFT represents and NFT in a collection of NFTs
 type CollectionNFT struct {
-	ID           DBID         `bson:"_id,id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at,creation_time"        json:"created_at"`
+	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
 
 	OwnerAddress Address `bson:"owner_address" json:"owner_address"`
 

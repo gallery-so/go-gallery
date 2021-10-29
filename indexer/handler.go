@@ -33,12 +33,6 @@ func coreInit() *gin.Engine {
 
 	setDefaults()
 
-	// fi, err := os.OpenFile("logs.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// redirectStderr(fi)
-
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
 	tokenRepo, contractRepo := newRepos()

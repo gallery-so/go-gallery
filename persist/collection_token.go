@@ -11,8 +11,8 @@ import (
 // This struct will only be used when updating or querying the database
 type CollectionTokenDB struct {
 	Version      int64           `bson:"version" json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id,id" json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at,creation_time" json:"created_at"`
+	ID           DBID            `bson:"_id" json:"id" binding:"required"`
+	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
@@ -33,8 +33,8 @@ type CollectionTokenDB struct {
 // the application where CollectionDB does not apply
 type CollectionToken struct {
 	Version      int64           `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id,id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at,creation_time" json:"created_at"`
+	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
+	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
