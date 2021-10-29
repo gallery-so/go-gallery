@@ -95,7 +95,7 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 // GetDataFromURI calls URI and returns the data
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
 
-	timeout := time.Duration(10 * time.Second)
+	timeout := time.Duration(5 * time.Second)
 	if t, ok := ctx.Deadline(); ok && time.Until(t) < timeout {
 		timeout = time.Until(t)
 	}
@@ -182,7 +182,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 // GetTokenURI returns metadata URI for a given token address.
 func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
-	newCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	newCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	contract := common.HexToAddress(string(pContractAddress))
 	switch pTokenType {

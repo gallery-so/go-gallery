@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"sync/atomic"
@@ -20,6 +21,7 @@ import (
 )
 
 // var defaultStartingBlock persist.BlockNumber = 6000000
+
 var defaultStartingBlock persist.BlockNumber = 13014050
 
 // eventHash represents an event keccak256 hash
@@ -108,6 +110,12 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
+	lastSyncedblock := defaultStartingBlock
+	recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
+	if err == nil && recentDBBlock > defaultStartingBlock {
+		lastSyncedblock = recentDBBlock
+	}
+
 	return &Indexer{
 
 		ethClient:    ethClient,
@@ -118,6 +126,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		chain: pChain,
 
 		eventHashes:     pEvents,
+		lastSyncedBlock: lastSyncedblock,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
 
 		metadatas:      make(chan tokenMetadata),
@@ -139,14 +148,14 @@ func (i *Indexer) Start() {
 	go i.listenForNewBlocks()
 	for i.lastSyncedBlock < i.mostRecentBlock {
 		logrus.Info("Starting pipeline...")
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second)
 		go i.processLogs()
 		go i.processTransfers()
 		i.processTokens()
 		i.resetChans()
 	}
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second)
 	go i.subscribeNewLogs()
 	go i.processTransfers()
 	i.processTokens()
@@ -155,12 +164,6 @@ func (i *Indexer) Start() {
 func (i *Indexer) processLogs() {
 	defer close(i.transfers)
 
-	lastSyncedBlock := defaultStartingBlock
-	recentDBBlock, err := i.tokenRepo.MostRecentBlock(context.Background())
-	if err == nil && recentDBBlock > defaultStartingBlock {
-		lastSyncedBlock = recentDBBlock
-	}
-
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
 		events[i] = common.HexToHash(string(event))
@@ -168,13 +171,13 @@ func (i *Indexer) processLogs() {
 
 	topics := [][]common.Hash{events}
 
-	curBlock := lastSyncedBlock.BigInt()
-	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(50)))
+	curBlock := i.lastSyncedBlock.BigInt()
+	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(80)))
 	errs := 0
-	for j := 0; j < 10; j++ {
-		if errs > 5 {
+	for j := 0; j < 5; j++ {
+		if errs > 2 {
 			nextBlock.Add(curBlock, big.NewInt(int64(5)))
-			time.Sleep(time.Second * 20)
+			time.Sleep(time.Second * 10)
 		}
 		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
@@ -189,21 +192,22 @@ func (i *Indexer) processLogs() {
 			errs++
 			logrus.WithError(err).Error("error getting logs, trying again")
 			time.Sleep(time.Second * 10)
+			j--
 			continue
-		}
-		if errs > 5 {
-			nextBlock.Add(curBlock, big.NewInt(int64(50)))
 		}
 		errs = 0
 		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
-		i.transfers <- logsToTransfer(logsTo)
+		i.lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
 
-		lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
-		i.lastSyncedBlock = lastSyncedBlock
+		transfers := logsToTransfer(logsTo)
 
-		curBlock.Add(curBlock, big.NewInt(int64(50)))
-		nextBlock.Add(nextBlock, big.NewInt(int64(50)))
+		for j := 0; j < len(transfers); j += len(transfers) / 4 {
+			i.transfers <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
+		}
+
+		curBlock.Add(curBlock, big.NewInt(int64(80)))
+		nextBlock.Add(nextBlock, big.NewInt(int64(80)))
 	}
 
 }
@@ -289,17 +293,16 @@ func (i *Indexer) processTransfers() {
 	defer close(i.previousOwners)
 	defer close(i.balances)
 
-	wp := workerpool.New(5)
+	wp := workerpool.New(20)
 
 	for transfers := range i.transfers {
 		if transfers == nil {
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
-		toQueue := func() {
+		wp.Submit(func() {
 			processTransfers(i, transfers)
-		}
-		wp.Submit(toQueue)
+		})
 	}
 	wp.StopWait()
 	logrus.Info("Transfer channel closed")
@@ -309,7 +312,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 	for _, t := range transfers {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
-		where := 0
 		go func(ctx context.Context, cancel context.CancelFunc, transfer *transfer) {
 			defer cancel()
 			contractAddress := transfer.contractAddress
@@ -323,13 +325,10 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			switch persist.TokenType(transfer.tokenType) {
 			case persist.TokenTypeERC721:
 				i.owners <- ownerAtBlock{key, to, transfer.blockNumber}
-				where = 1
 				i.previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
-				where = 2
 
 			case persist.TokenTypeERC1155:
 				i.balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
-				where = 3
 
 			default:
 				panic("unknown token type")
@@ -339,7 +338,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			if err != nil {
 				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
 			}
-			where = 4
 
 			id, err := util.HexToBigInt(string(tokenID))
 			if err != nil {
@@ -348,7 +346,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
 			i.uris <- tokenURI{key, uriReplaced}
-			where = 5
 			var metadata persist.TokenMetadata
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
@@ -356,7 +353,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
 				}
-
 			} else {
 				metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
 				if err != nil {
@@ -370,7 +366,6 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 		if ctx.Err() == context.DeadlineExceeded {
 			logrus.Errorf("Timed out processing transfer %+v", t)
 			logrus.Errorf("Total transfers %d", len(transfers))
-			logrus.Error("Where: ", where)
 			panic("timeout")
 		}
 	}
@@ -514,9 +509,6 @@ func receiveBalances(done chan bool, balanceChan chan tokenBalanceChange, balanc
 }
 
 func receiveOwners(done chan bool, ownersChan chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
-	defer func() {
-		done <- true
-	}()
 	for owner := range ownersChan {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -548,6 +540,7 @@ func receiveOwners(done chan bool, ownersChan chan ownerAtBlock, owners map[toke
 			}
 		}()
 	}
+	done <- true
 }
 
 func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
@@ -677,6 +670,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, i *Indexer) error {
 
+	logrus.Infof("Upserting %d tokens", len(t))
 	if err := i.tokenRepo.BulkUpsert(ctx, t); err != nil {
 		return err
 	}
@@ -690,9 +684,11 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, i *Indexe
 		wp.Submit(func() {
 			contract := handleContract(i.ethClient, token.ContractAddress, token.BlockNumber)
 			logrus.Infof("Processing contract %s", contract.Address)
-			err := i.contractReceive(context.Background(), contract)
+			ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*30)
+			defer cancel()
+			err := i.contractRepo.UpsertByAddress(ctxWithTimeout, contract.Address, contract)
 			if err != nil {
-				logrus.WithError(err).WithField("address", contract.Address).Error("error processing contract")
+				panic(err)
 			}
 		})
 		contracts[token.ContractAddress] = true
@@ -727,7 +723,7 @@ func (i *Indexer) subscribeNewLogs() {
 		events[i] = common.HexToHash(string(event))
 	}
 
-	topics := [][]common.Hash{events, nil, nil, nil}
+	topics := [][]common.Hash{events}
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: i.lastSyncedBlock.BigInt(),
@@ -746,16 +742,6 @@ func (i *Indexer) subscribeNewLogs() {
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}
 	}
-}
-
-func (i *Indexer) contractReceive(ctx context.Context, contract *persist.Contract) error {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-	err := i.contractRepo.UpsertByAddress(ctxWithTimeout, contract.Address, contract)
-	if err != nil {
-		panic(err)
-	}
-	return err
 }
 
 func (i *Indexer) resetChans() {
