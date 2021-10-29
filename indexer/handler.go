@@ -98,7 +98,7 @@ func setDefaults() {
 }
 
 func newEthClient() *ethclient.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	dialer := *websocket.DefaultDialer

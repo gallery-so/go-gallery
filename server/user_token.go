@@ -27,6 +27,7 @@ var bannedUsernames = map[string]bool{
 	"collections":   true,
 	"collection":    true,
 	"nft":           true,
+	"members":       true,
 	"nfts":          true,
 	"bookmarks":     true,
 	"messages":      true,

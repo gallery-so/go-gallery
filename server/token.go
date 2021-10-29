@@ -259,14 +259,14 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 
 func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
 	if tokenURI == "" {
-		if uri, err := indexer.GetTokenURI(tokenType, contractAddress, tokenID, ethClient); err != nil {
+		if uri, err := indexer.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not get token URI for token")
 		} else {
 			tokenURI = uri
 		}
 	}
 	if metadata == nil || len(metadata) == 0 {
-		if m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient); err == nil {
+		if m, err := indexer.GetMetadataFromURI(ctx, tokenURI, ipfsClient); err == nil {
 			metadata = m
 		}
 	}

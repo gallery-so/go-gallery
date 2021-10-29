@@ -172,7 +172,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string
 
 func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell) (persist.MediaType, error) {
 
-	bs, err := indexer.GetDataFromURI(persist.TokenURI(url), ipfsClient)
+	bs, err := indexer.GetDataFromURI(pCtx, persist.TokenURI(url), ipfsClient)
 	if err != nil {
 		return "", fmt.Errorf("could not get data from url %s: %s", url, err.Error())
 	}

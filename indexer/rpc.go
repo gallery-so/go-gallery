@@ -75,9 +75,9 @@ func getTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
-func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
+func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
 
-	bs, err := GetDataFromURI(turi, ipfsClient)
+	bs, err := GetDataFromURI(ctx, turi, ipfsClient)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -93,12 +93,15 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 }
 
 // GetDataFromURI calls URI and returns the data
-func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
+func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
+	timeout := time.Duration(10 * time.Second)
+	if t, ok := ctx.Deadline(); ok && time.Until(t) < timeout {
+		timeout = time.Until(t)
 	}
-
+	client := &http.Client{
+		Timeout: timeout,
+	}
 	asString := turi.String()
 
 	switch turi.Type() {
@@ -177,7 +180,10 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 }
 
 // GetTokenURI returns metadata URI for a given token address.
-func GetTokenURI(pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+
+	newCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
 	contract := common.HexToAddress(string(pContractAddress))
 	switch pTokenType {
 	case persist.TokenTypeERC721:
@@ -189,10 +195,8 @@ func GetTokenURI(pTokenType persist.TokenType, pContractAddress persist.Address,
 
 		logrus.Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		defer cancel()
 		turi, err := instance.TokenURI(&bind.CallOpts{
-			Context: ctx,
+			Context: newCtx,
 		}, pTokenID.BigInt())
 		if err != nil {
 			return "", err
@@ -212,11 +216,9 @@ func GetTokenURI(pTokenType persist.TokenType, pContractAddress persist.Address,
 		}
 		logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		turi, err := instance.Uri(&bind.CallOpts{
-			Context: ctx,
+			Context: newCtx,
 		}, i)
-		cancel()
 		if err != nil {
 			return "", err
 		}
@@ -225,10 +227,7 @@ func GetTokenURI(pTokenType persist.TokenType, pContractAddress persist.Address,
 		}
 
 		topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
-		defer cancel()
-
-		logs, err := ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		logs, err := ethClient.FilterLogs(newCtx, ethereum.FilterQuery{
 			FromBlock: defaultStartingBlock.BigInt(),
 			Addresses: []common.Address{contract},
 			Topics:    topics,
