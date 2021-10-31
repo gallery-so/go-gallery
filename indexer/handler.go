@@ -60,6 +60,11 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
 			return
 		}
+		mostRecent, err := tokenRepository.MostRecentBlock(context.Background())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
 		noMetadata, err := tokenRepository.Count(context.Background(), persist.CountTypeNoMetadata)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
@@ -76,13 +81,13 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"total_tokens":  total,
-			"current_block": i.lastSyncedBlock,
-			"recent_block":  i.mostRecentBlock,
-			"bad_uris":      i.badURIs,
-			"no_metadata":   noMetadata,
-			"erc721":        erc721,
-			"erc1155":       erc1155,
+			"total_tokens": total,
+			"recent_block": i.mostRecentBlock,
+			"most_recent":  mostRecent,
+			"bad_uris":     i.badURIs,
+			"no_metadata":  noMetadata,
+			"erc721":       erc721,
+			"erc1155":      erc1155,
 		})
 	}
 }

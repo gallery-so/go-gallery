@@ -86,17 +86,7 @@ type Indexer struct {
 
 	eventHashes []eventHash
 
-	lastSyncedBlock persist.BlockNumber
 	mostRecentBlock persist.BlockNumber
-
-	metadatas      chan tokenMetadata
-	uris           chan tokenURI
-	owners         chan ownerAtBlock
-	balances       chan tokenBalanceChange
-	previousOwners chan ownerAtBlock
-
-	subscriptions chan types.Log
-	transfers     chan []*transfer
 
 	badURIs uint64
 
@@ -110,12 +100,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		panic(err)
 	}
 
-	lastSyncedblock := defaultStartingBlock
-	recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
-	if err == nil && recentDBBlock > defaultStartingBlock {
-		lastSyncedblock = recentDBBlock
-	}
-
 	return &Indexer{
 
 		ethClient:    ethClient,
@@ -126,17 +110,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		chain: pChain,
 
 		eventHashes:     pEvents,
-		lastSyncedBlock: lastSyncedblock,
 		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
-
-		metadatas:      make(chan tokenMetadata),
-		uris:           make(chan tokenURI),
-		owners:         make(chan ownerAtBlock),
-		balances:       make(chan tokenBalanceChange),
-		previousOwners: make(chan ownerAtBlock),
-
-		subscriptions: make(chan types.Log),
-		transfers:     make(chan []*transfer),
 
 		uniqueMetadatas: getUniqueMetadataHandlers(),
 	}
@@ -145,24 +119,54 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
 
-	go i.listenForNewBlocks()
-	for i.lastSyncedBlock < i.mostRecentBlock {
-		logrus.Info("Starting pipeline...")
-		time.Sleep(time.Second)
-		go i.processLogs()
-		go i.processTransfers()
-		i.processTokens()
-		i.resetChans()
+	lastSyncedBlock := defaultStartingBlock
+	recentDBBlock, err := i.tokenRepo.MostRecentBlock(context.Background())
+	if err == nil && recentDBBlock > defaultStartingBlock {
+		lastSyncedBlock = recentDBBlock
 	}
+
+	wp := workerpool.New(10)
+
+	go i.listenForNewBlocks()
+	for lastSyncedBlock < i.mostRecentBlock {
+		input := lastSyncedBlock
+		toQueue := func() {
+			logrus.Info("Starting pipeline...")
+			time.Sleep(time.Second)
+			uris := make(chan tokenURI)
+			metadatas := make(chan tokenMetadata)
+			balances := make(chan tokenBalanceChange)
+			owners := make(chan ownerAtBlock)
+			previousOwners := make(chan ownerAtBlock)
+			transfers := make(chan []*transfer)
+			go i.processLogs(transfers, input)
+			go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
+			i.processTokens(uris, metadatas, owners, previousOwners, balances)
+		}
+		if wp.WaitingQueueSize() > 10 {
+			wp.SubmitWait(toQueue)
+		} else {
+			wp.Submit(toQueue)
+		}
+		lastSyncedBlock += (80 * 3)
+	}
+	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	time.Sleep(time.Second)
-	go i.subscribeNewLogs()
-	go i.processTransfers()
-	i.processTokens()
+	transfers := make(chan []*transfer)
+	subscriptions := make(chan types.Log)
+	uris := make(chan tokenURI)
+	metadatas := make(chan tokenMetadata)
+	balances := make(chan tokenBalanceChange)
+	owners := make(chan ownerAtBlock)
+	previousOwners := make(chan ownerAtBlock)
+	go i.subscribeNewLogs(lastSyncedBlock, transfers, subscriptions)
+	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
+	i.processTokens(uris, metadatas, owners, previousOwners, balances)
 }
 
-func (i *Indexer) processLogs() {
-	defer close(i.transfers)
+func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock persist.BlockNumber) {
+	defer close(transfersChan)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -171,10 +175,10 @@ func (i *Indexer) processLogs() {
 
 	topics := [][]common.Hash{events}
 
-	curBlock := i.lastSyncedBlock.BigInt()
+	curBlock := startingBlock.BigInt()
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(80)))
 	errs := 0
-	for j := 0; j < 5; j++ {
+	for j := 0; j < 3; j++ {
 		if errs > 2 {
 			nextBlock.Add(curBlock, big.NewInt(int64(5)))
 			time.Sleep(time.Second * 10)
@@ -198,12 +202,10 @@ func (i *Indexer) processLogs() {
 		errs = 0
 		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
-		i.lastSyncedBlock = persist.BlockNumber(nextBlock.Uint64())
-
-		transfers := logsToTransfer(logsTo)
+		transfers := logsToTransfers(logsTo)
 
 		for j := 0; j < len(transfers); j += len(transfers) / 4 {
-			i.transfers <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
+			transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
 		}
 
 		curBlock.Add(curBlock, big.NewInt(int64(80)))
@@ -212,7 +214,7 @@ func (i *Indexer) processLogs() {
 
 }
 
-func logsToTransfer(pLogs []types.Log) []*transfer {
+func logsToTransfers(pLogs []types.Log) []*transfer {
 	result := []*transfer{}
 	for _, pLog := range pLogs {
 		switch {
@@ -286,29 +288,29 @@ func (i *Indexer) listenForNewBlocks() {
 	}
 }
 
-func (i *Indexer) processTransfers() {
-	defer close(i.uris)
-	defer close(i.metadatas)
-	defer close(i.owners)
-	defer close(i.previousOwners)
-	defer close(i.balances)
+func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
+	defer close(uris)
+	defer close(metadatas)
+	defer close(owners)
+	defer close(previousOwners)
+	defer close(balances)
 
 	wp := workerpool.New(20)
 
-	for transfers := range i.transfers {
+	for transfers := range incomingTransfers {
 		if transfers == nil {
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
 		wp.Submit(func() {
-			processTransfers(i, transfers)
+			processTransfers(i, transfers, uris, metadatas, owners, previousOwners, balances)
 		})
 	}
 	wp.StopWait()
 	logrus.Info("Transfer channel closed")
 }
 
-func processTransfers(i *Indexer, transfers []*transfer) {
+func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
 
 	for _, t := range transfers {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
@@ -324,11 +326,11 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 			switch persist.TokenType(transfer.tokenType) {
 			case persist.TokenTypeERC721:
-				i.owners <- ownerAtBlock{key, to, transfer.blockNumber}
-				i.previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+				owners <- ownerAtBlock{key, to, transfer.blockNumber}
+				previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
 
 			case persist.TokenTypeERC1155:
-				i.balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+				balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
 
 			default:
 				panic("unknown token type")
@@ -345,7 +347,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 			}
 
 			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
-			i.uris <- tokenURI{key, uriReplaced}
+			uris <- tokenURI{key, uriReplaced}
 			var metadata persist.TokenMetadata
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
@@ -360,7 +362,7 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 					atomic.AddUint64(&i.badURIs, 1)
 				}
 			}
-			i.metadatas <- tokenMetadata{key, metadata}
+			metadatas <- tokenMetadata{key, metadata}
 		}(ctx, cancel, t)
 		<-ctx.Done()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -372,25 +374,25 @@ func processTransfers(i *Indexer, transfers []*transfer) {
 
 }
 
-func (i *Indexer) processTokens() {
+func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange) {
 
 	done := make(chan bool)
-	owners := map[tokenIdentifiers]ownerAtBlock{}
-	previousOwners := map[tokenIdentifiers][]ownerAtBlock{}
-	balances := map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
-	metadatas := map[tokenIdentifiers]tokenMetadata{}
-	uris := map[tokenIdentifiers]tokenURI{}
+	ownersMap := map[tokenIdentifiers]ownerAtBlock{}
+	previousOwnersMap := map[tokenIdentifiers][]ownerAtBlock{}
+	balancesMap := map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
+	metadatasMap := map[tokenIdentifiers]tokenMetadata{}
+	urisMap := map[tokenIdentifiers]tokenURI{}
 
-	go receiveBalances(done, i.balances, balances, i.tokenRepo)
-	go receiveOwners(done, i.owners, owners, i.tokenRepo)
-	go receiveMetadatas(done, i.metadatas, metadatas)
-	go receiveURIs(done, i.uris, uris)
-	go receivePreviousOwners(done, i.previousOwners, previousOwners, i.tokenRepo)
+	go receiveBalances(done, balances, balancesMap, i.tokenRepo)
+	go receiveOwners(done, owners, ownersMap, i.tokenRepo)
+	go receiveMetadatas(done, metadatas, metadatasMap)
+	go receiveURIs(done, uris, urisMap)
+	go receivePreviousOwners(done, previousOwners, previousOwnersMap, i.tokenRepo)
 	for i := 0; i < 5; i++ {
 		<-done
 	}
 
-	tokens := i.storedDataToTokens(owners, previousOwners, balances, metadatas, uris)
+	tokens := i.storedDataToTokens(ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap)
 	if tokens == nil {
 		return
 	}
@@ -407,7 +409,7 @@ func (i *Indexer) processTokens() {
 
 }
 
-func receiveURIs(done chan bool, uris chan tokenURI, uriMap map[tokenIdentifiers]tokenURI) {
+func receiveURIs(done chan bool, uris <-chan tokenURI, uriMap map[tokenIdentifiers]tokenURI) {
 
 	for uri := range uris {
 		func() {
@@ -417,7 +419,7 @@ func receiveURIs(done chan bool, uris chan tokenURI, uriMap map[tokenIdentifiers
 	done <- true
 }
 
-func receiveMetadatas(done chan bool, metadatas chan tokenMetadata, metaMap map[tokenIdentifiers]tokenMetadata) {
+func receiveMetadatas(done chan bool, metadatas <-chan tokenMetadata, metaMap map[tokenIdentifiers]tokenMetadata) {
 
 	for meta := range metadatas {
 		func() {
@@ -427,7 +429,7 @@ func receiveMetadatas(done chan bool, metadatas chan tokenMetadata, metaMap map[
 	done <- true
 }
 
-func receivePreviousOwners(done chan bool, prevOwners chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receivePreviousOwners(done chan bool, prevOwners <-chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	for previousOwner := range prevOwners {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -468,7 +470,7 @@ func receivePreviousOwners(done chan bool, prevOwners chan ownerAtBlock, prevOwn
 	done <- true
 }
 
-func receiveBalances(done chan bool, balanceChan chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
+func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
 
 	for balance := range balanceChan {
 		func() {
@@ -508,7 +510,7 @@ func receiveBalances(done chan bool, balanceChan chan tokenBalanceChange, balanc
 	done <- true
 }
 
-func receiveOwners(done chan bool, ownersChan chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receiveOwners(done chan bool, ownersChan <-chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	for owner := range ownersChan {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -714,9 +716,9 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 	return c
 }
 
-func (i *Indexer) subscribeNewLogs() {
+func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []*transfer, subscriptions chan types.Log) {
 
-	defer close(i.transfers)
+	defer close(transfers)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -726,32 +728,22 @@ func (i *Indexer) subscribeNewLogs() {
 	topics := [][]common.Hash{events}
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: i.lastSyncedBlock.BigInt(),
+		FromBlock: lastSyncedBlock.BigInt(),
 		Topics:    topics,
-	}, i.subscriptions)
+	}, subscriptions)
 	if err != nil {
 		panic(fmt.Sprintf("error subscribing to logs: %s", err))
 	}
 	for {
 		select {
-		case log := <-i.subscriptions:
+		case log := <-subscriptions:
 			logrus.Infof("Got log at: %d", log.BlockNumber)
-			i.lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
-			i.transfers <- logsToTransfer([]types.Log{log})
+			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
+			transfers <- logsToTransfers([]types.Log{log})
 		case err := <-sub.Err():
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}
 	}
-}
-
-func (i *Indexer) resetChans() {
-
-	i.transfers = make(chan []*transfer)
-	i.balances = make(chan tokenBalanceChange)
-	i.owners = make(chan ownerAtBlock)
-	i.previousOwners = make(chan ownerAtBlock)
-	i.metadatas = make(chan tokenMetadata)
-	i.uris = make(chan tokenURI)
 }
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
