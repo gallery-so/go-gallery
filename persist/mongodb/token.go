@@ -25,19 +25,44 @@ type TokenMongoRepository struct {
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
 func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
+	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tokenIdentifiersIndex := mongo.IndexModel{
+		Keys: bson.M{
+			"token_id":         1,
+			"contract_address": 1,
+			"deleted":          1,
+		},
+	}
+	tokenIDIndex := mongo.IndexModel{
+		Keys: bson.M{
+			"token_id": 1,
+			"deleted":  1,
+		},
+	}
+	ownerAddressIndex := mongo.IndexModel{
+		Keys: bson.M{
+			"owner_address": 1,
+			"deleted":       1,
+		},
+	}
+	tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
+	tokenStorage.createIndex(ctx, tokenIDIndex)
+	tokenStorage.createIndex(ctx, ownerAddressIndex)
 	return &TokenMongoRepository{
-		mp:  newStorage(mgoClient, 0, galleryDBName, tokenColName),
+		mp:  tokenStorage,
 		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
 	}
 }
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pERC721s []*persist.Token) ([]persist.DBID, error) {
+func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []*persist.Token) ([]persist.DBID, error) {
 
-	nfts := make([]interface{}, len(pERC721s))
+	nfts := make([]interface{}, len(pTokens))
 
-	for i, v := range pERC721s {
+	for i, v := range pTokens {
 		nfts[i] = v
 	}
 
