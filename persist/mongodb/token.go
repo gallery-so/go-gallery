@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -47,9 +48,19 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 			"deleted":       1,
 		},
 	}
-	tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
-	tokenStorage.createIndex(ctx, tokenIDIndex)
-	tokenStorage.createIndex(ctx, ownerAddressIndex)
+	tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
+	if err != nil {
+		panic(err)
+	}
+	tidName, err := tokenStorage.createIndex(ctx, tokenIDIndex)
+	if err != nil {
+		panic(err)
+	}
+	oaName, err := tokenStorage.createIndex(ctx, ownerAddressIndex)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Infof("created indexes %s, %s, and %s", tiName, tidName, oaName)
 	return &TokenMongoRepository{
 		mp:  tokenStorage,
 		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
