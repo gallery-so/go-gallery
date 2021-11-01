@@ -36,6 +36,11 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 			{"deleted", 1},
 		},
 	}
+	blockNumberIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{"block_number", -1},
+		},
+	}
 	tokenIDIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{"token_id", 1},
@@ -52,6 +57,10 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	if err != nil {
 		panic(err)
 	}
+	bnName, err := tokenStorage.createIndex(ctx, blockNumberIndex)
+	if err != nil {
+		panic(err)
+	}
 	tidName, err := tokenStorage.createIndex(ctx, tokenIDIndex)
 	if err != nil {
 		panic(err)
@@ -60,7 +69,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	if err != nil {
 		panic(err)
 	}
-	logrus.Infof("created indexes %s, %s, and %s", tiName, tidName, oaName)
+	logrus.Infof("created indexes %s, %s, %s, and %s", tiName, tidName, oaName, bnName)
 	return &TokenMongoRepository{
 		mp:  tokenStorage,
 		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
