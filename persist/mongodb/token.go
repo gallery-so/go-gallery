@@ -30,22 +30,22 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	tokenIdentifiersIndex := mongo.IndexModel{
-		Keys: bson.M{
-			"token_id":         1,
-			"contract_address": 1,
-			"deleted":          1,
+		Keys: bson.D{
+			{"token_id", 1},
+			{"contract_address", 1},
+			{"deleted", 1},
 		},
 	}
 	tokenIDIndex := mongo.IndexModel{
-		Keys: bson.M{
-			"token_id": 1,
-			"deleted":  1,
+		Keys: bson.D{
+			{"token_id", 1},
+			{"deleted", 1},
 		},
 	}
 	ownerAddressIndex := mongo.IndexModel{
-		Keys: bson.M{
-			"owner_address": 1,
-			"deleted":       1,
+		Keys: bson.D{
+			{"owner_address", 1},
+			{"deleted", 1},
 		},
 	}
 	tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
