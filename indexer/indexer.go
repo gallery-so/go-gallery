@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,8 @@ import (
 // var defaultStartingBlock persist.BlockNumber = 6000000
 
 var defaultStartingBlock persist.BlockNumber = 13014050
+
+const blocksPerLogsCall = 80
 
 // eventHash represents an event keccak256 hash
 type eventHash string
@@ -86,7 +89,7 @@ type Indexer struct {
 
 	eventHashes []eventHash
 
-	mostRecentBlock persist.BlockNumber
+	mostRecentBlock uint64
 
 	badURIs uint64
 
@@ -110,8 +113,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 		chain: pChain,
 
 		eventHashes:     pEvents,
-		mostRecentBlock: persist.BlockNumber(mostRecentBlockUint64),
-
+		mostRecentBlock: mostRecentBlockUint64,
 		uniqueMetadatas: getUniqueMetadataHandlers(),
 	}
 }
@@ -125,44 +127,52 @@ func (i *Indexer) Start() {
 		lastSyncedBlock = recentDBBlock
 	}
 
-	wp := workerpool.New(10)
+	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
+
+	wp := workerpool.New(5)
+	mu := &sync.Mutex{}
 
 	go i.listenForNewBlocks()
-	for lastSyncedBlock < i.mostRecentBlock {
+	for lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock) {
 		input := lastSyncedBlock
 		toQueue := func() {
-			logrus.Info("Starting pipeline...")
-			time.Sleep(time.Second)
-			uris := make(chan tokenURI)
-			metadatas := make(chan tokenMetadata)
-			balances := make(chan tokenBalanceChange)
-			owners := make(chan ownerAtBlock)
-			previousOwners := make(chan ownerAtBlock)
-			transfers := make(chan []*transfer)
-			go i.processLogs(transfers, input)
-			go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
-			i.processTokens(uris, metadatas, owners, previousOwners, balances)
+			i.startPipeline(input, mu)
 		}
-		if wp.WaitingQueueSize() > 10 {
+		if wp.WaitingQueueSize() > 5 {
 			wp.SubmitWait(toQueue)
 		} else {
 			wp.Submit(toQueue)
 		}
-		lastSyncedBlock += (80 * 3)
+		lastSyncedBlock += blocksPerLogsCall
 	}
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	time.Sleep(time.Second)
-	transfers := make(chan []*transfer)
-	subscriptions := make(chan types.Log)
+	i.startNewBlocksPipeline(lastSyncedBlock, mu)
+}
+
+func (i *Indexer) startPipeline(start persist.BlockNumber, mu *sync.Mutex) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalanceChange)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
-	go i.subscribeNewLogs(lastSyncedBlock, transfers, subscriptions)
+	transfers := make(chan []*transfer)
+	go i.processLogs(transfers, start)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
-	i.processTokens(uris, metadatas, owners, previousOwners, balances)
+	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
+}
+func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mutex) {
+	uris := make(chan tokenURI)
+	metadatas := make(chan tokenMetadata)
+	balances := make(chan tokenBalanceChange)
+	owners := make(chan ownerAtBlock)
+	previousOwners := make(chan ownerAtBlock)
+	transfers := make(chan []*transfer)
+	subscriptions := make(chan types.Log)
+	go i.subscribeNewLogs(start, transfers, subscriptions)
+	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
+	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
 }
 
 func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock persist.BlockNumber) {
@@ -176,40 +186,27 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 	topics := [][]common.Hash{events}
 
 	curBlock := startingBlock.BigInt()
-	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(80)))
-	errs := 0
-	for j := 0; j < 3; j++ {
-		if errs > 2 {
-			nextBlock.Add(curBlock, big.NewInt(int64(5)))
-			time.Sleep(time.Second * 10)
-		}
-		logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
+	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(blocksPerLogsCall)))
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
-			FromBlock: curBlock,
-			ToBlock:   nextBlock,
-			Topics:    topics,
-		})
-		cancel()
-		if err != nil {
-			errs++
-			logrus.WithError(err).Error("error getting logs, trying again")
-			time.Sleep(time.Second * 10)
-			j--
-			continue
-		}
-		errs = 0
-		logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
+	logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
-		transfers := logsToTransfers(logsTo)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		FromBlock: curBlock,
+		ToBlock:   nextBlock,
+		Topics:    topics,
+	})
+	cancel()
+	if err != nil {
+		panic(err)
+	}
 
-		for j := 0; j < len(transfers); j += len(transfers) / 4 {
-			transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
-		}
+	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
-		curBlock.Add(curBlock, big.NewInt(int64(80)))
-		nextBlock.Add(nextBlock, big.NewInt(int64(80)))
+	transfers := logsToTransfers(logsTo)
+
+	for j := 0; j < len(transfers); j += len(transfers) / 4 {
+		transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
 	}
 
 }
@@ -282,7 +279,7 @@ func (i *Indexer) listenForNewBlocks() {
 		if err != nil {
 			panic(fmt.Sprintf("error getting block number: %s", err))
 		}
-		i.mostRecentBlock = persist.BlockNumber(finalBlockUint)
+		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
 		logrus.Infof("final block number: %v", finalBlockUint)
 		time.Sleep(time.Minute)
 	}
@@ -302,8 +299,10 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
+		it := make([]*transfer, len(transfers))
+		copy(it, transfers)
 		wp.Submit(func() {
-			processTransfers(i, transfers, uris, metadatas, owners, previousOwners, balances)
+			processTransfers(i, it, uris, metadatas, owners, previousOwners, balances)
 		})
 	}
 	wp.StopWait()
@@ -374,7 +373,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 }
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange) {
+func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange, mu *sync.Mutex) {
 
 	done := make(chan bool)
 	ownersMap := map[tokenIdentifiers]ownerAtBlock{}
@@ -400,9 +399,11 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	mu.Lock()
+	defer mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
 	if err != nil {
 		panic(err)
 	}
@@ -412,9 +413,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 func receiveURIs(done chan bool, uris <-chan tokenURI, uriMap map[tokenIdentifiers]tokenURI) {
 
 	for uri := range uris {
-		func() {
-			uriMap[uri.ti] = uri
-		}()
+		uriMap[uri.ti] = uri
 	}
 	done <- true
 }
@@ -422,9 +421,7 @@ func receiveURIs(done chan bool, uris <-chan tokenURI, uriMap map[tokenIdentifie
 func receiveMetadatas(done chan bool, metadatas <-chan tokenMetadata, metaMap map[tokenIdentifiers]tokenMetadata) {
 
 	for meta := range metadatas {
-		func() {
-			metaMap[meta.ti] = meta
-		}()
+		metaMap[meta.ti] = meta
 	}
 	done <- true
 }
@@ -501,6 +498,8 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 			if balFrom.amnt == nil {
 				balFrom.amnt = big.NewInt(0)
 			}
+			balTo.block = balance.block
+			balFrom.block = balance.block
 			balTo.amnt.Add(balTo.amnt, balance.amt)
 			balFrom.amnt.Sub(balFrom.amnt, balance.amt)
 			balances[balance.ti][balance.from] = balFrom
@@ -670,33 +669,31 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, i *Indexer) error {
+func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client) error {
 
 	logrus.Infof("Upserting %d tokens", len(t))
-	if err := i.tokenRepo.BulkUpsert(ctx, t); err != nil {
+	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
 		return err
 	}
 
 	contracts := make(map[persist.Address]bool)
-	wp := workerpool.New(10)
+
 	for _, token := range t {
-		if _, ok := contracts[token.ContractAddress]; ok {
+		if contracts[token.ContractAddress] {
 			continue
 		}
-		wp.Submit(func() {
-			contract := handleContract(i.ethClient, token.ContractAddress, token.BlockNumber)
+		func() {
+			contract := handleContract(ethClient, token.ContractAddress, token.BlockNumber)
 			logrus.Infof("Processing contract %s", contract.Address)
 			ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*30)
 			defer cancel()
-			err := i.contractRepo.UpsertByAddress(ctxWithTimeout, contract.Address, contract)
+			err := contractRepo.UpsertByAddress(ctxWithTimeout, contract.Address, contract)
 			if err != nil {
 				panic(err)
 			}
-		})
+		}()
 		contracts[token.ContractAddress] = true
 	}
-
-	wp.StopWait()
 
 	return nil
 }

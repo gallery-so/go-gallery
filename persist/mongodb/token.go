@@ -145,6 +145,8 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 		opts.SetMaxTime(dur)
 	}
 
+	opts.SetSort(bson.M{"last_updated": -1})
+
 	result := []*persist.Token{}
 
 	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
@@ -250,7 +252,7 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.Bl
 
 	opts := options.Find()
 	opts.SetLimit(1)
-	opts.SetSort(bson.M{"latest_block": -1})
+	opts.SetSort(bson.M{"block_number": -1})
 
 	res := []*persist.Token{}
 
