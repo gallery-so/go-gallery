@@ -5,16 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"os"
 	"os/exec"
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/bakape/thumbnailer"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/nfnt/resize"
 	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
@@ -170,19 +174,29 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	if err != nil {
 		return "", fmt.Errorf("could not get data from url %s: %s", url, err.Error())
 	}
-
+	buf := bytes.NewBuffer(bs)
 	contentType := persist.SniffMediaType(bs)
-	thumbnailDimensions := thumbnailer.Dims{Width: 1024, Height: 1024}
 
-	thumbnailOptions := thumbnailer.Options{JPEGQuality: 100, ThumbDims: thumbnailDimensions}
-
-	_, thumb, err := thumbnailer.ProcessBuffer(bs, thumbnailOptions)
-	if err != nil {
-		return "", fmt.Errorf("could not process video: %s", err.Error())
-	}
 	switch contentType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF:
-		return persist.MediaTypeImage, cacheRawMedia(pCtx, thumb.Data, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+	case persist.MediaTypeImage:
+		img, _, err := image.Decode(buf)
+		if err != nil {
+			logrus.WithError(err).Error("could not decode image")
+			if png, err := png.Decode(buf); err == nil {
+				img = png
+			} else if jpg, err := jpeg.Decode(buf); err == nil {
+				img = jpg
+			} else {
+				return "", fmt.Errorf("could not decode image as jpg or png %s", err.Error())
+			}
+		}
+		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		err = jpeg.Encode(buf, img, nil)
+		if err != nil {
+			return "", fmt.Errorf("could not encode image as jpeg: %s", err.Error())
+		}
+		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeVideo:
 
 		scaled, err := scaleVideo(pCtx, bs, -1, 720)
@@ -194,16 +208,49 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return "", err
 		}
 
-		return persist.MediaTypeVideo, cacheRawMedia(pCtx, thumb.Data, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+		jp, err := thumbnailVideo(pCtx, bs)
+		if err != nil {
+			return "", err
+		}
+		jpg, err := jpeg.Decode(bytes.NewBuffer(jp))
+		if err != nil {
+			return "", err
+		}
+		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		jpeg.Encode(buf, jpg, nil)
+		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+	case persist.MediaTypeGIF:
+		// thumbnails a gif, do we need to store the whole gif?
+		asGif, err := gif.DecodeAll(bytes.NewReader(buf.Bytes()))
+		if err != nil {
+			return "", err
+		}
+		buf = &bytes.Buffer{}
+		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
+		if err != nil {
+			return "", err
+		}
+		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
 		return persist.MediaTypeUnknown, errUnsupportedMediaType{contentType}
 	}
 
 }
 
+func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {
+	c := exec.Command("ffmpeg", "-i", "pipe:0", "-ss=00:00:01.000", "-vframes=1", "-f=singlejpeg", "pipe:1")
+
+	return pipeIOForCmd(c, vid)
+}
+
 func scaleVideo(pCtx context.Context, vid []byte, w, h int) ([]byte, error) {
 	c := exec.Command("ffmpeg", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "pipe:1")
 
+	return pipeIOForCmd(c, vid)
+}
+
+func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 5*1024*1024))
 	c.Stdout = buf
 	c.Stderr = os.Stderr
@@ -217,7 +264,7 @@ func scaleVideo(pCtx context.Context, vid []byte, w, h int) ([]byte, error) {
 		return nil, err
 	}
 
-	_, err = stdin.Write(vid)
+	_, err = stdin.Write(input)
 	if err != nil {
 		return nil, err
 	}

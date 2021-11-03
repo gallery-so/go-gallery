@@ -21,12 +21,6 @@ jobs:
           keys:
             - go-mod-v4-{{ checksum "go.sum" }}
       - run:
-          name: "Install cli dependencies"
-          command: apt-get -y install sudo ffmpeg python3 libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
-      - run:
-          name: "Update apt"
-          command: sudo apt-get update
-      - run:
           name: Install Dependencies
           command: go mod download
       - save_cache:
@@ -53,11 +47,11 @@ jobs:
           name: "Decrypt secrets"
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
-          name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3 ffmpeg libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
-      - run:
           name: "Update apt"
-          command: sudo apt-get update
+          command: apt-get update
+      - run:
+          name: "Install cli dependencies"
+          command: apt-get -y install unzip curl sudo python3
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
