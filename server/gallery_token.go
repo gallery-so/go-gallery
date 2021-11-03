@@ -58,7 +58,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 		aeCtx := appengine.NewContext(c.Request)
 		for _, gallery := range galleries {
 			for _, collection := range gallery.Collections {
-				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
+				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ethClient)
 			}
 		}
 
@@ -93,7 +93,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, collection := range gallery.Collections {
-			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
+			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ethClient)
 		}
 
 		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: gallery})

@@ -37,7 +37,7 @@ type errUnsupportedMediaType struct {
 }
 
 func makePreviewsForToken(pCtx context.Context, contractAddress persist.Address, tokenID persist.TokenID, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell) (*persist.Media, error) {
-	tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress)
+	tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress, 1, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -178,27 +178,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	contentType := persist.SniffMediaType(bs)
 
 	switch contentType {
-	case persist.MediaTypeImage:
-		img, _, err := image.Decode(buf)
-		if err != nil {
-			logrus.WithError(err).Error("could not decode image")
-			if png, err := png.Decode(buf); err == nil {
-				img = png
-			} else if jpg, err := jpeg.Decode(buf); err == nil {
-				img = jpg
-			} else {
-				return "", fmt.Errorf("could not decode image as jpg or png %s", err.Error())
-			}
-		}
-		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
-		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, img, nil)
-		if err != nil {
-			return "", fmt.Errorf("could not encode image as jpeg: %s", err.Error())
-		}
-		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeVideo:
-
 		scaled, err := scaleVideo(pCtx, bs, -1, 720)
 		if err != nil {
 			return "", err
@@ -233,9 +213,25 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
-		return persist.MediaTypeUnknown, errUnsupportedMediaType{contentType}
+		img, _, err := image.Decode(buf)
+		if err != nil {
+			logrus.WithError(err).Error("could not decode image")
+			if png, err := png.Decode(buf); err == nil {
+				img = png
+			} else if jpg, err := jpeg.Decode(buf); err == nil {
+				img = jpg
+			} else {
+				return "", fmt.Errorf("could not decode image as jpg or png %s", err.Error())
+			}
+		}
+		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		err = jpeg.Encode(buf, img, nil)
+		if err != nil {
+			return "", fmt.Errorf("could not encode image as jpeg: %s", err.Error())
+		}
+		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	}
-
 }
 
 func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {

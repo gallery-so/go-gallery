@@ -172,7 +172,8 @@ func newMemstoreClients() *memstore.Clients {
 }
 
 func newIPFSShell() *shell.Shell {
+
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 5)
+	sh.SetTimeout(time.Second * 10)
 	return sh
 }

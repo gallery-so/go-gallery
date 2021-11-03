@@ -101,14 +101,15 @@ func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Tok
 }
 
 // GetByWallet gets tokens for a given wallet address
-func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-
-	opts.SetSort(bson.M{"last_updated": -1})
+	opts.SetSkip(limit * page)
+	opts.SetLimit(limit)
+	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
 
@@ -121,7 +122,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 }
 
 // GetByUserID gets ERC721 tokens for a given userID
-func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -142,7 +143,7 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 	errChan := make(chan error)
 	for _, v := range user.Addresses {
 		go func(addr persist.Address) {
-			tokensForAddress, err := t.GetByWallet(pCtx, addr)
+			tokensForAddress, err := t.GetByWallet(pCtx, addr, limit, page)
 			if err != nil {
 				errChan <- err
 			}
@@ -153,6 +154,10 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 	for i := 0; i < len(user.Addresses); i++ {
 		select {
 		case t := <-resultChan:
+			if len(t)+len(tokens) > int(limit) {
+				tokens = append(tokens, t[:int(limit)-len(tokens)]...)
+				break
+			}
 			tokens = append(tokens, t...)
 		case err := <-errChan:
 			return nil, err
@@ -163,14 +168,15 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 }
 
 // GetByContract gets ERC721 tokens for a given contract
-func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-
-	opts.SetSort(bson.M{"last_updated": -1})
+	opts.SetSkip(limit * page)
+	opts.SetLimit(limit)
+	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
 
@@ -183,14 +189,15 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 }
 
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-
-	opts.SetSort(bson.M{"last_updated": -1})
+	opts.SetSkip(limit * page)
+	opts.SetLimit(limit)
+	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
 

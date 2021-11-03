@@ -189,10 +189,10 @@ type TokenUpdateMediaInput struct {
 type TokenRepository interface {
 	CreateBulk(context.Context, []*Token) ([]DBID, error)
 	Create(context.Context, *Token) (DBID, error)
-	GetByWallet(context.Context, Address) ([]*Token, error)
-	GetByUserID(context.Context, DBID) ([]*Token, error)
-	GetByContract(context.Context, Address) ([]*Token, error)
-	GetByTokenIdentifiers(context.Context, TokenID, Address) ([]*Token, error)
+	GetByWallet(context.Context, Address, int64, int64) ([]*Token, error)
+	GetByUserID(context.Context, DBID, int64, int64) ([]*Token, error)
+	GetByContract(context.Context, Address, int64, int64) ([]*Token, error)
+	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]*Token, error)
 	GetByID(context.Context, DBID) (*Token, error)
 	BulkUpsert(context.Context, []*Token) error
 	Upsert(context.Context, *Token) error
