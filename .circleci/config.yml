@@ -21,11 +21,11 @@ jobs:
           keys:
             - go-mod-v4-{{ checksum "go.sum" }}
       - run:
-          name: "Update apt"
-          command: apt-get update
-      - run:
           name: "Install cli dependencies"
-          command: apt-get -y install ffmpeg python3 libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
+          command: apt-get -y install sudo ffmpeg python3 libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
+      - run:
+          name: "Update apt"
+          command: sudo apt-get update
       - run:
           name: Install Dependencies
           command: go mod download
@@ -47,9 +47,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "Update apt"
-          command: apt-get update
-      - run:
           name: "Oneshot Keybase"
           command: "keybase oneshot"
       - run:
@@ -58,6 +55,9 @@ jobs:
       - run:
           name: "Install cli dependencies"
           command: apt-get -y install unzip curl sudo python3 ffmpeg libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
+      - run:
+          name: "Update apt"
+          command: sudo apt-get update
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
