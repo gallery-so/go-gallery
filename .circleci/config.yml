@@ -25,7 +25,7 @@ jobs:
           command: apt-get update
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install ffmpeg python3
+          command: apt-get -y install ffmpeg python3 libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
       - run:
           name: Install Dependencies
           command: go mod download
@@ -57,7 +57,7 @@ jobs:
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3 ffmpeg
+          command: apt-get -y install unzip curl sudo python3 ffmpeg libavcodec libavutil libavformat GraphicsMagick libavcodec libavutil libavformat libswscale
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip
