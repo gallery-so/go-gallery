@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.18.2
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
+	github.com/bakape/thumbnailer v1.0.0
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.11

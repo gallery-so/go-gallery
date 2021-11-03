@@ -31,26 +31,26 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	defer cancel()
 	tokenIdentifiersIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{"token_id", 1},
-			{"contract_address", 1},
-			{"deleted", 1},
+			{Key: "token_id", Value: 1},
+			{Key: "contract_address", Value: 1},
+			{Key: "deleted", Value: 1},
 		},
 	}
 	blockNumberIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{"block_number", -1},
+			{Key: "block_number", Value: -1},
 		},
 	}
 	tokenIDIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{"token_id", 1},
-			{"deleted", 1},
+			{Key: "token_id", Value: 1},
+			{Key: "deleted", Value: 1},
 		},
 	}
 	ownerAddressIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{"owner_address", 1},
-			{"deleted", 1},
+			{Key: "owner_address", Value: 1},
+			{Key: "deleted", Value: 1},
 		},
 	}
 	tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
