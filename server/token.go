@@ -311,11 +311,11 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 		}
 		return []*persist.Token{token}, nil
 	case input.WalletAddress != "":
-		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Page, input.Limit)
+		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":
-		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Page, input.Limit)
+		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
 	case input.ContractAddress != "":
-		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Page, input.Limit)
+		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
 	}
 	return nil, nil
 
