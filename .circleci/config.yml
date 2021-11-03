@@ -21,6 +21,12 @@ jobs:
           keys:
             - go-mod-v4-{{ checksum "go.sum" }}
       - run:
+          name: "Update apt"
+          command: apt-get update
+      - run:
+          name: "Install cli dependencies"
+          command: apt-get -y install ffmpeg python3
+      - run:
           name: Install Dependencies
           command: go mod download
       - save_cache:
@@ -51,7 +57,7 @@ jobs:
           command: keybase decrypt -i secrits -o decrypted.zip
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3 
+          command: apt-get -y install unzip curl sudo python3 ffmpeg
       - run:
           name: "Unzip secrets file"
           command: unzip decrypted.zip

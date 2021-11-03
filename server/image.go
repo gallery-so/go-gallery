@@ -18,7 +18,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/appengine"
 	"google.golang.org/appengine/blobstore"
 	appimage "google.golang.org/appengine/image"
 )
@@ -158,7 +157,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string
 	if err != nil {
 		return "", err
 	}
-	res, err := appimage.ServingURL(pCtx, appengine.BlobKey(key), &appimage.ServingURLOptions{Secure: true})
+	res, err := appimage.ServingURL(pCtx, key, &appimage.ServingURLOptions{Secure: true})
 	if err != nil {
 		return "", err
 	}
