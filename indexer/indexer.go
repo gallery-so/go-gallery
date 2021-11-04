@@ -189,12 +189,12 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 	logrus.Info("Getting logs from ", curBlock.String(), " to ", nextBlock.String())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 	logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: curBlock,
 		ToBlock:   nextBlock,
 		Topics:    topics,
 	})
-	cancel()
 	if err != nil {
 		panic(err)
 	}
@@ -294,7 +294,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 	wp := workerpool.New(20)
 
 	for transfers := range incomingTransfers {
-		if transfers == nil {
+		if transfers == nil || len(transfers) == 0 {
 			continue
 		}
 		logrus.Infof("Processing %d transfers", len(transfers))
