@@ -37,8 +37,10 @@ const (
 	MediaTypeBase64Text MediaType = "base64text"
 	// MediaTypeAudio represents audio
 	MediaTypeAudio MediaType = "audio"
-	// MediaTypeJSON represents audio
+	// MediaTypeJSON represents json metadata
 	MediaTypeJSON MediaType = "json"
+	// MediaTypeInvalid represents an invalid media type such as when a token's external metadata's API is broken or no longer exists
+	MediaTypeInvalid MediaType = "invalid"
 	// MediaTypeUnknown represents an unknown media type
 	MediaTypeUnknown MediaType = "unknown"
 )

@@ -72,7 +72,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 		}
 
 		if input.ID == "" && input.WalletAddress == "" && input.ContractAddress == "" && input.TokenID == "" {
-			util.ErrResponse(c, http.StatusBadRequest, errInvalidInput{reason: "must specify at least one of id, wallet_address, contract_address, token_id"})
+			util.ErrResponse(c, http.StatusBadRequest, errInvalidInput{reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
 
@@ -273,7 +273,7 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 			metadata = m
 		}
 	}
-	if media.MediaURL == "" {
+	if media.MediaType == "" {
 		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not make previews for token")

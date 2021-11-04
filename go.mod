@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.18.2
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
-	github.com/bakape/thumbnailer v1.0.0
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.11
@@ -23,7 +22,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
-	github.com/u2takey/ffmpeg-go v0.3.0
+	github.com/tidwall/pretty v1.0.2 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	go.mongodb.org/mongo-driver v1.7.3

@@ -43,9 +43,10 @@ type tokenContractMetadata struct {
 	Symbol string
 }
 
-type errHTTP struct {
-	url    string
-	status string
+// ErrHTTP represents an error returned from an HTTP request
+type ErrHTTP struct {
+	URL    string
+	Status int
 }
 
 // getTokenContractMetadata returns the metadata for a given contract (without URI)
@@ -146,7 +147,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode > 299 || resp.StatusCode < 200 {
-				return nil, errHTTP{status: resp.Status, url: asString}
+				return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 			}
 			body = resp.Body
 		}
@@ -287,6 +288,6 @@ func padHex(pHex string, pLength int) string {
 	return pHex
 }
 
-func (h errHTTP) Error() string {
-	return fmt.Sprintf("HTTP Error Status - %s | URL - %s", h.status, h.url)
+func (h ErrHTTP) Error() string {
+	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
 }

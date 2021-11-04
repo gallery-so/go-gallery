@@ -9,6 +9,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"net/http"
 	"os"
 	"os/exec"
 	"time"
@@ -62,8 +63,8 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	if err == nil {
-		res.ThumbnailURL = imageURL + "=s96"
-		res.PreviewURL = imageURL + "=s256"
+		res.ThumbnailURL = imageURL + "=256"
+		res.PreviewURL = imageURL + "=512"
 		res.MediaURL = imageURL + "=s1024"
 		res.MediaType = persist.MediaTypeImage
 	}
@@ -74,7 +75,7 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res.MediaType = persist.MediaTypeVideo
 	}
 
-	if res.MediaURL != "" {
+	if res.MediaType != "" {
 		return res, nil
 	}
 
@@ -97,30 +98,56 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)
 	if err != nil {
-		return nil, err
+		if it, ok := err.(indexer.ErrHTTP); ok {
+			if it.Status == http.StatusNotFound {
+				mediaType = persist.MediaTypeInvalid
+			}
+		} else {
+			return nil, err
+		}
 	}
 	if vURL != "" {
 		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient)
 		if err != nil {
-			return nil, err
+			if it, ok := err.(indexer.ErrHTTP); ok {
+				if it.Status == http.StatusNotFound {
+					mediaType = persist.MediaTypeInvalid
+				}
+			} else {
+				return nil, err
+			}
 		}
 	}
 	res.MediaType = mediaType
 
-	imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
-	if err == nil {
-		res.ThumbnailURL = imageURL + "=s96"
-		res.PreviewURL = imageURL + "=s256"
-		res.MediaURL = imageURL + "=s1024"
-	} else {
-		logrus.WithError(err).Error("could not get image serving URL")
-	}
-
-	videoURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
-	if err == nil {
-		res.MediaURL = videoURL
-	} else {
-		logrus.WithError(err).Error("could not get video serving URL")
+	switch mediaType {
+	case persist.MediaTypeImage:
+		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+		if err == nil {
+			res.ThumbnailURL = imageURL + "=s256"
+			res.PreviewURL = imageURL + "=s512"
+			res.MediaURL = imageURL + "=s1024"
+		} else {
+			logrus.WithError(err).Error("could not get image serving URL")
+		}
+	case persist.MediaTypeVideo:
+		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+		if err == nil {
+			res.ThumbnailURL = imageURL + "=s256"
+			res.PreviewURL = imageURL + "=s512"
+		} else {
+			logrus.WithError(err).Error("could not get image serving URL")
+		}
+		videoURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
+		if err == nil {
+			res.MediaURL = videoURL
+		} else {
+			logrus.WithError(err).Error("could not get video serving URL")
+		}
+	default:
+		res.MediaURL = imgURL
+		res.ThumbnailURL = imgURL
+		res.PreviewURL = imgURL
 	}
 
 	return res, nil
@@ -168,33 +195,33 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string) (string
 	return res.String(), nil
 }
 
-func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell) (persist.MediaType, error) {
+func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell) (mediaType persist.MediaType, err error) {
 
 	bs, err := indexer.GetDataFromURI(pCtx, persist.TokenURI(url), ipfsClient)
 	if err != nil {
-		return "", fmt.Errorf("could not get data from url %s: %s", url, err.Error())
+		return mediaType, err
 	}
 	buf := bytes.NewBuffer(bs)
-	contentType := persist.SniffMediaType(bs)
+	mediaType = persist.SniffMediaType(bs)
 
-	switch contentType {
+	switch mediaType {
 	case persist.MediaTypeVideo:
 		scaled, err := scaleVideo(pCtx, bs, -1, 720)
 		if err != nil {
-			return "", err
+			return mediaType, err
 		}
 		err = cacheRawMedia(pCtx, scaled, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 		if err != nil {
-			return "", err
+			return mediaType, err
 		}
 
 		jp, err := thumbnailVideo(pCtx, bs)
 		if err != nil {
-			return "", err
+			return mediaType, err
 		}
 		jpg, err := jpeg.Decode(bytes.NewBuffer(jp))
 		if err != nil {
-			return "", err
+			return mediaType, err
 		}
 		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
@@ -209,7 +236,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		buf = &bytes.Buffer{}
 		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
 		if err != nil {
-			return "", err
+			return mediaType, err
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
@@ -221,14 +248,14 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			} else if jpg, err := jpeg.Decode(buf); err == nil {
 				img = jpg
 			} else {
-				return "", fmt.Errorf("could not decode image as jpg or png %s", err.Error())
+				return mediaType, fmt.Errorf("could not decode image as jpg or png %s", err.Error())
 			}
 		}
 		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
 		err = jpeg.Encode(buf, img, nil)
 		if err != nil {
-			return "", fmt.Errorf("could not encode image as jpeg: %s", err.Error())
+			return mediaType, fmt.Errorf("could not encode image as jpeg: %s", err.Error())
 		}
 		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	}
