@@ -3,7 +3,6 @@ package indexer
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -130,11 +129,18 @@ func (i *Indexer) Start() {
 	wp := workerpool.New(5)
 	mu := &sync.Mutex{}
 
+	events := make([]common.Hash, len(i.eventHashes))
+	for i, event := range i.eventHashes {
+		events[i] = common.HexToHash(string(event))
+	}
+
+	topics := [][]common.Hash{events}
+
 	go i.listenForNewBlocks()
 	for lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock) {
 		input := lastSyncedBlock
 		toQueue := func() {
-			i.startPipeline(input, mu)
+			i.startPipeline(input, mu, topics)
 		}
 		if wp.WaitingQueueSize() > 5 {
 			wp.SubmitWait(toQueue)
@@ -146,21 +152,22 @@ func (i *Indexer) Start() {
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	time.Sleep(time.Second)
-	i.startNewBlocksPipeline(lastSyncedBlock, mu)
+	i.startNewBlocksPipeline(lastSyncedBlock, mu, topics)
 }
 
-func (i *Indexer) startPipeline(start persist.BlockNumber, mu *sync.Mutex) {
+func (i *Indexer) startPipeline(start persist.BlockNumber, mu *sync.Mutex, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalanceChange)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []*transfer)
-	go i.processLogs(transfers, start)
+
+	go i.processLogs(transfers, start, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
 	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
 }
-func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mutex) {
+func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mutex, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalanceChange)
@@ -168,20 +175,13 @@ func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mut
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []*transfer)
 	subscriptions := make(chan types.Log)
-	go i.subscribeNewLogs(start, transfers, subscriptions)
+	go i.subscribeNewLogs(start, transfers, subscriptions, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
 	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
 }
 
-func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock persist.BlockNumber) {
+func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock persist.BlockNumber, topics [][]common.Hash) {
 	defer close(transfersChan)
-
-	events := make([]common.Hash, len(i.eventHashes))
-	for i, event := range i.eventHashes {
-		events[i] = common.HexToHash(string(event))
-	}
-
-	topics := [][]common.Hash{events}
 
 	curBlock := startingBlock.BigInt()
 	nextBlock := new(big.Int).Add(curBlock, big.NewInt(int64(blocksPerLogsCall)))
@@ -203,11 +203,21 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 
 	transfers := logsToTransfers(logsTo)
 
+	logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+
 	if len(transfers) > 0 && transfers != nil {
-		for j := 0; j < len(transfers); j += len(transfers) / 4 {
-			transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
+		logrus.Infof("Sending %d total transfers to transfers channel", len(transfers))
+		interval := len(transfers) / 4
+		for j := 0; j < len(transfers); j += interval {
+			to := j + interval
+			if to > len(transfers) {
+				to = len(transfers)
+			}
+			transfersChan <- transfers[j:to]
 		}
+
 	}
+	logrus.Info("Finished processing logs, closing transfers channel...")
 }
 
 func logsToTransfers(pLogs []types.Log) []*transfer {
@@ -293,10 +303,12 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 
 	wp := workerpool.New(20)
 
+	logrus.Info("Starting to process transfers...")
 	for transfers := range incomingTransfers {
 		if transfers == nil || len(transfers) == 0 {
 			continue
 		}
+
 		logrus.Infof("Processing %d transfers", len(transfers))
 		it := make([]*transfer, len(transfers))
 		copy(it, transfers)
@@ -304,8 +316,9 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 			processTransfers(i, it, uris, metadatas, owners, previousOwners, balances)
 		})
 	}
+	logrus.Info("Waiting for transfers to finish...")
 	wp.StopWait()
-	logrus.Info("Transfer channel closed")
+	logrus.Info("Closing field channels...")
 }
 
 func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
@@ -390,13 +403,15 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 		<-done
 	}
 
+	logrus.Info("Done recieving field data, convering fields into tokens...")
+
 	tokens := i.storedDataToTokens(ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap)
-	if tokens == nil {
+	if tokens == nil || len(tokens) == 0 {
+		logrus.Info("No tokens to process")
 		return
 	}
-	if len(tokens) == 0 {
-		return
-	}
+
+	logrus.Info("Created tokens to insert into database...")
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -712,16 +727,9 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 	return c
 }
 
-func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []*transfer, subscriptions chan types.Log) {
+func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []*transfer, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfers)
-
-	events := make([]common.Hash, len(i.eventHashes))
-	for i, event := range i.eventHashes {
-		events[i] = common.HexToHash(string(event))
-	}
-
-	topics := [][]common.Hash{events}
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: lastSyncedBlock.BigInt(),
