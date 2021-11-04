@@ -203,10 +203,11 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 
 	transfers := logsToTransfers(logsTo)
 
-	for j := 0; j < len(transfers); j += len(transfers) / 4 {
-		transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
+	if len(transfers) > 0 && transfers != nil {
+		for j := 0; j < len(transfers); j += len(transfers) / 4 {
+			transfersChan <- transfers[j:int(math.Min(float64(j+len(transfers)/4), float64(len(transfers))))]
+		}
 	}
-
 }
 
 func logsToTransfers(pLogs []types.Log) []*transfer {
