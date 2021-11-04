@@ -21,9 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// var defaultStartingBlock persist.BlockNumber = 6000000
-
-var defaultStartingBlock persist.BlockNumber = 13014050
+var defaultStartingBlock persist.BlockNumber = 5500000
 
 const blocksPerLogsCall = 80
 

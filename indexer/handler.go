@@ -119,12 +119,11 @@ func newEthClient() *ethclient.Client {
 
 func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 10)
+	sh.SetTimeout(time.Second * 15)
 	return sh
 }
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository) {
-
 	mgoClient := newMongoClient()
 	return mongodb.NewTokenMongoRepository(mgoClient), mongodb.NewContractMongoRepository(mgoClient)
 }

@@ -89,7 +89,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 		aeCtx := appengine.NewContext(c.Request)
 
 		if token != nil {
-			c.JSON(http.StatusOK, getTokenOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ethClient)[0]})
+			c.JSON(http.StatusOK, getTokenOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]})
 			return
 		}
 		tokens, err := getTokensFromDB(c, input, nftRepository)
@@ -102,7 +102,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 		if tokens != nil {
-			c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, tokens, nftRepository, ethClient)})
+			c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, tokens, nftRepository, ipfsClient, ethClient)})
 			return
 		}
 
@@ -155,7 +155,7 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ethClient)})
+		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient, ethClient)})
 	}
 }
 
@@ -174,7 +174,7 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ethClient)})
+		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient)})
 	}
 }
 
@@ -208,11 +208,11 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 	return true, nil
 }
 
-func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ethClient *ethclient.Client) []*persist.Token {
+func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.Token {
 	nftChan := make(chan *persist.Token)
 	for _, nft := range nfts {
 		go func(n *persist.Token) {
-			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, newIPFSShell(), ethClient)
+			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
@@ -234,11 +234,11 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	return nfts
 }
 
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ethClient *ethclient.Client) []*persist.TokenInCollection {
+func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.TokenInCollection {
 	nftChan := make(chan *persist.TokenInCollection)
 	for _, nft := range nfts {
 		go func(n *persist.TokenInCollection) {
-			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, newIPFSShell(), ethClient)
+			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
