@@ -208,6 +208,9 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 	if len(transfers) > 0 && transfers != nil {
 		logrus.Infof("Sending %d total transfers to transfers channel", len(transfers))
 		interval := len(transfers) / 4
+		if interval == 0 {
+			interval = 1
+		}
 		for j := 0; j < len(transfers); j += interval {
 			to := j + interval
 			if to > len(transfers) {
