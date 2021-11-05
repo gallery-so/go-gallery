@@ -22,7 +22,7 @@ import (
 
 var defaultStartingBlock persist.BlockNumber = 5500000
 
-const blocksPerLogsCall = 80
+const blocksPerLogsCall = 50
 
 // eventHash represents an event keccak256 hash
 type eventHash string
