@@ -9,6 +9,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -98,22 +99,28 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)
 	if err != nil {
-		if it, ok := err.(indexer.ErrHTTP); ok {
-			if it.Status == http.StatusNotFound {
+		switch err.(type) {
+		case indexer.ErrHTTP:
+			if err.(indexer.ErrHTTP).Status == http.StatusNotFound {
 				mediaType = persist.MediaTypeInvalid
 			}
-		} else {
+		case *net.DNSError:
+			mediaType = persist.MediaTypeInvalid
+		default:
 			return nil, err
 		}
 	}
 	if vURL != "" {
 		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient)
 		if err != nil {
-			if it, ok := err.(indexer.ErrHTTP); ok {
-				if it.Status == http.StatusNotFound {
+			switch err.(type) {
+			case indexer.ErrHTTP:
+				if err.(indexer.ErrHTTP).Status == http.StatusNotFound {
 					mediaType = persist.MediaTypeInvalid
 				}
-			} else {
+			case *net.DNSError:
+				mediaType = persist.MediaTypeInvalid
+			default:
 				return nil, err
 			}
 		}

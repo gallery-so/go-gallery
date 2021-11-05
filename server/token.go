@@ -24,6 +24,7 @@ type getTokensInput struct {
 	TokenID         persist.TokenID `form:"token_id"`
 	Page            int64           `form:"page"`
 	Limit           int64           `form:"limit"`
+	SkipMedia       bool            `form:"skip_media"`
 }
 
 type getTokensByUserIDInput struct {
@@ -89,7 +90,10 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 		aeCtx := appengine.NewContext(c.Request)
 
 		if token != nil {
-			c.JSON(http.StatusOK, getTokenOutput{Nft: ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]})
+			if !input.SkipMedia {
+				token = ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]
+			}
+			c.JSON(http.StatusOK, getTokenOutput{Nft: token})
 			return
 		}
 		tokens, err := getTokensFromDB(c, input, nftRepository)
@@ -102,11 +106,14 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 		if tokens != nil {
-			c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, tokens, nftRepository, ipfsClient, ethClient)})
+			if !input.SkipMedia {
+				tokens = ensureTokenMedia(aeCtx, tokens, nftRepository, ipfsClient, ethClient)
+			}
+			c.JSON(http.StatusOK, getTokensOutput{Nfts: tokens})
 			return
 		}
 
-		c.JSON(http.StatusNotFound, util.ErrorResponse{Error: "no tokens found"})
+		util.ErrResponse(c, http.StatusInternalServerError, fmt.Errorf("no tokens found"))
 	}
 }
 
@@ -278,18 +285,7 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not make previews for token")
 		} else {
-			if newMedia.MediaURL == "" {
-				if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
-					newMedia.MediaURL = it
-					newMedia.PreviewURL = it
-					newMedia.ThumbnailURL = it
-				}
-			} else {
-				media = *newMedia
-			}
-			if err != nil && newMedia.MediaURL != "" {
-				logrus.WithError(err).Error(errCouldNotMakeMedia{tokenID, contractAddress}.Error())
-			}
+			media = *newMedia
 		}
 	}
 	return media, metadata, tokenURI

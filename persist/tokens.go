@@ -65,8 +65,12 @@ const (
 	URITypeIPFSAPI URIType = "ipfs-api"
 	// URITypeBase64JSON represents a base64 encoded JSON document
 	URITypeBase64JSON URIType = "base64json"
+	// URITypeJSON represents a JSON document
+	URITypeJSON URIType = "json"
 	// URITypeBase64SVG represents a base64 encoded SVG
 	URITypeBase64SVG URIType = "base64svg"
+	// URITypeSVG represents an SVG
+	URITypeSVG URIType = "svg"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
 )
@@ -148,10 +152,10 @@ type Token struct {
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL string    `bson:"thumbnail_url" json:"thumbnail_url"`
-	PreviewURL   string    `bson:"preview_url" json:"preview_url"`
-	MediaURL     string    `bson:"media_url" json:"media_url"`
-	MediaType    MediaType `bson:"media_type" json:"media_type"`
+	ThumbnailURL string    `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
+	PreviewURL   string    `bson:"preview_url,omitempty" json:"preview_url"`
+	MediaURL     string    `bson:"media_url,omitempty" json:"media_url"`
+	MediaType    MediaType `bson:"media_type,omitempty" json:"media_type"`
 }
 
 // TokenInCollection represents a token within a collection
@@ -272,6 +276,10 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
 		return URITypeHTTP
+	case strings.HasPrefix(asString, "{"):
+		return URITypeJSON
+	case strings.HasPrefix(asString, "<svg"):
+		return URITypeSVG
 	default:
 		return URITypeUnknown
 	}

@@ -1,13 +1,13 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -106,7 +106,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 	asString := turi.String()
 
 	switch turi.Type() {
-	case persist.URITypeBase64JSON:
+	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
 		// decode the base64 encoded json
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
@@ -125,11 +125,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		defer it.Close()
 
-		bytes, err := ioutil.ReadAll(it)
-		if err != nil {
+		buf := &bytes.Buffer{}
+		if _, err = io.Copy(buf, it); err != nil {
 			return nil, err
 		}
-		return bytes, nil
+
+		return buf.Bytes(), nil
 	case persist.URITypeHTTP:
 		var body io.Reader
 		if strings.Contains(asString, "ipfs/") {
@@ -151,12 +152,13 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			}
 			body = resp.Body
 		}
-		bytes, err := ioutil.ReadAll(body)
-		if err != nil {
+
+		buf := &bytes.Buffer{}
+		if _, err := io.Copy(buf, body); err != nil {
 			return nil, err
 		}
 
-		return bytes, nil
+		return buf.Bytes(), nil
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
@@ -168,12 +170,14 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 		defer it.Close()
-		bytes, err := ioutil.ReadAll(it)
-		if err != nil {
+		buf := &bytes.Buffer{}
+		if _, err = io.Copy(buf, it); err != nil {
 			return nil, err
 		}
 
-		return bytes, nil
+		return buf.Bytes(), nil
+	case persist.URITypeJSON, persist.URITypeSVG:
+		return []byte(asString), nil
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
