@@ -196,7 +196,8 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 		Topics:    topics,
 	})
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Error("Error getting logs")
+		return
 	}
 
 	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
