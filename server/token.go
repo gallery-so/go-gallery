@@ -224,14 +224,14 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
 			nftChan <- n
-			go func(nm *persist.Token) {
+			go func(id persist.DBID) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
-				err := tokenRepo.UpdateByIDUnsafe(ctx, nm.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
+				err := tokenRepo.UpdateByIDUnsafe(ctx, id, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
 				if err != nil {
-					logrus.WithError(err).Error(errCouldNotUpdateMedia{nm.ID}.Error())
+					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
 				}
-			}(n)
+			}(n.ID)
 		}(nft)
 	}
 	for i := 0; i < len(nfts); i++ {
@@ -250,14 +250,14 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
 			nftChan <- n
-			go func(nm *persist.TokenInCollection) {
+			go func(id persist.DBID) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
-				err := tokenRepo.UpdateByIDUnsafe(ctx, nm.ID, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
+				err := tokenRepo.UpdateByIDUnsafe(ctx, id, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
 				if err != nil {
-					logrus.WithError(err).Error(errCouldNotUpdateMedia{nm.ID}.Error())
+					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
 				}
-			}(n)
+			}(n.ID)
 		}(nft)
 	}
 	for i := 0; i < len(nfts); i++ {
@@ -269,24 +269,32 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 
 func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
 	if tokenURI == "" {
-		if uri, err := indexer.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient); err != nil {
+		logrus.Infof("Token URI is empty for token %s-%s", contractAddress, id)
+		uri, err := indexer.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
+		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not get token URI for token")
-		} else {
-			tokenURI = uri
+			return media, metadata, tokenURI
 		}
+		tokenURI = uri
+
 	}
 	if metadata == nil || len(metadata) == 0 {
-		if m, err := indexer.GetMetadataFromURI(ctx, tokenURI, ipfsClient); err == nil {
-			metadata = m
+		logrus.Infof("Token metadata is empty for token %s-%s", contractAddress, id)
+		m, err := indexer.GetMetadataFromURI(ctx, tokenURI, ipfsClient)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"uri": tokenURI}).Error("could not get metadata for token")
+			return media, metadata, tokenURI
 		}
+		metadata = m
 	}
 	if media.MediaType == "" {
+		logrus.Infof("Token media type is empty for token %s-%s", contractAddress, id)
 		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not make previews for token")
-		} else {
-			media = *newMedia
+			return media, metadata, tokenURI
 		}
+		media = *newMedia
 	}
 	return media, metadata, tokenURI
 }

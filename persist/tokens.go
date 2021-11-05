@@ -189,6 +189,7 @@ type TokenUpdateInfoInput struct {
 type TokenUpdateMediaInput struct {
 	Media    Media         `bson:"media" json:"media"`
 	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
+	TokenURI TokenURI      `bson:"token_uri" json:"token_uri"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
