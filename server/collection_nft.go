@@ -28,10 +28,11 @@ type collectionGetOutput struct {
 }
 
 type collectionCreateInput struct {
-	GalleryID      persist.DBID   `json:"gallery_id" binding:"required"`
-	Nfts           []persist.DBID `json:"nfts" binding:"required"`
-	Name           string         `json:"name"`
-	CollectorsNote string         `json:"collectors_note"`
+	GalleryID      persist.DBID        `json:"gallery_id" binding:"required"`
+	Nfts           []persist.DBID      `json:"nfts" binding:"required"`
+	Layout         persist.TokenLayout `json:"layout"`
+	Name           string              `json:"name"`
+	CollectorsNote string              `json:"collectors_note"`
 }
 
 type collectionUpdateInfoByIDInput struct {
@@ -45,8 +46,9 @@ type collectionUpdateHiddenByIDInput struct {
 	Hidden bool         `json:"hidden"`
 }
 type collectionUpdateNftsByIDInput struct {
-	ID   persist.DBID   `json:"id" binding:"required"`
-	Nfts []persist.DBID `json:"nfts" binding:"required"`
+	ID     persist.DBID        `json:"id" binding:"required"`
+	Nfts   []persist.DBID      `json:"nfts" binding:"required"`
+	Layout persist.TokenLayout `json:"layout"`
 }
 
 type collectionCreateOutput struct {
@@ -218,10 +220,15 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 
 		// ensure that there are no repeat NFTs
 		withNoRepeats := uniqueDBID(input.Nfts)
+		layout, err := persist.ValidateLayout(input.Layout)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
 
-		update := &persist.CollectionUpdateNftsInput{Nfts: withNoRepeats}
+		update := &persist.CollectionUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
 
-		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
+		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -234,7 +241,6 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 					backupRepository.Insert(ctx, gallery)
 				}
 			}
-
 		}(c.Copy())
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -272,9 +278,14 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	pUserID persist.DBID,
 	collectionsRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) (persist.DBID, error) {
 
+	layout, err := persist.ValidateLayout(pInput.Layout)
+	if err != nil {
+		return "", err
+	}
 	coll := &persist.CollectionDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
+		Layout:         layout,
 		Name:           sanitizationPolicy.Sanitize(pInput.Name),
 		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}

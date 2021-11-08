@@ -15,6 +15,8 @@ type CollectionDB struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
+	Layout TokenLayout `bson:"layout" json:"layout"`
+
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"owner_user_id"`
@@ -35,6 +37,8 @@ type Collection struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
+	Layout TokenLayout `bson:"layout" json:"layout"`
+
 	Name           string           `bson:"name"          json:"name"`
 	CollectorsNote string           `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    string           `bson:"owner_user_id" json:"owner_user_id"`
@@ -52,7 +56,8 @@ type CollectionUpdateInfoInput struct {
 
 // CollectionUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateNftsInput struct {
-	Nfts []DBID `bson:"nfts" json:"nfts"`
+	Nfts   []DBID      `bson:"nfts" json:"nfts"`
+	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
