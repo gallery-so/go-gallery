@@ -41,7 +41,7 @@ func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				c.Set(userIDcontextKey, authHeaders[1])
+				c.Set(userIDcontextKey, persist.DBID(authHeaders[1]))
 				c.Next()
 				return
 			}
@@ -99,7 +99,7 @@ func jwtOptional() gin.HandlerFunc {
 			authHeaders := strings.Split(header, " ")
 			if len(authHeaders) == 2 {
 				if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-					c.Set(userIDcontextKey, authHeaders[1])
+					c.Set(userIDcontextKey, persist.DBID(authHeaders[1]))
 					c.Next()
 					return
 				}
