@@ -86,6 +86,7 @@ func setDefaults() {
 	viper.SetDefault("CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-mainnet.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
 	viper.SetDefault("REQUIRE_NFTS", false)
+	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 
 	viper.AutomaticEnv()
 }

@@ -40,6 +40,11 @@ func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
+			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
+				c.Set(userIDcontextKey, authHeaders[1])
+				c.Next()
+				return
+			}
 			if authHeaders[0] != "Bearer" {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
 				return
@@ -93,6 +98,11 @@ func jwtOptional() gin.HandlerFunc {
 		if header != "" {
 			authHeaders := strings.Split(header, " ")
 			if len(authHeaders) == 2 {
+				if authHeaders[0] == viper.GetString("ADMIN_PASS") {
+					c.Set(userIDcontextKey, authHeaders[1])
+					c.Next()
+					return
+				}
 				// get string after "Bearer"
 				jwt := authHeaders[1]
 				valid, userID, _ := authJwtParse(jwt, viper.GetString("JWT_SECRET"))
