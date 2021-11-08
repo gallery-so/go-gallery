@@ -55,31 +55,14 @@ func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenR
 
 func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		total, err := tokenRepository.Count(context.Background(), persist.CountTypeTotal)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-		mostRecent, err := tokenRepository.MostRecentBlock(context.Background())
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-		noMetadata, err := tokenRepository.Count(context.Background(), persist.CountTypeNoMetadata)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-		erc721, err := tokenRepository.Count(context.Background(), persist.CountTypeERC721)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-		erc1155, err := tokenRepository.Count(context.Background(), persist.CountTypeERC1155)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-			return
-		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		total, _ := tokenRepository.Count(ctx, persist.CountTypeTotal)
+		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
+		noMetadata, _ := tokenRepository.Count(ctx, persist.CountTypeNoMetadata)
+		erc721, _ := tokenRepository.Count(ctx, persist.CountTypeERC721)
+		erc1155, _ := tokenRepository.Count(ctx, persist.CountTypeERC1155)
+
 		c.JSON(http.StatusOK, gin.H{
 			"total_tokens": total,
 			"recent_block": i.mostRecentBlock,
