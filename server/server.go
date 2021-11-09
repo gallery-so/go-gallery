@@ -89,6 +89,10 @@ func setDefaults() {
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 
 	viper.AutomaticEnv()
+
+	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
+		panic("ADMIN_PASS must be set")
+	}
 }
 
 func newRepos() *repositories {
