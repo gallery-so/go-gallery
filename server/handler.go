@@ -99,6 +99,7 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(repos.userRepository, ethClient, requiredNFTs), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	parent.GET("/health", healthcheck())
+	parent.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }
 
@@ -141,5 +142,6 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(repos.userRepository, ethClient, requiredNFTs), refreshUnassignedNftsForUser(repos.collectionRepository))
 
 	parent.GET("/health", healthcheck())
+	parent.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }

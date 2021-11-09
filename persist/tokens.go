@@ -292,8 +292,21 @@ func (id TokenID) String() string {
 
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
-	i, _ := new(big.Int).SetString(id.String(), 16)
+	i, ok := new(big.Int).SetString(id.String(), 16)
+	if !ok {
+		i, _ = new(big.Int).SetString(id.String(), 10)
+	}
 	return i
+}
+
+// Base10String returns the token ID as a base 10 string
+func (id TokenID) Base10String() string {
+	return id.BigInt().String()
+}
+
+// Base10Int returns the token ID as a base 10 integer
+func (id TokenID) Base10Int() int64 {
+	return id.BigInt().Int64()
 }
 
 func (hex HexString) String() string {
