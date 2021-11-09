@@ -38,6 +38,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.POST("/update/addresses/remove", jwtRequired(repos.userRepository, ethClient, requiredNFTs), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
 	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository))
+	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }
 
@@ -59,6 +60,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.POST("/update/addresses/remove", jwtRequired(repos.userRepository, ethClient, requiredNFTs), removeAddresses(repos.userRepository, repos.collectionRepository))
 	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository))
+	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }
 
@@ -99,7 +101,6 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(repos.userRepository, ethClient, requiredNFTs), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	parent.GET("/health", healthcheck())
-	parent.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }
 
@@ -142,6 +143,5 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.POST("/unassigned/refresh", jwtRequired(repos.userRepository, ethClient, requiredNFTs), refreshUnassignedNftsForUser(repos.collectionRepository))
 
 	parent.GET("/health", healthcheck())
-	parent.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 
 }

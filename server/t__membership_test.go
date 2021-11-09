@@ -33,7 +33,7 @@ func TestMembership_Success(t *testing.T) {
 func membershipRequest(assert *assert.Assertions) *http.Response {
 
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/membership", tc.serverURL),
+		fmt.Sprintf("%s/users/membership", tc.serverURL),
 		nil)
 	assert.Nil(err)
 	client := &http.Client{
