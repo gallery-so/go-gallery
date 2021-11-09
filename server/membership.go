@@ -34,7 +34,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 				}
 			}
 			if !updatedRecently {
-				go updateMembershipTiers(c, membershipRepository, userRepository, ethClient)
+				go updateMembershipTiers(c.Copy(), membershipRepository, userRepository, ethClient)
 			}
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
