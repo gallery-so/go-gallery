@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -26,6 +28,8 @@ var errInvalidJWT = errors.New("invalid JWT")
 var errRateLimited = errors.New("rate limited")
 
 var errInvalidAuthHeader = errors.New("invalid auth header format")
+
+var mixpanelDistinctIDs = map[string]string{}
 
 type errUserDoesNotHaveRequiredNFT struct {
 	addresses []persist.Address
@@ -150,6 +154,50 @@ func handleCORS() gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+func mixpanelTrack(eventName string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		go func(ctx *gin.Context) {
+			var distinctID string
+			userID, ok := ctx.Get(userIDcontextKey)
+			if ok {
+				distinctID = string(userID.(persist.DBID))
+			} else {
+				uniqueID, ok := mixpanelDistinctIDs[c.ClientIP()]
+				if !ok {
+					distinctID = uuid.New().String()
+					mixpanelDistinctIDs[c.ClientIP()] = distinctID
+				} else {
+					distinctID = uniqueID
+				}
+			}
+
+			vals := url.Values{}
+			vals.Set("data", fmt.Sprintf(`{"event": "%s", "properties": {"token": "%s", "distinct_id": "%s", "ip": "%s", "params": "%s"}`, eventName, viper.GetString("MIXPANEL_TOKEN"), distinctID, c.ClientIP(), c.Params))
+			payload := strings.NewReader(vals.Encode())
+
+			req, err := http.NewRequest(http.MethodPost, viper.GetString("MIXPANEL_API_URL"), payload)
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
+			}
+
+			req.Header.Add("Accept", "text/plain")
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
+			}
+			defer res.Body.Close()
+			if res.StatusCode != http.StatusOK {
+				logrus.WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName, "Status": res.Status}).Error("error tracking mixpanel event")
+			}
+
+		}(c.Copy())
+
 	}
 }
 
