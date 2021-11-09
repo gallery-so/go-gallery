@@ -32,10 +32,11 @@ type collectionGetOutputtoken struct {
 }
 
 type collectionCreateInputToken struct {
-	GalleryID      persist.DBID   `json:"gallery_id" binding:"required"`
-	Nfts           []persist.DBID `json:"nfts" binding:"required"`
-	Name           string         `json:"name"`
-	CollectorsNote string         `json:"collectors_note"`
+	GalleryID      persist.DBID        `json:"gallery_id" binding:"required"`
+	Nfts           []persist.DBID      `json:"nfts" binding:"required"`
+	Layout         persist.TokenLayout `json:"layout" `
+	Name           string              `json:"name"`
+	CollectorsNote string              `json:"collectors_note"`
 }
 
 type collectionUpdateInfoByIDInputToken struct {
@@ -49,8 +50,9 @@ type collectionUpdateHiddenByIDInputToken struct {
 	Hidden bool         `json:"hidden"`
 }
 type collectionUpdateNftsByIDInputToken struct {
-	ID   persist.DBID   `json:"id" binding:"required"`
-	Nfts []persist.DBID `json:"nfts" binding:"required"`
+	ID     persist.DBID        `json:"id" binding:"required"`
+	Nfts   []persist.DBID      `json:"nfts" binding:"required"`
+	Layout persist.TokenLayout `json:"layout"`
 }
 
 type collectionCreateOutputToken struct {
@@ -232,9 +234,15 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 		// ensure that there are no repeat NFTs
 		withNoRepeats := uniqueDBID(input.Nfts)
 
-		update := &persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats}
+		layout, err := persist.ValidateLayout(input.Layout)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
 
-		err := collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
+		update := &persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+
+		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -275,10 +283,15 @@ func collectionCreateDbToken(pCtx context.Context, pInput *collectionCreateInput
 	pUserID persist.DBID,
 	collectionsRepo persist.CollectionTokenRepository, galleryRepo persist.GalleryTokenRepository) (persist.DBID, error) {
 
+	layout, err := persist.ValidateLayout(pInput.Layout)
+	if err != nil {
+		return "", err
+	}
 	coll := &persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
 		Name:           sanitizationPolicy.Sanitize(pInput.Name),
+		Layout:         layout,
 		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 

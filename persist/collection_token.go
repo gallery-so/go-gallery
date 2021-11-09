@@ -16,7 +16,7 @@ type CollectionTokenDB struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	GalleryID DBID `bson:"gallery_id" json:"gallery_id"`
+	Layout TokenLayout `bson:"layout" json:"layout"`
 
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
@@ -38,6 +38,8 @@ type CollectionToken struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
+	Layout TokenLayout `bson:"layout" json:"layout"`
+
 	Name           string               `bson:"name"          json:"name"`
 	CollectorsNote string               `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    string               `bson:"owner_user_id" json:"owner_user_id"`
@@ -45,6 +47,13 @@ type CollectionToken struct {
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
+}
+
+// TokenLayout defines the layout of a collection of tokens
+type TokenLayout struct {
+	Columns int `bson:"columns" json:"columns"`
+	// Padding         int   `bson:"padding" json:"padding"`
+	// WhitespaceAfter []int `bson:"whitespace_after" json:"whitespace_after"`
 }
 
 // CollectionTokenUpdateInfoInput represents the data that will be changed when updating a collection's metadata
@@ -55,7 +64,8 @@ type CollectionTokenUpdateInfoInput struct {
 
 // CollectionTokenUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionTokenUpdateNftsInput struct {
-	Nfts []DBID `bson:"nfts" json:"nfts"`
+	Nfts   []DBID      `bson:"nfts" json:"nfts"`
+	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
 // CollectionTokenUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
@@ -89,6 +99,27 @@ type ErrCollectionNotFoundByID struct {
 	ID DBID
 }
 
+// ErrInvalidLayout is returned when a layout is invalid
+type ErrInvalidLayout struct {
+	Layout TokenLayout
+	Reason string
+}
+
 func (e ErrCollectionNotFoundByID) Error() string {
 	return fmt.Sprintf("collection not found by id: %s", e.ID)
+}
+
+func (e ErrInvalidLayout) Error() string {
+	return fmt.Sprintf("invalid layout: %s - %+v", e.Reason, e.Layout)
+}
+
+// ValidateLayout ensures a layout is within constraints and if has unset properties, sets their defaults
+func ValidateLayout(layout TokenLayout) (TokenLayout, error) {
+	if layout.Columns < 0 || layout.Columns > 6 {
+		return TokenLayout{}, ErrInvalidLayout{Layout: layout, Reason: "columns must be between 0-6"}
+	}
+	if layout.Columns == 0 {
+		layout.Columns = 3
+	}
+	return layout, nil
 }
