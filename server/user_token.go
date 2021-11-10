@@ -13,6 +13,10 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+const (
+	analyticsKeyUserUpdateWithBio = "updated_bio"
+)
+
 var bannedUsernames = map[string]bool{
 	"password":      true,
 	"auth":          true,
@@ -164,6 +168,11 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+
+		// store if user included bio in request in the context for the analytics middleware
+		if input.BioStr != "" {
+			c.Set(analyticsKeyUserUpdateWithBio, true)
+		}
 	}
 }
 

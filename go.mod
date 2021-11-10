@@ -8,11 +8,13 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/dukex/mixpanel v0.0.0-20180925151559-f8d5594f958e
 	github.com/ethereum/go-ethereum v1.10.11
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gin-gonic/gin v1.7.4
 	github.com/go-playground/validator/v10 v10.9.0
 	github.com/go-redis/redis/v8 v8.11.4
+	github.com/google/uuid v1.1.5
 	github.com/gorilla/websocket v1.4.2
 	github.com/ipfs/go-ipfs-api v0.2.0
 	github.com/mattn/go-isatty v0.0.14 // indirect
