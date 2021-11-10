@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -113,7 +114,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(errInvalidAuthHeader.Error(), body.Error)
+	assert.Equal(middleware.ErrInvalidAuthHeader.Error(), body.Error)
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {

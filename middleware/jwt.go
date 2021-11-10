@@ -1,12 +1,10 @@
-package server
+package middleware
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/spf13/viper"
 )
@@ -14,23 +12,6 @@ import (
 type jwtClaims struct {
 	UserID persist.DBID `json:"user_id"`
 	jwt.StandardClaims
-}
-
-type jwtValidateResponse struct {
-	IsValid bool         `json:"valid"`
-	UserID  persist.DBID `json:"user_id"`
-}
-
-func validateJwt() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth := c.GetBool(authContextKey)
-		userID := getUserIDfromCtx(c)
-
-		c.JSON(http.StatusOK, jwtValidateResponse{
-			IsValid: auth,
-			UserID:  userID,
-		})
-	}
 }
 
 func authJwtParse(pJWTtokenStr string,
@@ -48,13 +29,14 @@ func authJwtParse(pJWTtokenStr string,
 	}
 
 	if !JWTtoken.Valid {
-		return false, "", errInvalidJWT
+		return false, "", ErrInvalidJWT
 	}
 
 	return true, claims.UserID, nil
 }
 
-func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
+// JWTGenerate generates a JWT token for the given userID
+func JWTGenerate(pCtx context.Context, pUserID persist.DBID) (string, error) {
 
 	issuer := "gallery"
 	jwtTokenStr, err := jwtGenerate(issuer, pUserID)

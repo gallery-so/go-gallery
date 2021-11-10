@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/indexer"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -126,7 +127,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -169,7 +170,7 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -188,7 +189,7 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 func refreshUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
 			return

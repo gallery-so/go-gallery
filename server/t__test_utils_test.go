@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
@@ -47,7 +48,7 @@ func generateTestUser(repos *repositories, username string) *TestUser {
 	if err != nil {
 		log.Fatal(err)
 	}
-	jwt, err := jwtGeneratePipeline(ctx, id)
+	jwt, err := middleware.JWTGenerate(ctx, id)
 	if err != nil {
 		log.Fatal(err)
 	}

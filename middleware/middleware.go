@@ -1,4 +1,4 @@
-package server
+package middleware
 
 import (
 	"errors"
@@ -15,38 +15,44 @@ import (
 )
 
 const (
-	userIDcontextKey = "user_id"
-	authContextKey   = "authenticated"
+	// UserIDContextKey is the key for retrieving the user id from the context
+	UserIDContextKey = "user_id"
+	// AuthContextKey is the key for retrieving the auth status from the context
+	AuthContextKey = "authenticated"
 )
 
 var rateLimiter = newIPRateLimiter(1, 5)
 
-var errInvalidJWT = errors.New("invalid JWT")
+// ErrInvalidJWT is returned when the JWT is invalid
+var ErrInvalidJWT = errors.New("invalid JWT")
 
-var errRateLimited = errors.New("rate limited")
+// ErrRateLimited is returned when the request is rate limited
+var ErrRateLimited = errors.New("rate limited")
 
-var errInvalidAuthHeader = errors.New("invalid auth header format")
+// ErrInvalidAuthHeader is returned when the auth header is invalid
+var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 
 type errUserDoesNotHaveRequiredNFT struct {
 	addresses []persist.Address
 }
 
-func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
+// JWTRequired is a middleware that requires a JWT to be present in the request
+func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
 			return
 		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				c.Set(userIDcontextKey, persist.DBID(authHeaders[1]))
+				c.Set(UserIDContextKey, persist.DBID(authHeaders[1]))
 				c.Next()
 				return
 			}
 			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
 				return
 			}
 			// get string after "Bearer"
@@ -60,7 +66,7 @@ func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 			}
 
 			if !valid {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: errInvalidJWT.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidJWT.Error()})
 				return
 			}
 
@@ -83,55 +89,59 @@ func jwtRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 				}
 			}
 
-			c.Set(userIDcontextKey, userID)
+			c.Set(UserIDContextKey, userID)
 		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errInvalidAuthHeader.Error()})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
 			return
 		}
 		c.Next()
 	}
 }
 
-func jwtOptional() gin.HandlerFunc {
+// JWTOptional is a middleware that will detect if a JWT is present in the request
+// and store the user id in the context if it is
+func JWTOptional() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header != "" {
 			authHeaders := strings.Split(header, " ")
 			if len(authHeaders) == 2 {
 				if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-					c.Set(userIDcontextKey, persist.DBID(authHeaders[1]))
+					c.Set(UserIDContextKey, persist.DBID(authHeaders[1]))
 					c.Next()
 					return
 				}
 				// get string after "Bearer"
 				jwt := authHeaders[1]
 				valid, userID, _ := authJwtParse(jwt, viper.GetString("JWT_SECRET"))
-				c.Set(authContextKey, valid)
-				c.Set(userIDcontextKey, userID)
+				c.Set(AuthContextKey, valid)
+				c.Set(UserIDContextKey, userID)
 			} else {
-				c.Set(authContextKey, false)
-				c.Set(userIDcontextKey, persist.DBID(""))
+				c.Set(AuthContextKey, false)
+				c.Set(UserIDContextKey, persist.DBID(""))
 			}
 		} else {
-			c.Set(authContextKey, false)
-			c.Set(userIDcontextKey, persist.DBID(""))
+			c.Set(AuthContextKey, false)
+			c.Set(UserIDContextKey, persist.DBID(""))
 		}
 		c.Next()
 	}
 }
 
-func rateLimited() gin.HandlerFunc {
+// RateLimited is a middleware that will rate limit requests based on IP address
+func RateLimited() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limiter := rateLimiter.getLimiter(c.ClientIP())
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errRateLimited.Error()})
+			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: ErrRateLimited.Error()})
 			return
 		}
 		c.Next()
 	}
 }
 
-func handleCORS() gin.HandlerFunc {
+// CORS is a middleware that will allow CORS requests
+func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestOrigin := c.Request.Header.Get("Origin")
 		allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
@@ -153,7 +163,8 @@ func handleCORS() gin.HandlerFunc {
 	}
 }
 
-func errLogger() gin.HandlerFunc {
+// ErrLogger is a middleware that will log errors that are returned by requests
+func ErrLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		if len(c.Errors) > 0 {
@@ -162,8 +173,9 @@ func errLogger() gin.HandlerFunc {
 	}
 }
 
-func getUserIDfromCtx(c *gin.Context) persist.DBID {
-	return c.MustGet(userIDcontextKey).(persist.DBID)
+// GetUserIDFromCtx is a helper function that will return the user id from the context and panic if it does not exist
+func GetUserIDFromCtx(c *gin.Context) persist.DBID {
+	return c.MustGet(UserIDContextKey).(persist.DBID)
 }
 
 func (e errUserDoesNotHaveRequiredNFT) Error() string {

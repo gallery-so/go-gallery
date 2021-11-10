@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -124,7 +125,7 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -227,7 +228,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -254,7 +255,7 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -307,7 +308,7 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 
 	output.UserID = userID
 
-	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := middleware.JWTGenerate(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}

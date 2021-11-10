@@ -11,6 +11,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"google.golang.org/appengine"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -80,7 +81,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		auth := userID == input.UserID
 		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
@@ -108,7 +109,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := c.GetBool(middleware.AuthContextKey)
 		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -138,7 +139,7 @@ func createCollectionToken(collectionsRepository persist.CollectionTokenReposito
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -167,7 +168,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -193,7 +194,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -225,7 +226,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -260,7 +261,7 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
