@@ -49,6 +49,8 @@ type openseaAsset struct {
 	AnimationURL         string `json:"animation_url"`
 	AnimationOriginalURL string `json:"animation_original_url"`
 
+	Orders []openseaOrder `json:"orders"`
+
 	AcquisitionDateStr string `json:"acquisition_date"`
 }
 
@@ -57,6 +59,7 @@ type openseaEvents struct {
 }
 type openseaEvent struct {
 	Asset       openseaAsset   `json:"asset"`
+	FromAccount openseaAccount `json:"from_account"`
 	ToAccount   openseaAccount `json:"to_account"`
 	CreatedDate string         `json:"created_date"`
 }
@@ -72,6 +75,11 @@ type openseaUser struct {
 
 type openseaCollection struct {
 	Name string `json:"name"`
+}
+
+type openseaOrder struct {
+	Maker openseaAccount `json:"maker"`
+	Taker openseaAccount `json:"taker"`
 }
 
 type errNoNFTForTokenIdentifiers struct {

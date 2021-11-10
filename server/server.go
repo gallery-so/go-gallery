@@ -39,6 +39,7 @@ type repositories struct {
 	accountRepository         persist.AccountRepository
 	contractRepository        persist.ContractRepository
 	backupRepository          persist.BackupRepository
+	membershipRepository      persist.MembershipRepository
 }
 
 // Init initializes the server
@@ -116,6 +117,7 @@ func newRepos() *repositories {
 		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
 		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
 		backupRepository:          mongodb.NewBackupMongoRepository(mgoClient),
+		membershipRepository:      mongodb.NewMembershipMongoRepository(mgoClient),
 	}
 }
 

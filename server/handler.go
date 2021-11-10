@@ -38,6 +38,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.POST("/update/addresses/add", mixpanelTrack("User Add Addresses", nil), jwtRequired(repos.userRepository, ethClient, requiredNFTs), addUserAddress(repos.userRepository, repos.nonceRepository))
 	usersGroup.POST("/update/addresses/remove", mixpanelTrack("User Remove Addresses", nil), jwtRequired(repos.userRepository, ethClient, requiredNFTs), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
 	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
+	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 	usersGroup.POST("/create", mixpanelTrack("User Create", nil), createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository))
 
 }
@@ -59,6 +60,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.POST("/update/addresses/add", mixpanelTrack("User Add Addresses", nil), jwtRequired(repos.userRepository, ethClient, requiredNFTs), addUserAddress(repos.userRepository, repos.nonceRepository))
 	usersGroup.POST("/update/addresses/remove", mixpanelTrack("User Remove Addresses", nil), jwtRequired(repos.userRepository, ethClient, requiredNFTs), removeAddresses(repos.userRepository, repos.collectionRepository))
 	usersGroup.GET("/get", jwtOptional(), getUser(repos.userRepository))
+	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
 	usersGroup.POST("/create", mixpanelTrack("User Create", nil), createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository))
 
 }
