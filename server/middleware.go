@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -157,46 +158,66 @@ func handleCORS() gin.HandlerFunc {
 	}
 }
 
-func mixpanelTrack(eventName string) gin.HandlerFunc {
+func mixpanelTrack(eventName string, keys []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
-		go func(ctx *gin.Context) {
-			var distinctID string
-			userID, ok := ctx.Get(userIDcontextKey)
-			if ok {
-				distinctID = string(userID.(persist.DBID))
+		var distinctID string
+		userID, ok := c.Get(userIDcontextKey)
+		if ok {
+			distinctID = string(userID.(persist.DBID))
+		} else {
+			uniqueID, ok := mixpanelDistinctIDs[c.ClientIP()]
+			if !ok {
+				distinctID = uuid.New().String()
+				mixpanelDistinctIDs[c.ClientIP()] = distinctID
 			} else {
-				uniqueID, ok := mixpanelDistinctIDs[c.ClientIP()]
-				if !ok {
-					distinctID = uuid.New().String()
-					mixpanelDistinctIDs[c.ClientIP()] = distinctID
-				} else {
-					distinctID = uniqueID
+				distinctID = uniqueID
+			}
+		}
+
+		vals := url.Values{}
+		data := map[string]interface{}{
+			"event": eventName,
+			"properties": map[string]interface{}{
+				"distinct_id": distinctID,
+				"ip":          c.ClientIP(),
+				"params":      c.Params,
+			},
+		}
+		if keys != nil {
+			for _, key := range keys {
+				val := c.Value(key)
+				if val != nil {
+					data["properties"].(map[string]interface{})[key] = val
 				}
 			}
+		}
+		marshalled, err := json.Marshal(data)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
+			return
+		}
+		vals.Set("data", string(marshalled))
+		payload := strings.NewReader(vals.Encode())
+		req, err := http.NewRequest(http.MethodPost, viper.GetString("MIXPANEL_API_URL"), payload)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
+			return
+		}
 
-			vals := url.Values{}
-			vals.Set("data", fmt.Sprintf(`{"event": "%s", "properties": {"token": "%s", "distinct_id": "%s", "ip": "%s", "params": "%s"}`, eventName, viper.GetString("MIXPANEL_TOKEN"), distinctID, c.ClientIP(), c.Params))
-			payload := strings.NewReader(vals.Encode())
+		req.Header.Add("Accept", "text/plain")
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-			req, err := http.NewRequest(http.MethodPost, viper.GetString("MIXPANEL_API_URL"), payload)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
-			}
-
-			req.Header.Add("Accept", "text/plain")
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-			res, err := http.DefaultClient.Do(req)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
-			}
-			defer res.Body.Close()
-			if res.StatusCode != http.StatusOK {
-				logrus.WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName, "Status": res.Status}).Error("error tracking mixpanel event")
-			}
-
-		}(c.Copy())
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
+			return
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			logrus.WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName, "Status": res.Status}).Error("error tracking mixpanel event")
+			return
+		}
 
 	}
 }
