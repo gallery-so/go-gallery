@@ -169,10 +169,6 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
-		// store if user included bio in request in the context for the analytics middleware
-		if input.BioStr != "" {
-			c.Set(analyticsKeyUserUpdateWithBio, true)
-		}
 	}
 }
 
