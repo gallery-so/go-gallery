@@ -121,17 +121,12 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 
 	// update other user's collections and this user's collection so that they and ONLY they can display these
 	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
-	// go func() {
-	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, &persist.CollectionUpdateNftsInput{Nfts: ids}); err != nil {
-		logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to claim nfts: %v", err)
-		return nil, err
-	}
-	// }()
-
-	// updatedNfts, err := openseaSyncHistories(pCtx, asDBNfts, userRepo, nftRepo, historyRepo)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	go func() {
+		if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, &persist.CollectionUpdateNftsInput{Nfts: ids}); err != nil {
+			logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to claim nfts: %v", err)
+			return
+		}
+	}()
 
 	result, err := dbToGalleryNFTs(pCtx, asDBNfts, user, nftRepo)
 	if err != nil {

@@ -44,6 +44,18 @@ func (c *Clients) Set(pCtx context.Context, r DB, key string, value interface{},
 	}
 }
 
+// SetMap sets a map value in the redis cache
+func (c *Clients) SetMap(pCtx context.Context, r DB, key string, value map[string]interface{}, expiration time.Duration) error {
+	switch r {
+	case OpenseaRDB:
+		return c.openseaClient.HSet(pCtx, key, value, expiration).Err()
+	case CollUnassignedRDB:
+		return c.unassignedClient.HSet(pCtx, key, value, expiration).Err()
+	default:
+		return errors.New("unknown redis database")
+	}
+}
+
 // SetKeepTTL sets a value in the redis cache without resetting TTL
 func (c *Clients) SetKeepTTL(pCtx context.Context, r DB, key string, value interface{}) error {
 	switch r {
@@ -56,6 +68,18 @@ func (c *Clients) SetKeepTTL(pCtx context.Context, r DB, key string, value inter
 	}
 }
 
+// SetMapKeepTTL sets a map value in the redis cache and ensures TTL lives on
+func (c *Clients) SetMapKeepTTL(pCtx context.Context, r DB, key string, value map[string]interface{}, expiration time.Duration) error {
+	switch r {
+	case OpenseaRDB:
+		return c.openseaClient.HSet(pCtx, key, value, redis.KeepTTL).Err()
+	case CollUnassignedRDB:
+		return c.unassignedClient.HSet(pCtx, key, value, redis.KeepTTL).Err()
+	default:
+		return errors.New("unknown redis database")
+	}
+}
+
 // Get gets a value from the redis cache
 func (c *Clients) Get(pCtx context.Context, r DB, key string) (string, error) {
 	switch r {
@@ -63,6 +87,18 @@ func (c *Clients) Get(pCtx context.Context, r DB, key string) (string, error) {
 		return c.openseaClient.Get(pCtx, key).Result()
 	case CollUnassignedRDB:
 		return c.unassignedClient.Get(pCtx, key).Result()
+	default:
+		return "", errors.New("unknown redis database")
+	}
+}
+
+// GetMapValue gets a value from a map at a given key in the redis cache
+func (c *Clients) GetMapValue(pCtx context.Context, r DB, key, mapKey string) (string, error) {
+	switch r {
+	case OpenseaRDB:
+		return c.openseaClient.HGet(pCtx, key, mapKey).Result()
+	case CollUnassignedRDB:
+		return c.unassignedClient.HGet(pCtx, key, mapKey).Result()
 	default:
 		return "", errors.New("unknown redis database")
 	}
