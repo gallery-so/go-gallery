@@ -8,7 +8,6 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/dukex/mixpanel v0.0.0-20180925151559-f8d5594f958e
 	github.com/ethereum/go-ethereum v1.10.11
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gin-gonic/gin v1.7.4
