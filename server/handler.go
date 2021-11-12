@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/dukex/mixpanel"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
@@ -10,18 +9,18 @@ import (
 
 var requiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
 
-func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell, mp mixpanel.Mixpanel) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 
-	nftHandlersInit(apiGroupV1, repos, ethClient, mp)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, mp)
+	nftHandlersInit(apiGroupV1, repos, ethClient)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient)
 
 	return router
 }
 
-func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, mp mixpanel.Mixpanel) {
+func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
 
 	usersGroup := parent.Group("/users")
 
@@ -43,7 +42,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 
 }
 
-func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, mp mixpanel.Mixpanel) {
+func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
 
 	usersGroup := parent.Group("/users")
 
@@ -65,11 +64,11 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell, mp mixpanel.Mixpanel) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) {
 
 	// AUTH
 
-	authHandlersInitToken(parent, repos, ethClient, mp)
+	authHandlersInitToken(parent, repos, ethClient)
 
 	// GALLERIES
 
@@ -105,11 +104,11 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 }
 
-func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, mp mixpanel.Mixpanel) {
+func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
 
 	// AUTH
 
-	authHandlersInitNFT(parent, repos, ethClient, mp)
+	authHandlersInitNFT(parent, repos, ethClient)
 
 	// GALLERIES
 

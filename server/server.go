@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dukex/mixpanel"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -71,7 +70,7 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newMixpanelClient())
+	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell())
 }
 
 func setDefaults() {
@@ -186,8 +185,4 @@ func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
 	sh.SetTimeout(time.Second * 15)
 	return sh
-}
-
-func newMixpanelClient() mixpanel.Mixpanel {
-	return mixpanel.New(viper.GetString("MIXPANEL_TOKEN"), viper.GetString("MIXPANEL_API_URL"))
 }
