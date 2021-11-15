@@ -107,8 +107,10 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	opts.SetSkip(limit * page)
-	opts.SetLimit(limit)
+	if limit > 0 {
+		opts.SetSkip(limit * page)
+		opts.SetLimit(limit)
+	}
 	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
@@ -174,8 +176,10 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	opts.SetSkip(limit * page)
-	opts.SetLimit(limit)
+	if limit > 0 {
+		opts.SetSkip(limit * page)
+		opts.SetLimit(limit)
+	}
 	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
@@ -195,8 +199,10 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	opts.SetSkip(limit * page)
-	opts.SetLimit(limit)
+	if limit > 0 {
+		opts.SetSkip(limit * page)
+		opts.SetLimit(limit)
+	}
 	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.Token{}
