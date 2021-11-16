@@ -37,7 +37,7 @@ type collectionCreateInput struct {
 
 type collectionUpdateInfoByIDInput struct {
 	ID             persist.DBID `json:"id" binding:"required"`
-	Name           string       `json:"name" binding:"required"`
+	Name           string       `json:"name"`
 	CollectorsNote string       `json:"collectors_note"`
 }
 
