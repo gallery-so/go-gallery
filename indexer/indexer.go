@@ -142,7 +142,7 @@ func (i *Indexer) Start() {
 		toQueue := func() {
 			i.startPipeline(input, mu, topics)
 		}
-		if wp.WaitingQueueSize() > 5 {
+		if wp.WaitingQueueSize() > 60 {
 			wp.SubmitWait(toQueue)
 		} else {
 			wp.Submit(toQueue)
