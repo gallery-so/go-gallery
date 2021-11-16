@@ -127,7 +127,6 @@ func (i *Indexer) Start() {
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
 	wp := workerpool.New(15)
-	mu := &sync.Mutex{}
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -140,7 +139,7 @@ func (i *Indexer) Start() {
 	for lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock) {
 		input := lastSyncedBlock
 		toQueue := func() {
-			i.startPipeline(input, mu, topics)
+			i.startPipeline(input, topics)
 		}
 		if wp.WaitingQueueSize() > 60 {
 			wp.SubmitWait(toQueue)
@@ -152,10 +151,10 @@ func (i *Indexer) Start() {
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	time.Sleep(time.Second)
-	i.startNewBlocksPipeline(lastSyncedBlock, mu, topics)
+	i.startNewBlocksPipeline(lastSyncedBlock, topics)
 }
 
-func (i *Indexer) startPipeline(start persist.BlockNumber, mu *sync.Mutex, topics [][]common.Hash) {
+func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalanceChange)
@@ -165,9 +164,9 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, mu *sync.Mutex, topic
 
 	go i.processLogs(transfers, start, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
-	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
+	i.processTokens(uris, metadatas, owners, previousOwners, balances)
 }
-func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mutex, topics [][]common.Hash) {
+func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalanceChange)
@@ -177,7 +176,7 @@ func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, mu *sync.Mut
 	subscriptions := make(chan types.Log)
 	go i.subscribeNewLogs(start, transfers, subscriptions, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
-	i.processTokens(uris, metadatas, owners, previousOwners, balances, mu)
+	i.processTokens(uris, metadatas, owners, previousOwners, balances)
 }
 
 func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock persist.BlockNumber, topics [][]common.Hash) {
@@ -331,6 +330,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 		go func(ctx context.Context, cancel context.CancelFunc, transfer *transfer) {
 			defer cancel()
+			wg := &sync.WaitGroup{}
 			contractAddress := transfer.contractAddress
 			from := transfer.from
 			to := transfer.to
@@ -341,12 +341,25 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 			switch persist.TokenType(transfer.tokenType) {
 			case persist.TokenTypeERC721:
-				owners <- ownerAtBlock{key, to, transfer.blockNumber}
-				previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+				wg.Add(4)
+				// send owner to channel
+				go func() {
+					defer wg.Done()
+					owners <- ownerAtBlock{key, to, transfer.blockNumber}
+				}()
+				// send previous owner to channel
+				go func() {
+					defer wg.Done()
+					previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+				}()
 
 			case persist.TokenTypeERC1155:
-				balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
-
+				wg.Add(3)
+				// send balance to channel
+				go func() {
+					defer wg.Done()
+					balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+				}()
 			default:
 				panic("unknown token type")
 			}
@@ -362,7 +375,12 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 			}
 
 			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
-			uris <- tokenURI{key, uriReplaced}
+			// send uri to channel
+			go func() {
+				defer wg.Done()
+				uris <- tokenURI{key, uriReplaced}
+			}()
+
 			var metadata persist.TokenMetadata
 			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
@@ -377,7 +395,12 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 					atomic.AddUint64(&i.badURIs, 1)
 				}
 			}
-			metadatas <- tokenMetadata{key, metadata}
+			// send metadata to channel
+			go func() {
+				defer wg.Done()
+				metadatas <- tokenMetadata{key, metadata}
+			}()
+			wg.Wait()
 		}(ctx, cancel, t)
 		<-ctx.Done()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -389,7 +412,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 }
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange, mu *sync.Mutex) {
+func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange) {
 
 	done := make(chan bool)
 	ownersMap := map[tokenIdentifiers]ownerAtBlock{}
@@ -417,8 +440,6 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 	logrus.Info("Created tokens to insert into database...")
 
-	mu.Lock()
-	defer mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
