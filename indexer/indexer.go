@@ -126,7 +126,7 @@ func (i *Indexer) Start() {
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
-	wp := workerpool.New(5)
+	wp := workerpool.New(15)
 	mu := &sync.Mutex{}
 
 	events := make([]common.Hash, len(i.eventHashes))
@@ -328,7 +328,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
 
 	for _, t := range transfers {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 		go func(ctx context.Context, cancel context.CancelFunc, transfer *transfer) {
 			defer cancel()
 			contractAddress := transfer.contractAddress
