@@ -246,7 +246,7 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 		updateModels[i] = model
 	}
 
-	_, err := m.collection.BulkWrite(ctx, updateModels)
+	_, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
 	if err != nil {
 		return err
 	}
