@@ -237,7 +237,7 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 			delete(asMap, k)
 		}
 
-		model := mongo.UpdateOneModel{
+		model := &mongo.UpdateOneModel{
 			Filter: upsert.query,
 			Update: bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap},
 			Upsert: boolin(true),
