@@ -130,6 +130,8 @@ func newMongoClient() *mongo.Client {
 	mOpts := options.Client().ApplyURI(mgoURL)
 	mOpts.SetRegistry(mongodb.CustomRegistry)
 	mOpts.SetWriteConcern(writeconcern.New(writeconcern.J(true), writeconcern.W(1)))
+	mOpts.SetRetryWrites(true)
+	mOpts.SetRetryReads(true)
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {

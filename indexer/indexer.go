@@ -518,8 +518,15 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 				if err != nil {
 					panic(err)
 				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 10000, 0)
+				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, 0)
 				if err == nil {
+					for i := 1; len(tokens) == 5000; i++ {
+						t, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, int64(i))
+						if err != nil {
+							panic(err)
+						}
+						tokens = append(tokens, t...)
+					}
 					for _, token := range tokens {
 						asBigInt, ok := new(big.Int).SetString(token.Quantity.String(), 16)
 						if ok {
@@ -714,6 +721,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
 		return fmt.Errorf("err upserting tokens: %s", err.Error())
 	}
+	logrus.Infof("Upserted %d tokens", len(t))
 
 	contracts := make(map[persist.Address]bool)
 
