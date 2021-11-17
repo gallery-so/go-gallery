@@ -235,31 +235,20 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persist.Token) error {
 
-	errChan := make(chan error)
-	done := make(chan bool)
-	for _, v := range pTokens {
-		go func(token *persist.Token) {
-			query := bson.M{"token_id": token.TokenID, "contract_address": token.ContractAddress}
-			if token.TokenType == persist.TokenTypeERC1155 {
-				query["owner_address"] = token.OwnerAddress
-			}
-			_, err := t.mp.upsert(pCtx, query, token)
-			if err != nil {
-				errChan <- err
-			}
-			done <- true
-		}(v)
-	}
+	models := make([]upsertModel, len(pTokens))
 
-	for i := 0; i < len(pTokens); i++ {
-		select {
-		case err := <-errChan:
-			return err
-		case <-done:
+	for i, v := range pTokens {
+		query := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress}
+		if v.TokenType == persist.TokenTypeERC1155 {
+			query["owner_address"] = v.OwnerAddress
+		}
+		models[i] = upsertModel{
+			query: query,
+			doc:   v,
 		}
 	}
 
-	return nil
+	return t.mp.bulkUpsert(pCtx, models)
 }
 
 // Upsert will upsert a token into the database

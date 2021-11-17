@@ -52,6 +52,11 @@ type storage struct {
 	collection *mongo.Collection
 }
 
+type upsertModel struct {
+	query bson.M
+	doc   interface{}
+}
+
 type errNotStruct struct {
 	iAmNotAStruct interface{}
 }
@@ -192,6 +197,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	for k := range query {
 		delete(asMap, k)
 	}
+
 	res, err := m.collection.UpdateOne(ctx, query, bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap}, opts...)
 	if err != nil {
 		return "", err
@@ -202,6 +208,49 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	}
 
 	return returnID, nil
+}
+
+// bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
+func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
+
+	updateModels := make([]mongo.WriteModel, len(upserts))
+	for i, upsert := range upserts {
+		now := primitive.NewDateTimeFromTime(time.Now())
+		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert.doc)
+		if err != nil {
+			return err
+		}
+
+		asMap := bson.M{}
+		err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+		if err != nil {
+			return err
+		}
+		asMap["last_updated"] = now
+		if _, ok := asMap["created_at"]; !ok {
+			asMap["created_at"] = now
+		}
+
+		delete(asMap, "_id")
+
+		for k := range upsert.query {
+			delete(asMap, k)
+		}
+
+		model := mongo.UpdateOneModel{
+			Filter: upsert.query,
+			Update: bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap},
+			Upsert: boolin(true),
+		}
+
+		updateModels[i] = model
+	}
+
+	_, err := m.collection.BulkWrite(ctx, updateModels)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // find finds documents in the mongo database which is not deleted
