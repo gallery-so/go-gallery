@@ -12,7 +12,7 @@ jobs:
   build:
     working_directory: ~/go-gallery
     docker:
-      - image: circleci/golang:1.15.8
+      - image: cimg/go:1.17.3
       - image: mongo:latest
       - image: redis:latest
     steps:
