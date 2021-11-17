@@ -32,12 +32,12 @@ func TestMembership_Success(t *testing.T) {
 
 func membershipRequest(assert *assert.Assertions) *http.Response {
 
-	req, err := http.NewRequest("GET",
+	req, err := http.NewRequest(http.MethodGet,
 		fmt.Sprintf("%s/users/membership", tc.serverURL),
 		nil)
 	assert.Nil(err)
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Minute,
 	}
 	resp, err := client.Do(req)
 	assert.Nil(err)

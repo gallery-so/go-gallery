@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/bson/bsonrw"
@@ -213,10 +215,13 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 // bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 
-	for i := 0; i < len(upserts); i += 250 {
+	wp := workerpool.New(10)
+	errs := make(chan error)
+
+	for i := 0; i < len(upserts); i += 100 {
 		var toUpsert []upsertModel
-		if i+250 < len(upserts) {
-			toUpsert = upserts[i : i+250]
+		if i+100 < len(upserts) {
+			toUpsert = upserts[i : i+100]
 		} else {
 			toUpsert = upserts[i:]
 		}
@@ -254,11 +259,28 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 			updateModels[i] = model
 		}
 
-		_, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
+		wp.Submit(func() {
+			beginUpsert := time.Now()
+			res, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				errs <- err
+				return
+			}
+			logrus.Infof("upserted %d documents and modified %d documents in %s", res.UpsertedCount, res.ModifiedCount, time.Since(beginUpsert))
+		})
+
+	}
+
+	go func() {
+		defer close(errs)
+		wp.StopWait()
+		errs <- nil
+	}()
+
+	for err := range errs {
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil

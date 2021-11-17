@@ -22,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 type repositories struct {
@@ -136,6 +137,8 @@ func newMongoClient() *mongo.Client {
 
 	mOpts := options.Client().ApplyURI(string(mgoURL))
 	mOpts.SetRegistry(mongodb.CustomRegistry)
+	mOpts.SetRetryWrites(true)
+	mOpts.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {

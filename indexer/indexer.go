@@ -440,7 +440,8 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 	logrus.Info("Created tokens to insert into database...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	timeout := (time.Minute * time.Duration(len(tokens)/100)) + time.Minute
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
 	if err != nil {
@@ -510,7 +511,7 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 
 	for balance := range balanceChan {
 		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 			defer cancel()
 			if balances[balance.ti] == nil {
 				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
@@ -518,12 +519,13 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 				if err != nil {
 					panic(err)
 				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, 0)
+				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1000, 0)
 				if err == nil {
-					for i := 1; len(tokens) == 5000; i++ {
-						t, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, int64(i))
+					for i := 1; len(tokens) == 1000; i++ {
+						t, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1000, int64(i))
 						if err != nil {
-							panic(err)
+							logrus.WithError(err).Error("error getting tokens by indetifiers for balances")
+							break
 						}
 						tokens = append(tokens, t...)
 					}
@@ -719,7 +721,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 	logrus.Infof("Upserting %d tokens", len(t))
 	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
-		return fmt.Errorf("err upserting tokens: %s", err.Error())
+		return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
 	}
 	logrus.Infof("Upserted %d tokens", len(t))
 
