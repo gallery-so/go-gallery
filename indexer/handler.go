@@ -21,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 // Init starts the indexer and handles requests
@@ -128,6 +129,7 @@ func newMongoClient() *mongo.Client {
 
 	mOpts := options.Client().ApplyURI(mgoURL)
 	mOpts.SetRegistry(mongodb.CustomRegistry)
+	mOpts.SetWriteConcern(writeconcern.New(writeconcern.J(true), writeconcern.W(1)))
 
 	mClient, err := mongo.Connect(ctx, mOpts)
 	if err != nil {
