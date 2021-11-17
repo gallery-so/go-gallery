@@ -126,7 +126,7 @@ func (i *Indexer) Start() {
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
-	wp := workerpool.New(15)
+	wp := workerpool.New(10)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
