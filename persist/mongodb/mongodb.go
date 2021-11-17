@@ -230,12 +230,14 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 				asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert.doc)
 				if err != nil {
 					errs <- err
+					return
 				}
 
 				asMap := bson.M{}
 				err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
 				if err != nil {
 					errs <- err
+					return
 				}
 				asMap["last_updated"] = now
 				if _, ok := asMap["created_at"]; !ok {
@@ -260,7 +262,9 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 			_, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
 			if err != nil {
 				errs <- err
+				return
 			}
+			errs <- nil
 
 		}(toUpsert)
 	}
