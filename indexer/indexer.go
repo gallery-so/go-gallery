@@ -476,7 +476,7 @@ func receivePreviousOwners(done chan bool, prevOwners <-chan ownerAtBlock, prevO
 				if err != nil {
 					panic(err)
 				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 0, 0)
+				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, 0)
 				if err == nil && len(tokens) == 1 {
 					token := tokens[0]
 					checker := map[persist.BlockNumber]persist.Address{}
@@ -518,7 +518,7 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 				if err != nil {
 					panic(err)
 				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 0, 0)
+				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 5000, 0)
 				if err == nil {
 					for _, token := range tokens {
 						asBigInt, ok := new(big.Int).SetString(token.Quantity.String(), 16)
