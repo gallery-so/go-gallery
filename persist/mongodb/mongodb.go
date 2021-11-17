@@ -213,43 +213,65 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 // bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 
-	updateModels := make([]mongo.WriteModel, len(upserts))
-	for i, upsert := range upserts {
-		now := primitive.NewDateTimeFromTime(time.Now())
-		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert.doc)
+	errs := make(chan error)
+	j := 0
+	for i := 0; i < len(upserts); i += 100 {
+		var toUpsert []upsertModel
+		if i+100 < len(upserts) {
+			toUpsert = upserts[i : i+100]
+		} else {
+			toUpsert = upserts[i:]
+		}
+		j++
+		go func(up []upsertModel) {
+			updateModels := make([]mongo.WriteModel, len(up))
+			for i, upsert := range up {
+				now := primitive.NewDateTimeFromTime(time.Now())
+				asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert.doc)
+				if err != nil {
+					errs <- err
+				}
+
+				asMap := bson.M{}
+				err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+				if err != nil {
+					errs <- err
+				}
+				asMap["last_updated"] = now
+				if _, ok := asMap["created_at"]; !ok {
+					asMap["created_at"] = now
+				}
+
+				delete(asMap, "_id")
+
+				for k := range upsert.query {
+					delete(asMap, k)
+				}
+
+				model := &mongo.UpdateOneModel{
+					Filter: upsert.query,
+					Update: bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap},
+					Upsert: boolin(true),
+				}
+
+				updateModels[i] = model
+			}
+
+			_, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				errs <- err
+			}
+
+		}(toUpsert)
+	}
+
+	for i := 0; i < j; i++ {
+		err := <-errs
 		if err != nil {
 			return err
 		}
-
-		asMap := bson.M{}
-		err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
-		if err != nil {
-			return err
-		}
-		asMap["last_updated"] = now
-		if _, ok := asMap["created_at"]; !ok {
-			asMap["created_at"] = now
-		}
-
-		delete(asMap, "_id")
-
-		for k := range upsert.query {
-			delete(asMap, k)
-		}
-
-		model := &mongo.UpdateOneModel{
-			Filter: upsert.query,
-			Update: bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap},
-			Upsert: boolin(true),
-		}
-
-		updateModels[i] = model
 	}
 
-	_, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
