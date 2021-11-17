@@ -440,7 +440,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 	logrus.Info("Created tokens to insert into database...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
 	if err != nil {
@@ -712,7 +712,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 	logrus.Infof("Upserting %d tokens", len(t))
 	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
-		return err
+		return fmt.Errorf("err upserting tokens: %s", err.Error())
 	}
 
 	contracts := make(map[persist.Address]bool)
@@ -730,7 +730,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 	}
 	err := contractRepo.BulkUpsert(ctx, toUpsert)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("err upserting contracts: %s", err.Error())
 	}
 	return nil
 }
