@@ -26,6 +26,7 @@ type Contract struct {
 type ContractRepository interface {
 	GetByAddress(context.Context, Address) (*Contract, error)
 	UpsertByAddress(context.Context, Address, *Contract) error
+	BulkUpsert(context.Context, []*Contract) error
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address

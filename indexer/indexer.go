@@ -141,7 +141,7 @@ func (i *Indexer) Start() {
 		toQueue := func() {
 			i.startPipeline(input, topics)
 		}
-		if wp.WaitingQueueSize() > 60 {
+		if wp.WaitingQueueSize() > 10 {
 			wp.SubmitWait(toQueue)
 		} else {
 			wp.Submit(toQueue)
@@ -717,23 +717,21 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 	contracts := make(map[persist.Address]bool)
 
+	toUpsert := []*persist.Contract{}
 	for _, token := range t {
 		if contracts[token.ContractAddress] {
 			continue
 		}
-		func() {
-			contract := handleContract(ethClient, token.ContractAddress, token.BlockNumber)
-			logrus.Infof("Processing contract %s", contract.Address)
-			ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*30)
-			defer cancel()
-			err := contractRepo.UpsertByAddress(ctxWithTimeout, contract.Address, contract)
-			if err != nil {
-				panic(err)
-			}
-		}()
+		contract := handleContract(ethClient, token.ContractAddress, token.BlockNumber)
+		logrus.Infof("Processing contract %s", contract.Address)
+		toUpsert = append(toUpsert, contract)
+
 		contracts[token.ContractAddress] = true
 	}
-
+	err := contractRepo.BulkUpsert(ctx, toUpsert)
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 

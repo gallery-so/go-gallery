@@ -39,6 +39,26 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 	return nil
 }
 
+// BulkUpsert upserts many contracts by their address field
+func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*persist.Contract) error {
+
+	upserts := make([]upsertModel, len(contracts))
+	for i, contract := range contracts {
+		upserts[i] = upsertModel{
+			query: bson.M{
+				"address": contract.Address,
+			},
+			doc: contract,
+		}
+	}
+	err := c.mp.bulkUpsert(pCtx, upserts)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetByAddress returns an contract by a given address
 func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Contract, error) {
 
