@@ -29,6 +29,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	// AUTH
 	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
 	authGroup.GET("/jwt_valid", jwtOptional(), validateJwt())
+	authGroup.GET("/is_member", jwtOptional(), hasNFTs(repos.userRepository, ethClient, requiredNFTs))
 
 	// USER
 
@@ -51,6 +52,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	// AUTH
 	authGroup.GET("/get_preflight", jwtOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
 	authGroup.GET("/jwt_valid", jwtOptional(), validateJwt())
+	authGroup.GET("/is_member", jwtOptional(), hasNFTs(repos.userRepository, ethClient, requiredNFTs))
 
 	// USER
 

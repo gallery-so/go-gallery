@@ -38,6 +38,13 @@ type authUserLoginOutput struct {
 type authUserGetPreflightInput struct {
 	Address persist.Address `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 }
+type authHasNFTInput struct {
+	UserID persist.DBID `json:"user_id" form:"user_id" binding:"required"`
+}
+
+type authHasNFTOutput struct {
+	HasNFT bool `json:"has_nft"`
+}
 
 type authUserGetPreflightOutput struct {
 	Nonce      string `json:"nonce"`
@@ -96,6 +103,29 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 		}
 
 		c.JSON(http.StatusOK, output)
+	}
+}
+
+func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &authHasNFTInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+		user, err := userRepository.GetByID(c, input.UserID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+		has := false
+		for _, addr := range user.Addresses {
+			if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
+				has = true
+				break
+			}
+		}
+		c.JSON(http.StatusOK, authHasNFTOutput{HasNFT: has})
 	}
 }
 
