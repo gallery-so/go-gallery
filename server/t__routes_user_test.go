@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -234,7 +235,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	}
 	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID)
+	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
@@ -266,7 +267,7 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID)
+	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{
@@ -287,7 +288,7 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	jwt, err := jwtGeneratePipeline(context.Background(), userID)
+	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := userRemoveAddressesInput{

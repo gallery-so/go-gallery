@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -43,7 +44,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.Gallery{}
@@ -65,7 +66,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := c.GetBool(middleware.AuthContextKey)
 		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -92,7 +93,7 @@ func updateGallery(galleryRepository persist.GalleryRepository, backupRepository
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return

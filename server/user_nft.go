@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -40,7 +41,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -93,7 +94,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 
 	output.UserID = userID
 
-	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}

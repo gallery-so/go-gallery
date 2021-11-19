@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -65,7 +66,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 			return
 		}
 
-		authed := c.GetBool(authContextKey)
+		authed := c.GetBool(middleware.AuthContextKey)
 
 		output, err := authUserGetPreflightDb(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
@@ -187,7 +188,7 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 		return output, nil
 	}
 
-	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userIDstr)
+	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userIDstr)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/memstore"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -59,7 +60,7 @@ func CoreInit() *gin.Engine {
 	setDefaults()
 
 	router := gin.Default()
-	router.Use(handleCORS(), errLogger())
+	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")

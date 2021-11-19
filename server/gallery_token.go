@@ -9,6 +9,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"google.golang.org/appengine"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -50,7 +51,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
 		if len(galleries) == 0 || err != nil {
 			galleries = []*persist.GalleryToken{}
@@ -78,7 +79,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 			return
 		}
 
-		auth := c.GetBool(authContextKey)
+		auth := c.GetBool(middleware.AuthContextKey)
 		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -110,7 +111,7 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
