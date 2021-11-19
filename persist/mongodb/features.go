@@ -25,8 +25,6 @@ func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepositor
 	featureNameIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "name", Value: 1},
-			{Key: "deleted", Value: 1},
-			{Key: "version", Value: 1},
 		},
 		Options: options.Index().SetUnique(true),
 	}
@@ -40,18 +38,16 @@ func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepositor
 }
 
 // GetByTokenIdentifiers returns an feature by a given token identifiers
-func (c *FeaturesMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenIdentifiers persist.TokenIdentifiers) (*persist.FeatureFlag, error) {
+func (c *FeaturesMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenIdentifiers []persist.TokenIdentifiers) ([]*persist.FeatureFlag, error) {
 
 	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
-	opts.SetSort(bson.M{"created_at": -1})
-	opts.SetLimit(1)
 
 	result := []*persist.FeatureFlag{}
-	err := c.mp.find(pCtx, bson.M{"token_identifiers": pTokenIdentifiers}, &result, opts)
+	err := c.mp.find(pCtx, bson.M{"token_identifiers": bson.M{"$in": pTokenIdentifiers}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -61,7 +57,7 @@ func (c *FeaturesMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pT
 		return nil, persist.ErrFeatureNotFoundByTokenIdentifiers{TokenIdentifiers: pTokenIdentifiers}
 	}
 
-	return result[0], nil
+	return result, nil
 }
 
 // GetByName returns an feature by a given name

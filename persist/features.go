@@ -3,6 +3,8 @@ package persist
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -15,7 +17,7 @@ type FeatureFlag struct {
 	Deleted      bool               `bson:"deleted" json:"-"`
 	LastUpdated  primitive.DateTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	RequiredToken       TokenIdentifiers `json:"token_identifiers" bson:"token_identifiers"`
+	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
 	Name                string           `json:"name" bson:"name"`
 	IsEnabled           bool             `json:"is_enabled" bson:"is_enabled"`
 	AdminOnly           bool             `json:"admin_only" bson:"admin_only"`
@@ -23,14 +25,11 @@ type FeatureFlag struct {
 }
 
 // TokenIdentifiers represents a unique identifier for a token
-type TokenIdentifiers struct {
-	TokenID         TokenID `json:"token_id" bson:"token_id"`
-	ContractAddress Address `json:"contract_address" bson:"contract_address"`
-}
+type TokenIdentifiers string
 
 // ErrFeatureNotFoundByTokenIdentifiers is an error type for when a feature is not found by token identifiers
 type ErrFeatureNotFoundByTokenIdentifiers struct {
-	TokenIdentifiers TokenIdentifiers
+	TokenIdentifiers []TokenIdentifiers
 }
 
 // ErrFeatureNotFoundByName is an error type for when a feature is not found by name
@@ -40,12 +39,42 @@ type ErrFeatureNotFoundByName struct {
 
 // FeatureFlagRepository represents a repository for interacting with persisted feature flags
 type FeatureFlagRepository interface {
-	GetByTokenIdentifiers(context.Context, TokenIdentifiers) (*FeatureFlag, error)
+	GetByTokenIdentifiers(context.Context, []TokenIdentifiers) ([]*FeatureFlag, error)
 	GetByName(context.Context, string) (*FeatureFlag, error)
 }
 
+// NewTokenIdentifiers creates a new token identifiers
+func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pAmount *big.Int) TokenIdentifiers {
+	return TokenIdentifiers(pContractAddress.String() + "+" + pTokenID.String() + "+" + pAmount.String())
+}
+
+func (t TokenIdentifiers) String() string {
+	if t.Valid() {
+		return string(t)
+	}
+	panic("invalid token identifiers")
+}
+
+// Valid returns true if the token identifiers are valid
+func (t TokenIdentifiers) Valid() bool {
+	return len(strings.Split(string(t), "+")) == 3
+}
+
+// GetParts returns the parts of the token identifiers
+func (t TokenIdentifiers) GetParts() (Address, TokenID, *big.Int) {
+	parts := strings.Split(t.String(), "+")
+	amount, ok := big.NewInt(0).SetString(parts[2], 10)
+	if !ok {
+		amount, ok = big.NewInt(0).SetString(parts[2], 16)
+		if !ok {
+			amount = big.NewInt(0)
+		}
+	}
+	return Address(parts[0]), TokenID(parts[1]), amount
+}
+
 func (e ErrFeatureNotFoundByTokenIdentifiers) Error() string {
-	return fmt.Sprintf("feature not found by token identifiers: %s", e.TokenIdentifiers)
+	return fmt.Sprintf("feature not found by token identifiers: %+v", e.TokenIdentifiers)
 }
 
 func (e ErrFeatureNotFoundByName) Error() string {
