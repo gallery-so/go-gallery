@@ -3,7 +3,6 @@ package persist
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,6 +17,8 @@ type FeatureFlag struct {
 	LastUpdated  primitive.DateTime `bson:"last_updated,update_time" json:"last_updated"`
 
 	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
+	RequiredAmount      uint64           `json:"required_amount" bson:"required_amount"`
+	TokenType           TokenType        `json:"token_type" bson:"token_type"`
 	Name                string           `json:"name" bson:"name"`
 	IsEnabled           bool             `json:"is_enabled" bson:"is_enabled"`
 	AdminOnly           bool             `json:"admin_only" bson:"admin_only"`
@@ -39,13 +40,14 @@ type ErrFeatureNotFoundByName struct {
 
 // FeatureFlagRepository represents a repository for interacting with persisted feature flags
 type FeatureFlagRepository interface {
-	GetByTokenIdentifiers(context.Context, []TokenIdentifiers) ([]*FeatureFlag, error)
+	GetByRequiredTokens(context.Context, map[TokenIdentifiers]uint64) ([]*FeatureFlag, error)
 	GetByName(context.Context, string) (*FeatureFlag, error)
+	GetAll(context.Context) ([]*FeatureFlag, error)
 }
 
 // NewTokenIdentifiers creates a new token identifiers
-func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pAmount *big.Int) TokenIdentifiers {
-	return TokenIdentifiers(pContractAddress.String() + "+" + pTokenID.String() + "+" + pAmount.String())
+func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdentifiers {
+	return TokenIdentifiers(pContractAddress.String() + "+" + pTokenID.String())
 }
 
 func (t TokenIdentifiers) String() string {
@@ -57,20 +59,14 @@ func (t TokenIdentifiers) String() string {
 
 // Valid returns true if the token identifiers are valid
 func (t TokenIdentifiers) Valid() bool {
-	return len(strings.Split(string(t), "+")) == 3
+	return len(strings.Split(string(t), "+")) == 2
 }
 
 // GetParts returns the parts of the token identifiers
-func (t TokenIdentifiers) GetParts() (Address, TokenID, *big.Int) {
+func (t TokenIdentifiers) GetParts() (Address, TokenID) {
 	parts := strings.Split(t.String(), "+")
-	amount, ok := big.NewInt(0).SetString(parts[2], 10)
-	if !ok {
-		amount, ok = big.NewInt(0).SetString(parts[2], 16)
-		if !ok {
-			amount = big.NewInt(0)
-		}
-	}
-	return Address(parts[0]), TokenID(parts[1]), amount
+
+	return Address(parts[0]), TokenID(parts[1])
 }
 
 func (e ErrFeatureNotFoundByTokenIdentifiers) Error() string {

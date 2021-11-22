@@ -17,8 +17,9 @@ type Access struct {
 
 	UserID DBID `json:"user_id" bson:"user_id"`
 
-	RequiredTokensOwned map[TokenIdentifiers]bool `json:"required_tokens_owned" bson:"required_tokens_owned"`
-	IsAdmin             bool                      `json:"is_admin" bson:"is_admin"`
+	RequiredTokensOwned map[TokenIdentifiers]uint64 `json:"required_tokens_owned" bson:"required_tokens_owned"`
+	IsAdmin             bool                        `json:"is_admin" bson:"is_admin"`
+	MostRecentBlock     BlockNumber                 `json:"most_recent_block" bson:"most_recent_block"`
 }
 
 // ErrAccessNotFoundByUserID is an error type for when an access is not found by user id
@@ -30,6 +31,7 @@ type ErrAccessNotFoundByUserID struct {
 type AccessRepository interface {
 	GetByUserID(context.Context, DBID) (*Access, error)
 	HasRequiredTokens(context.Context, DBID, []TokenIdentifiers) (bool, error)
+	UpdateRequiredTokensByUserID(context.Context, DBID, map[TokenIdentifiers]uint64, BlockNumber) error
 }
 
 func (e ErrAccessNotFoundByUserID) Error() string {

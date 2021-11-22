@@ -19,7 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// Init starts the indexer and handles requests
+// Init starts the background process for keeping the access state up to date and handles requests
 func Init() {
 	router := coreInit()
 	http.Handle("/", router)
@@ -29,12 +29,15 @@ func coreInit() *gin.Engine {
 
 	setDefaults()
 
-	featuresRepo, accessRepo := newRepos()
+	userRepo, featuresRepo, accessRepo := newRepos()
+	ec := newEthClient()
+
+	go trackFeatures(context.Background(), userRepo, featuresRepo, accessRepo, ec)
 
 	router := gin.Default()
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, featuresRepo, accessRepo)
+	return handlersInit(router, userRepo, featuresRepo, accessRepo, ec)
 }
 
 func setDefaults() {
@@ -59,9 +62,9 @@ func newEthClient() *ethclient.Client {
 
 }
 
-func newRepos() (persist.FeatureFlagRepository, persist.AccessRepository) {
+func newRepos() (persist.UserRepository, persist.FeatureFlagRepository, persist.AccessRepository) {
 	mgoClient := newMongoClient()
-	return mongodb.NewFeaturesMongoRepository(mgoClient), mongodb.NewAccessMongoRepository(mgoClient)
+	return mongodb.NewUserMongoRepository(mgoClient), mongodb.NewFeaturesMongoRepository(mgoClient), mongodb.NewAccessMongoRepository(mgoClient)
 }
 
 func newMongoClient() *mongo.Client {
