@@ -74,6 +74,7 @@ func getUserFeatures(userRepo persist.UserRepository, featureRepo persist.Featur
 			}
 
 			for _, feature := range allFeatures {
+				// TODO erc20
 				switch feature.TokenType {
 				case persist.TokenTypeERC1155:
 					address, tokenID := feature.RequiredToken.GetParts()
