@@ -51,6 +51,7 @@ func (g *PubSub) Subscribe(pCtx context.Context, topicName string, handler func(
 		if err != nil {
 			logrus.WithError(err).Error("error handling sub message")
 			msg.Nack()
+			return
 		}
 		msg.Ack()
 	})
