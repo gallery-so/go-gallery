@@ -56,3 +56,9 @@ func (g *PubSub) Subscribe(pCtx context.Context, topicName string, handler func(
 	})
 	return err
 }
+
+// CreateTopic creates a new topic
+func (g *PubSub) CreateTopic(pCtx context.Context, topic string) error {
+	_, err := g.pubsub.CreateTopic(pCtx, topic)
+	return err
+}
