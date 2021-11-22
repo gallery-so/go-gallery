@@ -17,6 +17,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// RequiredNFTs is a list of NFTs that are required for the user to be able to use the service as an authenticated user
+var RequiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
+
 const (
 	// UserIDContextKey is the key for the user id in the context
 	UserIDContextKey = "user_id"
@@ -42,7 +45,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 }
 
 // JWTRequired is a middleware that checks if the user is authenticated
-func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
+func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
@@ -83,7 +86,7 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client, t
 				}
 				has := false
 				for _, addr := range user.Addresses {
-					if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
+					if res, _ := ethClient.HasNFTs(c, RequiredNFTs, addr); res {
 						has = true
 						break
 					}

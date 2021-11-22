@@ -26,13 +26,14 @@ type getUserFeaturesOutput struct {
 
 func getUserFeatures(userRepo persist.UserRepository, featureRepo persist.FeatureFlagRepository, accessRepo persist.AccessRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input getUserFeaturesInput
+		input := &getUserFeaturesInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := input.UserID
+
 		access, err := accessRepo.GetByUserID(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -74,7 +75,6 @@ func getUserFeatures(userRepo persist.UserRepository, featureRepo persist.Featur
 			}
 
 			for _, feature := range allFeatures {
-				// TODO erc20
 				switch feature.TokenType {
 				case persist.TokenTypeERC1155:
 					address, tokenID := feature.RequiredToken.GetParts()
@@ -111,6 +111,23 @@ func getUserFeatures(userRepo persist.UserRepository, featureRepo persist.Featur
 						}
 					}
 					tis[feature.RequiredToken] = uint64(isOwner)
+				case persist.TokenTypeERC20:
+					address, _ := feature.RequiredToken.GetParts()
+					ca, err := contracts.NewIERC20Caller(address.Address(), ethClient)
+					if err != nil {
+						logrus.WithError(err).Error("failed to initialize ERC1155 caller")
+						return
+					}
+					totalBal := new(big.Int)
+					for _, address := range user.Addresses {
+						bal, err := ca.BalanceOf(&bind.CallOpts{
+							Context: ctx,
+						}, address.Address())
+						if err == nil {
+							totalBal.Add(totalBal, bal)
+						}
+					}
+					tis[feature.RequiredToken] = totalBal.Uint64()
 				}
 			}
 

@@ -300,7 +300,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 		if !pPreAuthed {
 
-			hasNFT, err := ethClient.HasNFTs(pCtx, requiredNFTs, pInput.Address)
+			hasNFT, err := ethClient.HasNFTs(pCtx, middleware.RequiredNFTs, pInput.Address)
 			if err != nil {
 				return nil, err
 			}
