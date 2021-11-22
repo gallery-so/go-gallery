@@ -5,20 +5,21 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/pubsub"
 )
 
-func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell, psub pubsub.PubSub) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 
-	nftHandlersInit(apiGroupV1, repos, ethClient)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient)
+	nftHandlersInit(apiGroupV1, repos, ethClient, psub)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, psub)
 
 	return router
 }
 
-func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, psub pubsub.PubSub) {
 
 	usersGroup := parent.Group("/users")
 
@@ -37,11 +38,11 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
 	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
-	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository))
+	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub))
 
 }
 
-func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, psub pubsub.PubSub) {
 
 	usersGroup := parent.Group("/users")
 
@@ -60,15 +61,15 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddresses(repos.userRepository, repos.collectionRepository))
 	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
-	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository))
+	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub))
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, ipfsClient *shell.Shell, psub pubsub.PubSub) {
 
 	// AUTH
 
-	authHandlersInitToken(parent, repos, ethClient)
+	authHandlersInitToken(parent, repos, ethClient, psub)
 
 	// GALLERIES
 
@@ -104,11 +105,11 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 }
 
-func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client) {
+func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *eth.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
-	authHandlersInitNFT(parent, repos, ethClient)
+	authHandlersInitNFT(parent, repos, ethClient, psub)
 
 	// GALLERIES
 

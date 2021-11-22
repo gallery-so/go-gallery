@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,7 +12,10 @@ import (
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/pubsub"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -203,7 +207,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -220,6 +224,13 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 		}
 
 		c.JSON(http.StatusOK, output)
+
+		if viper.GetString("ENV") != "local" {
+			err := publishUserSignup(c, output.UserID, userRepository, psub)
+			if err != nil {
+				logrus.WithError(err).Error("failed to publish user signup")
+			}
+		}
 
 	}
 }
@@ -463,6 +474,21 @@ func getUserWithNonce(pCtx context.Context, pAddress persist.Address,
 	}
 
 	return nonceValue, userID, nil
+}
+
+func publishUserSignup(pCtx context.Context, pUserID persist.DBID, userRepository persist.UserRepository, psub pubsub.PubSub) error {
+	user, err := userRepository.GetByID(pCtx, pUserID)
+	if err == nil {
+		asJSON, err := json.Marshal(user)
+		if err == nil {
+			psub.Publish(pCtx, viper.GetString("SIGNUP_TOPIC"), asJSON, true)
+		} else {
+			return fmt.Errorf("error marshalling user: %v", err)
+		}
+	} else {
+		return fmt.Errorf("error getting user: %v", err)
+	}
+	return nil
 }
 
 func (e errUserNotFound) Error() string {

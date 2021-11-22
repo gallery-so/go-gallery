@@ -86,11 +86,14 @@ func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID 
 	return len(result) > 0, nil
 }
 
-// UpdateRequiredTokensByUserID updates the required tokens owned by a user
-func (c *AccessMongoRepository) UpdateRequiredTokensByUserID(pCtx context.Context, pUserID persist.DBID, pRequiredTokensOwned map[persist.TokenIdentifiers]uint64, pBlock persist.BlockNumber) error {
+// UpsertRequiredTokensByUserID upserts the required tokens owned by a user
+func (c *AccessMongoRepository) UpsertRequiredTokensByUserID(pCtx context.Context, pUserID persist.DBID, pRequiredTokensOwned map[persist.TokenIdentifiers]uint64, pBlock persist.BlockNumber) error {
 
-	return c.mp.update(pCtx, bson.M{"user_id": pUserID}, bson.M{
+	if _, err := c.mp.upsert(pCtx, bson.M{"user_id": pUserID}, bson.M{
 		"required_tokens_owned": pRequiredTokensOwned,
 		"most_recent_block":     pBlock,
-	})
+	}); err != nil {
+		return err
+	}
+	return nil
 }

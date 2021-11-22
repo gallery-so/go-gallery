@@ -31,7 +31,7 @@ type ErrAccessNotFoundByUserID struct {
 type AccessRepository interface {
 	GetByUserID(context.Context, DBID) (*Access, error)
 	HasRequiredTokens(context.Context, DBID, []TokenIdentifiers) (bool, error)
-	UpdateRequiredTokensByUserID(context.Context, DBID, map[TokenIdentifiers]uint64, BlockNumber) error
+	UpsertRequiredTokensByUserID(context.Context, DBID, map[TokenIdentifiers]uint64, BlockNumber) error
 }
 
 func (e ErrAccessNotFoundByUserID) Error() string {

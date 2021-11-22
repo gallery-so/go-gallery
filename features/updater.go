@@ -119,7 +119,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 				currentAccess, err := accessRepo.GetByUserID(pCtx, fromUser.ID)
 				if err == nil {
 					currentAccess.RequiredTokensOwned[ti] -= transferEvent.Tokens.Uint64()
-					accessRepo.UpdateRequiredTokensByUserID(pCtx, fromUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
+					accessRepo.UpsertRequiredTokensByUserID(pCtx, fromUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
 				}
 			}
 			toUser, err := userRepo.GetByAddress(pCtx, to)
@@ -127,7 +127,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 				currentAccess, err := accessRepo.GetByUserID(pCtx, toUser.ID)
 				if err == nil {
 					currentAccess.RequiredTokensOwned[ti] += transferEvent.Tokens.Uint64()
-					accessRepo.UpdateRequiredTokensByUserID(pCtx, toUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
+					accessRepo.UpsertRequiredTokensByUserID(pCtx, toUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
 				}
 			}
 
@@ -138,13 +138,13 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 
 			fromUser, err := userRepo.GetByAddress(pCtx, from)
 			if err == nil {
-				accessRepo.UpdateRequiredTokensByUserID(pCtx, fromUser.ID, map[persist.TokenIdentifiers]uint64{
+				accessRepo.UpsertRequiredTokensByUserID(pCtx, fromUser.ID, map[persist.TokenIdentifiers]uint64{
 					ti: 0,
 				}, blockNumber)
 			}
 			toUser, err := userRepo.GetByAddress(pCtx, to)
 			if err == nil {
-				accessRepo.UpdateRequiredTokensByUserID(pCtx, toUser.ID, map[persist.TokenIdentifiers]uint64{
+				accessRepo.UpsertRequiredTokensByUserID(pCtx, toUser.ID, map[persist.TokenIdentifiers]uint64{
 					ti: 1,
 				}, blockNumber)
 			}
@@ -170,7 +170,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 			currentAccess, err := accessRepo.GetByUserID(pCtx, fromUser.ID)
 			if err == nil {
 				currentAccess.RequiredTokensOwned[ti] -= amount
-				accessRepo.UpdateRequiredTokensByUserID(pCtx, fromUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
+				accessRepo.UpsertRequiredTokensByUserID(pCtx, fromUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
 			}
 		}
 		toUser, err := userRepo.GetByAddress(pCtx, to)
@@ -178,7 +178,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 			currentAccess, err := accessRepo.GetByUserID(pCtx, toUser.ID)
 			if err == nil {
 				currentAccess.RequiredTokensOwned[ti] += amount
-				accessRepo.UpdateRequiredTokensByUserID(pCtx, toUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
+				accessRepo.UpsertRequiredTokensByUserID(pCtx, toUser.ID, currentAccess.RequiredTokensOwned, blockNumber)
 			}
 		}
 
@@ -229,11 +229,11 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 
 		}
 		if fromAccess != nil {
-			accessRepo.UpdateRequiredTokensByUserID(pCtx, fromUser.ID, fromAccess.RequiredTokensOwned, blockNumber)
+			accessRepo.UpsertRequiredTokensByUserID(pCtx, fromUser.ID, fromAccess.RequiredTokensOwned, blockNumber)
 		}
 
 		if toAccess != nil {
-			accessRepo.UpdateRequiredTokensByUserID(pCtx, toUser.ID, toAccess.RequiredTokensOwned, blockNumber)
+			accessRepo.UpsertRequiredTokensByUserID(pCtx, toUser.ID, toAccess.RequiredTokensOwned, blockNumber)
 		}
 	default:
 		logrus.WithFields(logrus.Fields{"address": pLog.Address, "block": pLog.BlockNumber, "event_type": pLog.Topics[0]}).Warn("unknown event")

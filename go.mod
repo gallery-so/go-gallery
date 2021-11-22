@@ -3,6 +3,8 @@ module github.com/mikeydub/go-gallery
 go 1.16
 
 require (
+	cloud.google.com/go/kms v1.1.0 // indirect
+	cloud.google.com/go/pubsub v1.3.1
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.18.2
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
@@ -30,6 +32,8 @@ require (
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871 // indirect
 	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
+	google.golang.org/api v0.58.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1
+	google.golang.org/grpc v1.40.0
 )
