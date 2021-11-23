@@ -16,6 +16,8 @@ const (
 	TokenTypeERC721 TokenType = "ERC-721"
 	// TokenTypeERC1155 is the type of an ERC1155 token
 	TokenTypeERC1155 TokenType = "ERC-1155"
+	// TokenTypeERC20 is the type of an ERC20 token
+	TokenTypeERC20 TokenType = "ERC-20"
 )
 
 const (

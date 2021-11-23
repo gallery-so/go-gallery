@@ -5,11 +5,15 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/pubsub"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
-func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository, psub pubsub.PubSub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -27,6 +31,13 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 
 		c.JSON(http.StatusOK, output)
 
+		if viper.GetString("ENV") != "local" {
+			err := publishUserSignup(c, output.UserID, userRepository, psub)
+			if err != nil {
+				logrus.WithError(err).Error("failed to publish user signup")
+			}
+		}
+
 	}
 }
 
@@ -40,7 +51,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		userID := getUserIDfromCtx(c)
+		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -93,7 +104,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 
 	output.UserID = userID
 
-	jwtTokenStr, err := jwtGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}

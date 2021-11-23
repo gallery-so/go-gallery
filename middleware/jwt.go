@@ -1,4 +1,4 @@
-package server
+package middleware
 
 import (
 	"context"
@@ -16,24 +16,27 @@ type jwtClaims struct {
 	jwt.StandardClaims
 }
 
-type jwtValidateResponse struct {
+// JWTValidateResponse is the response for the jwt validation endpoint
+type JWTValidateResponse struct {
 	IsValid bool         `json:"valid"`
 	UserID  persist.DBID `json:"user_id"`
 }
 
-func validateJwt() gin.HandlerFunc {
+// ValidateJWT is a handler that validates the JWT token and returns the user ID
+func ValidateJWT() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		auth := c.GetBool(authContextKey)
-		userID := getUserIDfromCtx(c)
+		auth := c.GetBool(AuthContextKey)
+		userID := GetUserIDFromCtx(c)
 
-		c.JSON(http.StatusOK, jwtValidateResponse{
+		c.JSON(http.StatusOK, JWTValidateResponse{
 			IsValid: auth,
 			UserID:  userID,
 		})
 	}
 }
 
-func authJwtParse(pJWTtokenStr string,
+// AuthJWTParse parses the JWT token from the request and returns whether the token is valid and the user ID associated with it
+func AuthJWTParse(pJWTtokenStr string,
 	pJWTsecretKeyStr string) (bool, persist.DBID, error) {
 
 	claims := jwtClaims{}
@@ -48,13 +51,14 @@ func authJwtParse(pJWTtokenStr string,
 	}
 
 	if !JWTtoken.Valid {
-		return false, "", errInvalidJWT
+		return false, "", ErrInvalidJWT
 	}
 
 	return true, claims.UserID, nil
 }
 
-func jwtGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
+// JWTGeneratePipeline generates a new JWT token for the user
+func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, error) {
 
 	issuer := "gallery"
 	jwtTokenStr, err := jwtGenerate(issuer, pUserID)

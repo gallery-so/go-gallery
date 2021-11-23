@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
@@ -49,9 +50,9 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 }
 
 func updateMembershipTiers(pCtx context.Context, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, ethClient *eth.Client) ([]*persist.MembershipTier, error) {
-	membershipTiers := make([]*persist.MembershipTier, len(requiredNFTs))
+	membershipTiers := make([]*persist.MembershipTier, len(middleware.RequiredNFTs))
 	tierChan := make(chan *persist.MembershipTier)
-	for _, v := range requiredNFTs {
+	for _, v := range middleware.RequiredNFTs {
 		go func(id persist.TokenID) {
 			tier := &persist.MembershipTier{
 				TokenID: id,
@@ -99,7 +100,7 @@ func updateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 		}(v)
 	}
 
-	for i := 0; i < len(requiredNFTs); i++ {
+	for i := 0; i < len(middleware.RequiredNFTs); i++ {
 		membershipTiers[i] = <-tierChan
 	}
 	return membershipTiers, nil

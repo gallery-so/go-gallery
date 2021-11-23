@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/pubsub/pstest"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -13,8 +14,11 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/memstore"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
+	"github.com/mikeydub/go-gallery/pubsub"
+	"github.com/mikeydub/go-gallery/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -23,6 +27,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 type repositories struct {
@@ -59,7 +65,7 @@ func CoreInit() *gin.Engine {
 	setDefaults()
 
 	router := gin.Default()
-	router.Use(handleCORS(), errLogger())
+	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -71,7 +77,7 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("username", usernameValidator)
 	}
 
-	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell())
+	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
 }
 
 func setDefaults() {
@@ -91,6 +97,7 @@ func setDefaults() {
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
+	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
 
 	viper.AutomaticEnv()
 
@@ -188,4 +195,30 @@ func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
 	sh.SetTimeout(time.Second * 15)
 	return sh
+}
+
+func newGCPPubSub() pubsub.PubSub {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
+	defer cancel()
+	if viper.GetString("ENV") != "local" {
+		pub, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_CLOUD_PROJECT"))
+		if err != nil {
+			panic(err)
+		}
+		return pub
+	}
+	srv := pstest.NewServer()
+	// Connect to the server without using TLS.
+	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
+	// Use the connection when creating a pubsub client.
+	client, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_PROJECT_ID"), option.WithGRPCConn(conn))
+	if err != nil {
+		panic(err)
+	}
+
+	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	return client
 }

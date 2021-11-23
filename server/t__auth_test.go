@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +52,7 @@ func TestJwtValid_Success(t *testing.T) {
 	resp := jwtValidRequest(assert, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
-	output := &jwtValidateResponse{}
+	output := &middleware.JWTValidateResponse{}
 	err := util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.True(output.IsValid)
@@ -63,7 +64,7 @@ func TestJwtValid_WrongSignatureAndClaims_Failure(t *testing.T) {
 	resp := jwtValidRequest(assert, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUZXN0IiwiaWF0IjoxNjMzMDE1MTM1LCJleHAiOjE2NjQ1NTExMzUsImF1ZCI6InRlc3QiLCJzdWIiOiJ0ZXN0IiwiVGVzdCI6IlRlc3QifQ.ewGO4x1xEN01CCZTp5vg0d_rxzdzH_rY0zBXVT1OVJY")
 	assertValidJSONResponse(assert, resp)
 
-	output := &jwtValidateResponse{}
+	output := &middleware.JWTValidateResponse{}
 	err := util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.False(output.IsValid)
