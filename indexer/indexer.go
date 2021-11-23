@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -340,11 +341,12 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 	for _, t := range transfers {
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 
 		at := int64(0)
 		go func(transfer *transfer) {
 			defer cancel()
+			wg := &sync.WaitGroup{}
 			contractAddress := transfer.contractAddress
 			from := transfer.from
 			to := transfer.to
@@ -356,25 +358,37 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 			switch persist.TokenType(transfer.tokenType) {
 			case persist.TokenTypeERC721:
 
+				wg.Add(4)
+
 				atomic.StoreInt64(&at, int64(1))
 				if ctx.Err() != nil {
 					return
 				}
-				owners <- ownerAtBlock{key, to, transfer.blockNumber}
+				go func() {
+					defer wg.Done()
+					owners <- ownerAtBlock{key, to, transfer.blockNumber}
+				}()
 
 				atomic.StoreInt64(&at, int64(2))
 				if ctx.Err() != nil {
 					return
 				}
-				previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+				go func() {
+					defer wg.Done()
+					previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+				}()
 
 			case persist.TokenTypeERC1155:
+				wg.Add(3)
 
 				atomic.StoreInt64(&at, int64(3))
 				if ctx.Err() != nil {
 					return
 				}
-				balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+				go func() {
+					defer wg.Done()
+					balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+				}()
 
 			default:
 				panic("unknown token type")
@@ -397,7 +411,10 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 			if ctx.Err() != nil {
 				return
 			}
-			uris <- tokenURI{key, uriReplaced}
+			go func() {
+				defer wg.Done()
+				uris <- tokenURI{key, uriReplaced}
+			}()
 
 			atomic.StoreInt64(&at, int64(6))
 			var metadata persist.TokenMetadata
@@ -419,8 +436,11 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 			if ctx.Err() != nil {
 				return
 			}
-			metadatas <- tokenMetadata{key, metadata}
-
+			go func() {
+				defer wg.Done()
+				metadatas <- tokenMetadata{key, metadata}
+			}()
+			wg.Wait()
 		}(t)
 
 		<-ctx.Done()
@@ -532,7 +552,7 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 
 	for balance := range balanceChan {
 		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 			if balances[balance.ti] == nil {
 				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
