@@ -27,8 +27,8 @@ type TokenMongoRepository struct {
 func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
 	tokenStorage.collection.Indexes().DropAll(context.Background())
-	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	// defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	// tokenIdentifiersIndex := mongo.IndexModel{
 	// 	Keys: bson.D{
 	// 		{Key: "token_id", Value: 1},
@@ -36,11 +36,11 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	// 		{Key: "deleted", Value: 1},
 	// 	},
 	// }
-	// blockNumberIndex := mongo.IndexModel{
-	// 	Keys: bson.D{
-	// 		{Key: "block_number", Value: -1},
-	// 	},
-	// }
+	blockNumberIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "block_number", Value: -1},
+		},
+	}
 	// tokenIDIndex := mongo.IndexModel{
 	// 	Keys: bson.D{
 	// 		{Key: "token_id", Value: 1},
@@ -57,10 +57,10 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// bnName, err := tokenStorage.createIndex(ctx, blockNumberIndex)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	_, err := tokenStorage.createIndex(ctx, blockNumberIndex)
+	if err != nil {
+		panic(err)
+	}
 	// tidName, err := tokenStorage.createIndex(ctx, tokenIDIndex)
 	// if err != nil {
 	// 	panic(err)
