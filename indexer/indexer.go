@@ -327,7 +327,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
 
 	for _, t := range transfers {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10*time.Duration(len(transfers)))
 		go func(ctx context.Context, cancel context.CancelFunc, transfer *transfer) {
 			defer cancel()
 			wg := &sync.WaitGroup{}
@@ -406,7 +406,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 		if ctx.Err() == context.DeadlineExceeded {
 			logrus.Errorf("Timed out processing transfer %+v", t)
 			logrus.Errorf("Total transfers %d", len(transfers))
-			panic("timeout")
+			return
 		}
 	}
 
