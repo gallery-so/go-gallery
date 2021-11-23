@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -100,7 +99,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 
 		if len(pLog.Topics) == 3 {
 
-			contractAbi, err := abi.JSON(strings.NewReader(string(contracts.IERC20ABI)))
+			contractAbi, err := contracts.IERC20MetaData.GetAbi()
 			if err != nil {
 				return err
 			}

@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -202,7 +204,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 
 	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
-	transfers := logsToTransfers(logsTo)
+	transfers := logsToTransfers(logsTo, i.ethClient)
 
 	logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
@@ -224,13 +226,23 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 	logrus.Info("Finished processing logs, closing transfers channel...")
 }
 
-func logsToTransfers(pLogs []types.Log) []*transfer {
+func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []*transfer {
 	result := []*transfer{}
 	for _, pLog := range pLogs {
 		switch {
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
 
 			if len(pLog.Topics) < 4 {
+				continue
+			}
+
+			erc721, err := contracts.NewIERC721Caller(pLog.Address, ethClient)
+			if err != nil {
+				logrus.WithError(err).Error("Error getting erc721 contract")
+				continue
+			}
+			isERC721, _ := erc721.SupportsInterface(&bind.CallOpts{}, [4]byte{0x80, 0xac, 0x58, 0xcd})
+			if !isERC721 {
 				continue
 			}
 
@@ -785,7 +797,7 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 		case log := <-subscriptions:
 			logrus.Infof("Got log at: %d", log.BlockNumber)
 			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
-			transfers <- logsToTransfers([]types.Log{log})
+			transfers <- logsToTransfers([]types.Log{log}, i.ethClient)
 		case err := <-sub.Err():
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}

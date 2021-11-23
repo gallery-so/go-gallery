@@ -155,4 +155,6 @@ interface IERC721 {
         uint256 tokenId,
         bytes calldata data
     ) external;
+
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
