@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -27,49 +26,49 @@ type TokenMongoRepository struct {
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
 func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	tokenIdentifiersIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "token_id", Value: 1},
-			{Key: "contract_address", Value: 1},
-			{Key: "deleted", Value: 1},
-		},
-	}
-	blockNumberIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "block_number", Value: -1},
-		},
-	}
-	tokenIDIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "token_id", Value: 1},
-			{Key: "deleted", Value: 1},
-		},
-	}
-	ownerAddressIndex := mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "owner_address", Value: 1},
-			{Key: "deleted", Value: 1},
-		},
-	}
-	tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
-	if err != nil {
-		panic(err)
-	}
-	bnName, err := tokenStorage.createIndex(ctx, blockNumberIndex)
-	if err != nil {
-		panic(err)
-	}
-	tidName, err := tokenStorage.createIndex(ctx, tokenIDIndex)
-	if err != nil {
-		panic(err)
-	}
-	oaName, err := tokenStorage.createIndex(ctx, ownerAddressIndex)
-	if err != nil {
-		panic(err)
-	}
-	logrus.Infof("created indexes %s, %s, %s, and %s", tiName, tidName, oaName, bnName)
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// defer cancel()
+	// tokenIdentifiersIndex := mongo.IndexModel{
+	// 	Keys: bson.D{
+	// 		{Key: "token_id", Value: 1},
+	// 		{Key: "contract_address", Value: 1},
+	// 		{Key: "deleted", Value: 1},
+	// 	},
+	// }
+	// blockNumberIndex := mongo.IndexModel{
+	// 	Keys: bson.D{
+	// 		{Key: "block_number", Value: -1},
+	// 	},
+	// }
+	// tokenIDIndex := mongo.IndexModel{
+	// 	Keys: bson.D{
+	// 		{Key: "token_id", Value: 1},
+	// 		{Key: "deleted", Value: 1},
+	// 	},
+	// }
+	// ownerAddressIndex := mongo.IndexModel{
+	// 	Keys: bson.D{
+	// 		{Key: "owner_address", Value: 1},
+	// 		{Key: "deleted", Value: 1},
+	// 	},
+	// }
+	// tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// bnName, err := tokenStorage.createIndex(ctx, blockNumberIndex)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// tidName, err := tokenStorage.createIndex(ctx, tokenIDIndex)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// oaName, err := tokenStorage.createIndex(ctx, ownerAddressIndex)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logrus.Infof("created indexes %s, %s, %s, and %s", tiName, tidName, oaName, bnName)
 	return &TokenMongoRepository{
 		mp:  tokenStorage,
 		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
