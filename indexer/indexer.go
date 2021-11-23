@@ -119,7 +119,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
 	if err == nil && recentDBBlock > defaultStartingBlock {
@@ -340,92 +340,94 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 	for _, t := range transfers {
 
-		func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		at := int64(0)
+		go func(transfer *transfer) {
 			defer cancel()
+			contractAddress := transfer.contractAddress
+			from := transfer.from
+			to := transfer.to
+			tokenID := transfer.tokenID
 
-			running := false
-			at := int64(0)
-			for {
-				select {
-				case <-ctx.Done():
-					if ctx.Err() == context.DeadlineExceeded {
-						logrus.Errorf("Timed out processing transfer %+v at %d", t, atomic.LoadInt64(&at))
-						logrus.Errorf("Total transfers %d", len(transfers))
-					}
+			key := makeKeyForToken(contractAddress, tokenID)
+			logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
+
+			switch persist.TokenType(transfer.tokenType) {
+			case persist.TokenTypeERC721:
+
+				atomic.StoreInt64(&at, int64(1))
+				if ctx.Err() != nil {
 					return
-				default:
-					if !running {
-						running = true
-						go func(transfer *transfer) {
-							contractAddress := transfer.contractAddress
-							from := transfer.from
-							to := transfer.to
-							tokenID := transfer.tokenID
+				}
+				owners <- ownerAtBlock{key, to, transfer.blockNumber}
 
-							key := makeKeyForToken(contractAddress, tokenID)
-							logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
+				atomic.StoreInt64(&at, int64(2))
+				if ctx.Err() != nil {
+					return
+				}
+				previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
 
-							switch persist.TokenType(transfer.tokenType) {
-							case persist.TokenTypeERC721:
+			case persist.TokenTypeERC1155:
 
-								atomic.StoreInt64(&at, int64(1))
-								owners <- ownerAtBlock{key, to, transfer.blockNumber}
+				atomic.StoreInt64(&at, int64(3))
+				if ctx.Err() != nil {
+					return
+				}
+				balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
 
-								atomic.StoreInt64(&at, int64(2))
-								previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
+			default:
+				panic("unknown token type")
+			}
 
-							case persist.TokenTypeERC1155:
+			atomic.StoreInt64(&at, int64(4))
+			u, err := GetTokenURI(ctx, transfer.tokenType, contractAddress, tokenID, i.ethClient)
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
+			}
 
-								atomic.StoreInt64(&at, int64(3))
-								balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+			id, err := util.HexToBigInt(string(tokenID))
+			if err != nil {
+				panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
+			}
 
-							default:
-								panic("unknown token type")
-							}
+			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
 
-							atomic.StoreInt64(&at, int64(4))
-							u, err := GetTokenURI(ctx, transfer.tokenType, contractAddress, tokenID, i.ethClient)
-							if err != nil {
-								logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
-							}
+			atomic.StoreInt64(&at, int64(5))
+			if ctx.Err() != nil {
+				return
+			}
+			uris <- tokenURI{key, uriReplaced}
 
-							id, err := util.HexToBigInt(string(tokenID))
-							if err != nil {
-								panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
-							}
-
-							uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
-
-							atomic.StoreInt64(&at, int64(5))
-							uris <- tokenURI{key, uriReplaced}
-
-							atomic.StoreInt64(&at, int64(6))
-							var metadata persist.TokenMetadata
-							if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-								metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
-								if err != nil {
-									logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-									atomic.AddUint64(&i.badURIs, 1)
-								}
-							} else {
-								metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
-								if err != nil {
-									logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-									atomic.AddUint64(&i.badURIs, 1)
-								}
-							}
-
-							atomic.StoreInt64(&at, int64(7))
-							metadatas <- tokenMetadata{key, metadata}
-						}(t)
-					}
-
+			atomic.StoreInt64(&at, int64(6))
+			var metadata persist.TokenMetadata
+			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+				if err != nil {
+					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+					atomic.AddUint64(&i.badURIs, 1)
+				}
+			} else {
+				metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
+				if err != nil {
+					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+					atomic.AddUint64(&i.badURIs, 1)
 				}
 			}
 
-		}()
+			atomic.StoreInt64(&at, int64(7))
+			if ctx.Err() != nil {
+				return
+			}
+			metadatas <- tokenMetadata{key, metadata}
+
+		}(t)
+
+		<-ctx.Done()
+		if ctx.Err() == context.DeadlineExceeded {
+			logrus.Errorf("Timed out processing transfer %+v at %d", t, atomic.LoadInt64(&at))
+			logrus.Errorf("Total transfers %d", len(transfers))
+		}
 
 	}
 
