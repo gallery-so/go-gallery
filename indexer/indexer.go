@@ -406,7 +406,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 		if ctx.Err() == context.DeadlineExceeded {
 			logrus.Errorf("Timed out processing transfer %+v", t)
 			logrus.Errorf("Total transfers %d", len(transfers))
-			return
+			continue
 		}
 	}
 
