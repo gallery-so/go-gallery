@@ -241,9 +241,11 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []*transfer
 				logrus.WithError(err).Error("Error getting erc721 contract")
 				continue
 			}
-			isERC721, _ := erc721.SupportsInterface(&bind.CallOpts{}, [4]byte{0x80, 0xac, 0x58, 0xcd})
-			if !isERC721 {
-				continue
+			isERC721, err := erc721.SupportsInterface(&bind.CallOpts{}, [4]byte{0x80, 0xac, 0x58, 0xcd})
+			if err == nil {
+				if !isERC721 {
+					continue
+				}
 			}
 
 			result = append(result, &transfer{
