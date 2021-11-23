@@ -26,6 +26,7 @@ type TokenMongoRepository struct {
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
 func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
+	tokenStorage.collection.Indexes().DropAll(context.Background())
 	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	// defer cancel()
 	// tokenIdentifiersIndex := mongo.IndexModel{
