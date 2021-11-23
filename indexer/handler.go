@@ -26,11 +26,13 @@ import (
 
 // Init starts the indexer and handles requests
 func Init() {
-	router := coreInit()
+	router, i := coreInit()
+	logrus.Info("Starting indexer...")
+	go i.Start()
 	http.Handle("/", router)
 }
 
-func coreInit() *gin.Engine {
+func coreInit() (*gin.Engine, *Indexer) {
 
 	setDefaults()
 
@@ -41,11 +43,8 @@ func coreInit() *gin.Engine {
 
 	router := gin.Default()
 
-	logrus.Info("Starting indexer...")
-	go i.Start()
-
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo)
+	return handlersInit(router, i, tokenRepo), i
 }
 
 func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenRepository) *gin.Engine {

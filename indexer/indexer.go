@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -118,11 +117,13 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	lastSyncedBlock := defaultStartingBlock
-	recentDBBlock, err := i.tokenRepo.MostRecentBlock(context.Background())
+	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
 	if err == nil && recentDBBlock > defaultStartingBlock {
 		lastSyncedBlock = recentDBBlock
 	}
+	cancel()
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
@@ -316,7 +317,8 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 		it := make([]*transfer, len(transfers))
 		copy(it, transfers)
 		wp.Submit(func() {
-			processTransfers(i, it, uris, metadatas, owners, previousOwners, balances)
+			submit := it
+			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -327,87 +329,94 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
 
 	for _, t := range transfers {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10*time.Duration(len(transfers)))
-		go func(ctx context.Context, cancel context.CancelFunc, transfer *transfer) {
+
+		func() {
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			wg := &sync.WaitGroup{}
-			contractAddress := transfer.contractAddress
-			from := transfer.from
-			to := transfer.to
-			tokenID := transfer.tokenID
 
-			key := makeKeyForToken(contractAddress, tokenID)
-			logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
+			running := false
+			at := int64(0)
+			for {
+				select {
+				case <-ctx.Done():
+					if ctx.Err() == context.DeadlineExceeded {
+						logrus.Errorf("Timed out processing transfer %+v at %d", t, atomic.LoadInt64(&at))
+						logrus.Errorf("Total transfers %d", len(transfers))
+					}
+					return
+				default:
+					if !running {
+						running = true
+						go func(transfer *transfer) {
+							contractAddress := transfer.contractAddress
+							from := transfer.from
+							to := transfer.to
+							tokenID := transfer.tokenID
 
-			switch persist.TokenType(transfer.tokenType) {
-			case persist.TokenTypeERC721:
-				wg.Add(4)
-				// send owner to channel
-				go func() {
-					defer wg.Done()
-					owners <- ownerAtBlock{key, to, transfer.blockNumber}
-				}()
-				// send previous owner to channel
-				go func() {
-					defer wg.Done()
-					previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
-				}()
+							key := makeKeyForToken(contractAddress, tokenID)
+							logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-			case persist.TokenTypeERC1155:
-				wg.Add(3)
-				// send balance to channel
-				go func() {
-					defer wg.Done()
-					balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
-				}()
-			default:
-				panic("unknown token type")
-			}
+							switch persist.TokenType(transfer.tokenType) {
+							case persist.TokenTypeERC721:
 
-			u, err := GetTokenURI(ctx, transfer.tokenType, contractAddress, tokenID, i.ethClient)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
-			}
+								atomic.StoreInt64(&at, int64(1))
+								owners <- ownerAtBlock{key, to, transfer.blockNumber}
 
-			id, err := util.HexToBigInt(string(tokenID))
-			if err != nil {
-				panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
-			}
+								atomic.StoreInt64(&at, int64(2))
+								previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
 
-			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
-			// send uri to channel
-			go func() {
-				defer wg.Done()
-				uris <- tokenURI{key, uriReplaced}
-			}()
+							case persist.TokenTypeERC1155:
 
-			var metadata persist.TokenMetadata
-			if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-				metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
-				if err != nil {
-					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-					atomic.AddUint64(&i.badURIs, 1)
+								atomic.StoreInt64(&at, int64(3))
+								balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+
+							default:
+								panic("unknown token type")
+							}
+
+							atomic.StoreInt64(&at, int64(4))
+							u, err := GetTokenURI(ctx, transfer.tokenType, contractAddress, tokenID, i.ethClient)
+							if err != nil {
+								logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for ERC1155 token")
+							}
+
+							id, err := util.HexToBigInt(string(tokenID))
+							if err != nil {
+								panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
+							}
+
+							uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
+
+							atomic.StoreInt64(&at, int64(5))
+							uris <- tokenURI{key, uriReplaced}
+
+							atomic.StoreInt64(&at, int64(6))
+							var metadata persist.TokenMetadata
+							if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+								metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+								if err != nil {
+									logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+									atomic.AddUint64(&i.badURIs, 1)
+								}
+							} else {
+								metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
+								if err != nil {
+									logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+									atomic.AddUint64(&i.badURIs, 1)
+								}
+							}
+
+							atomic.StoreInt64(&at, int64(7))
+							metadatas <- tokenMetadata{key, metadata}
+						}(t)
+					}
+
 				}
-			} else {
-				metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
-				if err != nil {
-					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-					atomic.AddUint64(&i.badURIs, 1)
-				}
 			}
-			// send metadata to channel
-			go func() {
-				defer wg.Done()
-				metadatas <- tokenMetadata{key, metadata}
-			}()
-			wg.Wait()
-		}(ctx, cancel, t)
-		<-ctx.Done()
-		if ctx.Err() == context.DeadlineExceeded {
-			logrus.Errorf("Timed out processing transfer %+v", t)
-			logrus.Errorf("Total transfers %d", len(transfers))
-			continue
-		}
+
+		}()
+
 	}
 
 }
