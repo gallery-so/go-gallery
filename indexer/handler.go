@@ -24,7 +24,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-func init() {
+// Init initializes the indexer
+func Init() {
 	router, i := coreInit()
 	logrus.Info("Starting indexer...")
 	go i.Start()
