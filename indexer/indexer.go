@@ -339,9 +339,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
 
 	for _, transfer := range transfers {
-
 		func() {
-
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
 
@@ -415,7 +413,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 				}
 			} else {
 
-				metadata, err = GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
+				metadata, err = GetMetadataFromURI(uriReplaced, i.ipfsClient)
 				if err != nil {
 					logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 					atomic.AddUint64(&i.badURIs, 1)
@@ -436,21 +434,20 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange) {
 
-	done := make(chan bool)
+	wg := &sync.WaitGroup{}
+	wg.Add(5)
 	ownersMap := map[tokenIdentifiers]ownerAtBlock{}
 	previousOwnersMap := map[tokenIdentifiers][]ownerAtBlock{}
 	balancesMap := map[tokenIdentifiers]map[persist.Address]balanceAtBlock{}
 	metadatasMap := map[tokenIdentifiers]tokenMetadata{}
 	urisMap := map[tokenIdentifiers]tokenURI{}
 
-	go receiveBalances(done, balances, balancesMap, i.tokenRepo)
-	go receiveOwners(done, owners, ownersMap, i.tokenRepo)
-	go receiveMetadatas(done, metadatas, metadatasMap)
-	go receiveURIs(done, uris, urisMap)
-	go receivePreviousOwners(done, previousOwners, previousOwnersMap, i.tokenRepo)
-	for i := 0; i < 5; i++ {
-		<-done
-	}
+	go receiveBalances(wg, balances, balancesMap, i.tokenRepo)
+	go receiveOwners(wg, owners, ownersMap, i.tokenRepo)
+	go receiveMetadatas(wg, metadatas, metadatasMap)
+	go receiveURIs(wg, uris, urisMap)
+	go receivePreviousOwners(wg, previousOwners, previousOwnersMap, i.tokenRepo)
+	wg.Wait()
 
 	logrus.Info("Done recieving field data, convering fields into tokens...")
 
@@ -472,23 +469,24 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 }
 
-func receiveURIs(done chan bool, uris <-chan tokenURI, uriMap map[tokenIdentifiers]tokenURI) {
+func receiveURIs(wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[tokenIdentifiers]tokenURI) {
+	defer wg.Done()
 
 	for uri := range uris {
 		uriMap[uri.ti] = uri
 	}
-	done <- true
 }
 
-func receiveMetadatas(done chan bool, metadatas <-chan tokenMetadata, metaMap map[tokenIdentifiers]tokenMetadata) {
+func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMap map[tokenIdentifiers]tokenMetadata) {
+	defer wg.Done()
 
 	for meta := range metadatas {
 		metaMap[meta.ti] = meta
 	}
-	done <- true
 }
 
-func receivePreviousOwners(done chan bool, prevOwners <-chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
+	defer wg.Done()
 	for previousOwner := range prevOwners {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -526,11 +524,10 @@ func receivePreviousOwners(done chan bool, prevOwners <-chan ownerAtBlock, prevO
 			prevOwnersMap[previousOwner.ti] = append(prevOwnersMap[previousOwner.ti], previousOwner)
 		}()
 	}
-	done <- true
 }
 
-func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
-
+func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
+	defer wg.Done()
 	for balance := range balanceChan {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -576,10 +573,10 @@ func receiveBalances(done chan bool, balanceChan <-chan tokenBalanceChange, bala
 			balances[balance.ti][balance.to] = balTo
 		}()
 	}
-	done <- true
 }
 
-func receiveOwners(done chan bool, ownersChan <-chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
+	defer wg.Done()
 	for owner := range ownersChan {
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -611,7 +608,6 @@ func receiveOwners(done chan bool, ownersChan <-chan ownerAtBlock, owners map[to
 			}
 		}()
 	}
-	done <- true
 }
 
 func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {

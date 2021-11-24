@@ -281,7 +281,7 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 	}
 	if metadata == nil || len(metadata) == 0 {
 		logrus.Infof("Token metadata is empty for token %s-%s", contractAddress, id)
-		m, err := indexer.GetMetadataFromURI(ctx, tokenURI, ipfsClient)
+		m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"uri": tokenURI}).Error("could not get metadata for token")
 			return media, metadata, tokenURI

@@ -73,9 +73,9 @@ func getTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
-func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
+func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
 
-	bs, err := GetDataFromURI(ctx, turi, ipfsClient)
+	bs, err := GetDataFromURI(turi, ipfsClient)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -91,12 +91,9 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 }
 
 // GetDataFromURI calls URI and returns the data
-func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
+func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
 
 	timeout := time.Duration(5 * time.Second)
-	if t, ok := ctx.Deadline(); ok && time.Until(t) < timeout {
-		timeout = time.Until(t)
-	}
 	client := &http.Client{
 		Timeout: timeout,
 	}
@@ -130,7 +127,6 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return buf.Bytes(), nil
 	case persist.URITypeHTTP:
 		var body io.ReadCloser
-		defer body.Close()
 		if strings.Contains(asString, "ipfs/") {
 			toCat := asString[strings.Index(asString, "ipfs/")+5:]
 			it, err := ipfsClient.Cat(toCat)
@@ -148,6 +144,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			}
 			body = resp.Body
 		}
+		defer body.Close()
 
 		buf := &bytes.Buffer{}
 		if _, err := io.Copy(buf, body); err != nil {
