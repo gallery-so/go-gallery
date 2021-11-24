@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5500000
+var defaultStartingBlock persist.BlockNumber = 11300000
 
 const blocksPerLogsCall = 50
 
@@ -119,7 +119,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
@@ -228,7 +227,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 }
 
 func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []*transfer {
-	result := []*transfer{}
+	result := make([]*transfer, 0, len(pLogs))
 	for _, pLog := range pLogs {
 		switch {
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
@@ -620,7 +619,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 	for _, v := range balances {
 		totalBalances += len(v)
 	}
-	result := make([]*persist.Token, len(owners)+totalBalances)
+	result := make([]*persist.Token, len(owners)+totalBalances, len(owners)+totalBalances+len(metadatas)+len(uris))
 	j := 0
 
 	for k, v := range owners {
@@ -750,7 +749,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 	contracts := make(map[persist.Address]bool)
 
-	toUpsert := []*persist.Contract{}
+	toUpsert := make([]*persist.Contract, 0, len(t))
 	for _, token := range t {
 		if contracts[token.ContractAddress] {
 			continue

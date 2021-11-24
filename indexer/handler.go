@@ -24,8 +24,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-// Init starts the indexer and handles requests
-func Init() {
+func init() {
 	router, i := coreInit()
 	logrus.Info("Starting indexer...")
 	go i.Start()
@@ -112,7 +111,7 @@ func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 }
 
 func newMongoClient() *mongo.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 	mgoURL := viper.GetString("MONGO_URL")
 	if viper.GetString("ENV") != "local" {

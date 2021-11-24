@@ -3,12 +3,11 @@ package main
 import (
 	"net/http"
 
-	"github.com/mikeydub/go-gallery/indexer"
+	_ "github.com/mikeydub/go-gallery/indexer"
 	"google.golang.org/appengine"
 )
 
 func main() {
-	indexer.Init()
 	if appengine.IsAppEngine() {
 		appengine.Main()
 	} else {

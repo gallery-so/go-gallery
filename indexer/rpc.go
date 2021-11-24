@@ -5,17 +5,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -132,21 +129,20 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return buf.Bytes(), nil
 	case persist.URITypeHTTP:
-		var body io.Reader
+		var body io.ReadCloser
+		defer body.Close()
 		if strings.Contains(asString, "ipfs/") {
 			toCat := asString[strings.Index(asString, "ipfs/")+5:]
 			it, err := ipfsClient.Cat(toCat)
 			if err != nil {
 				return nil, err
 			}
-			defer it.Close()
 			body = it
 		} else {
 			resp, err := client.Get(asString)
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 			if resp.StatusCode > 299 || resp.StatusCode < 200 {
 				return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 			}
@@ -227,34 +223,33 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		if err != nil {
 			return "", err
 		}
-		if turi != "" {
-			return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
-		}
 
-		topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}
-		logs, err := ethClient.FilterLogs(newCtx, ethereum.FilterQuery{
-			FromBlock: defaultStartingBlock.BigInt(),
-			Addresses: []common.Address{contract},
-			Topics:    topics,
-		})
-		if err != nil {
-			return "", err
-		}
-		if len(logs) == 0 {
-			return "", errors.New("no logs found")
-		}
+		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
 
-		sort.Slice(logs, func(i, j int) bool {
-			return logs[i].BlockNumber > logs[j].BlockNumber
-		})
-		if len(logs[0].Data) < 128 {
-			return "", errors.New("invalid data")
-		}
+		// topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}
+		// logs, err := ethClient.FilterLogs(newCtx, ethereum.FilterQuery{
+		// 	FromBlock: defaultStartingBlock.BigInt(),
+		// 	Addresses: []common.Address{contract},
+		// 	Topics:    topics,
+		// })
+		// if err != nil {
+		// 	return "", err
+		// }
+		// if len(logs) == 0 {
+		// 	return "", errors.New("no logs found")
+		// }
 
-		offset := new(big.Int).SetBytes(logs[0].Data[:32])
-		length := new(big.Int).SetBytes(logs[0].Data[32:64])
-		uri := persist.TokenURI(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
-		return uri, nil
+		// sort.Slice(logs, func(i, j int) bool {
+		// 	return logs[i].BlockNumber > logs[j].BlockNumber
+		// })
+		// if len(logs[0].Data) < 128 {
+		// 	return "", errors.New("invalid data")
+		// }
+
+		// offset := new(big.Int).SetBytes(logs[0].Data[:32])
+		// length := new(big.Int).SetBytes(logs[0].Data[32:64])
+		// uri := persist.TokenURI(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
+		// return uri, nil
 	default:
 		return "", fmt.Errorf("unknown token type: %s", pTokenType)
 	}
