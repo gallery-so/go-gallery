@@ -488,11 +488,12 @@ func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMa
 func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for previousOwner := range prevOwners {
-		previousOwnerMap, ok := prevOwnersMap[previousOwner.ti]
+		currentPreviousOwners, ok := prevOwnersMap[previousOwner.ti]
 		if !ok {
-			previousOwnerMap = make([]ownerAtBlock, 0, 20)
+			currentPreviousOwners = make([]ownerAtBlock, 0, 20)
 		}
-		previousOwnerMap = append(previousOwnerMap, previousOwner)
+		currentPreviousOwners = append(currentPreviousOwners, previousOwner)
+		prevOwnersMap[previousOwner.ti] = currentPreviousOwners
 	}
 }
 
@@ -503,12 +504,18 @@ func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalanceChange, 
 		if !ok {
 			balanceMap = make(map[persist.Address]balanceAtBlock)
 		}
-		toBal := balanceMap[balance.to]
+		toBal, ok := balanceMap[balance.to]
+		if !ok {
+			toBal = balanceAtBlock{amnt: big.NewInt(0)}
+		}
 		toBal.block = balance.block
 		toBal.amnt.Add(toBal.amnt, balance.amt)
 		balanceMap[balance.to] = toBal
 
-		fromBal := balanceMap[balance.from]
+		fromBal, ok := balanceMap[balance.from]
+		if !ok {
+			fromBal = balanceAtBlock{amnt: big.NewInt(0)}
+		}
 		fromBal.block = balance.block
 		fromBal.amnt.Sub(fromBal.amnt, balance.amt)
 		balanceMap[balance.from] = fromBal
@@ -554,18 +561,18 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 		uri := uris[k]
 		result[j] = &persist.Token{
-			TokenID:         tokenID,
-			ContractAddress: contractAddress,
-			OwnerAddress:    v.owner,
-			Quantity:        1,
-			Name:            name,
-			Description:     description,
-			PreviousOwners:  previousOwnerAddresses,
-			TokenType:       persist.TokenTypeERC721,
-			TokenMetadata:   metadata.md,
-			TokenURI:        uri.uri,
-			Chain:           i.chain,
-			BlockNumber:     v.block,
+			TokenID:          tokenID,
+			ContractAddress:  contractAddress,
+			OwnerAddress:     v.owner,
+			Amount:           1,
+			Name:             name,
+			Description:      description,
+			OwnershipHistoty: previousOwnerAddresses,
+			TokenType:        persist.TokenTypeERC721,
+			TokenMetadata:    metadata.md,
+			TokenURI:         uri.uri,
+			Chain:            i.chain,
+			BlockNumber:      v.block,
 		}
 		if uri.uri != "" {
 			delete(uris, k)
@@ -597,7 +604,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
-				Quantity:        balance.amnt.Uint64(),
+				Amount:          balance.amnt.Int64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,

@@ -42,8 +42,10 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 // BulkUpsert upserts many contracts by their address field
 func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*persist.Contract) error {
 
-	upserts := make([]upsertModel, len(contracts))
+	upserts := make([]updateModel, len(contracts))
 	for i, contract := range contracts {
+
+		setDocs := make(bson.D, 0, 2)
 		query := bson.M{
 			"address": contract.Address,
 		}
@@ -62,9 +64,17 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 		for k := range query {
 			delete(asMap, k)
 		}
-		upserts[i] = upsertModel{
+		now := time.Now()
+		asMap["last_updated"] = now
+
+		setDocs = append(setDocs, bson.E{Key: "$set", Value: asMap})
+
+		insertDoc := bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID(), "created_at": now}}
+		setDocs = append(setDocs, insertDoc)
+
+		upserts[i] = updateModel{
 			query:   query,
-			setDocs: []bson.M{asMap},
+			setDocs: setDocs,
 		}
 	}
 	err := c.mp.bulkUpsert(pCtx, upserts)

@@ -240,14 +240,19 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
 func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persist.Token) error {
 
-	models := make([]upsertModel, len(pTokens))
+	upsertModels := make([]updateModel, 0, len(pTokens))
+	updateModels := make([]updateModel, 0, len(pTokens))
 
-	for i, v := range pTokens {
+	for _, v := range pTokens {
 
-		setDocs := make([]bson.M, 0, 4)
+		setDocs := make(bson.D, 0, 3)
+		nextSetDocs := make(bson.D, 0, 1)
+
 		query := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress}
+		nextQuery := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress, "block_number": bson.M{"$lte": v.BlockNumber}}
 		if v.TokenType == persist.TokenTypeERC1155 {
 			query["owner_address"] = v.OwnerAddress
+			nextQuery["owner_address"] = v.OwnerAddress
 		}
 
 		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, v)
@@ -261,38 +266,63 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 			return err
 		}
 		delete(asMap, "_id")
+		delete(asMap, "ownership_history")
+		delete(asMap, "amount")
+		delete(asMap, "created_at")
+		delete(asMap, "block_number")
+		asMap["last_updated"] = time.Now()
 
 		for k := range query {
 			delete(asMap, k)
 		}
-		setDocs = append(setDocs, asMap)
 
-		ownerDoc := bson.M{"owner_address": bson.M{"$cond": bson.M{"if": bson.M{"$gt": []interface{}{"$block_number", v.BlockNumber}}, "then": "$owner_address", "else": v.OwnerAddress}}}
-		setDocs = append(setDocs, ownerDoc)
+		setDocs = append(setDocs, bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID(), "created_at": time.Now(), "block_number": v.BlockNumber}})
 
 		if v.TokenType == persist.TokenTypeERC1155 {
-			balanceDoc := bson.M{}
-			if v.Quantity > 0 {
-				balanceDoc = bson.M{"quantity": bson.M{"$add": []interface{}{"$balance", v.Quantity}}}
-			} else {
-				balanceDoc = bson.M{"quantity": bson.M{"$subtract": []interface{}{"$balance", v.Quantity}}}
-			}
+			balanceDoc := bson.E{Key: "$inc", Value: bson.M{"amount": v.Amount}}
 			setDocs = append(setDocs, balanceDoc)
+
+			ownerDoc := bson.E{Key: "$set", Value: bson.M{"block_number": v.BlockNumber}}
+			nextSetDocs = append(nextSetDocs, ownerDoc)
+
+			updateModels = append(updateModels, updateModel{
+				query:   nextQuery,
+				setDocs: nextSetDocs,
+			})
 		}
 
 		if v.TokenType == persist.TokenTypeERC721 {
-			previousOwnersDoc := bson.M{"previous_owners": bson.M{"$push": bson.M{"$owner_address": v.OwnerAddress}}}
-			setDocs = append(setDocs, previousOwnersDoc)
+			ownerHistory := bson.E{Key: "$push", Value: bson.M{"ownership_history": bson.M{"$each": v.OwnershipHistoty, "$sort": bson.M{"block": -1}}}}
+			setDocs = append(setDocs, ownerHistory)
+
+			delete(asMap, "owner_address")
+
+			ownerDoc := bson.E{Key: "$set", Value: bson.M{"owner_address": v.OwnerAddress, "block_number": v.BlockNumber}}
+			nextSetDocs = append(nextSetDocs, ownerDoc)
+
+			updateModels = append(updateModels, updateModel{
+				query:   nextQuery,
+				setDocs: nextSetDocs,
+			})
 		}
 
-		models[i] = upsertModel{
+		setDocs = append(setDocs, bson.E{Key: "$set", Value: asMap})
+
+		upsertModels = append(upsertModels, updateModel{
 			query:   query,
 			setDocs: setDocs,
-		}
+		})
 
 	}
 
-	return t.mp.bulkUpsert(pCtx, models)
+	if err := t.mp.bulkUpsert(pCtx, upsertModels); err != nil {
+		return err
+	}
+	if err := t.mp.bulkUpdate(pCtx, updateModels); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Upsert will upsert a token into the database

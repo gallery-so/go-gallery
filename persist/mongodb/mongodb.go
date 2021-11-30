@@ -54,9 +54,9 @@ type storage struct {
 	collection *mongo.Collection
 }
 
-type upsertModel struct {
+type updateModel struct {
 	query   bson.M
-	setDocs []bson.M
+	setDocs interface{}
 }
 
 type errNotStruct struct {
@@ -213,13 +213,13 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 }
 
 // bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
-func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
+func (m *storage) bulkUpsert(ctx context.Context, upserts []updateModel) error {
 
 	wp := workerpool.New(10)
 	errs := make(chan error)
 
 	for i := 0; i < len(upserts); i += 100 {
-		var toUpsert []upsertModel
+		var toUpsert []updateModel
 		if i+100 < len(upserts) {
 			toUpsert = upserts[i : i+100]
 		} else {
@@ -228,25 +228,10 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 
 		updateModels := make([]mongo.WriteModel, len(toUpsert))
 		for i, upsert := range toUpsert {
-			now := primitive.NewDateTimeFromTime(time.Now())
-			newSetDoc := bson.M{"last_updated": now}
-
-			if _, ok := newSetDoc["created_at"]; !ok {
-				newSetDoc["created_at"] = now
-			}
-
-			updateDoc := make(bson.D, len(upsert.setDocs)+2)
-
-			updateDoc[0] = bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID()}}
-			updateDoc[1] = bson.E{Key: "$set", Value: newSetDoc}
-
-			for i, v := range upsert.setDocs {
-				updateDoc[i+2] = bson.E{Key: "$set", Value: v}
-			}
 
 			model := &mongo.UpdateOneModel{
 				Filter: upsert.query,
-				Update: updateDoc,
+				Update: upsert.setDocs,
 				Upsert: boolin(true),
 			}
 
@@ -261,6 +246,56 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 				return
 			}
 			logrus.Infof("upserted %d documents and modified %d documents in %s", res.UpsertedCount, res.ModifiedCount, time.Since(beginUpsert))
+		})
+
+	}
+
+	go func() {
+		defer close(errs)
+		wp.StopWait()
+		errs <- nil
+	}()
+
+	if err := <-errs; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// bulkUpdate updates many documents in the mongo database
+func (m *storage) bulkUpdate(ctx context.Context, updates []updateModel) error {
+
+	wp := workerpool.New(10)
+	errs := make(chan error)
+
+	for i := 0; i < len(updates); i += 100 {
+		var toUpdate []updateModel
+		if i+100 < len(updates) {
+			toUpdate = updates[i : i+100]
+		} else {
+			toUpdate = updates[i:]
+		}
+
+		updateModels := make([]mongo.WriteModel, len(toUpdate))
+		for i, update := range toUpdate {
+
+			model := &mongo.UpdateOneModel{
+				Filter: update.query,
+				Update: update.setDocs,
+			}
+
+			updateModels[i] = model
+		}
+
+		wp.Submit(func() {
+			beginUpsert := time.Now()
+			res, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				errs <- err
+				return
+			}
+			logrus.Infof("modified %d documents out of %d matched in %s", res.ModifiedCount, res.MatchedCount, time.Since(beginUpsert))
 		})
 
 	}
