@@ -44,11 +44,27 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 
 	upserts := make([]upsertModel, len(contracts))
 	for i, contract := range contracts {
+		query := bson.M{
+			"address": contract.Address,
+		}
+		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, contract)
+		if err != nil {
+			return err
+		}
+
+		asMap := bson.M{}
+		err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+		if err != nil {
+			return err
+		}
+		delete(asMap, "_id")
+
+		for k := range query {
+			delete(asMap, k)
+		}
 		upserts[i] = upsertModel{
-			query: bson.M{
-				"address": contract.Address,
-			},
-			doc: contract,
+			query:   query,
+			setDocs: []bson.M{asMap},
 		}
 	}
 	err := c.mp.bulkUpsert(pCtx, upserts)

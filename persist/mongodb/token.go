@@ -243,14 +243,53 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 	models := make([]upsertModel, len(pTokens))
 
 	for i, v := range pTokens {
+
+		setDocs := make([]bson.M, 0, 4)
 		query := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress}
 		if v.TokenType == persist.TokenTypeERC1155 {
 			query["owner_address"] = v.OwnerAddress
 		}
-		models[i] = upsertModel{
-			query: query,
-			doc:   v,
+
+		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, v)
+		if err != nil {
+			return err
 		}
+
+		asMap := bson.M{}
+		err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+		if err != nil {
+			return err
+		}
+		delete(asMap, "_id")
+
+		for k := range query {
+			delete(asMap, k)
+		}
+		setDocs = append(setDocs, asMap)
+
+		ownerDoc := bson.M{"owner_address": bson.M{"$cond": bson.M{"if": bson.M{"$gt": []interface{}{"$block_number", v.BlockNumber}}, "then": "$owner_address", "else": v.OwnerAddress}}}
+		setDocs = append(setDocs, ownerDoc)
+
+		if v.TokenType == persist.TokenTypeERC1155 {
+			balanceDoc := bson.M{}
+			if v.Quantity > 0 {
+				balanceDoc = bson.M{"quantity": bson.M{"$add": []interface{}{"$balance", v.Quantity}}}
+			} else {
+				balanceDoc = bson.M{"quantity": bson.M{"$subtract": []interface{}{"$balance", v.Quantity}}}
+			}
+			setDocs = append(setDocs, balanceDoc)
+		}
+
+		if v.TokenType == persist.TokenTypeERC721 {
+			previousOwnersDoc := bson.M{"previous_owners": bson.M{"$push": bson.M{"$owner_address": v.OwnerAddress}}}
+			setDocs = append(setDocs, previousOwnersDoc)
+		}
+
+		models[i] = upsertModel{
+			query:   query,
+			setDocs: setDocs,
+		}
+
 	}
 
 	return t.mp.bulkUpsert(pCtx, models)

@@ -55,8 +55,8 @@ type storage struct {
 }
 
 type upsertModel struct {
-	query bson.M
-	doc   interface{}
+	query   bson.M
+	setDocs []bson.M
 }
 
 type errNotStruct struct {
@@ -229,30 +229,24 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 		updateModels := make([]mongo.WriteModel, len(toUpsert))
 		for i, upsert := range toUpsert {
 			now := primitive.NewDateTimeFromTime(time.Now())
-			asBSON, err := bson.MarshalWithRegistry(CustomRegistry, upsert.doc)
-			if err != nil {
-				return err
+			newSetDoc := bson.M{"last_updated": now}
+
+			if _, ok := newSetDoc["created_at"]; !ok {
+				newSetDoc["created_at"] = now
 			}
 
-			asMap := bson.M{}
-			err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
-			if err != nil {
-				return err
-			}
-			asMap["last_updated"] = now
-			if _, ok := asMap["created_at"]; !ok {
-				asMap["created_at"] = now
-			}
+			updateDoc := make(bson.D, len(upsert.setDocs)+2)
 
-			delete(asMap, "_id")
+			updateDoc[0] = bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID()}}
+			updateDoc[1] = bson.E{Key: "$set", Value: newSetDoc}
 
-			for k := range upsert.query {
-				delete(asMap, k)
+			for i, v := range upsert.setDocs {
+				updateDoc[i+2] = bson.E{Key: "$set", Value: v}
 			}
 
 			model := &mongo.UpdateOneModel{
 				Filter: upsert.query,
-				Update: bson.M{"$setOnInsert": bson.M{"_id": persist.GenerateID()}, "$set": asMap},
+				Update: updateDoc,
 				Upsert: boolin(true),
 			}
 
@@ -277,10 +271,8 @@ func (m *storage) bulkUpsert(ctx context.Context, upserts []upsertModel) error {
 		errs <- nil
 	}()
 
-	for err := range errs {
-		if err != nil {
-			return err
-		}
+	if err := <-errs; err != nil {
+		return err
 	}
 
 	return nil

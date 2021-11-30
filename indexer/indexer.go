@@ -488,125 +488,40 @@ func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMa
 func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, prevOwnersMap map[tokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for previousOwner := range prevOwners {
-		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			if prevOwnersMap[previousOwner.ti] == nil {
-				prevOwnersMap[previousOwner.ti] = []ownerAtBlock{}
-				contractAddress, tokenID, err := parseTokenIdentifiers(previousOwner.ti)
-				if err != nil {
-					panic(err)
-				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1, 0)
-				if err == nil && len(tokens) == 1 {
-					token := tokens[0]
-					checker := map[persist.BlockNumber]persist.Address{}
-					for _, o := range token.PreviousOwners {
-						if _, ok := checker[o.Block]; ok {
-							continue
-						}
-						checker[o.Block] = o.Address
-					}
-					ownersAtBlocks := make([]ownerAtBlock, len(checker))
-					i := 0
-					for k, v := range checker {
-						ownersAtBlocks[i] = ownerAtBlock{
-							ti:    previousOwner.ti,
-							block: k,
-							owner: v,
-						}
-						i++
-					}
-					prevOwnersMap[previousOwner.ti] = ownersAtBlocks
-				}
-
-			}
-			prevOwnersMap[previousOwner.ti] = append(prevOwnersMap[previousOwner.ti], previousOwner)
-		}()
+		previousOwnerMap, ok := prevOwnersMap[previousOwner.ti]
+		if !ok {
+			previousOwnerMap = make([]ownerAtBlock, 0, 20)
+		}
+		previousOwnerMap = append(previousOwnerMap, previousOwner)
 	}
 }
 
 func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for balance := range balanceChan {
-		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			if balances[balance.ti] == nil {
-				balances[balance.ti] = map[persist.Address]balanceAtBlock{}
-				contractAddress, tokenID, err := parseTokenIdentifiers(balance.ti)
-				if err != nil {
-					panic(err)
-				}
-				tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1000, 0)
-				if err == nil {
-					for i := 1; len(tokens) == 1000; i++ {
-						t, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1000, int64(i))
-						if err != nil {
-							logrus.WithError(err).Error("error getting tokens by indetifiers for balances")
-							break
-						}
-						tokens = append(tokens, t...)
-					}
-					for _, token := range tokens {
-						asBigInt, ok := new(big.Int).SetString(token.Quantity.String(), 16)
-						if ok {
-							balances[balance.ti][token.OwnerAddress] = balanceAtBlock{block: token.BlockNumber, amnt: asBigInt}
-						}
-					}
-				}
+		balanceMap, ok := balances[balance.ti]
+		if !ok {
+			balanceMap = make(map[persist.Address]balanceAtBlock)
+		}
+		toBal := balanceMap[balance.to]
+		toBal.block = balance.block
+		toBal.amnt.Add(toBal.amnt, balance.amt)
+		balanceMap[balance.to] = toBal
 
-			}
-			balTo := balances[balance.ti][balance.to]
-			balFrom := balances[balance.ti][balance.from]
-			if balTo.amnt == nil {
-				balTo.amnt = big.NewInt(0)
-			}
-			if balFrom.amnt == nil {
-				balFrom.amnt = big.NewInt(0)
-			}
-			balTo.block = balance.block
-			balFrom.block = balance.block
-			balTo.amnt.Add(balTo.amnt, balance.amt)
-			balFrom.amnt.Sub(balFrom.amnt, balance.amt)
-			balances[balance.ti][balance.from] = balFrom
-			balances[balance.ti][balance.to] = balTo
-		}()
+		fromBal := balanceMap[balance.from]
+		fromBal.block = balance.block
+		fromBal.amnt.Sub(fromBal.amnt, balance.amt)
+		balanceMap[balance.from] = fromBal
+
+		balances[balance.ti] = balanceMap
+
 	}
 }
 
 func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners map[tokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for owner := range ownersChan {
-		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			if on, ok := owners[owner.ti]; !ok {
-				owners[owner.ti] = owner
-			} else {
-				if on.block < owner.block {
-					owners[owner.ti] = owner
-				}
-			}
-			owner = owners[owner.ti]
-			contractAddress, tokenID, err := parseTokenIdentifiers(owner.ti)
-			if err != nil {
-				panic(err)
-			}
-			tokens, err := tokenRepo.GetByTokenIdentifiers(ctx, tokenID, contractAddress, 1, 0)
-			if err == nil && len(tokens) == 1 {
-				token := tokens[0]
-				if token.BlockNumber < owner.block {
-					owners[owner.ti] = owner
-				} else {
-					owners[owner.ti] = ownerAtBlock{
-						ti:    owner.ti,
-						block: token.BlockNumber,
-						owner: token.OwnerAddress,
-					}
-				}
-			}
-		}()
+		owners[owner.ti] = owner
 	}
 }
 
@@ -642,7 +557,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			TokenID:         tokenID,
 			ContractAddress: contractAddress,
 			OwnerAddress:    v.owner,
-			Quantity:        persist.HexString("1"),
+			Quantity:        1,
 			Name:            name,
 			Description:     description,
 			PreviousOwners:  previousOwnerAddresses,
@@ -682,7 +597,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
-				Quantity:        persist.HexString(balance.amnt.Text(16)),
+				Quantity:        balance.amnt.Uint64(),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
