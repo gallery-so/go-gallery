@@ -359,16 +359,12 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 				go func() {
 					defer wg.Done()
-					t := time.Now()
 					owners <- ownerAtBlock{key, to, transfer.blockNumber}
-					logrus.Infof("owner %s for %s in %s", to, key, time.Since(t))
 				}()
 
 				go func() {
 					defer wg.Done()
-					t := time.Now()
 					previousOwners <- ownerAtBlock{key, from, transfer.blockNumber}
-					logrus.Infof("previous owner %s for %s took %s", from, key, time.Since(t))
 				}()
 
 			case persist.TokenTypeERC1155:
@@ -376,9 +372,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 				go func() {
 					defer wg.Done()
-					t := time.Now()
 					balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
-					logrus.Infof("token balance change frin %s to %s for %s took %s", from, to, key, time.Since(t))
 				}()
 
 			default:
@@ -399,9 +393,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 			go func() {
 				defer wg.Done()
-				t := time.Now()
 				uris <- tokenURI{key, uriReplaced}
-				logrus.Infof("token URI %s for %s took %s", uriReplaced, key, time.Since(t))
 			}()
 
 			var metadata persist.TokenMetadata
@@ -422,9 +414,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 			go func() {
 				defer wg.Done()
-				t := time.Now()
 				metadatas <- tokenMetadata{key, metadata}
-				logrus.Infof("token metadata %s for %s took %s", metadata, key, time.Since(t))
 			}()
 			wg.Wait()
 		}()
@@ -459,7 +449,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 	logrus.Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * time.Duration(len(tokens)/100)) + time.Minute
+	timeout := (time.Minute * time.Duration(len(tokens)/100)) + (time.Minute * 2)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
@@ -659,13 +649,16 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client) error {
 
+	now := time.Now()
 	logrus.Infof("Upserting %d tokens", len(t))
 	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
 		return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
 	}
-	logrus.Infof("Upserted %d tokens", len(t))
+	logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
 
 	contracts := make(map[persist.Address]bool)
+
+	nextNow := time.Now()
 
 	toUpsert := make([]*persist.Contract, 0, len(t))
 	for _, token := range t {
@@ -678,10 +671,15 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 		contracts[token.ContractAddress] = true
 	}
+
+	logrus.Infof("Processed %d contracts in %v time", len(toUpsert), time.Since(nextNow))
+
+	finalNow := time.Now()
 	err := contractRepo.BulkUpsert(ctx, toUpsert)
 	if err != nil {
 		return fmt.Errorf("err upserting contracts: %s", err.Error())
 	}
+	logrus.Infof("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
 	return nil
 }
 
