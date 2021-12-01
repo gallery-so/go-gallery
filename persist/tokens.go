@@ -144,7 +144,7 @@ type Token struct {
 	Amount           int64            `bson:"amount,omitempty" json:"amount"`
 	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
 	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
-	TokenMetadata    TokenMetadata    `bson:"token_metadata,omitempty" json:"token_metadata"`
+	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
 	ExternalURL string `bson:"external_url,omitempty" json:"external_url"`
@@ -179,7 +179,7 @@ type TokenInCollection struct {
 	OwnerAddress Address  `bson:"owner_address" json:"owner_address"`
 
 	Media         Media         `bson:"media" json:"media"`
-	TokenMetadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
+	TokenMetadata TokenMetadata `bson:"metadata" json:"metadata"`
 }
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info

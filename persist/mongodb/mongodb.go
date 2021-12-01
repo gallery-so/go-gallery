@@ -1,9 +1,13 @@
 package mongodb
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -357,12 +361,30 @@ func tokenMetadataEncodeValue(ec bsoncodec.EncodeContext, vw bsonrw.ValueWriter,
 		}
 	}
 
-	dw, err := vw.WriteDocument()
+	buf := new(bytes.Buffer)
+	zipped := gzip.NewWriter(buf)
+
+	asJSON, err := json.Marshal(map[string]interface{}(val.Interface().(persist.TokenMetadata)))
 	if err != nil {
 		return err
 	}
 
-	return mapEncodeValue(ec, dw, val, nil)
+	_, err = zipped.Write(asJSON)
+	if err != nil {
+		return err
+	}
+	err = zipped.Close()
+	if err != nil {
+		return err
+	}
+	return vw.WriteBinary(buf.Bytes())
+
+	// dw, err := vw.WriteDocument()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// return mapEncodeValue(ec, dw, val, nil)
 }
 
 // mapEncodeValue handles encoding of the values of a map. The collisionFn returns
@@ -414,6 +436,40 @@ func mapEncodeValue(ec bsoncodec.EncodeContext, dw bsonrw.DocumentWriter, val re
 	}
 
 	return dw.WriteDocumentEnd()
+}
+
+func tokenMetadataDecodeValue(ec bsoncodec.DecodeContext, vw bsonrw.ValueReader, val reflect.Value) error {
+	if !val.IsValid() || !val.CanSet() || val.Type() != tokenMetadataType {
+		return bsoncodec.ValueDecoderError{Name: "TokenMetadataDecodeValue", Types: []reflect.Type{tokenMetadataType}, Received: val}
+	}
+	bin, _, err := vw.ReadBinary()
+	if err != nil {
+		return err
+	}
+
+	asJSON := new(bytes.Buffer)
+	unzipper, err := gzip.NewReader(bytes.NewReader(bin))
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(asJSON, unzipper)
+	if err != nil {
+		return err
+	}
+
+	err = unzipper.Close()
+	if err != nil {
+		return err
+	}
+
+	asTokenMetadata := make(persist.TokenMetadata)
+	if err = json.Unmarshal(asJSON.Bytes(), &asTokenMetadata); err != nil {
+		return err
+	}
+	val.Set(reflect.ValueOf(asTokenMetadata))
+
+	return nil
 }
 
 func lookupElementEncoder(ec bsoncodec.EncodeContext, origEncoder bsoncodec.ValueEncoder, currVal reflect.Value) (bsoncodec.ValueEncoder, reflect.Value, error) {
@@ -490,6 +546,7 @@ func createCustomRegistry() *bsoncodec.RegistryBuilder {
 	rb.RegisterTypeDecoder(lastUpdatedTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
 	rb.RegisterTypeDecoder(creationTimeType, bsoncodec.ValueDecoderFunc(dateTimeDecodeValue))
 	rb.RegisterTypeEncoder(tokenMetadataType, bsoncodec.ValueEncoderFunc(tokenMetadataEncodeValue))
+	rb.RegisterTypeDecoder(tokenMetadataType, bsoncodec.ValueDecoderFunc(tokenMetadataDecodeValue))
 	primitiveCodecs.RegisterPrimitiveCodecs(rb)
 	return rb
 }
