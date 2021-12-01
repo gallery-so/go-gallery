@@ -66,6 +66,7 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 		}
 		now := time.Now()
 		asMap["last_updated"] = now
+		delete(asMap, "created_at")
 
 		setDocs = append(setDocs, bson.E{Key: "$set", Value: asMap})
 
