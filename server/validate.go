@@ -28,11 +28,6 @@ var signatureValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return len(sig) >= 80 && len(sig) <= 200
 }
 
-var walletTypeValidator validator.Func = func(fl validator.FieldLevel) bool {
-	sig := fl.Field().Int()
-	return sig >= 0 && sig <= 1
-}
-
 var nonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 	nonce := fl.Field().String()
 	if nonce == "" {

@@ -39,7 +39,7 @@ var eip1271MagicValue = [4]byte{0x20, 0xc1, 0x3b, 0x0b}
 type authUserLoginInput struct {
 	Signature  string          `json:"signature" binding:"required,medium_string"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	WalletType walletType      `json:"walletType" binding:"required,wallet_type"`
+	WalletType walletType      `json:"walletType"`
 }
 
 type authUserLoginOutput struct {

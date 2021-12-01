@@ -90,7 +90,7 @@ type userAddAddressInput struct {
 	// the user still needs to prove ownership of their address.
 	Signature  string          `json:"signature" binding:"required,signature"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	WalletType walletType      `json:"wallet_type" binding:"required,wallet_type"`
+	WalletType walletType      `json:"wallet_type"`
 }
 
 type userRemoveAddressesInput struct {
