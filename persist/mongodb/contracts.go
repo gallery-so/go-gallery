@@ -77,7 +77,7 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 			setDocs: setDocs,
 		}
 	}
-	err := c.mp.bulkUpsert(pCtx, upserts)
+	err := c.mp.bulkUpdate(pCtx, upserts, true)
 	if err != nil {
 		return err
 	}

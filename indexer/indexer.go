@@ -450,6 +450,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	logrus.Info("Created tokens to insert into database...")
 
 	timeout := (time.Minute * time.Duration(len(tokens)/100)) + (time.Minute * 2)
+	logrus.Info("Upserting tokens and contracts with a timeout of ", timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)

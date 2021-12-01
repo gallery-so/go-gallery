@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -315,12 +316,16 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 	}
 
-	if err := t.mp.bulkUpsert(pCtx, upsertModels); err != nil {
+	now := time.Now()
+	if err := t.mp.bulkUpdate(pCtx, upsertModels, true); err != nil {
 		return err
 	}
-	if err := t.mp.bulkUpdate(pCtx, updateModels); err != nil {
+	logrus.Infof("Bulk upserted %d models in %s", len(upsertModels), time.Since(now))
+	nextNow := time.Now()
+	if err := t.mp.bulkUpdate(pCtx, updateModels, false); err != nil {
 		return err
 	}
+	logrus.Infof("Bulk updated %d models in %s", len(updateModels), time.Since(nextNow))
 
 	return nil
 }
