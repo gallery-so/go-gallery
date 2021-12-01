@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -147,17 +146,7 @@ func newMongoClient() *mongo.Client {
 	mOpts.SetRetryWrites(true)
 	mOpts.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
 
-	mClient, err := mongo.Connect(ctx, mOpts)
-	if err != nil {
-		panic(err)
-	}
-
-	err = mClient.Ping(ctx, readpref.Primary())
-	if err != nil {
-		panic(err)
-	}
-
-	return mClient
+	return mongodb.NewMongoClient(ctx, mOpts)
 }
 
 func newEthClient() *eth.Client {

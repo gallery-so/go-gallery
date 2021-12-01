@@ -20,7 +20,6 @@ import (
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
@@ -132,17 +131,7 @@ func newMongoClient() *mongo.Client {
 	mOpts.SetRetryWrites(true)
 	mOpts.SetRetryReads(true)
 
-	mClient, err := mongo.Connect(ctx, mOpts)
-	if err != nil {
-		panic(err)
-	}
-
-	err = mClient.Ping(ctx, readpref.Primary())
-	if err != nil {
-		panic(err)
-	}
-
-	return mClient
+	return mongodb.NewMongoClient(ctx, mOpts)
 }
 
 func redirectStderr(f *os.File) {

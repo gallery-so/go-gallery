@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 const (
@@ -61,6 +62,22 @@ type upsertModel struct {
 
 type errNotStruct struct {
 	iAmNotAStruct interface{}
+}
+
+// NewMongoClient returns a new MongoClient instance
+func NewMongoClient(ctx context.Context, mOpts *options.ClientOptions) *mongo.Client {
+
+	mClient, err := mongo.Connect(ctx, mOpts)
+	if err != nil {
+		panic(err)
+	}
+
+	err = mClient.Ping(ctx, readpref.Primary())
+	if err != nil {
+		panic(err)
+	}
+
+	return mClient
 }
 
 // newStorage returns a new MongoStorage instance with a pointer to a collection of the specified name

@@ -84,14 +84,15 @@ func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []p
 	for i, v := range pAddresses {
 		pAddresses[i] = v
 	}
-	opts := options.Aggregate()
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
+
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"owner_address": bson.M{"$in": pAddresses}}), &result, opts); err != nil {
+	if err := n.mp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +102,7 @@ func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []p
 // GetByID finds an nft by its id
 func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.NFT, error) {
 
-	opts := options.Aggregate()
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
@@ -109,7 +110,7 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"_id": pID}), &result, opts); err != nil {
+	if err := n.mp.find(pCtx, bson.M{"_id": pID}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -122,14 +123,14 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 
 // GetByContractData finds an nft by its contract data
 func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address) ([]*persist.NFT, error) {
-	opts := options.Aggregate()
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}), &result, opts); err != nil {
+	if err := n.mp.find(pCtx, bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -139,14 +140,14 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID pe
 // GetByOpenseaID finds an nft by its opensea ID
 func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address,
 ) ([]*persist.NFT, error) {
-	opts := options.Aggregate()
+	opts := options.Find()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
 		opts.SetMaxTime(dur)
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.aggregate(pCtx, newNFTPipeline(bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}), &result, opts); err != nil {
+	if err := n.mp.find(pCtx, bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}, &result, opts); err != nil {
 		return nil, err
 	}
 
