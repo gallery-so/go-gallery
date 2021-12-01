@@ -139,13 +139,13 @@ type Token struct {
 	Name        string `bson:"name,omitempty" json:"name"`
 	Description string `bson:"description,omitempty" json:"description"`
 
-	TokenURI        TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
-	TokenID         TokenID          `bson:"token_id" json:"token_id"`
-	Quantity        HexString        `bson:"quantity,omitempty" json:"quantity"`
-	OwnerAddress    Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	PreviousOwners  []AddressAtBlock `bson:"previous_owners,omitempty" json:"previous_owners"`
-	TokenMetadata   TokenMetadata    `bson:"token_metadata,omitempty" json:"token_metadata"`
-	ContractAddress Address          `bson:"contract_address" json:"contract_address"`
+	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
+	TokenID          TokenID          `bson:"token_id" json:"token_id"`
+	Amount           int64            `bson:"amount,omitempty" json:"amount"`
+	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
+	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
+	TokenMetadata    TokenMetadata    `bson:"token_metadata,omitempty" json:"token_metadata"`
+	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
 	ExternalURL string `bson:"external_url,omitempty" json:"external_url"`
 
@@ -313,4 +313,13 @@ func (id TokenID) Base10Int() int64 {
 
 func (hex HexString) String() string {
 	return strings.TrimPrefix(strings.ToLower(string(hex)), "0x")
+}
+
+// BigInt returns the hex string as a big.Int
+func (hex HexString) BigInt() *big.Int {
+	it, ok := big.NewInt(0).SetString(hex.String(), 16)
+	if !ok {
+		it, _ = big.NewInt(0).SetString(hex.String(), 10)
+	}
+	return it
 }

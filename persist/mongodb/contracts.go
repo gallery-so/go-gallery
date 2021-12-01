@@ -42,13 +42,39 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 // BulkUpsert upserts many contracts by their address field
 func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*persist.Contract) error {
 
-	upserts := make([]upsertModel, len(contracts))
+	upserts := make([]updateModel, len(contracts))
 	for i, contract := range contracts {
-		upserts[i] = upsertModel{
-			query: bson.M{
-				"address": contract.Address,
-			},
-			doc: contract,
+
+		setDocs := make(bson.D, 0, 2)
+		query := bson.M{
+			"address": contract.Address,
+		}
+		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, contract)
+		if err != nil {
+			return err
+		}
+
+		asMap := bson.M{}
+		err = bson.UnmarshalWithRegistry(CustomRegistry, asBSON, &asMap)
+		if err != nil {
+			return err
+		}
+		delete(asMap, "_id")
+
+		for k := range query {
+			delete(asMap, k)
+		}
+		now := time.Now()
+		asMap["last_updated"] = now
+
+		setDocs = append(setDocs, bson.E{Key: "$set", Value: asMap})
+
+		insertDoc := bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID(), "created_at": now}}
+		setDocs = append(setDocs, insertDoc)
+
+		upserts[i] = updateModel{
+			query:   query,
+			setDocs: setDocs,
 		}
 	}
 	err := c.mp.bulkUpsert(pCtx, upserts)
