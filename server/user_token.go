@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -87,8 +88,9 @@ type userAddAddressInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	Signature string          `json:"signature" binding:"required,signature"`
-	Address   persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Signature  string          `json:"signature" binding:"required,signature"`
+	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	WalletType walletType      `json:"wallet_type" binding:"required,wallet_type"`
 }
 
 type userRemoveAddressesInput struct {
@@ -207,7 +209,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -217,7 +219,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 			return
 		}
 
-		output, err := userCreateDbToken(c, input, userRepository, nonceRepository, galleryRepository)
+		output, err := userCreateDbToken(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -234,7 +236,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 
 	}
 }
-func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository) gin.HandlerFunc {
+func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -250,7 +252,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			return
 		}
 
-		output, err := addAddressToUserDB(c, userID, input, userRepository, nonceRepository)
+		output, err := addAddressToUserDB(c, userID, input, userRepository, nonceRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -289,7 +291,7 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 }
 
 func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository) (*userCreateOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
 
@@ -303,7 +305,7 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
-		pInput.Address)
+		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +351,7 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 }
 
 func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (*userAddAddressOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*userAddAddressOutput, error) {
 
 	output := &userAddAddressOutput{}
 
@@ -364,7 +366,7 @@ func addAddressToUserDB(pCtx context.Context, pUserID persist.DBID, pInput *user
 	dataStr := nonceValueStr
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		dataStr,
-		pInput.Address)
+		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
 		return nil, err
 	}

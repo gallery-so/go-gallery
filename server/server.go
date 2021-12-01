@@ -74,6 +74,8 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("nonce", nonceValidator)
 		v.RegisterValidation("signature", signatureValidator)
 		v.RegisterValidation("username", usernameValidator)
+		v.RegisterValidation("wallet_type", walletTypeValidator)
+
 	}
 
 	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
