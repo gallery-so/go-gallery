@@ -258,7 +258,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.NotNil(body.Collection)
-	assert.Len(body.Collection.Nfts, 1)
+	assert.Len(body.Collection.Nfts, 3)
 	assert.Empty(body.Error)
 
 }
