@@ -455,7 +455,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Error("error upserting tokens and contracts")
 	}
 
 }
