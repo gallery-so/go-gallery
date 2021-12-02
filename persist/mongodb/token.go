@@ -249,7 +249,6 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 		}
 		delete(asMap, "_id")
 		delete(asMap, "ownership_history")
-		delete(asMap, "amount")
 		delete(asMap, "created_at")
 		delete(asMap, "block_number")
 		asMap["last_updated"] = time.Now()
@@ -261,8 +260,6 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 		setDocs = append(setDocs, bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID(), "created_at": time.Now(), "block_number": v.BlockNumber}})
 
 		if v.TokenType == persist.TokenTypeERC1155 {
-			balanceDoc := bson.E{Key: "$inc", Value: bson.M{"amount": v.Amount}}
-			setDocs = append(setDocs, balanceDoc)
 
 			ownerDoc := bson.E{Key: "$set", Value: bson.M{"block_number": v.BlockNumber}}
 			nextSetDocs = append(nextSetDocs, ownerDoc)
