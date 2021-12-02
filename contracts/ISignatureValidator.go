@@ -30,7 +30,7 @@ var (
 
 // ISignatureValidatorMetaData contains all meta data concerning the ISignatureValidator contract.
 var ISignatureValidatorMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"_signature\",\"type\":\"bytes\"}],\"name\":\"isValidSignature\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_data\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"_signature\",\"type\":\"bytes\"}],\"name\":\"isValidSignature\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // ISignatureValidatorABI is the input ABI used to generate the binding from.
@@ -179,10 +179,10 @@ func (_ISignatureValidator *ISignatureValidatorTransactorRaw) Transact(opts *bin
 	return _ISignatureValidator.Contract.contract.Transact(opts, method, params...)
 }
 
-// IsValidSignature is a free data retrieval call binding the contract method 0x20c13b0b.
+// IsValidSignature is a free data retrieval call binding the contract method 0x1626ba7e.
 //
-// Solidity: function isValidSignature(bytes _data, bytes _signature) view returns(bytes4)
-func (_ISignatureValidator *ISignatureValidatorCaller) IsValidSignature(opts *bind.CallOpts, _data []byte, _signature []byte) ([4]byte, error) {
+// Solidity: function isValidSignature(bytes32 _data, bytes _signature) view returns(bytes4)
+func (_ISignatureValidator *ISignatureValidatorCaller) IsValidSignature(opts *bind.CallOpts, _data [32]byte, _signature []byte) ([4]byte, error) {
 	var out []interface{}
 	err := _ISignatureValidator.contract.Call(opts, &out, "isValidSignature", _data, _signature)
 
@@ -196,17 +196,17 @@ func (_ISignatureValidator *ISignatureValidatorCaller) IsValidSignature(opts *bi
 
 }
 
-// IsValidSignature is a free data retrieval call binding the contract method 0x20c13b0b.
+// IsValidSignature is a free data retrieval call binding the contract method 0x1626ba7e.
 //
-// Solidity: function isValidSignature(bytes _data, bytes _signature) view returns(bytes4)
-func (_ISignatureValidator *ISignatureValidatorSession) IsValidSignature(_data []byte, _signature []byte) ([4]byte, error) {
+// Solidity: function isValidSignature(bytes32 _data, bytes _signature) view returns(bytes4)
+func (_ISignatureValidator *ISignatureValidatorSession) IsValidSignature(_data [32]byte, _signature []byte) ([4]byte, error) {
 	return _ISignatureValidator.Contract.IsValidSignature(&_ISignatureValidator.CallOpts, _data, _signature)
 }
 
-// IsValidSignature is a free data retrieval call binding the contract method 0x20c13b0b.
+// IsValidSignature is a free data retrieval call binding the contract method 0x1626ba7e.
 //
-// Solidity: function isValidSignature(bytes _data, bytes _signature) view returns(bytes4)
-func (_ISignatureValidator *ISignatureValidatorCallerSession) IsValidSignature(_data []byte, _signature []byte) ([4]byte, error) {
+// Solidity: function isValidSignature(bytes32 _data, bytes _signature) view returns(bytes4)
+func (_ISignatureValidator *ISignatureValidatorCallerSession) IsValidSignature(_data [32]byte, _signature []byte) ([4]byte, error) {
 	return _ISignatureValidator.Contract.IsValidSignature(&_ISignatureValidator.CallOpts, _data, _signature)
 }
 

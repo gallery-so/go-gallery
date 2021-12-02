@@ -34,12 +34,12 @@ const noncePrepend = "Gallery uses this cryptographic signature in place of a pa
 
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
-var eip1271MagicValue = [4]byte{0x20, 0xc1, 0x3b, 0x0b}
+var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 type authUserLoginInput struct {
 	Signature  string          `json:"signature" binding:"required,medium_string"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	WalletType walletType      `json:"walletType"`
+	WalletType walletType      `json:"wallet_type"`
 }
 
 type authUserLoginOutput struct {
@@ -188,8 +188,6 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 		return nil, err
 	}
 
-	output.UserID = userIDstr
-
 	sigValid, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
 		pInput.Address, pInput.WalletType, ec)
@@ -201,6 +199,8 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 	if !sigValid {
 		return output, nil
 	}
+
+	output.UserID = userIDstr
 
 	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userIDstr)
 	if err != nil {
@@ -226,19 +226,17 @@ func authVerifySignatureAllMethods(pSignatureStr string,
 		pNonce,
 		pAddressStr, pWalletType,
 		true, ec)
-	if err != nil {
-		return false, err
-	}
 
-	if !validBool {
+	if !validBool || err != nil {
 		// eth_sign
 		validBool, err = authVerifySignature(pSignatureStr,
 			pNonce,
 			pAddressStr, pWalletType,
 			false, ec)
-		if err != nil {
-			return false, err
-		}
+	}
+
+	if err != nil {
+		return false, err
 	}
 
 	return validBool, nil
@@ -255,6 +253,7 @@ func authVerifySignature(pSignatureStr string,
 	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
 
 	nonceWithPrepend := noncePrepend + pDataStr
+
 	var dataStr string
 	if pUseDataHeaderBool {
 		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(nonceWithPrepend), nonceWithPrepend)
@@ -304,9 +303,15 @@ func authVerifySignature(pSignatureStr string,
 		if err != nil {
 			return false, err
 		}
-		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, []byte(pDataStr), []byte(pSignatureStr))
+
+		hashedData := crypto.Keccak256([]byte(dataStr))
+		var input [32]byte
+		copy(input[:], hashedData)
+
+		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
 		if err != nil {
-			return false, err
+			logrus.WithError(err).Error("IsValidSignature")
+			return false, nil
 		}
 
 		return result == eip1271MagicValue, nil
