@@ -44,13 +44,15 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 
 	if pColl.Nfts == nil {
 		pColl.Nfts = []persist.DBID{}
-	} else {
+	} /* else {
+		this is to ensure that nfts are not shared between collections
+
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if err != ErrDocumentNotFound {
 				return "", err
 			}
 		}
-	}
+	}*/
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pColl.OwnerUserID)); err != nil {
 		return "", err
@@ -151,11 +153,12 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 		return errors.New("not all nfts are owned by the user")
 	}
 
-	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if err != ErrDocumentNotFound {
-			return err
-		}
-	}
+	// this would ensure that the nfts are not being shared between collections
+	// if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+	// 	if err != ErrDocumentNotFound {
+	// 		return err
+	// 	}
+	// }
 
 	if err := c.redisClients.Delete(pCtx, memstore.CollUnassignedRDB, string(pUserID)); err != nil {
 		return err
