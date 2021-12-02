@@ -22,10 +22,10 @@ var errUserIDRequired = errors.New("owner user id is required")
 
 // CollectionTokenMongoRepository is a repository that stores collections in a MongoDB database
 type CollectionTokenMongoRepository struct {
-	mp              *storage
-	nmp             *storage
-	nnmp            *storage
-	unassignedCache memstore.Cache
+	collectionsStorage *storage
+	tokensStorage      *storage
+	usersStorage       *storage
+	unassignedCache    memstore.Cache
 }
 
 type errNotAllNFTsOwnedByUser struct {
@@ -35,10 +35,10 @@ type errNotAllNFTsOwnedByUser struct {
 // NewCollectionTokenMongoRepository creates a new instance of the collection mongo repository
 func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache) *CollectionTokenMongoRepository {
 	return &CollectionTokenMongoRepository{
-		mp:              newStorage(mgoClient, 0, galleryDBName, collectionColName),
-		nmp:             newStorage(mgoClient, 0, galleryDBName, tokenColName),
-		nnmp:            newStorage(mgoClient, 0, galleryDBName, usersCollName),
-		unassignedCache: unassignedCache,
+		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
+		tokensStorage:      newStorage(mgoClient, 0, galleryDBName, tokenColName),
+		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		unassignedCache:    unassignedCache,
 	}
 }
 
@@ -53,7 +53,7 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 	if pColl.Nfts == nil {
 		pColl.Nfts = []persist.DBID{}
 	} else {
-		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
+		if err := c.collectionsStorage.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if err != ErrDocumentNotFound {
 				return "", err
 			}
@@ -64,7 +64,7 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 		return "", err
 	}
 
-	return c.mp.insert(pCtx, pColl)
+	return c.collectionsStorage.insert(pCtx, pColl)
 
 }
 
@@ -85,7 +85,7 @@ func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUser
 		fil["hidden"] = false
 	}
 
-	if err := c.mp.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
+	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persi
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
-	if err := c.mp.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
+	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (c *CollectionTokenMongoRepository) Update(pCtx context.Context, pIDstr per
 	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
-	return c.mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
 }
 
 // UpdateNFTs will update a collections NFTs ensuring that the collection is owned
@@ -141,7 +141,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 ) error {
 
 	users := []*persist.User{}
-	err := c.nnmp.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
-	ct, err := c.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
+	ct, err := c.tokensStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return errNotAllNFTsOwnedByUser{pUserID}
 	}
 
-	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+	if err := c.collectionsStorage.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if err != ErrDocumentNotFound {
 			return err
 		}
@@ -167,7 +167,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return err
 	}
 
-	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	return c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
 // UpdateUnsafe will update a single collection by ID
@@ -176,7 +176,7 @@ func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDs
 	pUpdate interface{},
 ) error {
 
-	return c.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }
 
 // UpdateNFTsUnsafe will update a collections NFTs ensuring that
@@ -187,13 +187,13 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 	pUpdate *persist.CollectionTokenUpdateNftsInput,
 ) error {
 
-	if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+	if err := c.collectionsStorage.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 		if err != ErrDocumentNotFound {
 			return err
 		}
 	}
 
-	return c.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	return c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
 }
 
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
@@ -205,7 +205,7 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 
 	nftsToBeRemoved := []*persist.Token{}
 
-	if err := c.nmp.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := c.tokensStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 
@@ -215,13 +215,13 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 			idsToPull[i] = nft.ID
 		}
 
-		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
+		if err := c.collectionsStorage.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToPull); err != nil {
 			if err != ErrDocumentNotFound {
 				return err
 			}
 		}
 
-		if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}); err != nil {
+		if err := c.tokensStorage.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToPull}}); err != nil {
 			return err
 		}
 
@@ -245,7 +245,7 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 
 	nftsToBeRemoved := []*persist.Token{}
 
-	if err := c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := c.tokensStorage.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 
@@ -254,11 +254,11 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 		idsToBePulled[i] = nft.ID
 	}
 
-	if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToBePulled); err != nil {
+	if err := c.collectionsStorage.pullAll(pCtx, bson.M{"owner_user_id": pUserID}, "nfts", idsToBePulled); err != nil {
 		return err
 	}
 
-	if err := c.nmp.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
+	if err := c.tokensStorage.delete(pCtx, bson.M{"_id": bson.M{"$in": idsToBePulled}}); err != nil {
 		return err
 	}
 
@@ -281,7 +281,7 @@ func (c *CollectionTokenMongoRepository) Delete(pCtx context.Context, pIDstr per
 		return err
 	}
 
-	return c.mp.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
+	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
 }
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
@@ -304,13 +304,13 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return result[0], nil
 	}
 
-	countColls, err := c.mp.count(pCtx, bson.M{"owner_user_id": pUserID})
+	countColls, err := c.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pUserID})
 	if err != nil {
 		return nil, err
 	}
 
 	users := []*persist.User{}
-	err = c.nnmp.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err = c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 	if countColls == 0 {
 		nfts := []*persist.Token{}
-		err = c.nmp.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
+		err = c.tokensStorage.find(pCtx, bson.M{"owner_address": bson.M{"$in": users[0].Addresses}}, &nfts)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +331,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 		result = []*persist.CollectionToken{{Nfts: collNfts}}
 	} else {
-		if err := c.mp.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
+		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
 			return nil, err
 		}
 	}

@@ -14,7 +14,7 @@ const accessCollName = "access"
 
 // AccessMongoRepository is a mongoDB repository for storing access states of users
 type AccessMongoRepository struct {
-	mp *storage
+	accessStorage *storage
 }
 
 // NewAccessMongoRepository returns a new instance of a feature flag repository
@@ -33,7 +33,7 @@ func NewAccessMongoRepository(mgoClient *mongo.Client) *AccessMongoRepository {
 		panic(err)
 	}
 	return &AccessMongoRepository{
-		mp: accessStorage,
+		accessStorage: accessStorage,
 	}
 }
 
@@ -48,7 +48,7 @@ func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persis
 	opts.SetLimit(1)
 
 	result := []*persist.Access{}
-	err := c.mp.find(pCtx, bson.M{"user_id": pUserID}, &result, opts)
+	err := c.accessStorage.find(pCtx, bson.M{"user_id": pUserID}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID 
 	for _, tokenIdentifiers := range pTokenIdentifiers {
 		requiredTokensOwned[tokenIdentifiers] = true
 	}
-	err := c.mp.find(pCtx, bson.M{"user_id": pUserID, "required_tokens_owned": requiredTokensOwned}, &result, opts)
+	err := c.accessStorage.find(pCtx, bson.M{"user_id": pUserID, "required_tokens_owned": requiredTokensOwned}, &result, opts)
 
 	if err != nil {
 		return false, err
@@ -89,7 +89,7 @@ func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID 
 // UpsertRequiredTokensByUserID upserts the required tokens owned by a user
 func (c *AccessMongoRepository) UpsertRequiredTokensByUserID(pCtx context.Context, pUserID persist.DBID, pRequiredTokensOwned map[persist.TokenIdentifiers]uint64, pBlock persist.BlockNumber) error {
 
-	if _, err := c.mp.upsert(pCtx, bson.M{"user_id": pUserID}, bson.M{
+	if _, err := c.accessStorage.upsert(pCtx, bson.M{"user_id": pUserID}, bson.M{
 		"required_tokens_owned": pRequiredTokensOwned,
 		"most_recent_block":     pBlock,
 	}); err != nil {

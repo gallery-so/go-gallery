@@ -22,16 +22,16 @@ var errOwnerAddressRequired = errors.New("owner address required")
 
 // NFTMongoRepository is a repository that stores collections in a MongoDB database
 type NFTMongoRepository struct {
-	mp           *storage
-	nmp          *storage
+	nftsStorage  *storage
+	usersStorage *storage
 	openseaCache memstore.Cache
 }
 
 // NewNFTMongoRepository creates a new instance of the collection mongo repository
 func NewNFTMongoRepository(mgoClient *mongo.Client, openseaCache memstore.Cache) *NFTMongoRepository {
 	return &NFTMongoRepository{
-		mp:           newStorage(mgoClient, 0, galleryDBName, nftColName),
-		nmp:          newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		nftsStorage:  newStorage(mgoClient, 0, galleryDBName, nftColName),
+		usersStorage: newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		openseaCache: openseaCache,
 	}
 }
@@ -46,7 +46,7 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.N
 		nfts[i] = v
 	}
 
-	ids, err := n.mp.insertMany(pCtx, nfts)
+	ids, err := n.nftsStorage.insertMany(pCtx, nfts)
 
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.N
 
 // Create inserts an NFT into the database
 func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT *persist.NFTDB) (persist.DBID, error) {
-	return n.mp.insert(pCtx, pNFT)
+	return n.nftsStorage.insert(pCtx, pNFT)
 }
 
 // GetByUserID finds an nft by its owner user id
@@ -68,7 +68,7 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 	}
 
 	users := []*persist.User{}
-	err := n.nmp.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err := n.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []p
 
 	result := []*persist.NFT{}
 
-	if err := n.mp.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &result, opts); err != nil {
+	if err := n.nftsStorage.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +110,7 @@ func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*p
 
 	result := []*persist.NFT{}
 
-	if err := n.mp.find(pCtx, bson.M{"_id": pID}, &result, opts); err != nil {
+	if err := n.nftsStorage.find(pCtx, bson.M{"_id": pID}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -130,7 +130,7 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID pe
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.find(pCtx, bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}, &result, opts); err != nil {
+	if err := n.nftsStorage.find(pCtx, bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -147,7 +147,7 @@ func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int
 	}
 	result := []*persist.NFT{}
 
-	if err := n.mp.find(pCtx, bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}, &result, opts); err != nil {
+	if err := n.nftsStorage.find(pCtx, bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}, &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int
 func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
 	users := []*persist.User{}
-	err := n.nmp.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err := n.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
-	return n.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": users[0].Addresses}}, pUpdate)
+	return n.nftsStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": users[0].Addresses}}, pUpdate)
 }
 
 // BulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
@@ -184,7 +184,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 				errs <- errOwnerAddressRequired
 				return
 			}
-			id, err := n.mp.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
+			id, err := n.nftsStorage.upsert(pCtx, bson.M{"opensea_id": nft.OpenseaID, "owner_address": nft.OwnerAddress}, nft)
 			if err != nil {
 				errs <- err
 			}

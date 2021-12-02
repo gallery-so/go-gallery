@@ -15,20 +15,20 @@ const membershipColName = "membership"
 
 // MembershipRepository is a repository for storing membership information in the database
 type MembershipRepository struct {
-	mp *storage
+	membershipsStorage *storage
 }
 
 // NewMembershipMongoRepository returns a new instance of a membership repository
 func NewMembershipMongoRepository(mgoClient *mongo.Client) *MembershipRepository {
 	return &MembershipRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, membershipColName),
+		membershipsStorage: newStorage(mgoClient, 0, galleryDBName, membershipColName),
 	}
 }
 
 // UpsertByTokenID upserts an membership tier by a given token ID
 func (c *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.TokenID, pUpsert *persist.MembershipTier) error {
 
-	_, err := c.mp.upsert(pCtx, bson.M{
+	_, err := c.membershipsStorage.upsert(pCtx, bson.M{
 		"token_id": pTokenID,
 	}, pUpsert)
 	if err != nil {
@@ -48,7 +48,7 @@ func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persi
 	}
 
 	result := []*persist.MembershipTier{}
-	err := c.mp.find(pCtx, bson.M{"token_id": pTokenID}, &result, opts)
+	err := c.membershipsStorage.find(pCtx, bson.M{"token_id": pTokenID}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *MembershipRepository) GetAll(pCtx context.Context) ([]*persist.Membersh
 	}
 
 	result := []*persist.MembershipTier{}
-	err := c.mp.find(pCtx, bson.M{}, &result, opts)
+	err := c.membershipsStorage.find(pCtx, bson.M{}, &result, opts)
 
 	if err != nil {
 		return nil, err
