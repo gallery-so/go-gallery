@@ -14,6 +14,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -94,7 +95,7 @@ func newStorage(mongoClient *mongo.Client, version int64, dbName, collName strin
 
 // Insert inserts a document into the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*options.InsertOneOptions) (persist.DBID, error) {
-
+	defer util.Track("mongo.Insert", time.Now())
 	res, err := m.collection.InsertOne(ctx, insert, opts...)
 	if err != nil {
 		return "", err
@@ -105,7 +106,7 @@ func (m *storage) insert(ctx context.Context, insert interface{}, opts ...*optio
 
 // InsertMany inserts many documents into a mongo database while filling out the fields id, creation time, and last updated for each
 func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...*options.InsertManyOptions) ([]persist.DBID, error) {
-
+	defer util.Track("mongo.InsertMany", time.Now())
 	res, err := m.collection.InsertMany(ctx, insert, opts...)
 	if err != nil {
 		return nil, err
@@ -123,7 +124,7 @@ func (m *storage) insertMany(ctx context.Context, insert []interface{}, opts ...
 
 // Update updates a document in the mongo database while filling out the field LastUpdated
 func (m *storage) update(ctx context.Context, query bson.M, update interface{}, opts ...*options.UpdateOptions) error {
-
+	defer util.Track("mongo.Update", time.Now())
 	result, err := m.collection.UpdateMany(ctx, query, bson.D{{Key: "$set", Value: update}}, opts...)
 	if err != nil {
 		return err
@@ -138,7 +139,7 @@ func (m *storage) update(ctx context.Context, query bson.M, update interface{}, 
 // push pushes items into an array field for a given queried document(s)
 // value must be an array
 func (m *storage) push(ctx context.Context, query bson.M, field string, value interface{}) error {
-
+	defer util.Track("mongo.Push", time.Now())
 	push := bson.E{Key: "$push", Value: bson.M{field: bson.M{"$each": value}}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{push, lastUpdated}
@@ -157,7 +158,7 @@ func (m *storage) push(ctx context.Context, query bson.M, field string, value in
 // pullAll pulls all items from an array field for a given queried document(s)
 // value must be an array
 func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value interface{}) error {
-
+	defer util.Track("mongo.PullAll", time.Now())
 	pull := bson.E{Key: "$pullAll", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -175,7 +176,7 @@ func (m *storage) pullAll(ctx context.Context, query bson.M, field string, value
 
 // pull puls items from an array field for a given queried document(s)
 func (m *storage) pull(ctx context.Context, query bson.M, field string, value bson.M) error {
-
+	defer util.Track("mongo.Pull", time.Now())
 	pull := bson.E{Key: "$pull", Value: bson.M{field: value}}
 	lastUpdated := bson.E{Key: "$set", Value: bson.M{"last_updated": primitive.NewDateTimeFromTime(time.Now())}}
 	up := bson.D{pull, lastUpdated}
@@ -193,7 +194,7 @@ func (m *storage) pull(ctx context.Context, query bson.M, field string, value bs
 
 // Upsert upserts a document in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, opts ...*options.UpdateOptions) (persist.DBID, error) {
-
+	defer util.Track("mongo.Upsert", time.Now())
 	var returnID persist.DBID
 	opts = append(opts, &options.UpdateOptions{Upsert: boolin(true)})
 	now := primitive.NewDateTimeFromTime(time.Now())
@@ -235,7 +236,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 
 // bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
 func (m *storage) bulkUpdate(ctx context.Context, updates []updateModel, isUpsert bool) error {
-
+	defer util.Track("mongo.BulkUpdate", time.Now())
 	wp := workerpool.New(10)
 	errs := make(chan error)
 
@@ -287,6 +288,8 @@ func (m *storage) bulkUpdate(ctx context.Context, updates []updateModel, isUpser
 // find finds documents in the mongo database which is not deleted
 // result must be a slice of pointers to the struct of the type expected to be decoded from mongo
 func (m *storage) find(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOptions) error {
+	defer util.Track("mongo.Find", time.Now())
+
 	filter["deleted"] = false
 
 	cur, err := m.collection.Find(ctx, filter, opts...)
@@ -301,7 +304,7 @@ func (m *storage) find(ctx context.Context, filter bson.M, result interface{}, o
 // aggregate performs an aggregation operation on the mongo database
 // result must be a pointer to a slice of structs, map[string]interface{}, or bson structs
 func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result interface{}, opts ...*options.AggregateOptions) error {
-
+	defer util.Track("mongo.Aggregate", time.Now())
 	cur, err := m.collection.Aggregate(ctx, agg, opts...)
 	if err != nil {
 		return err
@@ -313,6 +316,7 @@ func (m *storage) aggregate(ctx context.Context, agg mongo.Pipeline, result inte
 
 // count counts the number of documents in the mongo database which is not deleted
 func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.CountOptions) (int64, error) {
+	defer util.Track("mongo.Count", time.Now())
 	if len(filter) == 0 {
 		return m.collection.EstimatedDocumentCount(ctx)
 	}
@@ -322,12 +326,14 @@ func (m *storage) count(ctx context.Context, filter bson.M, opts ...*options.Cou
 
 // delete deletes all documents matching a given filter query
 func (m *storage) delete(ctx context.Context, filter bson.M, opts ...*options.DeleteOptions) error {
+	defer util.Track("mongo.Delete", time.Now())
 	_, err := m.collection.DeleteMany(ctx, filter, opts...)
 	return err
 }
 
 // createIndex creates a new index in the mongo database
 func (m *storage) createIndex(ctx context.Context, index mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
+	defer util.Track("mongo.CreateIndex", time.Now())
 	return m.collection.Indexes().CreateOne(ctx, index, opts...)
 }
 
