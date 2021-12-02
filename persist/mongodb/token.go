@@ -31,8 +31,8 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	defer cancel()
 	tokenIdentifiersIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{Key: "token_id", Value: 1},
 			{Key: "contract_address", Value: 1},
+			{Key: "token_id", Value: 1},
 		},
 	}
 	blockNumberIndex := mongo.IndexModel{
