@@ -24,15 +24,15 @@ var errOwnerAddressRequired = errors.New("owner address required")
 type NFTMongoRepository struct {
 	mp           *storage
 	nmp          *storage
-	redisClients *memstore.Clients
+	openseaCache memstore.Cache
 }
 
 // NewNFTMongoRepository creates a new instance of the collection mongo repository
-func NewNFTMongoRepository(mgoClient *mongo.Client, redisClients *memstore.Clients) *NFTMongoRepository {
+func NewNFTMongoRepository(mgoClient *mongo.Client, openseaCache memstore.Cache) *NFTMongoRepository {
 	return &NFTMongoRepository{
 		mp:           newStorage(mgoClient, 0, galleryDBName, nftColName),
 		nmp:          newStorage(mgoClient, 0, galleryDBName, usersCollName),
-		redisClients: redisClients,
+		openseaCache: openseaCache,
 	}
 }
 
@@ -217,7 +217,7 @@ func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddres
 		return err
 	}
 
-	return n.redisClients.Set(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
+	return n.openseaCache.Set(pCtx, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
 }
 
 // OpenseaCacheDelete deletes a set of nfts from the opensea cache under a given set of wallet addresses
@@ -227,7 +227,7 @@ func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAdd
 		pWalletAddresses[i] = v
 	}
 
-	return n.redisClients.Delete(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
+	return n.openseaCache.Delete(pCtx, fmt.Sprint(pWalletAddresses))
 }
 
 // OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
@@ -237,7 +237,7 @@ func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddres
 		pWalletAddresses[i] = v
 	}
 
-	result, err := n.redisClients.Get(pCtx, memstore.OpenseaRDB, fmt.Sprint(pWalletAddresses))
+	result, err := n.openseaCache.Get(pCtx, fmt.Sprint(pWalletAddresses))
 	if err != nil {
 		return nil, err
 	}
