@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
@@ -13,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository, psub pubsub.PubSub) gin.HandlerFunc {
+func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := &userAddAddressInput{}
@@ -23,7 +24,7 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 			return
 		}
 
-		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository)
+		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -69,7 +70,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 }
 
 func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository) (*userCreateOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (*userCreateOutput, error) {
 
 	output := &userCreateOutput{}
 
@@ -83,7 +84,7 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
-		pInput.Address)
+		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
 		return nil, err
 	}
