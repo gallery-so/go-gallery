@@ -57,7 +57,7 @@ func (uq *UpdateQueue) start() {
 			updateFunc := func() {
 				ctx, cancel := context.WithTimeout(context.Background(), update.timeout)
 				defer cancel()
-				err := uq.cache.Set(ctx, update.key, update.val, update.timeout)
+				err := uq.cache.Set(ctx, update.key, update.val, update.ttl)
 				if err != nil {
 					logrus.WithError(err).Error("memstore: failed to update key")
 				}
@@ -77,5 +77,5 @@ func (uq *UpdateQueue) start() {
 
 // QueueUpdate queues an update to be run
 func (uq *UpdateQueue) QueueUpdate(key string, value interface{}, timeout, ttl time.Duration) {
-	uq.updates <- update{key: key, val: value}
+	uq.updates <- update{key: key, val: value, timeout: timeout, ttl: ttl}
 }

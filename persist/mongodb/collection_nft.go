@@ -266,8 +266,8 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 	result := []*persist.Collection{}
 
-	if cachedResult, err := c.unassignedCache.Get(pCtx, pUserID.String()); err == nil && string(cachedResult) != "" {
-		err = json.Unmarshal([]byte(cachedResult), &result)
+	if cachedResult, err := c.unassignedCache.Get(pCtx, pUserID.String()); err == nil && len(cachedResult) > 0 {
+		err = json.Unmarshal(cachedResult, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +301,6 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 		result = []*persist.Collection{{Nfts: collNfts}}
 	} else {
-
 		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, users[0].Addresses), &result); err != nil {
 			return nil, err
 		}
@@ -314,8 +313,10 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, updateQueueDefaultTimeout, collectionUnassignedTTL)
 
-	return result[0], nil
-
+	if len(result) > 0 {
+		return result[0], nil
+	}
+	return nil, errors.New("no nfts for user")
 }
 
 // RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
