@@ -41,10 +41,6 @@ func NewAccessMongoRepository(mgoClient *mongo.Client) *AccessMongoRepository {
 func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (*persist.Access, error) {
 
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 	opts.SetLimit(1)
 
 	result := []*persist.Access{}
@@ -65,10 +61,7 @@ func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persis
 func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID persist.DBID, pTokenIdentifiers []persist.TokenIdentifiers) (bool, error) {
 
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
+
 	opts.SetSort(bson.M{"created_at": -1})
 	opts.SetLimit(1)
 

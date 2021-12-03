@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -63,16 +61,13 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 		}
 	}
 
-	if err := c.unassignedCache.Delete(pCtx, string(pColl.OwnerUserID)); err != nil {
-		return "", err
-	}
-
 	id, err := c.collectionsStorage.insert(pCtx, pColl)
 	if err != nil {
 		return "", err
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pColl.OwnerUserID)
+	go c.RefreshUnassigned(pCtx, pColl.OwnerUserID)
 
 	return id, nil
 
@@ -82,12 +77,6 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 // and variably show hidden collections depending on the auth status of the caller
 func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]*persist.CollectionToken, error) {
 
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.CollectionToken{}
 
 	fil := bson.M{"owner_user_id": pUserID, "deleted": false}
@@ -95,7 +84,7 @@ func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUser
 		fil["hidden"] = false
 	}
 
-	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
+	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result); err != nil {
 		return nil, err
 	}
 
@@ -105,11 +94,6 @@ func (c *CollectionTokenMongoRepository) GetByUserID(pCtx context.Context, pUser
 // GetByID will form an aggregation pipeline to get a single collection by ID and
 // variably show hidden collections depending on the auth status of the caller
 func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (*persist.CollectionToken, error) {
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.CollectionToken{}
 
@@ -117,7 +101,7 @@ func (c *CollectionTokenMongoRepository) GetByID(pCtx context.Context, pID persi
 	if !pShowHidden {
 		fil["hidden"] = false
 	}
-	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result, opts); err != nil {
+	if err := c.collectionsStorage.aggregate(pCtx, newCollectionTokenPipeline(fil), &result); err != nil {
 		return nil, err
 	}
 
@@ -135,13 +119,11 @@ func (c *CollectionTokenMongoRepository) Update(pCtx context.Context, pIDstr per
 	pUserID persist.DBID,
 	pUpdate interface{},
 ) error {
-	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
-		return err
-	}
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate); err != nil {
 		return err
 	}
 	go c.galleryRepo.resetCache(pCtx, pUserID)
+	go c.RefreshUnassigned(pCtx, pUserID)
 	return nil
 
 }
@@ -178,15 +160,12 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		}
 	}
 
-	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
-		return err
-	}
-
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
+	go c.RefreshUnassigned(pCtx, pUserID)
 	return nil
 }
 
@@ -207,6 +186,7 @@ func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDs
 			return
 		}
 		c.galleryRepo.resetCache(pCtx, coll.OwnerUserID)
+		c.RefreshUnassigned(pCtx, coll.OwnerUserID)
 	}()
 
 	return nil
@@ -237,6 +217,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 			return
 		}
 		c.galleryRepo.resetCache(pCtx, coll.OwnerUserID)
+		c.RefreshUnassigned(pCtx, coll.OwnerUserID)
 	}()
 
 	return nil
@@ -271,12 +252,10 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 			return err
 		}
 
-		if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
-			return err
-		}
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
+	go c.RefreshUnassigned(pCtx, pUserID)
 	return nil
 }
 
@@ -310,11 +289,8 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 		return err
 	}
 
-	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
-		return err
-	}
-
 	go c.galleryRepo.resetCache(pCtx, pUserID)
+	go c.RefreshUnassigned(pCtx, pUserID)
 
 	return nil
 }
@@ -327,27 +303,18 @@ func (c *CollectionTokenMongoRepository) Delete(pCtx context.Context, pIDstr per
 
 	update := &persist.CollectionTokenUpdateDeletedInput{Deleted: true}
 
-	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
-		return err
-	}
-
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update); err != nil {
 		return err
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
+	go c.RefreshUnassigned(pCtx, pUserID)
 	return nil
 }
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
 func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (*persist.CollectionToken, error) {
-
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.CollectionToken{}
 
@@ -386,7 +353,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 		result = []*persist.CollectionToken{{Nfts: collNfts}}
 	} else {
-		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result, opts); err != nil {
+		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result); err != nil {
 			return nil, err
 		}
 	}
@@ -407,7 +374,12 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 // RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
 func (c *CollectionTokenMongoRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
-	return c.unassignedCache.Delete(pCtx, pUserID.String())
+	err := c.unassignedCache.Delete(pCtx, pUserID.String())
+	if err != nil {
+		return err
+	}
+	_, err = c.GetUnassigned(pCtx, pUserID)
+	return err
 }
 
 func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []persist.Address) mongo.Pipeline {

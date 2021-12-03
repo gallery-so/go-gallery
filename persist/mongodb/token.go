@@ -86,10 +86,7 @@ func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Tok
 // GetByWallet gets tokens for a given wallet address
 func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
+
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -109,10 +106,11 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 // GetByUserID gets ERC721 tokens for a given userID
 func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
+	if limit > 0 {
+		opts.SetSkip(limit * page)
+		opts.SetLimit(limit)
 	}
+	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.User{}
 	err := t.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &result, opts)
@@ -155,10 +153,6 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 // GetByContract gets ERC721 tokens for a given contract
 func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -178,10 +172,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
 func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
+
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -200,15 +191,10 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 // GetByID gets tokens for a given DB ID
 func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.Token, error) {
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result)
 	if err != nil {
 		return nil, err
 	}

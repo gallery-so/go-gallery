@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // GalleryMongoRepository is a repository that stores collections in a MongoDB database
@@ -104,15 +103,10 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 }
 
 func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]*persist.Gallery, error) {
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.Gallery{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result); err != nil {
 		return nil, err
 	}
 
@@ -131,15 +125,10 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
 func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (*persist.Gallery, error) {
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.Gallery{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result); err != nil {
 		return nil, err
 	}
 

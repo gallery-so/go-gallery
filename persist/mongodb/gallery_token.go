@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const galleryColName = "galleries"
@@ -123,15 +122,10 @@ func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID 
 }
 
 func (g *GalleryTokenMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]*persist.GalleryToken, error) {
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.GalleryToken{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result); err != nil {
 		return nil, err
 	}
 	go func() {
@@ -149,15 +143,10 @@ func (g *GalleryTokenMongoRepository) getByUserIDSkipCache(pCtx context.Context,
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
 func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (*persist.GalleryToken, error) {
-	opts := options.Aggregate()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.GalleryToken{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result); err != nil {
 		return nil, err
 	}
 

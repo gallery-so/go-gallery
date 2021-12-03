@@ -40,19 +40,13 @@ func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepositor
 // GetByRequiredTokens returns an feature by given token identifiers
 func (c *FeaturesMongoRepository) GetByRequiredTokens(pCtx context.Context, pRequiredtokens map[persist.TokenIdentifiers]uint64) ([]*persist.FeatureFlag, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.FeatureFlag{}
 	keys := make([]persist.TokenIdentifiers, len(pRequiredtokens))
 	i := 0
 	for k := range pRequiredtokens {
 		keys[i] = k
 	}
-	err := c.featuresStorage.find(pCtx, bson.M{"required_token": bson.M{"$in": keys}}, &result, opts)
+	err := c.featuresStorage.find(pCtx, bson.M{"required_token": bson.M{"$in": keys}}, &result)
 
 	if err != nil {
 		return nil, err
@@ -75,10 +69,6 @@ func (c *FeaturesMongoRepository) GetByRequiredTokens(pCtx context.Context, pReq
 func (c *FeaturesMongoRepository) GetByName(pCtx context.Context, pName string) (*persist.FeatureFlag, error) {
 
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 	opts.SetSort(bson.M{"created_at": -1})
 	opts.SetLimit(1)
 
