@@ -25,6 +25,7 @@ type CollectionTokenMongoRepository struct {
 	tokensStorage      *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
+	cacheUpdateQueue   *memstore.UpdateQueue
 	galleryRepo        *GalleryTokenMongoRepository
 }
 
@@ -39,6 +40,7 @@ func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, unassignedCache 
 		tokensStorage:      newStorage(mgoClient, 0, galleryDBName, tokenColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		unassignedCache:    unassignedCache,
+		cacheUpdateQueue:   memstore.NewUpdateQueue(unassignedCache),
 		galleryRepo:        galleryRepo,
 	}
 }
@@ -363,9 +365,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return nil, err
 	}
 
-	if err := c.unassignedCache.Set(pCtx, pUserID.String(), string(toCache), collectionUnassignedTTL); err != nil {
-		return nil, err
-	}
+	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, updateQueueDefaultTimeout, collectionUnassignedTTL)
 
 	return result[0], nil
 

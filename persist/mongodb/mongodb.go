@@ -32,9 +32,12 @@ const (
 const bsonDateFormat = "2006-01-02T15:04:05.999Z"
 
 var (
-	collectionUnassignedTTL time.Duration = time.Minute * 1
+	collectionUnassignedTTL time.Duration = time.Minute * 15
 	openseaAssetsTTL        time.Duration = time.Minute * 5
+	galleriesTTL            time.Duration = time.Hour
 )
+
+var updateQueueDefaultTimeout = time.Second * 5
 
 var errInvalidValue = errors.New("cannot encode invalid element")
 

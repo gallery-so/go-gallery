@@ -20,6 +20,7 @@ type CollectionMongoRepository struct {
 	nftsStorage        *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
+	cacheUpdateQueue   *memstore.UpdateQueue
 	galleryRepo        *GalleryMongoRepository
 }
 
@@ -30,6 +31,7 @@ func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memst
 		nftsStorage:        newStorage(mgoClient, 0, galleryDBName, nftColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		unassignedCache:    unassignedCache,
+		cacheUpdateQueue:   memstore.NewUpdateQueue(unassignedCache),
 		galleryRepo:        galleryRepo,
 	}
 }
@@ -264,7 +266,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 	result := []*persist.Collection{}
 
-	if cachedResult, err := c.unassignedCache.Get(pCtx, string(pUserID)); err == nil && string(cachedResult) != "" {
+	if cachedResult, err := c.unassignedCache.Get(pCtx, pUserID.String()); err == nil && string(cachedResult) != "" {
 		err = json.Unmarshal([]byte(cachedResult), &result)
 		if err != nil {
 			return nil, err
@@ -310,9 +312,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		return nil, err
 	}
 
-	if err := c.unassignedCache.Set(pCtx, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
-		return nil, err
-	}
+	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, updateQueueDefaultTimeout, collectionUnassignedTTL)
 
 	return result[0], nil
 
@@ -321,7 +321,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 // RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
 func (c *CollectionMongoRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
-	err := c.unassignedCache.Delete(pCtx, string(pUserID))
+	err := c.unassignedCache.Delete(pCtx, pUserID.String())
 	if err != nil {
 		return err
 	}

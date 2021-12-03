@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
@@ -19,6 +18,7 @@ type GalleryMongoRepository struct {
 	galleriesStorage   *storage
 	collectionsStorage *storage
 	galleriesCache     memstore.Cache
+	cacheUpdateQueue   *memstore.UpdateQueue
 }
 
 var errNoUserIDProvided = errors.New("no user ID provided")
@@ -29,6 +29,7 @@ func NewGalleryMongoRepository(mgoClient *mongo.Client, galleriesCache memstore.
 		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		galleriesCache:     galleriesCache,
+		cacheUpdateQueue:   memstore.NewUpdateQueue(galleriesCache),
 	}
 }
 
@@ -116,7 +117,7 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 			logrus.WithError(err).Error("failed to marshal galleries to json")
 			return
 		}
-		g.galleriesCache.Set(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, time.Hour)
+		g.cacheUpdateQueue.QueueUpdate(fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, updateQueueDefaultTimeout, galleriesTTL)
 	}()
 
 	return result, nil

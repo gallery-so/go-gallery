@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
@@ -20,6 +19,7 @@ type GalleryTokenMongoRepository struct {
 	galleriesStorage   *storage
 	collectionsStorage *storage
 	galleriesCache     memstore.Cache
+	updateCacheQueue   *memstore.UpdateQueue
 }
 
 type errUserDoesNotOwnCollections struct {
@@ -32,6 +32,7 @@ func NewGalleryTokenMongoRepository(mgoClient *mongo.Client, galleriesCache mems
 		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		galleriesCache:     galleriesCache,
+		updateCacheQueue:   memstore.NewUpdateQueue(galleriesCache),
 	}
 }
 
@@ -134,7 +135,7 @@ func (g *GalleryTokenMongoRepository) getByUserIDSkipCache(pCtx context.Context,
 			logrus.WithError(err).Error("failed to marshal galleries to json")
 			return
 		}
-		g.galleriesCache.Set(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, time.Hour)
+		g.updateCacheQueue.QueueUpdate(fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, updateQueueDefaultTimeout, galleriesTTL)
 	}()
 
 	return result, nil
