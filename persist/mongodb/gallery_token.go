@@ -2,10 +2,13 @@ package mongodb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -17,6 +20,7 @@ const galleryColName = "galleries"
 type GalleryTokenMongoRepository struct {
 	galleriesStorage   *storage
 	collectionsStorage *storage
+	galleriesCache     memstore.Cache
 }
 
 type errUserDoesNotOwnCollections struct {
@@ -24,10 +28,11 @@ type errUserDoesNotOwnCollections struct {
 }
 
 // NewGalleryTokenMongoRepository creates a new instance of the collection mongo repository
-func NewGalleryTokenMongoRepository(mgoClient *mongo.Client) *GalleryTokenMongoRepository {
+func NewGalleryTokenMongoRepository(mgoClient *mongo.Client, galleriesCache memstore.Cache) *GalleryTokenMongoRepository {
 	return &GalleryTokenMongoRepository{
 		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
+		galleriesCache:     galleriesCache,
 	}
 }
 
@@ -38,7 +43,12 @@ func (g *GalleryTokenMongoRepository) Create(pCtx context.Context, pGallery *per
 		pGallery.Collections = []persist.DBID{}
 	}
 
-	return g.galleriesStorage.insert(pCtx, pGallery)
+	id, err := g.galleriesStorage.insert(pCtx, pGallery)
+	if err != nil {
+		return "", err
+	}
+	go g.resetCache(pCtx, pGallery.OwnerUserID)
+	return id, nil
 }
 
 // Update updates a gallery in the database by ID, also ensuring the gallery
@@ -48,7 +58,6 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 	pOwnerUserID persist.DBID,
 	pUpdate *persist.GalleryTokenUpdateInput,
 ) error {
-
 	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
 	if err != nil {
 		return err
@@ -58,7 +67,12 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 		return errUserDoesNotOwnCollections{pOwnerUserID}
 	}
 
-	return g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	if err := g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
+		return err
+	}
+
+	go g.resetCache(pCtx, pOwnerUserID)
+	return nil
 }
 
 // UpdateUnsafe updates a gallery in the database by ID
@@ -66,20 +80,41 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 func (g *GalleryTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
 	pUpdate *persist.GalleryTokenUpdateInput,
 ) error {
-
-	return g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	if err := g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddCollections adds collections to the specified gallery
 func (g *GalleryTokenMongoRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
-	return g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
+	if err := g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs); err != nil {
+		return err
+	}
+	go g.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // GetByUserID gets a gallery by its owner user ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pAuth bool,
-) ([]*persist.GalleryToken, error) {
+func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]*persist.GalleryToken, error) {
 
+	galleries := []*persist.GalleryToken{}
+
+	fromCache, err := g.galleriesCache.Get(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth))
+	if err != nil || fromCache == nil || len(fromCache) == 0 {
+		return g.getByUserIDSkipCache(pCtx, pUserID, pAuth)
+	}
+
+	err = json.Unmarshal(fromCache, &galleries)
+	if err != nil {
+		return nil, err
+	}
+
+	return galleries, nil
+}
+
+func (g *GalleryTokenMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]*persist.GalleryToken, error) {
 	opts := options.Aggregate()
 	if deadline, ok := pCtx.Deadline(); ok {
 		dur := time.Until(deadline)
@@ -91,6 +126,14 @@ func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID 
 	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
+	go func() {
+		asJSON, err := json.Marshal(result)
+		if err != nil {
+			logrus.WithError(err).Error("failed to marshal galleries to json")
+			return
+		}
+		g.galleriesCache.Set(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, time.Hour)
+	}()
 
 	return result, nil
 }
@@ -115,6 +158,21 @@ func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.
 	}
 
 	return result[0], nil
+}
+
+func (g *GalleryTokenMongoRepository) resetCache(pCtx context.Context, ownerUserID persist.DBID) error {
+	if ownerUserID == "" {
+		return errNoUserIDProvided
+	}
+	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID, true)
+	if err != nil {
+		return err
+	}
+	_, err = g.getByUserIDSkipCache(pCtx, ownerUserID, false)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func newGalleryTokenPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {

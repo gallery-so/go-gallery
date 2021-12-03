@@ -22,15 +22,17 @@ type CollectionMongoRepository struct {
 	nftsStorage        *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
+	galleryRepo        *GalleryMongoRepository
 }
 
 // NewCollectionMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache) *CollectionMongoRepository {
+func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryMongoRepository) *CollectionMongoRepository {
 	return &CollectionMongoRepository{
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		nftsStorage:        newStorage(mgoClient, 0, galleryDBName, nftColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		unassignedCache:    unassignedCache,
+		galleryRepo:        galleryRepo,
 	}
 }
 
@@ -56,8 +58,13 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 		return "", err
 	}
 
-	return c.collectionsStorage.insert(pCtx, pColl)
+	id, err := c.collectionsStorage.insert(pCtx, pColl)
+	if err != nil {
+		return "", err
+	}
 
+	go c.galleryRepo.resetCache(pCtx, pColl.OwnerUserID)
+	return id, nil
 }
 
 // GetByUserID will form an aggregation pipeline to get all collections owned by a user
@@ -122,7 +129,11 @@ func (c *CollectionMongoRepository) Update(pCtx context.Context, pIDstr persist.
 	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
 		return err
 	}
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate); err != nil {
+		return err
+	}
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // UpdateNFTs will update a collections NFTs ensuring that the collection is owned
@@ -161,7 +172,12 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 		return err
 	}
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
@@ -207,6 +223,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context,
 		}
 	}
 
+	go c.galleryRepo.resetCache(pCtx, pUserID)
 	return nil
 }
 
@@ -244,6 +261,8 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context,
 		return err
 	}
 
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+
 	return nil
 }
 
@@ -259,7 +278,12 @@ func (c *CollectionMongoRepository) Delete(pCtx context.Context, pIDstr persist.
 		return err
 	}
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update); err != nil {
+		return err
+	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not

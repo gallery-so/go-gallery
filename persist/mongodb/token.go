@@ -22,10 +22,11 @@ var errNoTokensFound = errors.New("no tokens found")
 type TokenMongoRepository struct {
 	tokensStorage *storage
 	usersStorage  *storage
+	galleryRepo   *GalleryTokenMongoRepository
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
-func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
+func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenMongoRepository) *TokenMongoRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
@@ -54,6 +55,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	return &TokenMongoRepository{
 		tokensStorage: tokenStorage,
 		usersStorage:  newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		galleryRepo:   galleryRepo,
 	}
 }
 
@@ -341,7 +343,12 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 	}
 	user := users[0]
 
-	return t.tokensStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
+	if err := t.tokensStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate); err != nil {
+		return err
+	}
+
+	go t.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 
 }
 

@@ -26,6 +26,7 @@ type CollectionTokenMongoRepository struct {
 	tokensStorage      *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
+	galleryRepo        *GalleryTokenMongoRepository
 }
 
 type errNotAllNFTsOwnedByUser struct {
@@ -33,12 +34,13 @@ type errNotAllNFTsOwnedByUser struct {
 }
 
 // NewCollectionTokenMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache) *CollectionTokenMongoRepository {
+func NewCollectionTokenMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryTokenMongoRepository) *CollectionTokenMongoRepository {
 	return &CollectionTokenMongoRepository{
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		tokensStorage:      newStorage(mgoClient, 0, galleryDBName, tokenColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		unassignedCache:    unassignedCache,
+		galleryRepo:        galleryRepo,
 	}
 }
 
@@ -64,7 +66,14 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 		return "", err
 	}
 
-	return c.collectionsStorage.insert(pCtx, pColl)
+	id, err := c.collectionsStorage.insert(pCtx, pColl)
+	if err != nil {
+		return "", err
+	}
+
+	go c.galleryRepo.resetCache(pCtx, pColl.OwnerUserID)
+
+	return id, nil
 
 }
 
@@ -125,10 +134,15 @@ func (c *CollectionTokenMongoRepository) Update(pCtx context.Context, pIDstr per
 	pUserID persist.DBID,
 	pUpdate interface{},
 ) error {
-	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
 		return err
 	}
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate); err != nil {
+		return err
+	}
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
+
 }
 
 // UpdateNFTs will update a collections NFTs ensuring that the collection is owned
@@ -163,11 +177,16 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		}
 	}
 
-	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
 		return err
 	}
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // UpdateUnsafe will update a single collection by ID
@@ -176,7 +195,10 @@ func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDs
 	pUpdate interface{},
 ) error {
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdateNFTsUnsafe will update a collections NFTs ensuring that
@@ -193,7 +215,11 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 		}
 	}
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
@@ -225,10 +251,12 @@ func (c *CollectionTokenMongoRepository) ClaimNFTs(pCtx context.Context,
 			return err
 		}
 
-		if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+		if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
 			return err
 		}
 	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
 	return nil
 }
 
@@ -262,9 +290,11 @@ func (c *CollectionTokenMongoRepository) RemoveNFTsOfAddresses(pCtx context.Cont
 		return err
 	}
 
-	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
 		return err
 	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
 
 	return nil
 }
@@ -277,11 +307,16 @@ func (c *CollectionTokenMongoRepository) Delete(pCtx context.Context, pIDstr per
 
 	update := &persist.CollectionTokenUpdateDeletedInput{Deleted: true}
 
-	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+	if err := c.unassignedCache.Delete(pCtx, pUserID.String()); err != nil {
 		return err
 	}
 
-	return c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update)
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update); err != nil {
+		return err
+	}
+
+	go c.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 }
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
@@ -296,7 +331,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 	result := []*persist.CollectionToken{}
 
-	if cachedResult, err := c.unassignedCache.Get(pCtx, string(pUserID)); err == nil && string(cachedResult) != "" {
+	if cachedResult, err := c.unassignedCache.Get(pCtx, pUserID.String()); err == nil && string(cachedResult) != "" {
 		err = json.Unmarshal([]byte(cachedResult), &result)
 		if err != nil {
 			return nil, err
@@ -341,7 +376,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return nil, err
 	}
 
-	if err := c.unassignedCache.Set(pCtx, string(pUserID), string(toCache), collectionUnassignedTTL); err != nil {
+	if err := c.unassignedCache.Set(pCtx, pUserID.String(), string(toCache), collectionUnassignedTTL); err != nil {
 		return nil, err
 	}
 
@@ -352,7 +387,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 // RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
 func (c *CollectionTokenMongoRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
-	return c.unassignedCache.Delete(pCtx, string(pUserID))
+	return c.unassignedCache.Delete(pCtx, pUserID.String())
 }
 
 func newUnassignedCollectionTokenPipeline(pUserID persist.DBID, pOwnerAddresses []persist.Address) mongo.Pipeline {

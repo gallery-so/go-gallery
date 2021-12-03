@@ -106,17 +106,19 @@ func setDefaults() {
 func newRepos() *repositories {
 
 	mgoClient := newMongoClient()
-	openseaCache, unassignedCache := newMemstoreClients()
+	openseaCache, unassignedCache, galleriesCache := newMemstoreClients()
+	galleryTokenRepo := mongodb.NewGalleryTokenMongoRepository(mgoClient, galleriesCache)
+	galleryRepo := mongodb.NewGalleryMongoRepository(mgoClient, galleriesCache)
 	return &repositories{
 		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
 		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
-		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache),
-		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient),
-		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCache),
-		galleryTokenRepository:    mongodb.NewGalleryTokenMongoRepository(mgoClient),
-		galleryRepository:         mongodb.NewGalleryMongoRepository(mgoClient),
+		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache, galleryRepo),
+		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient, galleryTokenRepo),
+		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCache, galleryTokenRepo),
+		galleryTokenRepository:    galleryTokenRepo,
+		galleryRepository:         galleryRepo,
 		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
-		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, openseaCache),
+		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, openseaCache, galleryRepo),
 		userRepository:            mongodb.NewUserMongoRepository(mgoClient),
 		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
 		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
@@ -155,8 +157,8 @@ func newEthClient() *eth.Client {
 	return eth.NewEthClient(client, viper.GetString("CONTRACT_ADDRESS"))
 }
 
-func newMemstoreClients() (opensea, unassigned memstore.Cache) {
-	return redis.NewCache(0), redis.NewCache(1)
+func newMemstoreClients() (opensea, unassigned, galleries memstore.Cache) {
+	return redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
 }
 
 func newIPFSShell() *shell.Shell {
