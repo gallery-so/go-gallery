@@ -17,7 +17,7 @@ const (
 
 // LoginMongoRepository is a repository for storing login attempts in a MongoDB database
 type LoginMongoRepository struct {
-	mp *storage
+	loginsStorage *storage
 }
 
 // NonceMongoRepository is a repository for storing authentication nonces in a MongoDB database
@@ -28,7 +28,7 @@ type NonceMongoRepository struct {
 // NewLoginMongoRepository returns a new instance of a login attempt repository
 func NewLoginMongoRepository(mgoClient *mongo.Client) *LoginMongoRepository {
 	return &LoginMongoRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, loginAttemptCollName),
+		loginsStorage: newStorage(mgoClient, 0, galleryDBName, loginAttemptCollName),
 	}
 }
 
@@ -42,7 +42,7 @@ func NewNonceMongoRepository(mgoClient *mongo.Client) *NonceMongoRepository {
 // Create inserts a single login attempt into the database and will return the ID of the inserted attempt
 func (l *LoginMongoRepository) Create(pCtx context.Context, pLoginAttempt *persist.UserLoginAttempt,
 ) (persist.DBID, error) {
-	return l.mp.insert(pCtx, pLoginAttempt)
+	return l.loginsStorage.insert(pCtx, pLoginAttempt)
 }
 
 // Get returns the most recent nonce for a given address

@@ -20,8 +20,8 @@ var errNoTokensFound = errors.New("no tokens found")
 
 // TokenMongoRepository is a repository that stores tokens in a MongoDB database
 type TokenMongoRepository struct {
-	mp  *storage
-	nmp *storage
+	tokensStorage *storage
+	usersStorage  *storage
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
@@ -31,8 +31,8 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	defer cancel()
 	tokenIdentifiersIndex := mongo.IndexModel{
 		Keys: bson.D{
-			{Key: "token_id", Value: 1},
 			{Key: "contract_address", Value: 1},
+			{Key: "token_id", Value: 1},
 		},
 	}
 	blockNumberIndex := mongo.IndexModel{
@@ -52,8 +52,8 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 
 	logrus.Infof("created indexes %s and %s", tiName, bnName)
 	return &TokenMongoRepository{
-		mp:  tokenStorage,
-		nmp: newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		tokensStorage: tokenStorage,
+		usersStorage:  newStorage(mgoClient, 0, galleryDBName, usersCollName),
 	}
 }
 
@@ -67,7 +67,7 @@ func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []*persi
 		nfts[i] = v
 	}
 
-	ids, err := t.mp.insertMany(pCtx, nfts)
+	ids, err := t.tokensStorage.insertMany(pCtx, nfts)
 
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []*persi
 // Create inserts a token into the database
 func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Token) (persist.DBID, error) {
 
-	return t.mp.insert(pCtx, pERC721)
+	return t.tokensStorage.insert(pCtx, pERC721)
 }
 
 // GetByWallet gets tokens for a given wallet address
@@ -96,7 +96,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 	}
 
 	result := []*persist.User{}
-	err := t.nmp.find(pCtx, bson.M{"_id": pUserID}, &result, opts)
+	err := t.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 
 	result := []*persist.Token{}
 
-	err := t.mp.find(pCtx, bson.M{"_id": pID}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,6 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 		}
 		delete(asMap, "_id")
 		delete(asMap, "ownership_history")
-		delete(asMap, "amount")
 		delete(asMap, "created_at")
 		delete(asMap, "block_number")
 		asMap["last_updated"] = time.Now()
@@ -261,8 +260,6 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 		setDocs = append(setDocs, bson.E{Key: "$setOnInsert", Value: bson.M{"_id": persist.GenerateID(), "created_at": time.Now(), "block_number": v.BlockNumber}})
 
 		if v.TokenType == persist.TokenTypeERC1155 {
-			balanceDoc := bson.E{Key: "$inc", Value: bson.M{"amount": v.Amount}}
-			setDocs = append(setDocs, balanceDoc)
 
 			ownerDoc := bson.E{Key: "$set", Value: bson.M{"block_number": v.BlockNumber}}
 			nextSetDocs = append(nextSetDocs, ownerDoc)
@@ -298,12 +295,12 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 	}
 
 	now := time.Now()
-	if err := t.mp.bulkUpdate(pCtx, upsertModels, true); err != nil {
+	if err := t.tokensStorage.bulkUpdate(pCtx, upsertModels, true); err != nil {
 		return err
 	}
 	logrus.Infof("Bulk upserted %d models in %s", len(upsertModels), time.Since(now))
 	nextNow := time.Now()
-	if err := t.mp.bulkUpdate(pCtx, updateModels, false); err != nil {
+	if err := t.tokensStorage.bulkUpdate(pCtx, updateModels, false); err != nil {
 		return err
 	}
 	logrus.Infof("Bulk updated %d models in %s", len(updateModels), time.Since(nextNow))
@@ -320,14 +317,14 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Toke
 		query["owner_address"] = pToken.OwnerAddress
 	}
 
-	_, err := t.mp.upsert(pCtx, query, pToken)
+	_, err := t.tokensStorage.upsert(pCtx, query, pToken)
 	return err
 }
 
 // UpdateByIDUnsafe will update a given token by its DB ID and owner user ID
 func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
-	return t.mp.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	return t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
 
 }
 
@@ -335,7 +332,7 @@ func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persis
 func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
 	users := []*persist.User{}
-	err := t.nmp.find(pCtx, bson.M{"_id": pUserID}, &users, options.Find())
+	err := t.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users, options.Find())
 	if err != nil {
 		return err
 	}
@@ -344,7 +341,7 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 	}
 	user := users[0]
 
-	return t.mp.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
+	return t.tokensStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
 
 }
 
@@ -357,7 +354,7 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.Bl
 
 	res := []*persist.Token{}
 
-	if err := t.mp.find(pCtx, bson.M{}, &res, opts); err != nil {
+	if err := t.tokensStorage.find(pCtx, bson.M{}, &res, opts); err != nil {
 		return 0, err
 	}
 
@@ -382,7 +379,7 @@ func (t *TokenMongoRepository) Count(pCtx context.Context, countType persist.Tok
 	case persist.CountTypeERC1155:
 		filter = bson.M{"token_type": persist.TokenTypeERC1155}
 	}
-	count, err := t.mp.count(pCtx, filter)
+	count, err := t.tokensStorage.count(pCtx, filter)
 	if err != nil {
 		return 0, err
 	}

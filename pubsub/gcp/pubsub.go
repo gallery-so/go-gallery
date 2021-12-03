@@ -5,8 +5,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/pstest"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 // PubSub is a GCP PubSub client
@@ -14,12 +17,29 @@ type PubSub struct {
 	pubsub *pubsub.Client
 }
 
-// NewGCPPubSub creates a new GCPPubSub instance.
-func NewGCPPubSub(pCtx context.Context, projectID string, opts ...option.ClientOption) (*PubSub, error) {
-	pubsub, err := pubsub.NewClient(pCtx, projectID, opts...)
+// NewPubSub creates a new GCPPubSub instance.
+func NewPubSub(pCtx context.Context, opts ...option.ClientOption) (*PubSub, error) {
+
+	if viper.GetString("ENV") != "local" {
+		pubsub, err := pubsub.NewClient(pCtx, viper.GetString("GOOGLE_CLOUD_PROJECT"), opts...)
+		if err != nil {
+			return nil, err
+		}
+		return &PubSub{pubsub: pubsub}, nil
+	}
+	srv := pstest.NewServer()
+	// Connect to the server without using TLS.
+	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
+	opts = append(opts, option.WithGRPCConn(conn))
+	// Use the connection when creating a pubsub client.
+	pubsub, err := pubsub.NewClient(pCtx, viper.GetString("GOOGLE_PROJECT_ID"), opts...)
 	if err != nil {
 		return nil, err
 	}
+
 	return &PubSub{pubsub: pubsub}, nil
 }
 

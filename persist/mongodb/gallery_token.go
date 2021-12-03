@@ -15,8 +15,8 @@ const galleryColName = "galleries"
 
 // GalleryTokenMongoRepository is a repository that stores collections in a MongoDB database
 type GalleryTokenMongoRepository struct {
-	mp  *storage
-	nmp *storage
+	galleriesStorage   *storage
+	collectionsStorage *storage
 }
 
 type errUserDoesNotOwnCollections struct {
@@ -26,8 +26,8 @@ type errUserDoesNotOwnCollections struct {
 // NewGalleryTokenMongoRepository creates a new instance of the collection mongo repository
 func NewGalleryTokenMongoRepository(mgoClient *mongo.Client) *GalleryTokenMongoRepository {
 	return &GalleryTokenMongoRepository{
-		mp:  newStorage(mgoClient, 0, galleryDBName, galleryColName),
-		nmp: newStorage(mgoClient, 0, galleryDBName, collectionColName),
+		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
+		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 	}
 }
 
@@ -38,7 +38,7 @@ func (g *GalleryTokenMongoRepository) Create(pCtx context.Context, pGallery *per
 		pGallery.Collections = []persist.DBID{}
 	}
 
-	return g.mp.insert(pCtx, pGallery)
+	return g.galleriesStorage.insert(pCtx, pGallery)
 }
 
 // Update updates a gallery in the database by ID, also ensuring the gallery
@@ -49,7 +49,7 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 	pUpdate *persist.GalleryTokenUpdateInput,
 ) error {
 
-	ct, err := g.nmp.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (g *GalleryTokenMongoRepository) Update(pCtx context.Context, pIDstr persis
 		return errUserDoesNotOwnCollections{pOwnerUserID}
 	}
 
-	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	return g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }
 
 // UpdateUnsafe updates a gallery in the database by ID
@@ -67,12 +67,12 @@ func (g *GalleryTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr 
 	pUpdate *persist.GalleryTokenUpdateInput,
 ) error {
 
-	return g.mp.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
+	return g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate)
 }
 
 // AddCollections adds collections to the specified gallery
 func (g *GalleryTokenMongoRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
-	return g.mp.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
+	return g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs)
 }
 
 // GetByUserID gets a gallery by its owner user ID and will variably return
@@ -88,7 +88,7 @@ func (g *GalleryTokenMongoRepository) GetByUserID(pCtx context.Context, pUserID 
 
 	result := []*persist.GalleryToken{}
 
-	if err := g.mp.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (g *GalleryTokenMongoRepository) GetByID(pCtx context.Context, pID persist.
 
 	result := []*persist.GalleryToken{}
 
-	if err := g.mp.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryTokenPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result, opts); err != nil {
 		return nil, err
 	}
 

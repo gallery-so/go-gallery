@@ -12,13 +12,13 @@ var historyColName = "history"
 
 // HistoryMongoRepository is a repository that stores collections in a MongoDB database
 type HistoryMongoRepository struct {
-	mp *storage
+	historiesStorage *storage
 }
 
 // NewHistoryMongoRepository creates a new instance of the collection mongo repository
 func NewHistoryMongoRepository(mgoClient *mongo.Client) *HistoryMongoRepository {
 	return &HistoryMongoRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, historyColName),
+		historiesStorage: newStorage(mgoClient, 0, galleryDBName, historyColName),
 	}
 }
 
@@ -27,7 +27,7 @@ func (h *HistoryMongoRepository) Upsert(pCtx context.Context, pNFTID persist.DBI
 
 	pHistory.NFTID = pNFTID
 
-	if _, err := h.mp.upsert(pCtx, bson.M{"nft_id": pNFTID}, pHistory); err != nil {
+	if _, err := h.historiesStorage.upsert(pCtx, bson.M{"nft_id": pNFTID}, pHistory); err != nil {
 		return err
 	}
 	return nil

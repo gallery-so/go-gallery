@@ -15,13 +15,13 @@ const contractsCollName = "contracts"
 
 // ContractMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type ContractMongoRepository struct {
-	mp *storage
+	contractsStorage *storage
 }
 
 // NewContractMongoRepository returns a new instance of a login attempt repository
 func NewContractMongoRepository(mgoClient *mongo.Client) *ContractMongoRepository {
 	return &ContractMongoRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, contractsCollName),
+		contractsStorage: newStorage(mgoClient, 0, galleryDBName, contractsCollName),
 	}
 }
 
@@ -29,7 +29,7 @@ func NewContractMongoRepository(mgoClient *mongo.Client) *ContractMongoRepositor
 // pUpdate represents a struct with bson tags to specify which fields to update
 func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Contract) error {
 
-	_, err := c.mp.upsert(pCtx, bson.M{
+	_, err := c.contractsStorage.upsert(pCtx, bson.M{
 		"address": pAddress,
 	}, pUpsert)
 	if err != nil {
@@ -78,7 +78,7 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 			setDocs: setDocs,
 		}
 	}
-	err := c.mp.bulkUpdate(pCtx, upserts, true)
+	err := c.contractsStorage.bulkUpdate(pCtx, upserts, true)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress pe
 	}
 
 	result := []*persist.Contract{}
-	err := c.mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
+	err := c.contractsStorage.find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
 		return nil, err

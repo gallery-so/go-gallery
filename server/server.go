@@ -5,15 +5,14 @@ import (
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/pubsub/pstest"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/go-redis/redis/v8"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/eth"
 	"github.com/mikeydub/go-gallery/memstore"
+	"github.com/mikeydub/go-gallery/memstore/redis"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/mikeydub/go-gallery/persist/mongodb"
@@ -26,8 +25,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"google.golang.org/api/option"
-	"google.golang.org/grpc"
 )
 
 type repositories struct {
@@ -74,6 +71,7 @@ func CoreInit() *gin.Engine {
 		v.RegisterValidation("nonce", nonceValidator)
 		v.RegisterValidation("signature", signatureValidator)
 		v.RegisterValidation("username", usernameValidator)
+
 	}
 
 	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
@@ -90,8 +88,8 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "decrypted/service-key.json")
-	viper.SetDefault("CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-mainnet.alchemyapi.io/v2/lZc9uHY6g2ak1jnEkrOkkopylNJXvE76")
+	viper.SetDefault("CONTRACT_ADDRESS", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46")
+	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("REQUIRE_NFTS", false)
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
@@ -108,17 +106,17 @@ func setDefaults() {
 func newRepos() *repositories {
 
 	mgoClient := newMongoClient()
-	redisClients := newMemstoreClients()
+	openseaCache, unassignedCache := newMemstoreClients()
 	return &repositories{
 		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
 		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
-		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, redisClients),
+		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache),
 		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient),
-		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, redisClients),
+		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCache),
 		galleryTokenRepository:    mongodb.NewGalleryTokenMongoRepository(mgoClient),
 		galleryRepository:         mongodb.NewGalleryMongoRepository(mgoClient),
 		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
-		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, redisClients),
+		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, openseaCache),
 		userRepository:            mongodb.NewUserMongoRepository(mgoClient),
 		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
 		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
@@ -157,30 +155,11 @@ func newEthClient() *eth.Client {
 	return eth.NewEthClient(client, viper.GetString("CONTRACT_ADDRESS"))
 }
 
-func newMemstoreClients() *memstore.Clients {
-	redisURL := viper.GetString("REDIS_URL")
-	redisPass := viper.GetString("REDIS_PASS")
-	opensea := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: redisPass,
-		DB:       int(memstore.OpenseaRDB),
-	})
-	if err := opensea.Ping(context.Background()).Err(); err != nil {
-		panic(err)
-	}
-	unassigned := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: redisPass,
-		DB:       int(memstore.CollUnassignedRDB),
-	})
-	if err := unassigned.Ping(context.Background()).Err(); err != nil {
-		panic(err)
-	}
-	return memstore.NewMemstoreClients(opensea, unassigned)
+func newMemstoreClients() (opensea, unassigned memstore.Cache) {
+	return redis.NewCache(0), redis.NewCache(1)
 }
 
 func newIPFSShell() *shell.Shell {
-
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
 	sh.SetTimeout(time.Second * 15)
 	return sh
@@ -189,25 +168,10 @@ func newIPFSShell() *shell.Shell {
 func newGCPPubSub() pubsub.PubSub {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
-	if viper.GetString("ENV") != "local" {
-		pub, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_CLOUD_PROJECT"))
-		if err != nil {
-			panic(err)
-		}
-		return pub
-	}
-	srv := pstest.NewServer()
-	// Connect to the server without using TLS.
-	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+	client, err := gcp.NewPubSub(ctx)
 	if err != nil {
 		panic(err)
 	}
-	// Use the connection when creating a pubsub client.
-	client, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_PROJECT_ID"), option.WithGRPCConn(conn))
-	if err != nil {
-		panic(err)
-	}
-
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	return client
 }
