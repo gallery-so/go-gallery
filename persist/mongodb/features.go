@@ -14,7 +14,7 @@ const featuresCollName = "features"
 
 // FeaturesMongoRepository is a mongoDB repository for storing feature flags in the database
 type FeaturesMongoRepository struct {
-	mp *storage
+	featuresStorage *storage
 }
 
 // NewFeaturesMongoRepository returns a new instance of a feature flag repository
@@ -33,7 +33,7 @@ func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepositor
 		panic(err)
 	}
 	return &FeaturesMongoRepository{
-		mp: featureStorage,
+		featuresStorage: featureStorage,
 	}
 }
 
@@ -52,7 +52,7 @@ func (c *FeaturesMongoRepository) GetByRequiredTokens(pCtx context.Context, pReq
 	for k := range pRequiredtokens {
 		keys[i] = k
 	}
-	err := c.mp.find(pCtx, bson.M{"required_token": bson.M{"$in": keys}}, &result, opts)
+	err := c.featuresStorage.find(pCtx, bson.M{"required_token": bson.M{"$in": keys}}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (c *FeaturesMongoRepository) GetByName(pCtx context.Context, pName string) 
 	opts.SetLimit(1)
 
 	result := []*persist.FeatureFlag{}
-	err := c.mp.find(pCtx, bson.M{"name": pName}, &result, opts)
+	err := c.featuresStorage.find(pCtx, bson.M{"name": pName}, &result, opts)
 
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (c *FeaturesMongoRepository) GetAll(pCtx context.Context) ([]*persist.Featu
 	}
 
 	result := []*persist.FeatureFlag{}
-	err := c.mp.find(pCtx, bson.M{}, &result, opts)
+	err := c.featuresStorage.find(pCtx, bson.M{}, &result, opts)
 
 	if err != nil {
 		return nil, err
