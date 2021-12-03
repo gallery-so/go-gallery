@@ -9,6 +9,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -198,6 +199,16 @@ func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDs
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
 		return err
 	}
+
+	go func() {
+		coll, err := c.GetByID(pCtx, pIDstr, true)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get collection for cache reset")
+			return
+		}
+		c.galleryRepo.resetCache(pCtx, coll.OwnerUserID)
+	}()
+
 	return nil
 }
 
@@ -218,6 +229,15 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
 	}
+
+	go func() {
+		coll, err := c.GetByID(pCtx, pID, true)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get collection for cache reset")
+			return
+		}
+		c.galleryRepo.resetCache(pCtx, coll.OwnerUserID)
+	}()
 
 	return nil
 }

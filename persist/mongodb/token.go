@@ -307,6 +307,26 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 	}
 	logrus.Infof("Bulk updated %d models in %s", len(updateModels), time.Since(nextNow))
 
+	go func() {
+		processedUsers := make(map[persist.DBID]bool)
+		for _, v := range pTokens {
+			if v.OwnerAddress != "" {
+				users := []*persist.User{}
+				err := t.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": v.OwnerAddress}}, &users)
+				if err != nil {
+					logrus.Errorf("failed to get user by address %s: %s", v.OwnerAddress, err.Error())
+					continue
+				}
+				for _, user := range users {
+					if !processedUsers[user.ID] {
+						t.galleryRepo.resetCache(pCtx, user.ID)
+						processedUsers[user.ID] = true
+					}
+				}
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -326,7 +346,34 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Toke
 // UpdateByIDUnsafe will update a given token by its DB ID and owner user ID
 func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
-	return t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	if err := t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	go func() {
+		token, err := t.GetByID(pCtx, pID)
+		if err != nil {
+			logrus.WithError(err).Errorf("failed to get token by ID %s", pID)
+			return
+		}
+		if token.OwnerAddress != "" {
+			processedUsers := make(map[persist.DBID]bool)
+			users := []*persist.User{}
+			err = t.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": token.OwnerAddress}}, &users)
+			if err != nil {
+				logrus.Errorf("failed to get user by address %s: %s", token.OwnerAddress, err.Error())
+				return
+			}
+			for _, user := range users {
+				if !processedUsers[user.ID] {
+					t.galleryRepo.resetCache(pCtx, user.ID)
+					processedUsers[user.ID] = true
+				}
+			}
+		}
+	}()
+
+	return nil
 
 }
 

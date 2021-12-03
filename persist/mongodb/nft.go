@@ -9,6 +9,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/memstore"
 	"github.com/mikeydub/go-gallery/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -207,6 +208,26 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 			return nil, err
 		}
 	}
+
+	go func() {
+		processedUsers := make(map[persist.DBID]bool)
+		for _, nft := range pNfts {
+			if nft.OwnerAddress != "" {
+				users := []*persist.User{}
+				err := n.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": nft.OwnerAddress}}, &users)
+				if err != nil {
+					logrus.WithError(err).Error("failed to find users for nft")
+					continue
+				}
+				for _, user := range users {
+					if !processedUsers[user.ID] {
+						n.galleryRepo.resetCache(pCtx, user.ID)
+						processedUsers[user.ID] = true
+					}
+				}
+			}
+		}
+	}()
 
 	return result, nil
 

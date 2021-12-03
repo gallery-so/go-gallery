@@ -83,6 +83,14 @@ func (g *GalleryTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr 
 	if err := g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
 		return err
 	}
+	go func() {
+		gallery, err := g.GetByID(pCtx, pIDstr, true)
+		if err != nil {
+			logrus.WithError(err).Error("error getting gallery to reset cache")
+			return
+		}
+		g.resetCache(pCtx, gallery.OwnerUserID)
+	}()
 	return nil
 }
 
