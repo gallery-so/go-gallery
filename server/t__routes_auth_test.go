@@ -187,7 +187,7 @@ func TestUserLoginGnosis_Success(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x", nonce.Address, walletTypeGnosis)
+	resp := loginRequest(assert, " TEST NONCE", nonce.Address, walletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
@@ -220,6 +220,36 @@ func TestUserLoginGnosis_WrongNonce_Failure(t *testing.T) {
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x", nonce.Address, walletTypeGnosis)
+	assertValidResponse(assert, resp)
+
+	type LoginOutput struct {
+		authUserLoginOutput
+		Error string `json:"error"`
+	}
+	output := &LoginOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	assert.False(output.SignatureValid)
+	assert.Empty(output.UserID)
+}
+
+func TestUserLoginGnosis_WrongSig_Failure(t *testing.T) {
+	assert := setupTest(t)
+
+	user := &persist.User{
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
+	}
+
+	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	assert.Nil(err)
+
+	nonce := &persist.UserNonce{
+		Value:   " TEST NONCE",
+		Address: user.Addresses[0],
+	}
+	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	assert.Nil(err)
+
+	resp := loginRequest(assert, "Blah Blah Blah", nonce.Address, walletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {

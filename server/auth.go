@@ -183,13 +183,20 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 
 	output := &authUserLoginOutput{}
 
-	nonceValueStr, userIDstr, err := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	nonce, userID, err := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
+	if pInput.WalletType != walletTypeEOA {
+		if nonce != pInput.Signature {
+			output.SignatureValid = false
+			return output, nil
+		}
+	}
+
 	sigValid, err := authVerifySignatureAllMethods(pInput.Signature,
-		nonceValueStr,
+		nonce,
 		pInput.Address, pInput.WalletType, ec)
 	if err != nil {
 		return nil, err
@@ -200,16 +207,16 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 		return output, nil
 	}
 
-	output.UserID = userIDstr
+	output.UserID = userID
 
-	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userIDstr)
+	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	output.JWTtoken = jwtTokenStr
 
-	err = authNonceRotateDb(pCtx, pInput.Address, userIDstr, nonceRepo)
+	err = authNonceRotateDb(pCtx, pInput.Address, userID, nonceRepo)
 	if err != nil {
 		return nil, err
 	}
