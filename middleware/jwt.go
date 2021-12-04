@@ -76,7 +76,7 @@ func jwtGenerate(
 	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") //60*60*24*2 // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		jwt.StandardClaims{
