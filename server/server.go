@@ -81,7 +81,7 @@ func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("JWT_SECRET", "Test-Secret")
-	viper.SetDefault("JWT_TTL", 60*60*24*3)
+	viper.SetDefault("JWT_TTL", 60*60*24*7)
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
