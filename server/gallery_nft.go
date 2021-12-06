@@ -46,7 +46,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 
 		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
-		if len(galleries) == 0 || err != nil {
+		if galleries == nil || err != nil {
 			galleries = []persist.Gallery{}
 		}
 
