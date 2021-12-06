@@ -235,7 +235,7 @@ func (m *storage) upsert(ctx context.Context, query bson.M, upsert interface{}, 
 	return returnID, nil
 }
 
-// bulkUpsert upserts many documents in the mongo database while filling out the fields id, creation time, and last updated
+// bulkUpdate updates many documents in the mongo database
 func (m *storage) bulkUpdate(ctx context.Context, updates []updateModel, isUpsert bool) error {
 	defer util.Track("mongo.BulkUpdate", time.Now())
 	wp := workerpool.New(10)
@@ -264,6 +264,55 @@ func (m *storage) bulkUpdate(ctx context.Context, updates []updateModel, isUpser
 		wp.Submit(func() {
 			beginUpsert := time.Now()
 			res, err := m.collection.BulkWrite(ctx, updateModels, options.BulkWrite().SetOrdered(false))
+			if err != nil {
+				errs <- err
+				return
+			}
+			logrus.Infof("upserted %d documents and modified %d documents in %s", res.UpsertedCount, res.ModifiedCount, time.Since(beginUpsert))
+		})
+
+	}
+
+	go func() {
+		defer close(errs)
+		wp.StopWait()
+		errs <- nil
+	}()
+
+	if err := <-errs; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// bulkDelete updates many documents in the mongo database
+func (m *storage) bulkDelete(ctx context.Context, queries []bson.M) error {
+	defer util.Track("mongo.BulkUpdate", time.Now())
+	wp := workerpool.New(10)
+	errs := make(chan error)
+
+	for i := 0; i < len(queries); i += 50 {
+		var toUpdate []bson.M
+		if i+50 < len(queries) {
+			toUpdate = queries[i : i+50]
+		} else {
+			toUpdate = queries[i:]
+		}
+
+		delModels := make([]mongo.WriteModel, len(toUpdate))
+		for i, q := range toUpdate {
+
+			model := &mongo.DeleteOneModel{
+				Filter: q,
+			}
+
+			delModels[i] = model
+		}
+
+		wp.Submit(func() {
+			beginUpsert := time.Now()
+			res, err := m.collection.BulkWrite(ctx, delModels, options.BulkWrite().SetOrdered(false))
 			if err != nil {
 				errs <- err
 				return

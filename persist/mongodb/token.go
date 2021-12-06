@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"errors"
+	"math/big"
 	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
@@ -212,11 +213,9 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 	upsertModels := make([]updateModel, 0, len(pTokens))
 	updateModels := make([]updateModel, 0, len(pTokens))
+	delModels := make([]bson.M, 0, len(pTokens))
 
 	for _, v := range pTokens {
-
-		setDocs := make(bson.D, 0, 3)
-		nextSetDocs := make(bson.D, 0, 1)
 
 		query := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress}
 		nextQuery := bson.M{"token_id": v.TokenID, "contract_address": v.ContractAddress, "block_number": bson.M{"$lte": v.BlockNumber}}
@@ -224,6 +223,16 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 			query["owner_address"] = v.OwnerAddress
 			nextQuery["owner_address"] = v.OwnerAddress
 		}
+
+		if v.TokenType == persist.TokenTypeERC1155 && v.Quantity.String() != "" {
+			if v.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
+				delModels = append(delModels, query)
+				continue
+			}
+		}
+
+		setDocs := make(bson.D, 0, 3)
+		nextSetDocs := make(bson.D, 0, 1)
 
 		asBSON, err := bson.MarshalWithRegistry(CustomRegistry, v)
 		if err != nil {
@@ -292,6 +301,11 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 		return err
 	}
 	logrus.Infof("Bulk updated %d models in %s", len(updateModels), time.Since(nextNow))
+	finalNow := time.Now()
+	if err := t.tokensStorage.bulkDelete(pCtx, delModels); err != nil {
+		return err
+	}
+	logrus.Infof("Bulk deleted %d models in %s", len(delModels), time.Since(finalNow))
 
 	return nil
 }
