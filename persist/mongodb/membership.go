@@ -2,13 +2,11 @@ package mongodb
 
 import (
 	"context"
-	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const membershipColName = "membership"
@@ -41,14 +39,8 @@ func (c *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID pe
 // GetByTokenID returns a membership tier by token ID
 func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (*persist.MembershipTier, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.MembershipTier{}
-	err := c.membershipsStorage.find(pCtx, bson.M{"token_id": pTokenID}, &result, opts)
+	err := c.membershipsStorage.find(pCtx, bson.M{"token_id": pTokenID}, &result)
 
 	if err != nil {
 		return nil, err
@@ -68,14 +60,8 @@ func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persi
 // GetAll returns all membership tiers
 func (c *MembershipRepository) GetAll(pCtx context.Context) ([]*persist.MembershipTier, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.MembershipTier{}
-	err := c.membershipsStorage.find(pCtx, bson.M{}, &result, opts)
+	err := c.membershipsStorage.find(pCtx, bson.M{}, &result)
 
 	if err != nil {
 		return nil, err

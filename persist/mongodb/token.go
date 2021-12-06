@@ -22,10 +22,11 @@ var errNoTokensFound = errors.New("no tokens found")
 type TokenMongoRepository struct {
 	tokensStorage *storage
 	usersStorage  *storage
+	galleryRepo   *GalleryTokenMongoRepository
 }
 
 // NewTokenMongoRepository creates a new instance of the collection mongo repository
-func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
+func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenMongoRepository) *TokenMongoRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
@@ -54,6 +55,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client) *TokenMongoRepository {
 	return &TokenMongoRepository{
 		tokensStorage: tokenStorage,
 		usersStorage:  newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		galleryRepo:   galleryRepo,
 	}
 }
 
@@ -84,10 +86,7 @@ func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Tok
 // GetByWallet gets tokens for a given wallet address
 func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
+
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -107,10 +106,11 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 // GetByUserID gets ERC721 tokens for a given userID
 func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
+	if limit > 0 {
+		opts.SetSkip(limit * page)
+		opts.SetLimit(limit)
 	}
+	opts.SetSort(bson.M{"block_number": -1})
 
 	result := []*persist.User{}
 	err := t.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &result, opts)
@@ -153,10 +153,6 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 // GetByContract gets ERC721 tokens for a given contract
 func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -176,10 +172,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
 func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
 	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
+
 	if limit > 0 {
 		opts.SetSkip(limit * page)
 		opts.SetLimit(limit)
@@ -198,15 +191,10 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 // GetByID gets tokens for a given DB ID
 func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.Token, error) {
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
 
 	result := []*persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result, opts)
+	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +312,11 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Toke
 // UpdateByIDUnsafe will update a given token by its DB ID and owner user ID
 func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
-	return t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
+	if err := t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	return nil
 
 }
 
@@ -341,7 +333,12 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 	}
 	user := users[0]
 
-	return t.tokensStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate)
+	if err := t.tokensStorage.update(pCtx, bson.M{"_id": pID, "owner_address": bson.M{"$in": user.Addresses}}, pUpdate); err != nil {
+		return err
+	}
+
+	go t.galleryRepo.resetCache(pCtx, pUserID)
+	return nil
 
 }
 

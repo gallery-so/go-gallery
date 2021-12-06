@@ -23,3 +23,7 @@ func GenerateID() DBID {
 	}
 	return DBID(id.String())
 }
+
+func (d DBID) String() string {
+	return string(d)
+}
