@@ -34,7 +34,7 @@ func NewGalleryMongoRepository(mgoClient *mongo.Client, galleriesCache memstore.
 }
 
 // Create inserts a new gallery into the database and returns the ID of the new gallery
-func (g *GalleryMongoRepository) Create(pCtx context.Context, pGallery *persist.GalleryDB) (persist.DBID, error) {
+func (g *GalleryMongoRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
 
 	if pGallery.Collections == nil {
 		pGallery.Collections = []persist.DBID{}
@@ -55,7 +55,7 @@ func (g *GalleryMongoRepository) Create(pCtx context.Context, pGallery *persist.
 // pUpdate is a struct that contains bson tags representing the fields to be updated
 func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 	pOwnerUserID persist.DBID,
-	pUpdate *persist.GalleryUpdateInput,
+	pUpdate persist.GalleryUpdateInput,
 ) error {
 
 	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
@@ -85,10 +85,9 @@ func (g *GalleryMongoRepository) AddCollections(pCtx context.Context, pID persis
 
 // GetByUserID gets a gallery by its owner user ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pAuth bool,
-) ([]*persist.Gallery, error) {
+func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]persist.Gallery, error) {
 
-	galleries := []*persist.Gallery{}
+	galleries := []persist.Gallery{}
 
 	fromCache, err := g.galleriesCache.Get(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth))
 	if err != nil || fromCache == nil || len(fromCache) == 0 {
@@ -103,9 +102,9 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 	return galleries, nil
 }
 
-func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]*persist.Gallery, error) {
+func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]persist.Gallery, error) {
 
-	result := []*persist.Gallery{}
+	result := []persist.Gallery{}
 
 	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result); err != nil {
 		return nil, err
@@ -125,16 +124,16 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (*persist.Gallery, error) {
+func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (persist.Gallery, error) {
 
-	result := []*persist.Gallery{}
+	result := []persist.Gallery{}
 
 	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result); err != nil {
-		return nil, err
+		return persist.Gallery{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrGalleryNotFoundByID{ID: pID}
+		return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil

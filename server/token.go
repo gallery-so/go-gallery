@@ -35,15 +35,15 @@ type getTokensByUserIDInput struct {
 }
 
 type getTokensOutput struct {
-	Nfts []*persist.Token `json:"nfts"`
+	Nfts []persist.Token `json:"nfts"`
 }
 
 type getTokenOutput struct {
-	Nft *persist.Token `json:"nft"`
+	Nft persist.Token `json:"nft"`
 }
 
 type getUnassignedTokensOutput struct {
-	Nfts []*persist.TokenInCollection `json:"nfts"`
+	Nfts []persist.TokenInCollection `json:"nfts"`
 }
 
 type updateTokenByIDInput struct {
@@ -90,9 +90,9 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		if token != nil {
+		if token.ID != "" {
 			if !input.SkipMedia {
-				token = ensureTokenMedia(aeCtx, []*persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]
+				token = ensureTokenMedia(aeCtx, []persist.Token{token}, nftRepository, ipfsClient, ethClient)[0]
 			}
 			c.JSON(http.StatusOK, getTokenOutput{Nft: token})
 			return
@@ -157,8 +157,8 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			return
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID, input.Limit, input.Page)
-		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.Token{}
+		if nfts == nil || err != nil {
+			nfts = []persist.Token{}
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
@@ -176,8 +176,8 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID)
-		if coll == nil || err != nil {
-			coll = &persist.CollectionToken{Nfts: []*persist.TokenInCollection{}}
+		if err != nil {
+			coll.Nfts = []persist.TokenInCollection{}
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
@@ -216,10 +216,10 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 	return true, nil
 }
 
-func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.Token {
-	nftChan := make(chan *persist.Token)
+func ensureTokenMedia(aeCtx context.Context, nfts []persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []persist.Token {
+	nftChan := make(chan persist.Token)
 	for _, nft := range nfts {
-		go func(n *persist.Token) {
+		go func(n persist.Token) {
 			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
@@ -242,10 +242,10 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 	return nfts
 }
 
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.TokenInCollection {
-	nftChan := make(chan *persist.TokenInCollection)
+func ensureCollectionTokenMedia(aeCtx context.Context, nfts []persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []persist.TokenInCollection {
+	nftChan := make(chan persist.TokenInCollection)
 	for _, nft := range nfts {
-		go func(n *persist.TokenInCollection) {
+		go func(n persist.TokenInCollection) {
 			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
@@ -300,21 +300,21 @@ func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType
 	return media, metadata, tokenURI
 }
 
-func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (*persist.Token, error) {
+func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {
 	switch {
 	case input.ID != "":
 		return tokenRepo.GetByID(pCtx, input.ID)
 	}
-	return nil, nil
+	return persist.Token{}, nil
 }
-func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) ([]*persist.Token, error) {
+func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) ([]persist.Token, error) {
 	switch {
 	case input.ID != "":
 		token, err := tokenRepo.GetByID(pCtx, input.ID)
 		if err != nil {
 			return nil, err
 		}
-		return []*persist.Token{token}, nil
+		return []persist.Token{token}, nil
 	case input.WalletAddress != "":
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":

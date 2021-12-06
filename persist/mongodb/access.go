@@ -38,20 +38,20 @@ func NewAccessMongoRepository(mgoClient *mongo.Client) *AccessMongoRepository {
 }
 
 // GetByUserID returns an feature by a given token identifiers
-func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (*persist.Access, error) {
+func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (persist.Access, error) {
 
 	opts := options.Find()
 	opts.SetLimit(1)
 
-	result := []*persist.Access{}
+	result := []persist.Access{}
 	err := c.accessStorage.find(pCtx, bson.M{"user_id": pUserID}, &result, opts)
 
 	if err != nil {
-		return nil, err
+		return persist.Access{}, err
 	}
 
 	if len(result) == 0 {
-		return nil, persist.ErrAccessNotFoundByUserID{UserID: pUserID}
+		return persist.Access{}, persist.ErrAccessNotFoundByUserID{UserID: pUserID}
 	}
 
 	return result[0], nil

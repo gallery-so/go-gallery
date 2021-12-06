@@ -26,7 +26,7 @@ func NewContractMongoRepository(mgoClient *mongo.Client) *ContractMongoRepositor
 
 // UpsertByAddress upserts an contract by a given address
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Contract) error {
+func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert persist.Contract) error {
 
 	_, err := c.contractsStorage.upsert(pCtx, bson.M{
 		"address": pAddress,
@@ -39,7 +39,7 @@ func (c *ContractMongoRepository) UpsertByAddress(pCtx context.Context, pAddress
 }
 
 // BulkUpsert upserts many contracts by their address field
-func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*persist.Contract) error {
+func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []persist.Contract) error {
 
 	upserts := make([]updateModel, len(contracts))
 	for i, contract := range contracts {
@@ -86,17 +86,17 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 }
 
 // GetByAddress returns an contract by a given address
-func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Contract, error) {
+func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Contract, error) {
 
-	result := []*persist.Contract{}
+	result := []persist.Contract{}
 	err := c.contractsStorage.find(pCtx, bson.M{"address": pAddress}, &result)
 
 	if err != nil {
-		return nil, err
+		return persist.Contract{}, err
 	}
 
 	if len(result) < 1 {
-		return nil, persist.ErrContractNotFoundByAddress{Address: pAddress}
+		return persist.Contract{}, persist.ErrContractNotFoundByAddress{Address: pAddress}
 	}
 
 	if len(result) > 1 {

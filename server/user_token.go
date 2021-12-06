@@ -182,9 +182,9 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *eth.Client
 func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &userGetInput{}
+		input := userGetInput{}
 
-		if err := c.ShouldBindQuery(input); err != nil {
+		if err := c.ShouldBindQuery(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -212,9 +212,9 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &userAddAddressInput{}
+		input := userAddAddressInput{}
 
-		if err := c.ShouldBindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -290,24 +290,23 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 	}
 }
 
-func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client) (*userCreateOutput, error) {
+func userCreateDbToken(pCtx context.Context, pInput userAddAddressInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client) (userCreateOutput, error) {
 
-	output := &userCreateOutput{}
+	output := userCreateOutput{}
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errNonceNotFound{address: pInput.Address}
+		return userCreateOutput{}, errNonceNotFound{address: pInput.Address}
 	}
 	if id != "" {
-		return nil, errUserExistsWithAddress{address: pInput.Address}
+		return userCreateOutput{}, errUserExistsWithAddress{address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
 		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.SignatureValid = sigValidBool
@@ -315,34 +314,34 @@ func userCreateDbToken(pCtx context.Context, pInput *userAddAddressInput,
 		return output, nil
 	}
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses: []persist.Address{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.UserID = userID
 
 	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.JWTtoken = jwtTokenStr
 
 	err = authNonceRotateDb(pCtx, pInput.Address, userID, nonceRepo)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
-	galleryInsert := &persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.GalleryID = galleryID
@@ -406,39 +405,38 @@ func removeAddressesFromUserDBToken(pCtx context.Context, pUserID persist.DBID, 
 	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
 }
 
-func userGetDb(pCtx context.Context, pInput *userGetInput,
-	userRepo persist.UserRepository) (*userGetOutput, error) {
+func userGetDb(pCtx context.Context, pInput userGetInput, userRepo persist.UserRepository) (userGetOutput, error) {
 
 	//------------------
 
-	var user *persist.User
+	var user persist.User
 	var err error
 	switch {
 	case pInput.UserID != "":
 		user, err = userRepo.GetByID(pCtx, pInput.UserID)
 		if err != nil {
-			return nil, err
+			return userGetOutput{}, err
 		}
 		break
 	case pInput.Username != "":
 		user, err = userRepo.GetByUsername(pCtx, pInput.Username)
 		if err != nil {
-			return nil, err
+			return userGetOutput{}, err
 		}
 		break
 	case pInput.Address != "":
 		user, err = userRepo.GetByAddress(pCtx, pInput.Address)
 		if err != nil {
-			return nil, err
+			return userGetOutput{}, err
 		}
 		break
 	}
 
-	if user == nil {
-		return nil, errUserNotFound{pInput.UserID, pInput.Address, pInput.Username}
+	if user.ID == "" {
+		return userGetOutput{}, errUserNotFound{pInput.UserID, pInput.Address, pInput.Username}
 	}
 
-	output := &userGetOutput{
+	output := userGetOutput{
 		UserID:      user.ID,
 		UserNameStr: user.UserName,
 		BioStr:      user.Bio,
@@ -452,24 +450,20 @@ func userGetDb(pCtx context.Context, pInput *userGetInput,
 // returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func getUserWithNonce(pCtx context.Context, pAddress persist.Address,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (nonceValue string, userID persist.DBID, err error) {
+func getUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (nonceValue string, userID persist.DBID, err error) {
 
 	nonce, err := nonceRepo.Get(pCtx, pAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
-	if nonce != nil {
-		nonceValue = nonce.Value
-	} else {
-		return nonceValue, userID, errNonceNotFound{pAddress}
-	}
+
+	nonceValue = nonce.Value
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
-	if user != nil {
+	if user.ID != "" {
 		userID = user.ID
 	} else {
 		return nonceValue, userID, errUserNotFound{address: pAddress}

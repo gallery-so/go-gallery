@@ -38,7 +38,7 @@ func NewNFTMongoRepository(mgoClient *mongo.Client, openseaCache memstore.Cache,
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NFTDB) ([]persist.DBID, error) {
 
 	nfts := make([]interface{}, len(pNfts))
 
@@ -55,14 +55,14 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []*persist.N
 }
 
 // Create inserts an NFT into the database
-func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT *persist.NFTDB) (persist.DBID, error) {
+func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT persist.NFTDB) (persist.DBID, error) {
 	return n.nftsStorage.insert(pCtx, pNFT)
 }
 
 // GetByUserID finds an nft by its owner user id
-func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.NFT, error) {
 
-	users := []*persist.User{}
+	users := []persist.User{}
 	err := n.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
 	if err != nil {
 		return nil, err
@@ -75,12 +75,12 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 }
 
 // GetByAddresses finds an nft by its owner user id
-func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]persist.NFT, error) {
 	for i, v := range pAddresses {
 		pAddresses[i] = v
 	}
 
-	result := []*persist.NFT{}
+	result := []persist.NFT{}
 
 	if err := n.nftsStorage.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &result); err != nil {
 		return nil, err
@@ -90,25 +90,25 @@ func (n *NFTMongoRepository) GetByAddresses(pCtx context.Context, pAddresses []p
 }
 
 // GetByID finds an nft by its id
-func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.NFT, error) {
 
-	result := []*persist.NFT{}
+	result := []persist.NFT{}
 
 	if err := n.nftsStorage.find(pCtx, bson.M{"_id": pID}, &result); err != nil {
-		return nil, err
+		return persist.NFT{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrNFTNotFoundByID{ID: pID}
+		return persist.NFT{}, persist.ErrNFTNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
 }
 
 // GetByContractData finds an nft by its contract data
-func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address) ([]persist.NFT, error) {
 
-	result := []*persist.NFT{}
+	result := []persist.NFT{}
 
 	if err := n.nftsStorage.find(pCtx, bson.M{"opensea_token_id": pTokenID, "contract.contract_address": pContractAddress}, &result); err != nil {
 		return nil, err
@@ -118,10 +118,9 @@ func (n *NFTMongoRepository) GetByContractData(pCtx context.Context, pTokenID pe
 }
 
 // GetByOpenseaID finds an nft by its opensea ID
-func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address,
-) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address) ([]persist.NFT, error) {
 
-	result := []*persist.NFT{}
+	result := []persist.NFT{}
 
 	if err := n.nftsStorage.find(pCtx, bson.M{"opensea_id": pOpenseaID, "owner_address": pWalletAddress}, &result); err != nil {
 		return nil, err
@@ -153,13 +152,13 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 
 // BulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []persist.NFTDB) ([]persist.DBID, error) {
 
 	ids := make(chan persist.DBID)
 	errs := make(chan error)
 
 	for _, v := range pNfts {
-		go func(nft *persist.NFTDB) {
+		go func(nft persist.NFTDB) {
 			if nft.OwnerAddress == "" {
 				errs <- errOwnerAddressRequired
 				return
@@ -187,7 +186,7 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []*persist.N
 }
 
 // OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
-func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []*persist.NFT) error {
+func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []persist.NFT) error {
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = v
 	}
@@ -211,7 +210,7 @@ func (n *NFTMongoRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAdd
 }
 
 // OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
-func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []persist.Address) ([]*persist.NFT, error) {
+func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []persist.Address) ([]persist.NFT, error) {
 
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = v
@@ -222,28 +221,11 @@ func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddres
 		return nil, err
 	}
 
-	nfts := []*persist.NFT{}
+	nfts := []persist.NFT{}
 	if err := json.Unmarshal([]byte(result), &nfts); err != nil {
 		return nil, err
 	}
 	return nfts, nil
-}
-
-func findDifference(nfts []*persist.NFTDB, dbNfts []*persist.NFTDB) ([]persist.DBID, error) {
-	currOpenseaIds := map[int]bool{}
-
-	for _, v := range nfts {
-		currOpenseaIds[v.OpenseaID] = true
-	}
-
-	diff := []persist.DBID{}
-	for _, v := range dbNfts {
-		if !currOpenseaIds[v.OpenseaID] {
-			diff = append(diff, v.ID)
-		}
-	}
-
-	return diff, nil
 }
 
 func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {

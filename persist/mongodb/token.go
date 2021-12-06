@@ -61,7 +61,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenM
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []*persist.Token) ([]persist.DBID, error) {
+func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []persist.Token) ([]persist.DBID, error) {
 
 	nfts := make([]interface{}, len(pTokens))
 
@@ -78,13 +78,13 @@ func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []*persi
 }
 
 // Create inserts a token into the database
-func (t *TokenMongoRepository) Create(pCtx context.Context, pERC721 *persist.Token) (persist.DBID, error) {
+func (t *TokenMongoRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
 
-	return t.tokensStorage.insert(pCtx, pERC721)
+	return t.tokensStorage.insert(pCtx, pToken)
 }
 
 // GetByWallet gets tokens for a given wallet address
-func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 
 	if limit > 0 {
@@ -93,7 +93,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 	}
 	opts.SetSort(bson.M{"block_number": -1})
 
-	result := []*persist.Token{}
+	result := []persist.Token{}
 
 	err := t.tokensStorage.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
 	if err != nil {
@@ -104,7 +104,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 }
 
 // GetByUserID gets ERC721 tokens for a given userID
-func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 	if limit > 0 {
 		opts.SetSkip(limit * page)
@@ -121,8 +121,8 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 	user := result[0]
-	tokens := []*persist.Token{}
-	resultChan := make(chan []*persist.Token)
+	tokens := []persist.Token{}
+	resultChan := make(chan []persist.Token)
 	errChan := make(chan error)
 	for _, v := range user.Addresses {
 		go func(addr persist.Address) {
@@ -151,7 +151,7 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 }
 
 // GetByContract gets ERC721 tokens for a given contract
-func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 	if limit > 0 {
 		opts.SetSkip(limit * page)
@@ -159,7 +159,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 	}
 	opts.SetSort(bson.M{"block_number": -1})
 
-	result := []*persist.Token{}
+	result := []persist.Token{}
 
 	err := t.tokensStorage.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
 	if err != nil {
@@ -170,7 +170,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 }
 
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]*persist.Token, error) {
+func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 
 	if limit > 0 {
@@ -179,7 +179,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 	}
 	opts.SetSort(bson.M{"block_number": -1})
 
-	result := []*persist.Token{}
+	result := []persist.Token{}
 
 	err := t.tokensStorage.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
 	if err != nil {
@@ -190,17 +190,17 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 }
 
 // GetByID gets tokens for a given DB ID
-func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (*persist.Token, error) {
+func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Token, error) {
 
-	result := []*persist.Token{}
+	result := []persist.Token{}
 
 	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result)
 	if err != nil {
-		return nil, err
+		return persist.Token{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrTokenNotFoundByID{ID: pID}
+		return persist.Token{}, persist.ErrTokenNotFoundByID{ID: pID}
 	}
 
 	return result[0], nil
@@ -208,7 +208,7 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 
 // BulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persist.Token) error {
+func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
 
 	upsertModels := make([]updateModel, 0, len(pTokens))
 	updateModels := make([]updateModel, 0, len(pTokens))
@@ -298,7 +298,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 
 // Upsert will upsert a token into the database
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken *persist.Token) error {
+func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken persist.Token) error {
 
 	query := bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress}
 	if pToken.TokenType == persist.TokenTypeERC1155 {

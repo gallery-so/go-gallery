@@ -26,7 +26,7 @@ func NewAccountMongoRepository(mgoClient *mongo.Client) *AccountMongoRepository 
 
 // UpsertByAddress upserts an account by a given address
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Account) error {
+func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert persist.Account) error {
 
 	_, err := a.accountStorage.upsert(pCtx, bson.M{
 		"address": strings.ToLower(pAddress.String()),
@@ -39,16 +39,16 @@ func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress 
 }
 
 // GetByAddress returns an account by a given address
-func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Account, error) {
+func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Account, error) {
 
-	result := []*persist.Account{}
+	result := []persist.Account{}
 	err := a.accountStorage.find(pCtx, bson.M{"address": strings.ToLower(pAddress.String())}, &result)
 	if err != nil {
-		return nil, err
+		return persist.Account{}, err
 	}
 
 	if len(result) < 1 {
-		return nil, persist.ErrAccountNotFoundByAddress{Address: pAddress}
+		return persist.Account{}, persist.ErrAccountNotFoundByAddress{Address: pAddress}
 	}
 
 	if len(result) > 1 {

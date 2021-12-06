@@ -30,15 +30,15 @@ type refreshOpenseaNftsInput struct {
 }
 
 type getNftsOutput struct {
-	Nfts []*persist.NFT `json:"nfts"`
+	Nfts []persist.NFT `json:"nfts"`
 }
 
 type getNftByIDOutput struct {
-	Nft *persist.NFT `json:"nft"`
+	Nft persist.NFT `json:"nft"`
 }
 
 type getUnassignedNftsOutput struct {
-	Nfts []*persist.CollectionNFT `json:"nfts"`
+	Nfts []persist.CollectionNFT `json:"nfts"`
 }
 
 type updateNftByIDInput struct {
@@ -52,7 +52,7 @@ type getOwnershipHistoryInput struct {
 }
 
 type getOwnershipHistoryOutput struct {
-	OwnershipHistory *persist.OwnershipHistory `json:"ownership_history"`
+	OwnershipHistory persist.OwnershipHistory `json:"ownership_history"`
 }
 
 type errDoesNotOwnWallets struct {
@@ -122,8 +122,8 @@ func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 			return
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID)
-		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.NFT{}
+		if nfts == nil || err != nil {
+			nfts = []persist.NFT{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
@@ -139,8 +139,8 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 			return
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID)
-		if coll == nil || err != nil {
-			coll = &persist.Collection{Nfts: []*persist.CollectionNFT{}}
+		if err != nil {
+			coll = persist.Collection{Nfts: []persist.CollectionNFT{}}
 		}
 
 		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
@@ -199,8 +199,8 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 		}
 
 		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
-		if len(nfts) == 0 || err != nil {
-			nfts = []*persist.NFT{}
+		if nfts == nil || err != nil {
+			nfts = []persist.NFT{}
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})

@@ -29,7 +29,7 @@ type ErrAccessNotFoundByUserID struct {
 
 // AccessRepository represents a repository for interacting with persisted access states
 type AccessRepository interface {
-	GetByUserID(context.Context, DBID) (*Access, error)
+	GetByUserID(context.Context, DBID) (Access, error)
 	HasRequiredTokens(context.Context, DBID, []TokenIdentifiers) (bool, error)
 	UpsertRequiredTokensByUserID(context.Context, DBID, map[TokenIdentifiers]uint64, BlockNumber) error
 }

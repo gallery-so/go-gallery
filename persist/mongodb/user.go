@@ -36,8 +36,7 @@ func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
 
 // UpdateByID updates a user by ID
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (u *UserMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{},
-) error {
+func (u *UserMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
 	err := u.usersStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
 	if err != nil {
@@ -63,7 +62,7 @@ func (u *UserMongoRepository) ExistsByAddress(pCtx context.Context, pAddress per
 }
 
 // Create inserts a user into the database
-func (u *UserMongoRepository) Create(pCtx context.Context, pUser *persist.User) (persist.DBID, error) {
+func (u *UserMongoRepository) Create(pCtx context.Context, pUser persist.User) (persist.DBID, error) {
 	return u.usersStorage.insert(pCtx, pUser)
 }
 
@@ -74,34 +73,34 @@ func (u *UserMongoRepository) Delete(pCtx context.Context, pUserID persist.DBID,
 }
 
 // GetByID returns a user by a given ID
-func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID) (*persist.User, error) {
+func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID) (persist.User, error) {
 
-	result := []*persist.User{}
+	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"_id": userID}, &result)
 
 	if err != nil {
-		return nil, err
+		return persist.User{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrUserNotFoundByID{ID: userID}
+		return persist.User{}, persist.ErrUserNotFoundByID{ID: userID}
 	}
 
 	return result[0], nil
 }
 
 // GetByAddress returns a user by a given wallet address
-func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.User, error) {
+func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
 
-	result := []*persist.User{}
+	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}}, &result)
 
 	if err != nil {
-		return nil, err
+		return persist.User{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrUserNotFoundByAddress{Address: pAddress}
+		return persist.User{}, persist.ErrUserNotFoundByAddress{Address: pAddress}
 	}
 
 	if len(result) > 1 {
@@ -112,17 +111,17 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persis
 }
 
 // GetByUsername returns a user by a given username (case insensitive)
-func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string) (*persist.User, error) {
+func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
-	result := []*persist.User{}
+	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result)
 
 	if err != nil {
-		return nil, err
+		return persist.User{}, err
 	}
 
 	if len(result) < 1 {
-		return nil, persist.ErrUserNotFoundByUsername{Username: pUsername}
+		return persist.User{}, persist.ErrUserNotFoundByUsername{Username: pUsername}
 	}
 
 	if len(result) > 1 {

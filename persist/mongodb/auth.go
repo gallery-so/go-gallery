@@ -40,34 +40,33 @@ func NewNonceMongoRepository(mgoClient *mongo.Client) *NonceMongoRepository {
 }
 
 // Create inserts a single login attempt into the database and will return the ID of the inserted attempt
-func (l *LoginMongoRepository) Create(pCtx context.Context, pLoginAttempt *persist.UserLoginAttempt,
-) (persist.DBID, error) {
+func (l *LoginMongoRepository) Create(pCtx context.Context, pLoginAttempt persist.UserLoginAttempt) (persist.DBID, error) {
 	return l.loginsStorage.insert(pCtx, pLoginAttempt)
 }
 
 // Get returns the most recent nonce for a given address
-func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress persist.Address) (*persist.UserNonce, error) {
+func (n *NonceMongoRepository) Get(pCtx context.Context, pAddress persist.Address) (persist.UserNonce, error) {
 
 	opts := options.Find()
 	opts.SetSort(bson.M{"created_at": -1})
 	opts.SetLimit(1)
 
-	result := []*persist.UserNonce{}
+	result := []persist.UserNonce{}
 	err := n.mp.find(pCtx, bson.M{"address": pAddress}, &result, opts)
 
 	if err != nil {
-		return nil, err
+		return persist.UserNonce{}, err
 	}
 
 	if len(result) != 1 {
-		return nil, persist.ErrNonceNotFoundForAddress{Address: pAddress}
+		return persist.UserNonce{}, persist.ErrNonceNotFoundForAddress{Address: pAddress}
 	}
 
 	return result[0], nil
 }
 
 // Create inserts a new nonce into the database and will return the ID of the inserted nonce
-func (n *NonceMongoRepository) Create(pCtx context.Context, pNonce *persist.UserNonce) error {
+func (n *NonceMongoRepository) Create(pCtx context.Context, pNonce persist.UserNonce) error {
 	_, err := n.mp.insert(pCtx, pNonce)
 	return err
 }

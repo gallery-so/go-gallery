@@ -39,7 +39,7 @@ func generateTestUser(repos *repositories, username string) *TestUser {
 	ctx := context.Background()
 
 	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40))))
-	user := &persist.User{
+	user := persist.User{
 		UserName:           username,
 		UserNameIdempotent: strings.ToLower(username),
 		Addresses:          []persist.Address{address},
