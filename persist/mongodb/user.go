@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/mikeydub/go-gallery/persist"
 	"github.com/sirupsen/logrus"
@@ -77,14 +76,8 @@ func (u *UserMongoRepository) Delete(pCtx context.Context, pUserID persist.DBID,
 // GetByID returns a user by a given ID
 func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID) (*persist.User, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.User{}
-	err := u.usersStorage.find(pCtx, bson.M{"_id": userID}, &result, opts)
+	err := u.usersStorage.find(pCtx, bson.M{"_id": userID}, &result)
 
 	if err != nil {
 		return nil, err
@@ -100,14 +93,8 @@ func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID)
 // GetByAddress returns a user by a given wallet address
 func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.User, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.User{}
-	err := u.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}}, &result, opts)
+	err := u.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}}, &result)
 
 	if err != nil {
 		return nil, err
@@ -127,14 +114,8 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persis
 // GetByUsername returns a user by a given username (case insensitive)
 func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string) (*persist.User, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.User{}
-	err := u.usersStorage.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result, opts)
+	err := u.usersStorage.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result)
 
 	if err != nil {
 		return nil, err

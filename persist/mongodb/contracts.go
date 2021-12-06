@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const contractsCollName = "contracts"
@@ -89,14 +88,8 @@ func (c *ContractMongoRepository) BulkUpsert(pCtx context.Context, contracts []*
 // GetByAddress returns an contract by a given address
 func (c *ContractMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (*persist.Contract, error) {
 
-	opts := options.Find()
-	if deadline, ok := pCtx.Deadline(); ok {
-		dur := time.Until(deadline)
-		opts.SetMaxTime(dur)
-	}
-
 	result := []*persist.Contract{}
-	err := c.contractsStorage.find(pCtx, bson.M{"address": pAddress}, &result, opts)
+	err := c.contractsStorage.find(pCtx, bson.M{"address": pAddress}, &result)
 
 	if err != nil {
 		return nil, err

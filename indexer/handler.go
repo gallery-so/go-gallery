@@ -107,7 +107,7 @@ func newIPFSShell() *shell.Shell {
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 	mgoClient := newMongoClient()
-	return mongodb.NewTokenMongoRepository(mgoClient), mongodb.NewContractMongoRepository(mgoClient)
+	return mongodb.NewTokenMongoRepository(mgoClient, nil), mongodb.NewContractMongoRepository(mgoClient)
 }
 
 func newMongoClient() *mongo.Client {

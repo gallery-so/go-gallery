@@ -9,5 +9,5 @@ import (
 // Track the time it takes to execute a function
 func Track(s string, startTime time.Time) {
 	endTime := time.Now()
-	logrus.Infof("%s took %v", s, endTime.Sub(startTime))
+	logrus.Debugf("%s took %v", s, endTime.Sub(startTime))
 }
