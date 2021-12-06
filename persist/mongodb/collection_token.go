@@ -164,6 +164,8 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 	// 	}
 	// }
 	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
+		return err
+	}
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
@@ -176,9 +178,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 
 // UpdateUnsafe will update a single collection by ID
 // pUpdate will be a struct with bson tags that represent the fields to be updated
-func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID,
-	pUpdate interface{},
-) error {
+func (c *CollectionTokenMongoRepository) UpdateUnsafe(pCtx context.Context, pIDstr persist.DBID, pUpdate interface{}) error {
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
 		return err
