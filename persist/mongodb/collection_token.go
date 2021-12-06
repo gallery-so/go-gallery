@@ -53,7 +53,7 @@ func (c *CollectionTokenMongoRepository) Create(pCtx context.Context, pColl *per
 	if pColl.Nfts == nil {
 		pColl.Nfts = []persist.DBID{}
 	} /* else {
-		this is to ensure that nfts are not shared between collections
+		TODO this is to ensure that the NFTs are not being shared between collections
 
 		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if err != ErrDocumentNotFound {
@@ -159,7 +159,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 		return errNotAllNFTsOwnedByUser{pUserID}
 	}
 
-	// this is to ensure that the NFTs are not being shared between collections
+	// TODO this is to ensure that the NFTs are not being shared between collections
 	// if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 	// 	if err != ErrDocumentNotFound {
 	// 		return err
@@ -190,7 +190,7 @@ func (c *CollectionTokenMongoRepository) UpdateNFTsUnsafe(pCtx context.Context, 
 	pUpdate *persist.CollectionTokenUpdateNftsInput,
 ) error {
 
-	// this is to ensure that the NFTs are not being shared between collections
+	// TODO this is to ensure that the NFTs are not being shared between collections
 	// if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
 	// 	if err != ErrDocumentNotFound {
 	// 		return err
