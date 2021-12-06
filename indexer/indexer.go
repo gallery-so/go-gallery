@@ -386,15 +386,20 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 						logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
 						return
 					}
-					fromBalance, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
-					if err != nil {
-						logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
-						return
+					var fromBalance, toBalance *big.Int
+					if from.String() != "0x0000000000000000000000000000000000000000" {
+						fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
+						if err != nil {
+							logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
+							return
+						}
 					}
-					toBalance, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
-					if err != nil {
-						logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
-						return
+					if to.String() != "0x0000000000000000000000000000000000000000" {
+						toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
+						if err != nil {
+							logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
+							return
+						}
 					}
 
 					balances <- tokenBalances{key, from, to, fromBalance, toBalance, transfer.blockNumber}
