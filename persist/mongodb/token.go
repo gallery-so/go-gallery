@@ -224,7 +224,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []*persi
 			nextQuery["owner_address"] = v.OwnerAddress
 		}
 
-		if v.TokenType == persist.TokenTypeERC1155 && v.Quantity.String() != "" {
+		if v.TokenType == persist.TokenTypeERC1155 && v.Quantity.BigInt() != nil {
 			if v.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
 				delModels = append(delModels, query)
 				continue
