@@ -46,13 +46,15 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl *persist.
 
 	if pColl.Nfts == nil {
 		pColl.Nfts = []persist.DBID{}
-	} else {
-		if err := c.collectionsStorage.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
+	} /* else {
+		TODO this is to ensure that the NFTs are not being shared between collections
+
+		if err := c.mp.pullAll(pCtx, bson.M{"owner_user_id": pColl.OwnerUserID}, "nfts", pColl.Nfts); err != nil {
 			if err != ErrDocumentNotFound {
 				return "", err
 			}
 		}
-	}
+	}*/
 
 	id, err := c.collectionsStorage.insert(pCtx, pColl)
 	if err != nil {
@@ -147,11 +149,12 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 		return errors.New("not all nfts are owned by the user")
 	}
 
-	if err := c.collectionsStorage.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
-		if err != ErrDocumentNotFound {
-			return err
-		}
-	}
+	// TODO this is to ensure that the NFTs are not being shared between collections
+	// if err := c.mp.pullAll(pCtx, bson.M{}, "nfts", pUpdate.Nfts); err != nil {
+	// 	if err != ErrDocumentNotFound {
+	// 		return err
+	// 	}
+	// }
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
