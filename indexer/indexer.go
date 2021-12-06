@@ -359,7 +359,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 			tokenID := transfer.tokenID
 
 			key := makeKeyForToken(contractAddress, tokenID)
-			logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
+			// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
 			switch persist.TokenType(transfer.tokenType) {
 			case persist.TokenTypeERC721:
