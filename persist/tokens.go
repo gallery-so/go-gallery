@@ -141,7 +141,7 @@ type Token struct {
 
 	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
-	Amount           int64            `bson:"amount,omitempty" json:"amount"`
+	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
 	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
 	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`

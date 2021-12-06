@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/pubsub/pstest"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gin-gonic/gin"
@@ -20,8 +19,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"google.golang.org/api/option"
-	"google.golang.org/grpc"
 )
 
 // Init starts the background process for keeping the access state up to date and handles requests
@@ -117,21 +114,7 @@ func newMongoClient() *mongo.Client {
 func newGCPPubSub() pubsub.PubSub {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
-	if viper.GetString("ENV") != "local" {
-		pub, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_CLOUD_PROJECT"))
-		if err != nil {
-			panic(err)
-		}
-		return pub
-	}
-	srv := pstest.NewServer()
-	// Connect to the server without using TLS.
-	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	// Use the connection when creating a pubsub client.
-	client, err := gcp.NewGCPPubSub(ctx, viper.GetString("GOOGLE_PROJECT_ID"), option.WithGRPCConn(conn))
+	client, err := gcp.NewPubSub(ctx)
 	if err != nil {
 		panic(err)
 	}

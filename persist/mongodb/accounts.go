@@ -16,13 +16,13 @@ const accountCollName = "accounts"
 
 // AccountMongoRepository is a repository for storing authentication nonces in a MongoDB database
 type AccountMongoRepository struct {
-	mp *storage
+	accountStorage *storage
 }
 
 // NewAccountMongoRepository returns a new instance of a login attempt repository
 func NewAccountMongoRepository(mgoClient *mongo.Client) *AccountMongoRepository {
 	return &AccountMongoRepository{
-		mp: newStorage(mgoClient, 0, galleryDBName, accountCollName),
+		accountStorage: newStorage(mgoClient, 0, galleryDBName, accountCollName),
 	}
 }
 
@@ -30,7 +30,7 @@ func NewAccountMongoRepository(mgoClient *mongo.Client) *AccountMongoRepository 
 // pUpdate represents a struct with bson tags to specify which fields to update
 func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert *persist.Account) error {
 
-	_, err := a.mp.upsert(pCtx, bson.M{
+	_, err := a.accountStorage.upsert(pCtx, bson.M{
 		"address": strings.ToLower(pAddress.String()),
 	}, pUpsert)
 	if err != nil {
@@ -50,7 +50,7 @@ func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress per
 	}
 
 	result := []*persist.Account{}
-	err := a.mp.find(pCtx, bson.M{"address": strings.ToLower(pAddress.String())}, &result, opts)
+	err := a.accountStorage.find(pCtx, bson.M{"address": strings.ToLower(pAddress.String())}, &result, opts)
 	if err != nil {
 		return nil, err
 	}

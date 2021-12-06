@@ -47,12 +47,21 @@ type tokenMetadata struct {
 	md persist.TokenMetadata
 }
 
-type tokenBalanceChange struct {
-	ti    tokenIdentifiers
-	from  persist.Address
-	to    persist.Address
-	amt   *big.Int
-	block persist.BlockNumber
+// type tokenBalanceChange struct {
+// 	ti    tokenIdentifiers
+// 	from  persist.Address
+// 	to    persist.Address
+// 	amt   *big.Int
+// 	block persist.BlockNumber
+// }
+
+type tokenBalances struct {
+	ti      tokenIdentifiers
+	from    persist.Address
+	to      persist.Address
+	fromAmt *big.Int
+	toAmt   *big.Int
+	block   persist.BlockNumber
 }
 
 type tokenURI struct {
@@ -160,7 +169,7 @@ func (i *Indexer) Start() {
 func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
-	balances := make(chan tokenBalanceChange)
+	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []*transfer)
@@ -172,7 +181,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
-	balances := make(chan tokenBalanceChange)
+	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []*transfer)
@@ -308,7 +317,7 @@ func (i *Indexer) listenForNewBlocks() {
 	}
 }
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
+func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
 	defer close(metadatas)
 	defer close(owners)
@@ -336,7 +345,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []*transfer, uris ch
 	logrus.Info("Closing field channels...")
 }
 
-func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalanceChange) {
+func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 
 	for _, transfer := range transfers {
 		func() {
@@ -372,7 +381,23 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 				go func() {
 					defer wg.Done()
-					balances <- tokenBalanceChange{key, from, to, new(big.Int).SetUint64(transfer.amount), transfer.blockNumber}
+					ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), i.ethClient)
+					if err != nil {
+						logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
+						return
+					}
+					fromBalance, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
+					if err != nil {
+						logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
+						return
+					}
+					toBalance, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
+					if err != nil {
+						logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
+						return
+					}
+
+					balances <- tokenBalances{key, from, to, fromBalance, toBalance, transfer.blockNumber}
 				}()
 
 			default:
@@ -422,7 +447,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 
 }
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalanceChange) {
+func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(5)
@@ -455,7 +480,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Error("error upserting tokens and contracts")
 	}
 
 }
@@ -488,28 +513,26 @@ func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, p
 	}
 }
 
-func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalanceChange, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
+func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for balance := range balanceChan {
 		balanceMap, ok := balances[balance.ti]
 		if !ok {
 			balanceMap = make(map[persist.Address]balanceAtBlock)
 		}
-		toBal, ok := balanceMap[balance.to]
-		if !ok {
-			toBal = balanceAtBlock{amnt: big.NewInt(0)}
+		toBal := balanceMap[balance.to]
+		if toBal.block < balance.block {
+			toBal.block = balance.block
+			toBal.amnt = balance.toAmt
+			balanceMap[balance.to] = toBal
 		}
-		toBal.block = balance.block
-		toBal.amnt.Add(toBal.amnt, balance.amt)
-		balanceMap[balance.to] = toBal
 
-		fromBal, ok := balanceMap[balance.from]
-		if !ok {
-			fromBal = balanceAtBlock{amnt: big.NewInt(0)}
+		fromBal := balanceMap[balance.from]
+		if fromBal.block < balance.block {
+			fromBal.block = balance.block
+			fromBal.amnt = balance.fromAmt
+			balanceMap[balance.from] = fromBal
 		}
-		fromBal.block = balance.block
-		fromBal.amnt.Sub(fromBal.amnt, balance.amt)
-		balanceMap[balance.from] = fromBal
 
 		balances[balance.ti] = balanceMap
 
@@ -555,7 +578,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			TokenID:          tokenID,
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
-			Amount:           1,
+			Quantity:         persist.HexString("1"),
 			Name:             name,
 			Description:      description,
 			OwnershipHistoty: previousOwnerAddresses,
@@ -595,7 +618,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
-				Amount:          balance.amnt.Int64(),
+				Quantity:        persist.HexString(balance.amnt.Text(16)),
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
