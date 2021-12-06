@@ -127,12 +127,6 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 func TestDeleteCollection_Success(t *testing.T) {
 	assert := setupTest(t)
 
-	// nfts := []*persist.NFTDB{
-	// 	{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-	// 	{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-	// 	{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-	// }
-	// _, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
 	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForID(assert, collID)
 

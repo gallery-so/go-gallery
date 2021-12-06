@@ -128,7 +128,7 @@ func (g *GalleryTokenMongoRepository) getByUserIDSkipCache(pCtx context.Context,
 			logrus.WithError(err).Error("failed to marshal galleries to json")
 			return
 		}
-		g.updateCacheQueue.QueueUpdate(fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, updateQueueDefaultTimeout, galleriesTTL)
+		g.updateCacheQueue.QueueUpdate(fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, galleriesTTL)
 	}()
 
 	return result, nil

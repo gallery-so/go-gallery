@@ -14,8 +14,7 @@ type update struct {
 	key string
 	val interface{}
 
-	ttl     time.Duration
-	timeout time.Duration
+	ttl time.Duration
 }
 
 // UpdateQueue is a queue of updates to be run
@@ -55,7 +54,7 @@ func (uq *UpdateQueue) start() {
 			uq.mu.Unlock()
 
 			updateFunc := func() {
-				ctx, cancel := context.WithTimeout(context.Background(), update.timeout)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 				err := uq.cache.Set(ctx, update.key, update.val, update.ttl)
 				if err != nil {
@@ -75,7 +74,12 @@ func (uq *UpdateQueue) start() {
 	}()
 }
 
+// Stop stops the update queue
+func (uq *UpdateQueue) Stop() {
+	uq.wp.StopWait()
+}
+
 // QueueUpdate queues an update to be run
-func (uq *UpdateQueue) QueueUpdate(key string, value interface{}, timeout, ttl time.Duration) {
-	uq.updates <- update{key: key, val: value, timeout: timeout, ttl: ttl}
+func (uq *UpdateQueue) QueueUpdate(key string, value interface{}, ttl time.Duration) {
+	uq.updates <- update{key: key, val: value, ttl: ttl}
 }

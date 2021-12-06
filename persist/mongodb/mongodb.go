@@ -37,8 +37,6 @@ var (
 	galleriesTTL            time.Duration = time.Hour * 24
 )
 
-var updateQueueDefaultTimeout = time.Second * 10
-
 var errInvalidValue = errors.New("cannot encode invalid element")
 
 var addressType = reflect.TypeOf(persist.Address(""))

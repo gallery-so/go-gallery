@@ -311,7 +311,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 		return nil, err
 	}
 
-	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, updateQueueDefaultTimeout, collectionUnassignedTTL)
+	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, collectionUnassignedTTL)
 
 	if len(result) > 0 {
 		return result[0], nil

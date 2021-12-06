@@ -344,7 +344,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 		return nil, err
 	}
 
-	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, updateQueueDefaultTimeout, collectionUnassignedTTL)
+	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, collectionUnassignedTTL)
 
 	return result[0], nil
 
