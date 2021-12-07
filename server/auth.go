@@ -37,9 +37,10 @@ var errAddressSignatureMismatch = errors.New("address does not match signature")
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 type authUserLoginInput struct {
-	Signature  string          `json:"signature" binding:"required,medium_string"`
+	Signature  string          `json:"signature" binding:"medium_string"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	WalletType walletType      `json:"wallet_type"`
+	Nonce      string          `json:"nonce"`
 }
 
 type authUserLoginOutput struct {
@@ -189,7 +190,7 @@ func authUserLoginPipeline(pCtx context.Context, pInput *authUserLoginInput, use
 	}
 
 	if pInput.WalletType != walletTypeEOA {
-		if nonce != pInput.Signature {
+		if nonce != pInput.Nonce {
 			output.SignatureValid = false
 			return output, nil
 		}
