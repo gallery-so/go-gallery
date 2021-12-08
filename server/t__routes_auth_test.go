@@ -15,7 +15,7 @@ import (
 )
 
 func TestAuthPreflightUserExists_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp := getPreflightRequest(assert, tc.user1.address, tc.user1.jwt)
 	assertValidResponse(assert, resp)
@@ -32,7 +32,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 }
 
 func TestAuthPreflightUserNotExists_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp := getPreflightRequest(assert, "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "")
 	assertValidResponse(assert, resp)
@@ -49,7 +49,7 @@ func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 }
 
 func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp := getPreflightRequest(assert, "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", tc.user1.jwt)
 	assertValidResponse(assert, resp)
@@ -66,7 +66,7 @@ func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 }
 
 func TestUserCreate_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -90,7 +90,7 @@ func TestUserCreate_Success(t *testing.T) {
 	assert.NotEmpty(output.UserID)
 }
 func TestUserCreate_WrongNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "Wrong Nonce",
@@ -104,7 +104,7 @@ func TestUserCreate_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestUserCreate_WrongSig_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -118,7 +118,7 @@ func TestUserCreate_WrongSig_Failure(t *testing.T) {
 }
 
 func TestUserCreate_WrongAddress_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -132,14 +132,14 @@ func TestUserCreate_WrongAddress_Failure(t *testing.T) {
 }
 
 func TestUserCreate_NoNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "0x456d569592f15Af845D0dbe984C12BAB8F430e32")
 	assertErrorResponse(assert, resp)
 }
 
 func TestUserLogin_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
@@ -171,7 +171,7 @@ func TestUserLogin_Success(t *testing.T) {
 }
 
 func TestUserLoginGnosis_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
@@ -203,7 +203,7 @@ func TestUserLoginGnosis_Success(t *testing.T) {
 }
 
 func TestUserLoginGnosis_WrongNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
@@ -233,7 +233,7 @@ func TestUserLoginGnosis_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestUserLoginGnosis_WrongSig_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
@@ -262,7 +262,7 @@ func TestUserLoginGnosis_WrongSig_Failure(t *testing.T) {
 	assert.Empty(output.UserID)
 }
 func TestUserLogin_WrongNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
@@ -283,7 +283,7 @@ func TestUserLogin_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestUserLogin_WrongSig_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
@@ -304,7 +304,7 @@ func TestUserLogin_WrongSig_Failure(t *testing.T) {
 }
 
 func TestUserLogin_WrongAddr_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
@@ -325,7 +325,7 @@ func TestUserLogin_WrongAddr_Failure(t *testing.T) {
 }
 
 func TestUserLogin_NoNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	user := &persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
@@ -339,7 +339,7 @@ func TestUserLogin_NoNonce_Failure(t *testing.T) {
 }
 
 func TestUserLogin_UserNotExist_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",
@@ -353,7 +353,7 @@ func TestUserLogin_UserNotExist_Failure(t *testing.T) {
 }
 
 func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonce := &persist.UserNonce{
 		Value:   "TestNonce",

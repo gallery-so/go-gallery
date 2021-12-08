@@ -17,6 +17,7 @@ const (
 )
 
 var errUserIDRequired = errors.New("owner user id is required")
+var errNoUnassignedNFTs = errors.New("no unassigned nfts")
 
 // CollectionTokenMongoRepository is a repository that stores collections in a MongoDB database
 type CollectionTokenMongoRepository struct {
@@ -163,9 +164,6 @@ func (c *CollectionTokenMongoRepository) UpdateNFTs(pCtx context.Context, pID pe
 	// 		return err
 	// 	}
 	// }
-	if err := c.unassignedCache.Delete(pCtx, string(pUserID)); err != nil {
-		return err
-	}
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
@@ -351,7 +349,10 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 
 	c.cacheUpdateQueue.QueueUpdate(pUserID.String(), toCache, collectionUnassignedTTL)
 
-	return result[0], nil
+	if len(result) > 0 {
+		return result[0], nil
+	}
+	return nil, errNoUnassignedNFTs
 
 }
 

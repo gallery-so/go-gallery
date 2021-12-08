@@ -15,7 +15,7 @@ import (
 )
 
 func TestGetNftByID_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	// seed DB with nft
 	name := "very cool nft"
@@ -40,7 +40,7 @@ func TestGetNftByID_Success(t *testing.T) {
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
 	assert.Nil(err)
@@ -52,7 +52,7 @@ func TestGetNftByID_NoParamError(t *testing.T) {
 }
 
 func TestGetNftByID_NotFoundError(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nonexistentNftID := "12345"
 
@@ -66,7 +66,7 @@ func TestGetNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	// seed DB with nft
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
@@ -98,7 +98,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	// seed DB with nft
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{
@@ -118,7 +118,7 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note"}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
@@ -130,7 +130,7 @@ func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 }
 
 func TestUpdateNftByID_NotFoundError(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	nftID := persist.DBID("no exist :(")
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
@@ -143,7 +143,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	// seed DB with nft
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), &persist.NFTDB{

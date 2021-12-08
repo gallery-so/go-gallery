@@ -216,15 +216,20 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 	return true, nil
 }
 
+type tokenIndexTuple struct {
+	token *persist.Token
+	i     int
+}
+
 func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.Token {
-	nftChan := make(chan *persist.Token)
-	for _, nft := range nfts {
-		go func(n *persist.Token) {
+	nftChan := make(chan tokenIndexTuple)
+	for i, nft := range nfts {
+		go func(index int, n *persist.Token) {
 			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
-			nftChan <- n
+			nftChan <- tokenIndexTuple{n, index}
 			go func(id persist.DBID) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
@@ -233,24 +238,30 @@ func ensureTokenMedia(aeCtx context.Context, nfts []*persist.Token, tokenRepo pe
 					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
 				}
 			}(n.ID)
-		}(nft)
+		}(i, nft)
 	}
 	for i := 0; i < len(nfts); i++ {
 		nft := <-nftChan
-		nfts[i] = nft
+		nfts[nft.i] = nft.token
 	}
 	return nfts
 }
 
+type tokenCollectionIndexTuple struct {
+	token *persist.TokenInCollection
+	i     int
+}
+
 func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) []*persist.TokenInCollection {
-	nftChan := make(chan *persist.TokenInCollection)
-	for _, nft := range nfts {
-		go func(n *persist.TokenInCollection) {
+
+	nftChan := make(chan tokenCollectionIndexTuple)
+	for i, nft := range nfts {
+		go func(index int, n *persist.TokenInCollection) {
 			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient)
 			n.Media = newMedia
 			n.TokenMetadata = newMetadata
 			n.TokenURI = newURI
-			nftChan <- n
+			nftChan <- tokenCollectionIndexTuple{n, index}
 			go func(id persist.DBID) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
@@ -259,11 +270,11 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []*persist.TokenInCo
 					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
 				}
 			}(n.ID)
-		}(nft)
+		}(i, nft)
 	}
 	for i := 0; i < len(nfts); i++ {
 		nft := <-nftChan
-		nfts[i] = nft
+		nfts[nft.i] = nft.token
 	}
 	return nfts
 }
