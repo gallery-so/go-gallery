@@ -22,7 +22,7 @@ type galleryTokenGetByIDInput struct {
 }
 
 type galleryTokenGetByIDOutput struct {
-	Gallery *persist.GalleryToken `json:"gallery"`
+	Gallery persist.GalleryToken `json:"gallery"`
 }
 
 type galleryTokenUpdateInput struct {
@@ -31,7 +31,7 @@ type galleryTokenUpdateInput struct {
 }
 
 type galleryTokenGetOutput struct {
-	Galleries []*persist.GalleryToken `json:"galleries"`
+	Galleries []persist.GalleryToken `json:"galleries"`
 }
 
 type errNoGalleriesFoundWithID struct {
@@ -54,7 +54,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
 		if len(galleries) == 0 || err != nil {
-			galleries = []*persist.GalleryToken{}
+			galleries = []persist.GalleryToken{}
 		}
 		aeCtx := appengine.NewContext(c.Request)
 		for i, gallery := range galleries {
@@ -120,7 +120,7 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 			return
 		}
 
-		update := &persist.GalleryTokenUpdateInput{Collections: input.Collections}
+		update := persist.GalleryTokenUpdateInput{Collections: input.Collections}
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {

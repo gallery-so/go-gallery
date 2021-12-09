@@ -24,7 +24,7 @@ func NewMembershipMongoRepository(mgoClient *mongo.Client) *MembershipRepository
 }
 
 // UpsertByTokenID upserts an membership tier by a given token ID
-func (c *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.TokenID, pUpsert *persist.MembershipTier) error {
+func (c *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.TokenID, pUpsert persist.MembershipTier) error {
 
 	_, err := c.membershipsStorage.upsert(pCtx, bson.M{
 		"token_id": pTokenID,
@@ -37,17 +37,17 @@ func (c *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID pe
 }
 
 // GetByTokenID returns a membership tier by token ID
-func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (*persist.MembershipTier, error) {
+func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (persist.MembershipTier, error) {
 
-	result := []*persist.MembershipTier{}
+	result := []persist.MembershipTier{}
 	err := c.membershipsStorage.find(pCtx, bson.M{"token_id": pTokenID}, &result)
 
 	if err != nil {
-		return nil, err
+		return persist.MembershipTier{}, err
 	}
 
 	if len(result) < 1 {
-		return nil, persist.ErrMembershipNotFoundByTokenID{TokenID: pTokenID}
+		return persist.MembershipTier{}, persist.ErrMembershipNotFoundByTokenID{TokenID: pTokenID}
 	}
 
 	if len(result) > 1 {
@@ -58,9 +58,9 @@ func (c *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persi
 }
 
 // GetAll returns all membership tiers
-func (c *MembershipRepository) GetAll(pCtx context.Context) ([]*persist.MembershipTier, error) {
+func (c *MembershipRepository) GetAll(pCtx context.Context) ([]persist.MembershipTier, error) {
 
-	result := []*persist.MembershipTier{}
+	result := []persist.MembershipTier{}
 	err := c.membershipsStorage.find(pCtx, bson.M{}, &result)
 
 	if err != nil {

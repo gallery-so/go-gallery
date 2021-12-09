@@ -551,12 +551,12 @@ func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners ma
 	}
 }
 
-func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []*persist.Token {
+func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, previousOwners map[tokenIdentifiers][]ownerAtBlock, balances map[tokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[tokenIdentifiers]tokenMetadata, uris map[tokenIdentifiers]tokenURI) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)
 	}
-	result := make([]*persist.Token, len(owners)+totalBalances, len(owners)+totalBalances+len(metadatas)+len(uris))
+	result := make([]persist.Token, len(owners)+totalBalances, len(owners)+totalBalances+len(metadatas)+len(uris))
 	j := 0
 
 	for k, v := range owners {
@@ -579,7 +579,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		}
 
 		uri := uris[k]
-		result[j] = &persist.Token{
+		result[j] = persist.Token{
 			TokenID:          tokenID,
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
@@ -619,7 +619,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 		uri := uris[k]
 		for addr, balance := range v {
-			result[j] = &persist.Token{
+			result[j] = persist.Token{
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				OwnerAddress:    addr,
@@ -648,7 +648,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			panic(err)
 		}
 		if v.uri != "" {
-			result = append(result, &persist.Token{
+			result = append(result, persist.Token{
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				TokenURI:        v.uri,
@@ -664,7 +664,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			panic(err)
 		}
 		if v.md != nil && len(v.md) > 0 {
-			result = append(result, &persist.Token{
+			result = append(result, persist.Token{
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
 				TokenMetadata:   v.md,
@@ -676,7 +676,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client) error {
 
 	now := time.Now()
 	logrus.Infof("Upserting %d tokens", len(t))
@@ -689,7 +689,7 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 
 	nextNow := time.Now()
 
-	toUpsert := make([]*persist.Contract, 0, len(t))
+	toUpsert := make([]persist.Contract, 0, len(t))
 	for _, token := range t {
 		if contracts[token.ContractAddress] {
 			continue
@@ -712,8 +712,8 @@ func upsertTokensAndContracts(ctx context.Context, t []*persist.Token, tokenRepo
 	return nil
 }
 
-func handleContract(ethClient *ethclient.Client, contractAddress persist.Address, lastSyncedBlock persist.BlockNumber) *persist.Contract {
-	c := &persist.Contract{
+func handleContract(ethClient *ethclient.Client, contractAddress persist.Address, lastSyncedBlock persist.BlockNumber) persist.Contract {
+	c := persist.Contract{
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
 	}

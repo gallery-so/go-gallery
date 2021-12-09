@@ -39,10 +39,10 @@ type Collection struct {
 
 	Layout TokenLayout `bson:"layout" json:"layout"`
 
-	Name           string           `bson:"name"          json:"name"`
-	CollectorsNote string           `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    DBID             `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []*CollectionNFT `bson:"nfts"          json:"nfts"`
+	Name           string          `bson:"name"          json:"name"`
+	CollectorsNote string          `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    DBID            `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []CollectionNFT `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -72,14 +72,14 @@ type CollectionUpdateDeletedInput struct {
 
 // CollectionRepository represents the interface for interacting with the collection persistence layer
 type CollectionRepository interface {
-	Create(context.Context, *CollectionDB) (DBID, error)
-	GetByUserID(context.Context, DBID, bool) ([]*Collection, error)
-	GetByID(context.Context, DBID, bool) (*Collection, error)
+	Create(context.Context, CollectionDB) (DBID, error)
+	GetByUserID(context.Context, DBID, bool) ([]Collection, error)
+	GetByID(context.Context, DBID, bool) (Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
-	UpdateNFTs(context.Context, DBID, DBID, *CollectionUpdateNftsInput) error
-	ClaimNFTs(context.Context, DBID, []Address, *CollectionUpdateNftsInput) error
+	UpdateNFTs(context.Context, DBID, DBID, CollectionUpdateNftsInput) error
+	ClaimNFTs(context.Context, DBID, []Address, CollectionUpdateNftsInput) error
 	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
 	Delete(context.Context, DBID, DBID) error
-	GetUnassigned(context.Context, DBID) (*Collection, error)
+	GetUnassigned(context.Context, DBID) (Collection, error)
 	RefreshUnassigned(context.Context, DBID) error
 }

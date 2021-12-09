@@ -15,7 +15,7 @@ import (
 )
 
 type getMembershipTiersResponse struct {
-	Tiers []*persist.MembershipTier `json:"tiers"`
+	Tiers []persist.MembershipTier `json:"tiers"`
 }
 
 func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
@@ -49,12 +49,12 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 	}
 }
 
-func updateMembershipTiers(pCtx context.Context, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, ethClient *eth.Client) ([]*persist.MembershipTier, error) {
-	membershipTiers := make([]*persist.MembershipTier, len(middleware.RequiredNFTs))
-	tierChan := make(chan *persist.MembershipTier)
+func updateMembershipTiers(pCtx context.Context, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+	membershipTiers := make([]persist.MembershipTier, len(middleware.RequiredNFTs))
+	tierChan := make(chan persist.MembershipTier)
 	for _, v := range middleware.RequiredNFTs {
 		go func(id persist.TokenID) {
-			tier := &persist.MembershipTier{
+			tier := persist.MembershipTier{
 				TokenID: id,
 			}
 
@@ -74,7 +74,7 @@ func updateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					owners := []string{}
 					hasNFT, _ := ethClient.HasNFT(pCtx, id, event.FromAccount.Address)
 					if hasNFT {
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser != nil && glryUser.UserName != "" {
+						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
 							owners = append(owners, glryUser.UserName)
 						} else {
 							owners = append(owners, event.FromAccount.Address.String())
@@ -82,7 +82,7 @@ func updateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					}
 					hasNFT, _ = ethClient.HasNFT(pCtx, id, event.ToAccount.Address)
 					if hasNFT {
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser != nil && glryUser.UserName != "" {
+						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
 							owners = append(owners, glryUser.UserName)
 						} else {
 							owners = append(owners, event.ToAccount.Address.String())

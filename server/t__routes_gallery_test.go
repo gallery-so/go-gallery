@@ -26,7 +26,7 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 		initialCollectionOrder = append(initialCollectionOrder, collID)
 	}
 	// Seed DB with gallery
-	id, err := tc.repos.galleryTokenRepository.Create(context.Background(), &persist.GalleryTokenDB{
+	id, err := tc.repos.galleryTokenRepository.Create(context.Background(), persist.GalleryDB{
 		OwnerUserID: tc.user1.id,
 		Collections: initialCollectionOrder,
 	})

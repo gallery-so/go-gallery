@@ -24,7 +24,7 @@ type getUserFeaturesInput struct {
 }
 
 type getUserFeaturesOutput struct {
-	Features []*persist.FeatureFlag `json:"features"`
+	Features []persist.FeatureFlag `json:"features"`
 }
 
 func getUserFeatures(userRepo persist.UserRepository, featureRepo persist.FeatureFlagRepository, accessRepo persist.AccessRepository, ethClient *ethclient.Client) gin.HandlerFunc {

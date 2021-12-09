@@ -25,11 +25,11 @@ type collectionGetByIDInputToken struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 type collectionGetByIDOutputToken struct {
-	Collection *persist.CollectionToken `json:"collection"`
+	Collection persist.CollectionToken `json:"collection"`
 }
 
 type collectionGetOutputtoken struct {
-	Collections []*persist.CollectionToken `json:"collections"`
+	Collections []persist.CollectionToken `json:"collections"`
 }
 
 type collectionCreateInputToken struct {
@@ -85,7 +85,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 		auth := userID == input.UserID
 		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
-			colls = []*persist.CollectionToken{}
+			colls = []persist.CollectionToken{}
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
@@ -133,8 +133,8 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 func createCollectionToken(collectionsRepository persist.CollectionTokenRepository, galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &collectionCreateInputToken{}
-		if err := c.ShouldBindJSON(input); err != nil {
+		input := collectionCreateInputToken{}
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -241,7 +241,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+		update := persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
 
 		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
@@ -280,15 +280,13 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 }
 
 // CREATE
-func collectionCreateDbToken(pCtx context.Context, pInput *collectionCreateInputToken,
-	pUserID persist.DBID,
-	collectionsRepo persist.CollectionTokenRepository, galleryRepo persist.GalleryTokenRepository) (persist.DBID, error) {
+func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputToken, pUserID persist.DBID, collectionsRepo persist.CollectionTokenRepository, galleryRepo persist.GalleryTokenRepository) (persist.DBID, error) {
 
 	layout, err := persist.ValidateLayout(pInput.Layout)
 	if err != nil {
 		return "", err
 	}
-	coll := &persist.CollectionTokenDB{
+	coll := persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
 		Name:           sanitizationPolicy.Sanitize(pInput.Name),

@@ -18,9 +18,9 @@ type MembershipTier struct {
 
 // MembershipRepository represents the interface for interacting with the persisted state of users
 type MembershipRepository interface {
-	UpsertByTokenID(context.Context, TokenID, *MembershipTier) error
-	GetByTokenID(context.Context, TokenID) (*MembershipTier, error)
-	GetAll(context.Context) ([]*MembershipTier, error)
+	UpsertByTokenID(context.Context, TokenID, MembershipTier) error
+	GetByTokenID(context.Context, TokenID) (MembershipTier, error)
+	GetAll(context.Context) ([]MembershipTier, error)
 }
 
 // ErrMembershipNotFoundByTokenID represents an error when a membership is not found by token id

@@ -21,11 +21,11 @@ type collectionGetByIDInput struct {
 	ID persist.DBID `form:"id" json:"id" binding:"required"`
 }
 type collectionGetByIDOutput struct {
-	Collection *persist.Collection `json:"collection"`
+	Collection persist.Collection `json:"collection"`
 }
 
 type collectionGetOutput struct {
-	Collections []*persist.Collection `json:"collections"`
+	Collections []persist.Collection `json:"collections"`
 }
 
 type collectionCreateInput struct {
@@ -77,7 +77,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 		auth := userID == input.UserID
 		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
-			colls = []*persist.Collection{}
+			colls = []persist.Collection{}
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutput{Collections: colls})
@@ -120,8 +120,8 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 func createCollection(collectionsRepository persist.CollectionRepository, galleryRepository persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &collectionCreateInput{}
-		if err := c.ShouldBindJSON(input); err != nil {
+		input := collectionCreateInput{}
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -227,7 +227,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 			return
 		}
 
-		update := &persist.CollectionUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+		update := persist.CollectionUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
 
 		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
@@ -275,7 +275,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 }
 
 // CREATE
-func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
+func collectionCreateDb(pCtx context.Context, pInput collectionCreateInput,
 	pUserID persist.DBID,
 	collectionsRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) (persist.DBID, error) {
 
@@ -283,7 +283,7 @@ func collectionCreateDb(pCtx context.Context, pInput *collectionCreateInput,
 	if err != nil {
 		return "", err
 	}
-	coll := &persist.CollectionDB{
+	coll := persist.CollectionDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
 		Layout:         layout,

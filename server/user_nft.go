@@ -17,9 +17,9 @@ import (
 func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &userAddAddressInput{}
+		input := userAddAddressInput{}
 
-		if err := c.ShouldBindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -69,24 +69,23 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 	}
 }
 
-func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (*userCreateOutput, error) {
+func userCreateDb(pCtx context.Context, pInput userAddAddressInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (userCreateOutput, error) {
 
-	output := &userCreateOutput{}
+	output := userCreateOutput{}
 
 	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonceValueStr == "" {
-		return nil, errNonceNotFound{pInput.Address}
+		return userCreateOutput{}, errNonceNotFound{pInput.Address}
 	}
 	if id != "" {
-		return nil, errUserExistsWithAddress{address: pInput.Address}
+		return userCreateOutput{}, errUserExistsWithAddress{address: pInput.Address}
 	}
 
 	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
 		nonceValueStr,
 		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.SignatureValid = sigValidBool
@@ -94,34 +93,34 @@ func userCreateDb(pCtx context.Context, pInput *userAddAddressInput,
 		return output, nil
 	}
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses: []persist.Address{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.UserID = userID
 
 	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.JWTtoken = jwtTokenStr
 
 	err = authNonceRotateDb(pCtx, pInput.Address, userID, nonceRepo)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
-	galleryInsert := &persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
-		return nil, err
+		return userCreateOutput{}, err
 	}
 
 	output.GalleryID = galleryID

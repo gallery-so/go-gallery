@@ -19,7 +19,7 @@ type galleryGetByIDInput struct {
 }
 
 type galleryGetByIDOutput struct {
-	Gallery *persist.Gallery `json:"gallery"`
+	Gallery persist.Gallery `json:"gallery"`
 }
 
 type galleryUpdateInput struct {
@@ -28,7 +28,7 @@ type galleryUpdateInput struct {
 }
 
 type galleryGetOutput struct {
-	Galleries []*persist.Gallery `json:"galleries"`
+	Galleries []persist.Gallery `json:"galleries"`
 }
 
 // HANDLERS
@@ -46,8 +46,8 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 
 		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
-		if len(galleries) == 0 || err != nil {
-			galleries = []*persist.Gallery{}
+		if galleries == nil || err != nil {
+			galleries = []persist.Gallery{}
 		}
 
 		c.JSON(http.StatusOK, galleryGetOutput{Galleries: galleries})
@@ -99,7 +99,7 @@ func updateGallery(galleryRepository persist.GalleryRepository, backupRepository
 			return
 		}
 
-		update := &persist.GalleryUpdateInput{Collections: input.Collections}
+		update := persist.GalleryUpdateInput{Collections: input.Collections}
 
 		err := galleryRepository.Update(c, input.ID, userID, update)
 		if err != nil {

@@ -17,7 +17,7 @@ type NFTDB struct {
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
-	OwnershipHistory *OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
+	OwnershipHistory OwnershipHistory `bson:"ownership_history,only_get" json:"ownership_history"`
 
 	Name                string      `bson:"name"                 json:"name"`
 	Description         string      `bson:"description"          json:"description"`
@@ -59,7 +59,7 @@ type NFT struct {
 
 	MultipleOwners bool `bson:"multiple_owners" json:"multiple_owners"`
 
-	OwnershipHistory *OwnershipHistory `bson:"ownership_history" json:"ownership_history"`
+	OwnershipHistory OwnershipHistory `bson:"ownership_history" json:"ownership_history"`
 
 	Name                string      `bson:"name"                 json:"name"`
 	Description         string      `bson:"description"          json:"description"`
@@ -135,17 +135,17 @@ type UpdateNFTInfoInput struct {
 
 // NFTRepository represents the interface for interacting with persisted NFTs
 type NFTRepository interface {
-	CreateBulk(context.Context, []*NFTDB) ([]DBID, error)
-	Create(context.Context, *NFTDB) (DBID, error)
-	GetByUserID(context.Context, DBID) ([]*NFT, error)
-	GetByAddresses(context.Context, []Address) ([]*NFT, error)
-	GetByID(context.Context, DBID) (*NFT, error)
-	GetByContractData(context.Context, TokenID, Address) ([]*NFT, error)
-	GetByOpenseaID(context.Context, int, Address) ([]*NFT, error)
+	CreateBulk(context.Context, []NFTDB) ([]DBID, error)
+	Create(context.Context, NFTDB) (DBID, error)
+	GetByUserID(context.Context, DBID) ([]NFT, error)
+	GetByAddresses(context.Context, []Address) ([]NFT, error)
+	GetByID(context.Context, DBID) (NFT, error)
+	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
+	GetByOpenseaID(context.Context, int, Address) ([]NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	BulkUpsert(context.Context, []*NFTDB) ([]DBID, error)
-	OpenseaCacheGet(context.Context, []Address) ([]*NFT, error)
-	OpenseaCacheSet(context.Context, []Address, []*NFT) error
+	BulkUpsert(context.Context, []NFTDB) ([]DBID, error)
+	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
+	OpenseaCacheSet(context.Context, []Address, []NFT) error
 	OpenseaCacheDelete(context.Context, []Address) error
 }
 

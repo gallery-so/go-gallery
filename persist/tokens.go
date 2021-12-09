@@ -196,15 +196,15 @@ type TokenUpdateMediaInput struct {
 
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
-	CreateBulk(context.Context, []*Token) ([]DBID, error)
-	Create(context.Context, *Token) (DBID, error)
-	GetByWallet(context.Context, Address, int64, int64) ([]*Token, error)
-	GetByUserID(context.Context, DBID, int64, int64) ([]*Token, error)
-	GetByContract(context.Context, Address, int64, int64) ([]*Token, error)
-	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]*Token, error)
-	GetByID(context.Context, DBID) (*Token, error)
-	BulkUpsert(context.Context, []*Token) error
-	Upsert(context.Context, *Token) error
+	CreateBulk(context.Context, []Token) ([]DBID, error)
+	Create(context.Context, Token) (DBID, error)
+	GetByWallet(context.Context, Address, int64, int64) ([]Token, error)
+	GetByUserID(context.Context, DBID, int64, int64) ([]Token, error)
+	GetByContract(context.Context, Address, int64, int64) ([]Token, error)
+	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]Token, error)
+	GetByID(context.Context, DBID) (Token, error)
+	BulkUpsert(context.Context, []Token) error
+	Upsert(context.Context, Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)

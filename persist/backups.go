@@ -12,11 +12,11 @@ type Backup struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	GalleryID DBID     `bson:"gallery_id" json:"gallery_id" `
-	Gallery   *Gallery `bson:"gallery" json:"gallery"`
+	GalleryID DBID    `bson:"gallery_id" json:"gallery_id" `
+	Gallery   Gallery `bson:"gallery" json:"gallery"`
 }
 
 // BackupRepository is the interface for interacting with backed up versions of galleries
 type BackupRepository interface {
-	Insert(context.Context, *Gallery) error
+	Insert(context.Context, Gallery) error
 }

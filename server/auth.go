@@ -161,7 +161,7 @@ func authUserLoginAndMemorizeAttemptDb(pCtx context.Context, pInput *authUserLog
 		return nil, err
 	}
 
-	loginAttempt := &persist.UserLoginAttempt{
+	loginAttempt := persist.UserLoginAttempt{
 
 		Address:        pInput.Address,
 		Signature:      pInput.Signature,
@@ -336,7 +336,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 	logrus.WithError(err).Error("error retrieving user by address for auth preflight")
 
-	userExistsBool := user != nil
+	userExistsBool := user.ID != ""
 
 	output := &authUserGetPreflightOutput{
 		UserExists: userExistsBool,
@@ -355,7 +355,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 		}
 
-		nonce := &persist.UserNonce{
+		nonce := persist.UserNonce{
 			Address: pInput.Address,
 			Value:   generateNonce(),
 		}
@@ -379,7 +379,7 @@ func authUserGetPreflightDb(pCtx context.Context, pInput *authUserGetPreflightIn
 
 func authNonceRotateDb(pCtx context.Context, pAddress persist.Address, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
-	newNonce := &persist.UserNonce{
+	newNonce := persist.UserNonce{
 		Value:   generateNonce(),
 		Address: pAddress,
 	}

@@ -31,8 +31,8 @@ type Account struct {
 
 // AccountRepository is the interface for interacting with the account persistence layer
 type AccountRepository interface {
-	GetByAddress(context.Context, Address) (*Account, error)
-	UpsertByAddress(context.Context, Address, *Account) error
+	GetByAddress(context.Context, Address) (Account, error)
+	UpsertByAddress(context.Context, Address, Account) error
 }
 
 // ErrAccountNotFoundByAddress is an error that occurs when an account is not found by an address

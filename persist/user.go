@@ -30,10 +30,10 @@ type UserUpdateInfoInput struct {
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
 	ExistsByAddress(context.Context, Address) (bool, error)
-	Create(context.Context, *User) (DBID, error)
-	GetByID(context.Context, DBID) (*User, error)
-	GetByAddress(context.Context, Address) (*User, error)
-	GetByUsername(context.Context, string) (*User, error)
+	Create(context.Context, User) (DBID, error)
+	GetByID(context.Context, DBID) (User, error)
+	GetByAddress(context.Context, Address) (User, error)
+	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
 	AddAddresses(context.Context, DBID, []Address) error
 	RemoveAddresses(context.Context, DBID, []Address) error
