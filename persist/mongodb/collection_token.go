@@ -334,7 +334,7 @@ func (c *CollectionTokenMongoRepository) GetUnassigned(pCtx context.Context, pUs
 	if len(result) > 0 {
 		return result[0], nil
 	}
-	return nil, errNoUnassignedNFTs
+	return persist.CollectionToken{}, errNoUnassignedNFTs
 
 }
 
