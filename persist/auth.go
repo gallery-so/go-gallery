@@ -40,13 +40,13 @@ type UserLoginAttempt struct {
 
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, Address) (*UserNonce, error)
-	Create(context.Context, *UserNonce) error
+	Get(context.Context, Address) (UserNonce, error)
+	Create(context.Context, UserNonce) error
 }
 
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
 type LoginAttemptRepository interface {
-	Create(context.Context, *UserLoginAttempt) (DBID, error)
+	Create(context.Context, UserLoginAttempt) (DBID, error)
 }
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address

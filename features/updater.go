@@ -192,7 +192,8 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 		contract := persist.Address(pLog.Address.Hex())
 		blockNumber := persist.BlockNumber(pLog.BlockNumber)
 
-		var fromAccess, toAccess *persist.Access
+		var fromAccess, toAccess persist.Access
+		var fromAccessExists, toAccessExists bool
 
 		fromUser, err := userRepo.GetByAddress(pCtx, from)
 		if err == nil {
@@ -200,6 +201,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 			if err != nil {
 				return err
 			}
+			fromAccessExists = err == nil
 			fromAccess = currentAccess
 		}
 		toUser, err := userRepo.GetByAddress(pCtx, to)
@@ -208,6 +210,7 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 			if err != nil {
 				return err
 			}
+			toAccessExists = err == nil
 			toAccess = currentAccess
 		}
 
@@ -218,20 +221,20 @@ func processIncomingLog(pCtx context.Context, userRepo persist.UserRepository, a
 
 			ti := persist.NewTokenIdentifiers(contract, tokenID)
 
-			if fromAccess != nil {
+			if fromAccessExists {
 				fromAccess.RequiredTokensOwned[ti] -= amount
 			}
 
-			if toAccess != nil {
+			if toAccessExists {
 				toAccess.RequiredTokensOwned[ti] += amount
 			}
 
 		}
-		if fromAccess != nil {
+		if fromAccessExists {
 			accessRepo.UpsertRequiredTokensByUserID(pCtx, fromUser.ID, fromAccess.RequiredTokensOwned, blockNumber)
 		}
 
-		if toAccess != nil {
+		if toAccessExists {
 			accessRepo.UpsertRequiredTokensByUserID(pCtx, toUser.ID, toAccess.RequiredTokensOwned, blockNumber)
 		}
 	default:

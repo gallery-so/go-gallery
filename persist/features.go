@@ -40,9 +40,9 @@ type ErrFeatureNotFoundByName struct {
 
 // FeatureFlagRepository represents a repository for interacting with persisted feature flags
 type FeatureFlagRepository interface {
-	GetByRequiredTokens(context.Context, map[TokenIdentifiers]uint64) ([]*FeatureFlag, error)
-	GetByName(context.Context, string) (*FeatureFlag, error)
-	GetAll(context.Context) ([]*FeatureFlag, error)
+	GetByRequiredTokens(context.Context, map[TokenIdentifiers]uint64) ([]FeatureFlag, error)
+	GetByName(context.Context, string) (FeatureFlag, error)
+	GetAll(context.Context) ([]FeatureFlag, error)
 }
 
 // NewTokenIdentifiers creates a new token identifiers

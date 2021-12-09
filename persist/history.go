@@ -13,8 +13,8 @@ type OwnershipHistory struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	NFTID  DBID     `bson:"nft_id" json:"nft_id"`
-	Owners []*Owner `bson:"owners" json:"owners"`
+	NFTID  DBID    `bson:"nft_id" json:"nft_id"`
+	Owners []Owner `bson:"owners" json:"owners"`
 }
 
 // Owner represents a single owner of an NFT.
@@ -27,5 +27,5 @@ type Owner struct {
 
 // OwnershipHistoryRepository is the interface for the OwnershipHistory persistence layer
 type OwnershipHistoryRepository interface {
-	Upsert(context.Context, DBID, *OwnershipHistory) error
+	Upsert(context.Context, DBID, OwnershipHistory) error
 }

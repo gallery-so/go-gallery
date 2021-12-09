@@ -25,7 +25,7 @@ func NewBackupMongoRepository(mgoClient *mongo.Client) *BackupMongoRepository {
 
 // Insert inserts a backed up gallery into the mongo db while also ensuring there are
 // no more than three backups per gallery at any given time
-func (b *BackupMongoRepository) Insert(pCtx context.Context, pGallery *persist.Gallery) error {
+func (b *BackupMongoRepository) Insert(pCtx context.Context, pGallery persist.Gallery) error {
 
 	currentlyBackedUp := []*persist.Backup{}
 	err := b.backupsStorage.find(pCtx, bson.M{"gallery_id": pGallery.ID}, &currentlyBackedUp, options.Find().SetSort(bson.M{"last_updated": -1}))

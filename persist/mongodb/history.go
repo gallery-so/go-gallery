@@ -23,7 +23,7 @@ func NewHistoryMongoRepository(mgoClient *mongo.Client) *HistoryMongoRepository 
 }
 
 // Upsert caches a transfer in the memory storage
-func (h *HistoryMongoRepository) Upsert(pCtx context.Context, pNFTID persist.DBID, pHistory *persist.OwnershipHistory) error {
+func (h *HistoryMongoRepository) Upsert(pCtx context.Context, pNFTID persist.DBID, pHistory persist.OwnershipHistory) error {
 
 	pHistory.NFTID = pNFTID
 

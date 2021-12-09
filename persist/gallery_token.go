@@ -31,8 +31,8 @@ type GalleryToken struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	OwnerUserID DBID               `bson:"owner_user_id" json:"owner_user_id"`
-	Collections []*CollectionToken `bson:"collections"          json:"collections"`
+	OwnerUserID DBID              `bson:"owner_user_id" json:"owner_user_id"`
+	Collections []CollectionToken `bson:"collections"          json:"collections"`
 }
 
 // GalleryTokenUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
@@ -42,12 +42,12 @@ type GalleryTokenUpdateInput struct {
 
 // GalleryTokenRepository is an interface for interacting with the gallery persistence layer
 type GalleryTokenRepository interface {
-	Create(context.Context, *GalleryTokenDB) (DBID, error)
-	Update(context.Context, DBID, DBID, *GalleryTokenUpdateInput) error
-	UpdateUnsafe(context.Context, DBID, *GalleryTokenUpdateInput) error
+	Create(context.Context, GalleryTokenDB) (DBID, error)
+	Update(context.Context, DBID, DBID, GalleryTokenUpdateInput) error
+	UpdateUnsafe(context.Context, DBID, GalleryTokenUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
-	GetByUserID(context.Context, DBID, bool) ([]*GalleryToken, error)
-	GetByID(context.Context, DBID, bool) (*GalleryToken, error)
+	GetByUserID(context.Context, DBID, bool) ([]GalleryToken, error)
+	GetByID(context.Context, DBID, bool) (GalleryToken, error)
 }
 
 // ErrGalleryNotFoundByID is returned when a gallery is not found by its ID

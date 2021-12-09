@@ -30,8 +30,8 @@ type Gallery struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	OwnerUserID DBID          `bson:"owner_user_id" json:"owner_user_id"`
-	Collections []*Collection `bson:"collections"          json:"collections"`
+	OwnerUserID DBID         `bson:"owner_user_id" json:"owner_user_id"`
+	Collections []Collection `bson:"collections"          json:"collections"`
 }
 
 // GalleryUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
@@ -41,9 +41,9 @@ type GalleryUpdateInput struct {
 
 // GalleryRepository is an interface for interacting with the gallery persistence layer
 type GalleryRepository interface {
-	Create(context.Context, *GalleryDB) (DBID, error)
-	Update(context.Context, DBID, DBID, *GalleryUpdateInput) error
+	Create(context.Context, GalleryDB) (DBID, error)
+	Update(context.Context, DBID, DBID, GalleryUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
-	GetByUserID(context.Context, DBID, bool) ([]*Gallery, error)
-	GetByID(context.Context, DBID, bool) (*Gallery, error)
+	GetByUserID(context.Context, DBID, bool) ([]Gallery, error)
+	GetByID(context.Context, DBID, bool) (Gallery, error)
 }

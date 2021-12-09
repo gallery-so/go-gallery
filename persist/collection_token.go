@@ -40,10 +40,10 @@ type CollectionToken struct {
 
 	Layout TokenLayout `bson:"layout" json:"layout"`
 
-	Name           string               `bson:"name"          json:"name"`
-	CollectorsNote string               `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    DBID                 `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []*TokenInCollection `bson:"nfts"          json:"nfts"`
+	Name           string              `bson:"name"          json:"name"`
+	CollectorsNote string              `bson:"collectors_note"   json:"collectors_note"`
+	OwnerUserID    DBID                `bson:"owner_user_id" json:"owner_user_id"`
+	Nfts           []TokenInCollection `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -80,17 +80,17 @@ type CollectionTokenUpdateDeletedInput struct {
 
 // CollectionTokenRepository represents the interface for interacting with the collection persistence layer
 type CollectionTokenRepository interface {
-	Create(context.Context, *CollectionTokenDB) (DBID, error)
-	GetByUserID(context.Context, DBID, bool) ([]*CollectionToken, error)
-	GetByID(context.Context, DBID, bool) (*CollectionToken, error)
+	Create(context.Context, CollectionTokenDB) (DBID, error)
+	GetByUserID(context.Context, DBID, bool) ([]CollectionToken, error)
+	GetByID(context.Context, DBID, bool) (CollectionToken, error)
 	Update(context.Context, DBID, DBID, interface{}) error
-	UpdateNFTs(context.Context, DBID, DBID, *CollectionTokenUpdateNftsInput) error
+	UpdateNFTs(context.Context, DBID, DBID, CollectionTokenUpdateNftsInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
-	UpdateNFTsUnsafe(context.Context, DBID, *CollectionTokenUpdateNftsInput) error
-	ClaimNFTs(context.Context, DBID, []Address, *CollectionTokenUpdateNftsInput) error
+	UpdateNFTsUnsafe(context.Context, DBID, CollectionTokenUpdateNftsInput) error
+	ClaimNFTs(context.Context, DBID, []Address, CollectionTokenUpdateNftsInput) error
 	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
 	Delete(context.Context, DBID, DBID) error
-	GetUnassigned(context.Context, DBID) (*CollectionToken, error)
+	GetUnassigned(context.Context, DBID) (CollectionToken, error)
 	RefreshUnassigned(context.Context, DBID) error
 }
 
