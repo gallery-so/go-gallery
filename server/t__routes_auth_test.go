@@ -395,7 +395,7 @@ func createUserRequest(assert *assert.Assertions, sig string, address persist.Ad
 }
 
 func loginRequest(assert *assert.Assertions, sig string, address persist.Address, wt walletType) *http.Response {
-	body := map[string]interface{}{"address": address, "signature": sig, "wallet_type": wt}
+	body := map[string]interface{}{"address": address, "signature": sig, "wallet_type": wt, "nonce": sig}
 	asJSON, err := json.Marshal(body)
 	assert.Nil(err)
 	req, err := http.NewRequest("POST",
