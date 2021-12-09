@@ -15,7 +15,7 @@ import (
 )
 
 func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	initialCollectionOrder := []persist.DBID{}
 
@@ -32,7 +32,7 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 5)
 
 	// Validate the initial order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
@@ -48,7 +48,7 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
 	updateTestGallery(assert, update)
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 5)
 
 	// Validate the updated order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)

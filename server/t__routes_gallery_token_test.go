@@ -1,83 +1,88 @@
 package server
 
-// import (
-// 	"bytes"
-// 	"context"
-// 	"encoding/json"
-// 	"fmt"
-// 	"net/http"
-// 	"testing"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"testing"
+	"time"
 
-// 	"github.com/mikeydub/go-gallery/persist"
-// 	"github.com/mikeydub/go-gallery/util"
-// 	"github.com/stretchr/testify/assert"
-// )
+	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/stretchr/testify/assert"
+)
 
-// func TestUpdateGalleryById_ReorderCollections_Success_Token(t *testing.T) {
-// 	assert := setupTest(t)
+func TestUpdateGalleryById_ReorderCollections_Success_Token(t *testing.T) {
+	assert := setupTest(t, 2)
 
-// 	initialCollectionOrder := []persist.DBID{}
+	initialCollectionOrder := []persist.DBID{}
 
-// 	// SET UP
-// 	// Seed DB with collection
-// 	for i := 0; i < 4; i++ {
-// 		collID := createCollectionInDbForUserIDToken(assert, fmt.Sprintf("Collection #%d", i), tc.user1.id)
-// 		initialCollectionOrder = append(initialCollectionOrder, collID)
-// 	}
-// 	// Seed DB with gallery
-// 	id, err := tc.repos.galleryTokenRepository.Create(context.Background(), &persist.GalleryTokenDB{
-// 		OwnerUserID: tc.user1.id,
-// 		Collections: initialCollectionOrder,
-// 	})
-// 	assert.Nil(err)
+	// SET UP
+	// Seed DB with collection
+	for i := 0; i < 4; i++ {
+		collID := createCollectionInDbForUserIDToken(assert, fmt.Sprintf("Collection #%d", i), tc.user1.id)
+		initialCollectionOrder = append(initialCollectionOrder, collID)
+	}
+	// Seed DB with gallery
+	id, err := tc.repos.galleryTokenRepository.Create(context.Background(), persist.GalleryTokenDB{
+		OwnerUserID: tc.user1.id,
+		Collections: initialCollectionOrder,
+	})
+	assert.Nil(err)
 
-// 	// Validate the initial order of the gallery's collections
-// 	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
+	time.Sleep(time.Second * 3)
 
-// 	// UPDATE COLLECTION ORDER
-// 	// build update request body
-// 	updatedCollectionOrder := []persist.DBID{
-// 		initialCollectionOrder[3],
-// 		initialCollectionOrder[2],
-// 		initialCollectionOrder[1],
-// 		initialCollectionOrder[0],
-// 	}
-// 	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
-// 	updateTestGalleryToken(assert, update)
+	// Validate the initial order of the gallery's collections
+	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
 
-// 	// Validate the updated order of the gallery's collections
-// 	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
-// }
+	// UPDATE COLLECTION ORDER
+	// build update request body
+	updatedCollectionOrder := []persist.DBID{
+		initialCollectionOrder[3],
+		initialCollectionOrder[2],
+		initialCollectionOrder[1],
+		initialCollectionOrder[0],
+	}
+	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
+	updateTestGalleryToken(assert, update)
 
-// // Retrieve the user's gallery and verify that the collections are in the expected order
-// func validateCollectionsOrderInGalleryToken(assert *assert.Assertions, collections []persist.DBID) {
-// 	getGalleryURL := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
-// 	resp, err := http.Get(getGalleryURL)
-// 	assert.Nil(err)
-// 	assertValidJSONResponse(assert, resp)
+	time.Sleep(time.Second * 3)
 
-// 	body := galleryTokenGetOutput{}
-// 	util.UnmarshallBody(&body, resp.Body)
-// 	assert.Len(body.Galleries, 1)
-// 	retreivedCollections := body.Galleries[0].Collections
+	// Validate the updated order of the gallery's collections
+	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
+}
 
-// 	for index, element := range collections {
-// 		assert.Equal(element, retreivedCollections[index].ID)
-// 	}
-// }
+// Retrieve the user's gallery and verify that the collections are in the expected order
+func validateCollectionsOrderInGalleryToken(assert *assert.Assertions, collections []persist.DBID) {
+	getGalleryURL := fmt.Sprintf("%s/galleries/user_get?user_id=%s", tc.serverURL, tc.user1.id)
+	resp, err := http.Get(getGalleryURL)
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
 
-// func updateTestGalleryToken(assert *assert.Assertions, update interface{}) {
-// 	data, err := json.Marshal(update)
-// 	assert.Nil(err)
+	body := galleryTokenGetOutput{}
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Len(body.Galleries, 1)
+	retreivedCollections := body.Galleries[0].Collections
 
-// 	req, err := http.NewRequest("POST",
-// 		fmt.Sprintf("%s/galleries/update", tc.serverURL),
-// 		bytes.NewBuffer(data))
-// 	assert.Nil(err)
+	for index, element := range collections {
+		assert.Equal(element, retreivedCollections[index].ID)
+	}
+}
 
-// 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	assert.Nil(err)
-// 	assertValidResponse(assert, resp)
-// }
+func updateTestGalleryToken(assert *assert.Assertions, update interface{}) {
+	data, err := json.Marshal(update)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/galleries/update", tc.serverURL),
+		bytes.NewBuffer(data))
+	assert.Nil(err)
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	assertValidResponse(assert, resp)
+}

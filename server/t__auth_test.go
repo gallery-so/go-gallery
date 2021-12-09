@@ -14,7 +14,7 @@ import (
 )
 
 func TestAuthVerifySignature_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 	if err != nil {
@@ -31,7 +31,7 @@ func TestAuthVerifySignature_Success(t *testing.T) {
 }
 
 func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 	if err != nil {
@@ -47,7 +47,7 @@ func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
 }
 
 func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 	if err != nil {
@@ -64,7 +64,7 @@ func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 }
 
 func TestJwtValid_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 	resp := jwtValidRequest(assert, tc.user1.jwt)
 	assertValidJSONResponse(assert, resp)
 
@@ -76,7 +76,7 @@ func TestJwtValid_Success(t *testing.T) {
 }
 
 func TestJwtValid_WrongSignatureAndClaims_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 	resp := jwtValidRequest(assert, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUZXN0IiwiaWF0IjoxNjMzMDE1MTM1LCJleHAiOjE2NjQ1NTExMzUsImF1ZCI6InRlc3QiLCJzdWIiOiJ0ZXN0IiwiVGVzdCI6IlRlc3QifQ.ewGO4x1xEN01CCZTp5vg0d_rxzdzH_rY0zBXVT1OVJY")
 	assertValidJSONResponse(assert, resp)
 

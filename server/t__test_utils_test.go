@@ -59,7 +59,7 @@ func generateTestUser(repos *repositories, username string) *TestUser {
 
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
-func initializeTestEnv() *TestConfig {
+func initializeTestEnv(v int) *TestConfig {
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	ts := httptest.NewServer(CoreInit())
 
@@ -68,7 +68,7 @@ func initializeTestEnv() *TestConfig {
 	log.Info("test server connected! ✅")
 	return &TestConfig{
 		server:    ts,
-		serverURL: fmt.Sprintf("%s/glry/v1", ts.URL),
+		serverURL: fmt.Sprintf("%s/glry/v%d", ts.URL, v),
 		repos:     repos,
 		mgoClient: mclient,
 		user1:     generateTestUser(repos, "bob"),
@@ -105,8 +105,8 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
-func setupTest(t *testing.T) *assert.Assertions {
-	tc = initializeTestEnv()
+func setupTest(t *testing.T, v int) *assert.Assertions {
+	tc = initializeTestEnv(v)
 	t.Cleanup(teardown)
 	return assert.New(t)
 }

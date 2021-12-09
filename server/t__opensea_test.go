@@ -14,7 +14,7 @@ import (
 )
 
 func TestOpenseaSync_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 	ctx := context.Background()
 
 	mike := persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
@@ -113,7 +113,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 }
 
 func TestOpenseaRateLimit_Failure(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 	var resp *http.Response
 	for i := 0; i < 100; i++ {
 		resp = openseaSyncRequest(assert, tc.user1.address, tc.user1.jwt)

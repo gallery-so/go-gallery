@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealthcheck(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp, err := http.Get(fmt.Sprintf("%s/health", tc.serverURL))
 	assert.Nil(err)

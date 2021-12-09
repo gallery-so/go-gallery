@@ -43,11 +43,13 @@ func TestUpdateQueue(t *testing.T) {
 	result.Description = "updated"
 
 	asJSON, err = json.Marshal(result)
+	assert.Nil(err)
 	uq.QueueUpdate("test", asJSON, -1)
 
 	result.Description = "updated2"
-	asJSON, err = json.Marshal(result)
-	uq.QueueUpdate("test", asJSON, -1)
+	next, err := json.Marshal(result)
+	assert.Nil(err)
+	uq.QueueUpdate("test", next, -1)
 
 	uq.Stop()
 

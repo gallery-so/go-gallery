@@ -12,7 +12,7 @@ import (
 )
 
 func TestMembership_Success(t *testing.T) {
-	assert := setupTest(t)
+	assert := setupTest(t, 1)
 
 	resp := membershipRequest(assert)
 	defer resp.Body.Close()
