@@ -146,7 +146,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure_Token(t *testing.T) {
 func TestUserAddAddresses_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	nonce := &persist.UserNonce{
+	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 	}
@@ -173,7 +173,7 @@ func TestUserAddAddresses_Success_Token(t *testing.T) {
 func TestUserAddAddresses_WrongNonce_Failure_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	nonce := &persist.UserNonce{
+	nonce := persist.UserNonce{
 		Value:   "Wrong Nonce",
 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 	}
@@ -191,12 +191,12 @@ func TestUserAddAddresses_WrongNonce_Failure_Token(t *testing.T) {
 func TestUserAddAddresses_OtherUserOwnsAddress_Failure_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses: []persist.Address{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
 	}
 	_, err := tc.repos.userRepository.Create(context.Background(), user)
 
-	nonce := &persist.UserNonce{
+	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 	}
@@ -214,7 +214,7 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure_Token(t *testing.T) {
 func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
 		UserName:           "TestUser",
 		UserNameIdempotent: "testuser",
@@ -222,13 +222,13 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	nft := &persist.Token{
+	nft := persist.Token{
 		OwnerAddress: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 		Name:         "test",
 	}
 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), nft)
 
-	coll := &persist.CollectionTokenDB{
+	coll := persist.CollectionTokenDB{
 		Nfts:        []persist.DBID{nftID},
 		Name:        "test-coll",
 		OwnerUserID: userID,
@@ -261,7 +261,7 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 func TestUserRemoveAddresses_NotOwnAddress_Failure_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses: []persist.Address{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)
@@ -282,7 +282,7 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure_Token(t *testing.T) {
 func TestUserRemoveAddresses_AllAddresses_Failure_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	user := &persist.User{
+	user := persist.User{
 		Addresses: []persist.Address{"0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
 	userID, err := tc.repos.userRepository.Create(context.Background(), user)

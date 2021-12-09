@@ -17,7 +17,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	// seed DB with collection
-	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 	})
@@ -50,7 +50,7 @@ func TestCreateCollection_Success_Token(t *testing.T) {
 
 	nftIDs := seedTokens(assert)
 
-	gid, err := tc.repos.galleryTokenRepository.Create(context.Background(), &persist.GalleryTokenDB{OwnerUserID: tc.user1.id})
+	gid, err := tc.repos.galleryTokenRepository.Create(context.Background(), persist.GalleryTokenDB{OwnerUserID: tc.user1.id})
 	assert.Nil(err)
 
 	input := collectionCreateInputToken{GalleryID: gid, Nfts: nftIDs}
@@ -93,7 +93,7 @@ func TestGetUnassignedCollection_Success_Token(t *testing.T) {
 
 	nftIDs := seedTokens(assert)
 	// seed DB with collection
-	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs[:2],
@@ -155,7 +155,7 @@ func TestGetHiddenCollections_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	nftIDs := seedTokens(assert)
-	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs,
@@ -180,13 +180,13 @@ func TestGetNoHiddenCollections_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	nftIDs := seedTokens(assert)
-	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs[0:1],
 		Hidden:      false,
 	})
-	_, err = tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	_, err = tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs[1:],
@@ -212,7 +212,7 @@ func TestUpdateCollectionNftsOrder_Success_Token(t *testing.T) {
 
 	nftIDs := seedTokens(assert)
 
-	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs,
@@ -254,7 +254,7 @@ func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 
 	nftIDs := seedTokens(assert)
 
-	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		Nfts:        nftIDs,
@@ -391,7 +391,7 @@ func updateCollectionNftsRequestToken(assert *assert.Assertions, input collectio
 }
 
 func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
-	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), &persist.CollectionTokenDB{
+	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        collectionName,
 		OwnerUserID: userID,
 	})
@@ -401,7 +401,7 @@ func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionNam
 }
 
 func seedTokens(assert *assert.Assertions) []persist.DBID {
-	nfts := []*persist.Token{
+	nfts := []persist.Token{
 		{CollectorsNote: "asd", OwnerAddress: tc.user1.address},
 		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
 		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},

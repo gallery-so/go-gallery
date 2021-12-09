@@ -19,7 +19,7 @@ func TestGetTokenByID_Success(t *testing.T) {
 
 	// seed DB with nft
 	name := "very cool nft"
-	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
+	nftID, err := tc.repos.tokenRepository.Create(context.Background(), persist.Token{
 		Name:           name,
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   tc.user1.address,
@@ -70,7 +70,7 @@ func TestUpdateTokenByID_Success(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	// seed DB with nft
-	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
+	nftID, err := tc.repos.tokenRepository.Create(context.Background(), persist.Token{
 		Name:           "very cool nft",
 		CollectorsNote: "silly note",
 		OwnerAddress:   tc.user1.address,
@@ -95,7 +95,7 @@ func TestUpdateTokenByID_UnauthedError(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	// seed DB with nft
-	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
+	nftID, err := tc.repos.tokenRepository.Create(context.Background(), persist.Token{
 		Name:           "very cool nft",
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   tc.user1.address,
@@ -139,7 +139,7 @@ func TestUpdateTokenByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	// seed DB with nft
-	nftID, err := tc.repos.tokenRepository.Create(context.Background(), &persist.Token{
+	nftID, err := tc.repos.tokenRepository.Create(context.Background(), persist.Token{
 		Name: "very cool nft",
 	})
 	assert.Nil(err)
