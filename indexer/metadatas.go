@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	svg "github.com/ajstarks/svgo"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 

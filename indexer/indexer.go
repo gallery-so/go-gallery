@@ -17,7 +17,7 @@ import (
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )

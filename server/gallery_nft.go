@@ -5,9 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -46,6 +47,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 
 		auth := c.GetBool(middleware.AuthContextKey)
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
+		logrus.Infof("GALLERY %+v", galleries)
 		if galleries == nil || err != nil {
 			galleries = []persist.Gallery{}
 		}

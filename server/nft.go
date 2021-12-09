@@ -7,9 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type getNftsByIDInput struct {
@@ -98,7 +99,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.UpdateNFTInfoInput{CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := &persist.UpdateNFTInfoInput{CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {

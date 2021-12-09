@@ -1,30 +1,28 @@
 package server
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/pubsub"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 func createUser(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := userAddAddressInput{}
+		input := user.AddUserAddressesInput{}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		output, err := userCreateDb(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
+		output, err := user.CreateUser(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -32,22 +30,15 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 
 		c.JSON(http.StatusOK, output)
 
-		if viper.GetString("ENV") != "local" {
-			err := publishUserSignup(c, output.UserID, userRepository, psub)
-			if err != nil {
-				logrus.WithError(err).Error("failed to publish user signup")
-			}
-		}
-
 	}
 }
 
 func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := &userRemoveAddressesInput{}
+		input := user.RemoveUserAddressesInput{}
 
-		if err := c.ShouldBindJSON(input); err != nil {
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
@@ -58,7 +49,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		err := removeAddressesFromUserDB(c, userID, input, userRepository, collRepo)
+		err := user.RemoveAddressesFromUser(c, userID, input, userRepository, collRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -67,82 +58,4 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
 	}
-}
-
-func userCreateDb(pCtx context.Context, pInput userAddAddressInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (userCreateOutput, error) {
-
-	output := userCreateOutput{}
-
-	nonceValueStr, id, _ := getUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonceValueStr == "" {
-		return userCreateOutput{}, errNonceNotFound{pInput.Address}
-	}
-	if id != "" {
-		return userCreateOutput{}, errUserExistsWithAddress{address: pInput.Address}
-	}
-
-	sigValidBool, err := authVerifySignatureAllMethods(pInput.Signature,
-		nonceValueStr,
-		pInput.Address, pInput.WalletType, ethClient)
-	if err != nil {
-		return userCreateOutput{}, err
-	}
-
-	output.SignatureValid = sigValidBool
-	if !sigValidBool {
-		return output, nil
-	}
-
-	user := persist.User{
-		Addresses: []persist.Address{pInput.Address},
-	}
-
-	userID, err := userRepo.Create(pCtx, user)
-	if err != nil {
-		return userCreateOutput{}, err
-	}
-
-	output.UserID = userID
-
-	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
-	if err != nil {
-		return userCreateOutput{}, err
-	}
-
-	output.JWTtoken = jwtTokenStr
-
-	err = authNonceRotateDb(pCtx, pInput.Address, userID, nonceRepo)
-	if err != nil {
-		return userCreateOutput{}, err
-	}
-
-	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
-
-	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
-	if err != nil {
-		return userCreateOutput{}, err
-	}
-
-	output.GalleryID = galleryID
-
-	return output, nil
-}
-
-func removeAddressesFromUserDB(pCtx context.Context, pUserID persist.DBID, pInput *userRemoveAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
-
-	user, err := userRepo.GetByID(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
-
-	if len(user.Addresses) < len(pInput.Addresses) {
-		return errUserCannotRemoveAllAddresses
-	}
-
-	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
 }

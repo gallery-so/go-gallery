@@ -18,7 +18,7 @@ import (
 	"cloud.google.com/go/storage"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/indexer"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/nfnt/resize"
 	"github.com/spf13/viper"

@@ -12,8 +12,9 @@ import (
 	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var errTooManyTokensInCollection = errors.New("a collection can have no more than 1000 tokens")
@@ -174,7 +175,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateInfoInput{Name: sanitizationPolicy.Sanitize(input.Name), CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := &persist.CollectionTokenUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -289,9 +290,9 @@ func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputT
 	coll := persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
-		Name:           sanitizationPolicy.Sanitize(pInput.Name),
+		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
 		Layout:         layout,
-		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
+		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 
 	collID, err := collectionsRepo.Create(pCtx, coll)

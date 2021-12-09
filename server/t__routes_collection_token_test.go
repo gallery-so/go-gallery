@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateCollectionNameByID_Success(t *testing.T) {
+func TestUpdateCollectionNameByID_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
 	// seed DB with collection
