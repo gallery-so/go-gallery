@@ -48,7 +48,7 @@ type AddUserAddressesInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	Signature  string          `json:"signature" binding:"required,signature"`
+	Signature  string          `json:"signature" binding:"signature"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	WalletType auth.WalletType `json:"wallet_type"`
 }

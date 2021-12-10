@@ -39,7 +39,7 @@ var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
-	Signature  string          `json:"signature" binding:"medium_string"`
+	Signature  string          `json:"signature" binding:"signature"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	WalletType WalletType      `json:"wallet_type"`
 	Nonce      string          `json:"nonce"`
