@@ -46,8 +46,8 @@ func NewUpdateQueue(cache Cache) *UpdateQueue {
 // Start starts the update queue
 func (uq *UpdateQueue) start() {
 	uq.wg.Add(1)
-	defer uq.wg.Done()
 	go func() {
+		defer uq.wg.Done()
 		for update := range uq.updates {
 			uq.mu.Lock()
 			if uq.runningUpdates[update.key] {
