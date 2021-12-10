@@ -25,6 +25,9 @@ var signatureValidator validator.Func = func(fl validator.FieldLevel) bool {
 	if sig == "" {
 		return true
 	}
+	if sig == "0x" {
+		return true
+	}
 	return len(sig) >= 80 && len(sig) <= 200
 }
 
