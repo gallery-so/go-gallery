@@ -5,14 +5,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthVerifySignature_Success(t *testing.T) {
 	assert := assert.New(t)
 
-	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
+	client, err := ethclient.Dial("https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	if err != nil {
 		panic(err)
 	}
@@ -29,7 +28,7 @@ func TestAuthVerifySignature_Success(t *testing.T) {
 func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
 	assert := assert.New(t)
 
-	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
+	client, err := ethclient.Dial("https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +44,7 @@ func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
 func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 	assert := assert.New(t)
 
-	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
+	client, err := ethclient.Dial("https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	if err != nil {
 		panic(err)
 	}
