@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,7 +76,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress(t *testing.T) {
 func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	update := userUpdateInput{
+	update := user.UpdateUserInput{
 		UserName: "kaito",
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
@@ -91,7 +92,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	update := userUpdateInput{
+	update := user.UpdateUserInput{
 		UserName: "bob",
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
@@ -105,7 +106,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	update := userUpdateInput{
+	update := user.UpdateUserInput{
 		UserName: "kaito",
 	}
 	resp := updateUserInfoNoAuthRequest(assert, update)
@@ -119,7 +120,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert.Nil(err)
 	log.Println(user2.UserName)
 
-	update := userUpdateInput{
+	update := user.UpdateUserInput{
 		UserName: tc.user2.username,
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
@@ -132,7 +133,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	update := userUpdateInput{
+	update := user.UpdateUserInput{
 		UserName: "92ks&$m__",
 	}
 	resp := updateUserInfoRequest(assert, update, tc.user1.jwt)
@@ -153,7 +154,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	update := userAddAddressInput{
+	update := user.AddUserAddressesInput{
 		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
@@ -180,7 +181,7 @@ func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	update := userAddAddressInput{
+	update := user.AddUserAddressesInput{
 		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
@@ -191,10 +192,10 @@ func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
 func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	user := persist.User{
+	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.userRepository.Create(context.Background(), u)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
@@ -203,7 +204,7 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	update := userAddAddressInput{
+	update := user.AddUserAddressesInput{
 		Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
@@ -214,12 +215,12 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 func TestUserRemoveAddresses_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	user := persist.User{
+	u := persist.User{
 		Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		UserName:           "TestUser",
 		UserNameIdempotent: "testuser",
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), user)
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	nft := persist.NFTDB{
@@ -238,7 +239,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
-	update := userRemoveAddressesInput{
+	update := user.RemoveUserAddressesInput{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 	resp := userRemoveAddressesRequest(assert, update, jwt)
@@ -261,16 +262,16 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	user := persist.User{
+	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), user)
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
-	update := userRemoveAddressesInput{
+	update := user.RemoveUserAddressesInput{
 		Addresses: []persist.Address{tc.user1.address},
 	}
 
@@ -282,17 +283,17 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	user := persist.User{
+	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), user)
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
-	update := userRemoveAddressesInput{
-		Addresses: user.Addresses,
+	update := user.RemoveUserAddressesInput{
+		Addresses: u.Addresses,
 	}
 
 	resp := userRemoveAddressesRequest(assert, update, jwt)
@@ -300,7 +301,7 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 
 }
 
-func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt string) *http.Response {
+func updateUserInfoRequest(assert *assert.Assertions, input user.UpdateUserInput, jwt string) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -312,7 +313,7 @@ func updateUserInfoRequest(assert *assert.Assertions, input userUpdateInput, jwt
 	assert.Nil(err)
 	return resp
 }
-func userAddAddressesRequest(assert *assert.Assertions, input userAddAddressInput, jwt string) *http.Response {
+func userAddAddressesRequest(assert *assert.Assertions, input user.AddUserAddressesInput, jwt string) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -325,7 +326,7 @@ func userAddAddressesRequest(assert *assert.Assertions, input userAddAddressInpu
 	return resp
 }
 
-func userRemoveAddressesRequest(assert *assert.Assertions, input userRemoveAddressesInput, jwt string) *http.Response {
+func userRemoveAddressesRequest(assert *assert.Assertions, input user.RemoveUserAddressesInput, jwt string) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -338,7 +339,7 @@ func userRemoveAddressesRequest(assert *assert.Assertions, input userRemoveAddre
 	return resp
 }
 
-func updateUserInfoNoAuthRequest(assert *assert.Assertions, input userUpdateInput) *http.Response {
+func updateUserInfoNoAuthRequest(assert *assert.Assertions, input user.UpdateUserInput) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 

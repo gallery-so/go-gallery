@@ -8,8 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var errTooManyNFTsInCollection = errors.New("maximum of 1000 NFTs in a collection")
@@ -161,7 +162,7 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 			return
 		}
 
-		update := &persist.CollectionUpdateInfoInput{Name: sanitizationPolicy.Sanitize(input.Name), CollectorsNote: sanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := &persist.CollectionUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -287,8 +288,8 @@ func collectionCreateDb(pCtx context.Context, pInput collectionCreateInput,
 		OwnerUserID:    pUserID,
 		Nfts:           pInput.Nfts,
 		Layout:         layout,
-		Name:           sanitizationPolicy.Sanitize(pInput.Name),
-		CollectorsNote: sanitizationPolicy.Sanitize(pInput.CollectorsNote),
+		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
+		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),
 	}
 
 	collID, err := collectionsRepo.Create(pCtx, coll)

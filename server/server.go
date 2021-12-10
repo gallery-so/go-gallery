@@ -10,15 +10,15 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/eth"
-	"github.com/mikeydub/go-gallery/memstore"
-	"github.com/mikeydub/go-gallery/memstore/redis"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
-	"github.com/mikeydub/go-gallery/persist/mongodb"
-	"github.com/mikeydub/go-gallery/pubsub"
-	"github.com/mikeydub/go-gallery/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -65,12 +65,12 @@ func CoreInit() *gin.Engine {
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
-		v.RegisterValidation("short_string", shortStringValidator)
-		v.RegisterValidation("medium_string", mediumStringValidator)
-		v.RegisterValidation("eth_addr", ethValidator)
-		v.RegisterValidation("nonce", nonceValidator)
-		v.RegisterValidation("signature", signatureValidator)
-		v.RegisterValidation("username", usernameValidator)
+		v.RegisterValidation("short_string", validate.ShortStringValidator)
+		v.RegisterValidation("medium_string", validate.MediumStringValidator)
+		v.RegisterValidation("eth_addr", validate.EthValidator)
+		v.RegisterValidation("nonce", validate.NonceValidator)
+		v.RegisterValidation("signature", validate.SignatureValidator)
+		v.RegisterValidation("username", validate.UsernameValidator)
 
 	}
 
@@ -106,15 +106,16 @@ func setDefaults() {
 func newRepos() *repositories {
 
 	mgoClient := newMongoClient()
-	openseaCache, unassignedCache, galleriesCache := newMemstoreClients()
-	galleryTokenRepo := mongodb.NewGalleryTokenMongoRepository(mgoClient, galleriesCache)
+	openseaCache, unassignedCache, galleriesCache := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
+	galleriesCacheToken, unassignedCacheToken := redis.NewCache(3), redis.NewCache(4)
+	galleryTokenRepo := mongodb.NewGalleryTokenMongoRepository(mgoClient, galleriesCacheToken)
 	galleryRepo := mongodb.NewGalleryMongoRepository(mgoClient, galleriesCache)
 	return &repositories{
 		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
 		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
 		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache, galleryRepo),
 		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient, galleryTokenRepo),
-		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCache, galleryTokenRepo),
+		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
 		galleryTokenRepository:    galleryTokenRepo,
 		galleryRepository:         galleryRepo,
 		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
@@ -155,10 +156,6 @@ func newEthClient() *eth.Client {
 		panic(err)
 	}
 	return eth.NewEthClient(client, viper.GetString("CONTRACT_ADDRESS"))
-}
-
-func newMemstoreClients() (opensea, unassigned, galleries memstore.Cache) {
-	return redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
 }
 
 func newIPFSShell() *shell.Shell {

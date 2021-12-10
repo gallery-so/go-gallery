@@ -3,7 +3,7 @@ package features
 import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 func handlersInit(router *gin.Engine, userRepo persist.UserRepository, featuresRepository persist.FeatureFlagRepository, accessRepository persist.AccessRepository, ethClient *ethclient.Client) *gin.Engine {

@@ -10,7 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/memstore"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -18,12 +21,16 @@ import (
 )
 
 type TestConfig struct {
-	server    *httptest.Server
-	serverURL string
-	repos     *repositories
-	mgoClient *mongo.Client
-	user1     *TestUser
-	user2     *TestUser
+	server              *httptest.Server
+	serverURL           string
+	repos               *repositories
+	mgoClient           *mongo.Client
+	user1               *TestUser
+	user2               *TestUser
+	openseaCache        memstore.Cache
+	unassignedCache     memstore.Cache
+	galleriesCache      memstore.Cache
+	galleriesCacheToken memstore.Cache
 }
 
 var tc *TestConfig
@@ -52,7 +59,7 @@ func generateTestUser(repos *repositories, username string) *TestUser {
 	if err != nil {
 		log.Fatal(err)
 	}
-	authNonceRotateDb(ctx, address, id, repos.nonceRepository)
+	auth.NonceRotate(ctx, address, id, repos.nonceRepository)
 	log.Info(id, username)
 	return &TestUser{id, address, jwt, username}
 }
@@ -65,14 +72,19 @@ func initializeTestEnv(v int) *TestConfig {
 
 	mclient := newMongoClient()
 	repos := newRepos()
+	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
 	log.Info("test server connected! ✅")
 	return &TestConfig{
-		server:    ts,
-		serverURL: fmt.Sprintf("%s/glry/v%d", ts.URL, v),
-		repos:     repos,
-		mgoClient: mclient,
-		user1:     generateTestUser(repos, "bob"),
-		user2:     generateTestUser(repos, "john"),
+		server:              ts,
+		serverURL:           fmt.Sprintf("%s/glry/v%d", ts.URL, v),
+		repos:               repos,
+		mgoClient:           mclient,
+		user1:               generateTestUser(repos, "bob"),
+		user2:               generateTestUser(repos, "john"),
+		openseaCache:        opensea,
+		unassignedCache:     unassigned,
+		galleriesCache:      galleries,
+		galleriesCacheToken: galleriesToken,
 	}
 }
 

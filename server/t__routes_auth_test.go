@@ -9,7 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/persist"
+	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +24,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
-		authUserGetPreflightOutput
+		auth.GetPreflightOutput
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
@@ -38,7 +41,7 @@ func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
-		authUserGetPreflightOutput
+		auth.GetPreflightOutput
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
@@ -55,7 +58,7 @@ func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
-		authUserGetPreflightOutput
+		auth.GetPreflightOutput
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
@@ -79,7 +82,7 @@ func TestUserCreate_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type UserCreateOutput struct {
-		userCreateOutput
+		user.CreateUserOutput
 		Error string `json:"error"`
 	}
 	output := &UserCreateOutput{}
@@ -155,11 +158,11 @@ func TestUserLogin_Success(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, auth.WalletTypeEOA)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
-		authUserLoginOutput
+		auth.LoginOutput
 		Error string `json:"error"`
 	}
 	output := &LoginOutput{}
@@ -187,11 +190,11 @@ func TestUserLoginGnosis_Success(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, " TEST NONCE", nonce.Address, walletTypeGnosis)
+	resp := loginRequest(assert, " TEST NONCE", nonce.Address, auth.WalletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
-		authUserLoginOutput
+		auth.LoginOutput
 		Error string `json:"error"`
 	}
 	output := &LoginOutput{}
@@ -219,11 +222,11 @@ func TestUserLoginGnosis_WrongNonce_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x", nonce.Address, walletTypeGnosis)
+	resp := loginRequest(assert, "0x", nonce.Address, auth.WalletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
-		authUserLoginOutput
+		auth.LoginOutput
 		Error string `json:"error"`
 	}
 	output := &LoginOutput{}
@@ -249,11 +252,11 @@ func TestUserLoginGnosis_WrongSig_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "Blah Blah Blah", nonce.Address, walletTypeGnosis)
+	resp := loginRequest(assert, "Blah Blah Blah", nonce.Address, auth.WalletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
-		authUserLoginOutput
+		auth.LoginOutput
 		Error string `json:"error"`
 	}
 	output := &LoginOutput{}
@@ -278,7 +281,7 @@ func TestUserLogin_WrongNonce_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
 }
 
@@ -299,7 +302,7 @@ func TestUserLogin_WrongSig_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x0a22246c5feee38a80dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b", nonce.Address, walletTypeEOA)
+	resp := loginRequest(assert, "0x0a22246c5feee38a80dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b", nonce.Address, auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
 }
 
@@ -320,7 +323,7 @@ func TestUserLogin_WrongAddr_Failure(t *testing.T) {
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
 }
 
@@ -334,7 +337,7 @@ func TestUserLogin_NoNonce_Failure(t *testing.T) {
 	_, err := tc.repos.userRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
 }
 
@@ -348,7 +351,7 @@ func TestUserLogin_UserNotExist_Failure(t *testing.T) {
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
 }
 
@@ -362,8 +365,43 @@ func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
 	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, walletTypeEOA)
+	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address, auth.WalletTypeEOA)
 	assertErrorResponse(assert, resp)
+}
+
+func TestJwtValid_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+	resp := jwtValidRequest(assert, tc.user1.jwt)
+	assertValidJSONResponse(assert, resp)
+
+	output := &middleware.JWTValidateResponse{}
+	err := util.UnmarshallBody(output, resp.Body)
+	assert.Nil(err)
+	assert.True(output.IsValid)
+	assert.Equal(tc.user1.id, output.UserID)
+}
+
+func TestJwtValid_WrongSignatureAndClaims_Failure(t *testing.T) {
+	assert := setupTest(t, 1)
+	resp := jwtValidRequest(assert, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUZXN0IiwiaWF0IjoxNjMzMDE1MTM1LCJleHAiOjE2NjQ1NTExMzUsImF1ZCI6InRlc3QiLCJzdWIiOiJ0ZXN0IiwiVGVzdCI6IlRlc3QifQ.ewGO4x1xEN01CCZTp5vg0d_rxzdzH_rY0zBXVT1OVJY")
+	assertValidJSONResponse(assert, resp)
+
+	output := &middleware.JWTValidateResponse{}
+	err := util.UnmarshallBody(output, resp.Body)
+	assert.Nil(err)
+	assert.False(output.IsValid)
+}
+
+func jwtValidRequest(assert *assert.Assertions, jwt string) *http.Response {
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s/auth/jwt_valid", tc.serverURL),
+		nil)
+	assert.Nil(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
 }
 
 func getPreflightRequest(assert *assert.Assertions, address persist.Address, jwt string) *http.Response {
@@ -394,7 +432,7 @@ func createUserRequest(assert *assert.Assertions, sig string, address persist.Ad
 	return resp
 }
 
-func loginRequest(assert *assert.Assertions, sig string, address persist.Address, wt walletType) *http.Response {
+func loginRequest(assert *assert.Assertions, sig string, address persist.Address, wt auth.WalletType) *http.Response {
 	body := map[string]interface{}{"address": address, "signature": sig, "wallet_type": wt, "nonce": sig}
 	asJSON, err := json.Marshal(body)
 	assert.Nil(err)
