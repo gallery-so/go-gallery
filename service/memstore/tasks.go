@@ -104,6 +104,11 @@ func (uq *UpdateQueue) start() {
 func (uq *UpdateQueue) Stop() {
 	close(uq.updates)
 	uq.wg.Wait()
+	uq.poolMu.Lock()
+	defer uq.poolMu.Unlock()
+	for _, pool := range uq.pools {
+		pool.StopWait()
+	}
 }
 
 // QueueUpdate queues an update to be run
