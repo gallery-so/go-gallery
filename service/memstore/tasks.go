@@ -21,6 +21,7 @@ type update struct {
 type UpdateQueue struct {
 	mu *sync.Mutex
 	wp *workerpool.WorkerPool
+	wg *sync.WaitGroup
 
 	cache Cache
 
@@ -33,6 +34,7 @@ func NewUpdateQueue(cache Cache) *UpdateQueue {
 	queue := &UpdateQueue{
 		mu:             &sync.Mutex{},
 		wp:             workerpool.New(10),
+		wg:             &sync.WaitGroup{},
 		cache:          cache,
 		updates:        make(chan update),
 		runningUpdates: make(map[string]bool),
@@ -43,6 +45,8 @@ func NewUpdateQueue(cache Cache) *UpdateQueue {
 
 // Start starts the update queue
 func (uq *UpdateQueue) start() {
+	uq.wg.Add(1)
+	defer uq.wg.Done()
 	go func() {
 		for update := range uq.updates {
 			uq.mu.Lock()
@@ -76,6 +80,8 @@ func (uq *UpdateQueue) start() {
 
 // Stop stops the update queue
 func (uq *UpdateQueue) Stop() {
+	close(uq.updates)
+	uq.wg.Wait()
 	uq.wp.StopWait()
 }
 
