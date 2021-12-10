@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -85,9 +84,9 @@ func (g *GalleryMongoRepository) AddCollections(pCtx context.Context, pID persis
 
 // GetByUserID gets a gallery by its owner user ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]persist.Gallery, error) {
+func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
 
-	fromCache, err := g.galleriesCache.Get(pCtx, fmt.Sprintf("%s-%t", pUserID, pAuth))
+	fromCache, err := g.galleriesCache.Get(pCtx, pUserID.String())
 	if err == nil && len(fromCache) > 0 {
 		galleries := []persist.Gallery{}
 		err = json.Unmarshal(fromCache, &galleries)
@@ -101,14 +100,14 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 
 	logrus.Info("got galleries from cache")
 
-	return g.getByUserIDSkipCache(pCtx, pUserID, pAuth)
+	return g.getByUserIDSkipCache(pCtx, pUserID)
 }
 
-func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID, pAuth bool) ([]persist.Gallery, error) {
+func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
 
 	result := []persist.Gallery{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}, pAuth), &result); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"owner_user_id": pUserID, "deleted": false}), &result); err != nil {
 		return nil, err
 	}
 
@@ -118,7 +117,7 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 			logrus.WithError(err).Error("failed to marshal galleries to json")
 			return
 		}
-		g.cacheUpdateQueue.QueueUpdate(fmt.Sprintf("%s-%t", pUserID, pAuth), asJSON, galleriesTTL)
+		g.cacheUpdateQueue.QueueUpdate(pUserID.String(), asJSON, galleriesTTL)
 	}()
 
 	return result, nil
@@ -126,11 +125,11 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pAuth bool) (persist.Gallery, error) {
+func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
 
 	result := []persist.Gallery{}
 
-	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}, pAuth), &result); err != nil {
+	if err := g.galleriesStorage.aggregate(pCtx, newGalleryPipeline(bson.M{"_id": pID, "deleted": false}), &result); err != nil {
 		return persist.Gallery{}, err
 	}
 
@@ -145,12 +144,7 @@ func (g *GalleryMongoRepository) resetCache(pCtx context.Context, ownerUserID pe
 	if ownerUserID == "" {
 		return errNoUserIDProvided
 	}
-	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID, true)
-	if err != nil {
-		return err
-	}
-
-	_, err = g.getByUserIDSkipCache(pCtx, ownerUserID, false)
+	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID)
 	if err != nil {
 		return err
 	}
@@ -158,14 +152,11 @@ func (g *GalleryMongoRepository) resetCache(pCtx context.Context, ownerUserID pe
 	return nil
 }
 
-func newGalleryPipeline(matchFilter bson.M, pAuth bool) mongo.Pipeline {
+func newGalleryPipeline(matchFilter bson.M) mongo.Pipeline {
 
 	andExpr := []bson.M{
 		{"$in": []string{"$_id", "$$childArray"}},
 		{"$eq": []interface{}{"$deleted", false}},
-	}
-	if !pAuth {
-		andExpr = append(andExpr, bson.M{"$eq": []interface{}{"$hidden", false}})
 	}
 
 	innerMatch := bson.M{

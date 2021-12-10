@@ -51,8 +51,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 			return
 		}
 
-		auth := c.GetBool(middleware.AuthContextKey)
-		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
+		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
 		if len(galleries) == 0 || err != nil {
 			galleries = []persist.GalleryToken{}
 		}
@@ -81,8 +80,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 			return
 		}
 
-		auth := c.GetBool(middleware.AuthContextKey)
-		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
+		gallery, err := galleryRepository.GetByID(c, input.ID)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrGalleryNotFoundByID); ok {

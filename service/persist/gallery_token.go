@@ -46,8 +46,8 @@ type GalleryTokenRepository interface {
 	Update(context.Context, DBID, DBID, GalleryTokenUpdateInput) error
 	UpdateUnsafe(context.Context, DBID, GalleryTokenUpdateInput) error
 	AddCollections(context.Context, DBID, DBID, []DBID) error
-	GetByUserID(context.Context, DBID, bool) ([]GalleryToken, error)
-	GetByID(context.Context, DBID, bool) (GalleryToken, error)
+	GetByUserID(context.Context, DBID) ([]GalleryToken, error)
+	GetByID(context.Context, DBID) (GalleryToken, error)
 }
 
 // ErrGalleryNotFoundByID is returned when a gallery is not found by its ID

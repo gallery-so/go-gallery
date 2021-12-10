@@ -237,7 +237,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 		}
 
 		go func(ctx context.Context) {
-			galleries, err := galleryRepository.GetByUserID(ctx, userID, true)
+			galleries, err := galleryRepository.GetByUserID(ctx, userID)
 			if err == nil {
 				for _, gallery := range galleries {
 					backupRepository.Insert(ctx, gallery)

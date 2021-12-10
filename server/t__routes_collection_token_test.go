@@ -83,7 +83,7 @@ func TestCreateCollection_Success_Token(t *testing.T) {
 	assert.Len(body.Collection.Nfts, 3)
 	assert.Empty(body.Error)
 
-	gallery, err := tc.repos.galleryTokenRepository.GetByID(context.Background(), gid, true)
+	gallery, err := tc.repos.galleryTokenRepository.GetByID(context.Background(), gid)
 	assert.Nil(err)
 	assert.Len(gallery.Collections, 1)
 }

@@ -45,8 +45,7 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 			return
 		}
 
-		auth := c.GetBool(middleware.AuthContextKey)
-		galleries, err := galleryRepository.GetByUserID(c, input.UserID, auth)
+		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
 		logrus.Infof("GALLERY %+v", galleries)
 		if galleries == nil || err != nil {
 			galleries = []persist.Gallery{}
@@ -68,8 +67,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 			return
 		}
 
-		auth := c.GetBool(middleware.AuthContextKey)
-		gallery, err := galleryRepository.GetByID(c, input.ID, auth)
+		gallery, err := galleryRepository.GetByID(c, input.ID)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrGalleryNotFoundByID); ok {
@@ -110,7 +108,7 @@ func updateGallery(galleryRepository persist.GalleryRepository, backupRepository
 		}
 
 		go func(ctx context.Context) {
-			galleries, err := galleryRepository.GetByUserID(ctx, userID, true)
+			galleries, err := galleryRepository.GetByUserID(ctx, userID)
 			if err == nil {
 				for _, gallery := range galleries {
 					backupRepository.Insert(ctx, gallery)
