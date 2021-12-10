@@ -74,6 +74,9 @@ func (uq *UpdateQueue) start() {
 			} else {
 				uq.wp.Submit(updateFunc)
 			}
+			if uq.wp.Stopped() {
+				break
+			}
 		}
 	}()
 }

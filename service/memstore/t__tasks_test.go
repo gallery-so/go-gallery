@@ -51,6 +51,8 @@ func TestUpdateQueue(t *testing.T) {
 	assert.Nil(err)
 	uq.QueueUpdate("test", next, -1)
 
+	time.Sleep(time.Second * 3)
+
 	uq.Stop()
 
 	bs, err = redisCache.Get(ctx, "test")
