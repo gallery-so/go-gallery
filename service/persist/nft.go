@@ -143,7 +143,7 @@ type NFTRepository interface {
 	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
 	GetByOpenseaID(context.Context, int, Address) ([]NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	BulkUpsert(context.Context, []NFTDB) ([]DBID, error)
+	BulkUpsert(context.Context, DBID, []NFTDB) ([]DBID, error)
 	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
 	OpenseaCacheSet(context.Context, []Address, []NFT) error
 	OpenseaCacheDelete(context.Context, []Address) error

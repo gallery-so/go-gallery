@@ -14,30 +14,36 @@ type update struct {
 	key string
 	val []byte
 
-	ttl time.Duration
+	ttl  time.Duration
+	sync bool
 }
 
 // UpdateQueue is a queue of updates to be run
 type UpdateQueue struct {
-	mu *sync.Mutex
-	wp *workerpool.WorkerPool
-	wg *sync.WaitGroup
+	wg             *sync.WaitGroup
+	poolMu         *sync.Mutex
+	lastFinishedMu *sync.Mutex
 
 	cache Cache
 
-	updates        chan update
-	runningUpdates map[string]bool
+	updates           chan update
+	pools             map[string]*workerpool.WorkerPool
+	lastFinishedPools map[string]time.Time
+
+	poolFinished chan string
 }
 
 // NewUpdateQueue creates a new UpdateQueue
 func NewUpdateQueue(cache Cache) *UpdateQueue {
 	queue := &UpdateQueue{
-		mu:             &sync.Mutex{},
-		wp:             workerpool.New(10),
-		wg:             &sync.WaitGroup{},
-		cache:          cache,
-		updates:        make(chan update),
-		runningUpdates: make(map[string]bool),
+		wg:                &sync.WaitGroup{},
+		poolMu:            &sync.Mutex{},
+		lastFinishedMu:    &sync.Mutex{},
+		cache:             cache,
+		updates:           make(chan update),
+		pools:             map[string]*workerpool.WorkerPool{},
+		lastFinishedPools: map[string]time.Time{},
+		poolFinished:      make(chan string),
 	}
 	queue.start()
 	return queue
@@ -47,36 +53,49 @@ func NewUpdateQueue(cache Cache) *UpdateQueue {
 func (uq *UpdateQueue) start() {
 	uq.wg.Add(1)
 	go func() {
+		pools := map[string]*workerpool.WorkerPool{}
 		defer uq.wg.Done()
 		for update := range uq.updates {
-			uq.mu.Lock()
-			if uq.runningUpdates[update.key] {
-				uq.mu.Unlock()
-				continue
+			pool, ok := pools[update.key]
+			if !ok {
+				pool = workerpool.New(1)
+				pools[update.key] = pool
 			}
-			uq.runningUpdates[update.key] = true
-			uq.mu.Unlock()
-
-			updateFunc := func() {
+			pool.Submit(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 				err := uq.cache.Set(ctx, update.key, update.val, update.ttl)
 				if err != nil {
 					logrus.WithError(err).Error("memstore: failed to update key")
 				}
-
-				uq.mu.Lock()
-				defer uq.mu.Unlock()
-				delete(uq.runningUpdates, update.key)
+				uq.poolFinished <- update.key
+			})
+		}
+	}()
+	go func() {
+		for key := range uq.poolFinished {
+			uq.lastFinishedMu.Lock()
+			uq.lastFinishedPools[key] = time.Now()
+			uq.lastFinishedMu.Unlock()
+		}
+	}()
+	go func() {
+		for {
+			uq.lastFinishedMu.Lock()
+			for key, lastFinished := range uq.lastFinishedPools {
+				if time.Since(lastFinished) > time.Minute*10 {
+					delete(uq.lastFinishedPools, key)
+					uq.poolMu.Lock()
+					pool, ok := uq.pools[key]
+					if ok {
+						pool.StopWait()
+						delete(uq.pools, key)
+					}
+					uq.poolMu.Unlock()
+				}
 			}
-			if uq.wp.WaitingQueueSize() > 25 {
-				uq.wp.SubmitWait(updateFunc)
-			} else {
-				uq.wp.Submit(updateFunc)
-			}
-			if uq.wp.Stopped() {
-				break
-			}
+			uq.lastFinishedMu.Unlock()
+			time.Sleep(time.Second * 10)
 		}
 	}()
 }
@@ -85,7 +104,6 @@ func (uq *UpdateQueue) start() {
 func (uq *UpdateQueue) Stop() {
 	close(uq.updates)
 	uq.wg.Wait()
-	uq.wp.StopWait()
 }
 
 // QueueUpdate queues an update to be run

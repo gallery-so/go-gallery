@@ -108,18 +108,20 @@ func newRepos() *repositories {
 	mgoClient := newMongoClient()
 	openseaCache, unassignedCache, galleriesCache := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
 	galleriesCacheToken, unassignedCacheToken := redis.NewCache(3), redis.NewCache(4)
+	nftsCache := redis.NewCache(5)
 	galleryTokenRepo := mongodb.NewGalleryTokenMongoRepository(mgoClient, galleriesCacheToken)
 	galleryRepo := mongodb.NewGalleryMongoRepository(mgoClient, galleriesCache)
+	nftRepo := mongodb.NewNFTMongoRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
 	return &repositories{
 		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
 		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
-		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache, galleryRepo),
+		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
 		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient, galleryTokenRepo),
 		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
 		galleryTokenRepository:    galleryTokenRepo,
 		galleryRepository:         galleryRepo,
 		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
-		nftRepository:             mongodb.NewNFTMongoRepository(mgoClient, openseaCache, galleryRepo),
+		nftRepository:             nftRepo,
 		userRepository:            mongodb.NewUserMongoRepository(mgoClient),
 		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
 		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
