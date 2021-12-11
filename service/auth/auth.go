@@ -31,7 +31,8 @@ const (
 	WalletTypeGnosis
 )
 
-const noncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
+// NoncePrepend is what is prepended to every nonce
+const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
@@ -134,7 +135,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 	}
 
 	if pInput.WalletType != WalletTypeEOA {
-		if nonce != pInput.Nonce {
+		if NoncePrepend+nonce != pInput.Nonce {
 			return LoginOutput{}, ErrNonceMismatch
 		}
 	}
@@ -205,7 +206,7 @@ func VerifySignature(pSignatureStr string,
 	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
 	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
 
-	nonceWithPrepend := noncePrepend + pDataStr
+	nonceWithPrepend := NoncePrepend + pDataStr
 
 	var dataStr string
 	if pUseDataHeaderBool {
@@ -310,14 +311,14 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 		if err != nil {
 			return nil, err
 		}
-		output.Nonce = noncePrepend + nonce.Value
+		output.Nonce = NoncePrepend + nonce.Value
 
 	} else {
 		nonce, err := nonceRepo.Get(pCtx, pInput.Address)
 		if err != nil {
 			return nil, err
 		}
-		output.Nonce = noncePrepend + nonce.Value
+		output.Nonce = NoncePrepend + nonce.Value
 	}
 
 	return output, nil
