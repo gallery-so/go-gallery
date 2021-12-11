@@ -184,13 +184,13 @@ func TestUserLoginGnosis_Success(t *testing.T) {
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
-		Value:   " TEST NONCE",
+		Value:   "TEST NONCE",
 		Address: user.Addresses[0],
 	}
 	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
-	resp := loginRequest(assert, "", " TEST NONCE", nonce.Address, auth.WalletTypeGnosis)
+	resp := loginRequest(assert, "", "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: TEST NONCE", nonce.Address, auth.WalletTypeGnosis)
 	assertValidResponse(assert, resp)
 
 	type LoginOutput struct {
