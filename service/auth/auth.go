@@ -35,6 +35,9 @@ const noncePrepend = "Gallery uses this cryptographic signature in place of a pa
 
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
+// ErrNonceMismatch is returned when the nonce does not match the expected nonce
+var ErrNonceMismatch = errors.New("incorrect nonce input")
+
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 // LoginInput is the input to the login pipeline
@@ -132,8 +135,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 
 	if pInput.WalletType != WalletTypeEOA {
 		if nonce != pInput.Nonce {
-			output.SignatureValid = false
-			return output, nil
+			return LoginOutput{}, ErrNonceMismatch
 		}
 	}
 
