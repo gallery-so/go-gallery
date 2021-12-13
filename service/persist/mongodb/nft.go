@@ -60,24 +60,24 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NF
 		return nil, err
 	}
 
-	// go func() {
-	// 	usersFound := map[persist.DBID]bool{}
-	// 	for _, v := range pNfts {
-	// 		if v.OwnerAddress != "" {
-	// 			users := []persist.User{}
-	// 			err := n.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": v.OwnerAddress}}, &users)
-	// 			if err != nil {
-	// 				continue
-	// 			}
-	// 			for _, u := range users {
-	// 				if u.ID != "" && !usersFound[u.ID] {
-	// 					usersFound[u.ID] = true
-	// 					n.resetCache(pCtx, u.ID)
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }()
+	go func() {
+		usersFound := map[persist.DBID]bool{}
+		for _, v := range pNfts {
+			if v.OwnerAddress != "" {
+				users := []persist.User{}
+				err := n.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": v.OwnerAddress}}, &users)
+				if err != nil {
+					continue
+				}
+				for _, u := range users {
+					if u.ID != "" && !usersFound[u.ID] {
+						usersFound[u.ID] = true
+						n.resetCache(pCtx, u.ID)
+					}
+				}
+			}
+		}
+	}()
 	return ids, nil
 }
 
