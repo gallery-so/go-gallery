@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -22,10 +20,11 @@ type CollectionMongoRepository struct {
 	unassignedCache    memstore.Cache
 	cacheUpdateQueue   *memstore.UpdateQueue
 	galleryRepo        *GalleryMongoRepository
+	nftRepo            *NFTMongoRepository
 }
 
 // NewCollectionMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryMongoRepository) *CollectionMongoRepository {
+func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryMongoRepository, nftRepo *NFTMongoRepository) *CollectionMongoRepository {
 	return &CollectionMongoRepository{
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		nftsStorage:        newStorage(mgoClient, 0, galleryDBName, nftColName),
@@ -33,6 +32,7 @@ func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memst
 		unassignedCache:    unassignedCache,
 		cacheUpdateQueue:   memstore.NewUpdateQueue(unassignedCache),
 		galleryRepo:        galleryRepo,
+		nftRepo:            nftRepo,
 	}
 }
 
@@ -164,14 +164,9 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 	}
 
 	nftsToBeRemoved := []*persist.NFTDB{}
-	log.Printf("NFTS TO BE REMOVED %+v\n", pUpdate.Nfts)
 
 	if err := c.nftsStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
-	}
-
-	for _, nft := range nftsToBeRemoved {
-		logrus.Infof("removing nft: %+v", *nft)
 	}
 
 	if len(nftsToBeRemoved) > 0 {
@@ -194,6 +189,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
 	go c.RefreshUnassigned(pCtx, pUserID)
+	go c.nftRepo.resetCache(pCtx, pUserID)
 	return nil
 }
 

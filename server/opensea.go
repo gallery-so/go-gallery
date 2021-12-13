@@ -13,7 +13,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 )
 
 // mongodb.GLRYnft struct tags reflect the json data of an open sea response and therefore
@@ -102,26 +101,21 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 		pOwnerWalletAddresses = user.Addresses
 	}
 
-	logrus.WithField("owner_wallet_addresses", pOwnerWalletAddresses).Info("getting opensea assets for user")
-
 	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		return nil, err
 	}
 
-	ids, err := nftRepo.BulkUpsert(pCtx, asDBNfts)
+	ids, err := nftRepo.BulkUpsert(pCtx, pUserID, asDBNfts)
 	if err != nil {
 		return nil, err
 	}
 
 	// update other user's collections and this user's collection so that they and ONLY they can display these
 	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
-	go func() {
-		if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{Nfts: ids}); err != nil {
-			logrus.WithFields(logrus.Fields{"method": "openSeaPipelineAssetsForAcc"}).Errorf("failed to claim nfts: %v", err)
-			return
-		}
-	}()
+	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{Nfts: ids}); err != nil {
+		return nil, err
+	}
 
 	result, err := dbToGalleryNFTs(pCtx, asDBNfts, user, nftRepo)
 	if err != nil {

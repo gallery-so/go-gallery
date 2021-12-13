@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -16,23 +18,29 @@ const (
 	nftColName = "nfts"
 )
 
+var nftsTTL = time.Hour * 24
+
 var errOwnerAddressRequired = errors.New("owner address required")
 
 // NFTMongoRepository is a repository that stores collections in a MongoDB database
 type NFTMongoRepository struct {
-	nftsStorage  *storage
-	usersStorage *storage
-	openseaCache memstore.Cache
-	galleryRepo  *GalleryMongoRepository
+	nftsStorage          *storage
+	usersStorage         *storage
+	openseaCache         memstore.Cache
+	nftsCache            memstore.Cache
+	nftsCacheUpdateQueue *memstore.UpdateQueue
+	galleryRepo          *GalleryMongoRepository
 }
 
 // NewNFTMongoRepository creates a new instance of the collection mongo repository
-func NewNFTMongoRepository(mgoClient *mongo.Client, openseaCache memstore.Cache, galleryRepo *GalleryMongoRepository) *NFTMongoRepository {
+func NewNFTMongoRepository(mgoClient *mongo.Client, nftscache, openseaCache memstore.Cache, galleryRepo *GalleryMongoRepository) *NFTMongoRepository {
 	return &NFTMongoRepository{
-		nftsStorage:  newStorage(mgoClient, 0, galleryDBName, nftColName),
-		usersStorage: newStorage(mgoClient, 0, galleryDBName, usersCollName),
-		openseaCache: openseaCache,
-		galleryRepo:  galleryRepo,
+		nftsStorage:          newStorage(mgoClient, 0, galleryDBName, nftColName),
+		usersStorage:         newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		nftsCache:            nftscache,
+		nftsCacheUpdateQueue: memstore.NewUpdateQueue(nftscache),
+		openseaCache:         openseaCache,
+		galleryRepo:          galleryRepo,
 	}
 }
 
@@ -51,16 +59,72 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NF
 	if err != nil {
 		return nil, err
 	}
+
+	go func() {
+		usersFound := map[persist.DBID]bool{}
+		for _, v := range pNfts {
+			if v.OwnerAddress != "" {
+				users := []persist.User{}
+				err := n.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": v.OwnerAddress}}, &users)
+				if err != nil {
+					continue
+				}
+				for _, u := range users {
+					if u.ID != "" && !usersFound[u.ID] {
+						usersFound[u.ID] = true
+						n.resetCache(pCtx, u.ID)
+					}
+				}
+			}
+		}
+	}()
 	return ids, nil
 }
 
 // Create inserts an NFT into the database
 func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT persist.NFTDB) (persist.DBID, error) {
-	return n.nftsStorage.insert(pCtx, pNFT)
+	id, err := n.nftsStorage.insert(pCtx, pNFT)
+	if err != nil {
+		return "", err
+	}
+	go func() {
+		if pNFT.OwnerAddress != "" {
+			users := []persist.User{}
+			err := n.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": pNFT.OwnerAddress}}, &users)
+			if err != nil {
+				return
+			}
+			for _, u := range users {
+				if u.ID != "" {
+					n.resetCache(pCtx, u.ID)
+				}
+			}
+		}
+	}()
+	return id, nil
 }
 
 // GetByUserID finds an nft by its owner user id
 func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.NFT, error) {
+
+	nftsJSON, err := n.nftsCache.Get(pCtx, pUserID.String())
+	if err == nil && len(nftsJSON) > 0 {
+		nfts := []persist.NFT{}
+		err = json.Unmarshal(nftsJSON, &nfts)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(nfts) > 0 {
+			return nfts, nil
+		}
+	}
+
+	return n.getByUserIDSkipCache(pCtx, pUserID)
+}
+
+// GetByUserID finds an nft by its owner user id
+func (n *NFTMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID) ([]persist.NFT, error) {
 
 	users := []persist.User{}
 	err := n.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
@@ -71,7 +135,19 @@ func (n *NFTMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.D
 		return nil, persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
-	return n.GetByAddresses(pCtx, users[0].Addresses)
+	nfts, err := n.GetByAddresses(pCtx, users[0].Addresses)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		asJSON, err := json.Marshal(nfts)
+		if err != nil {
+			logrus.WithError(err).Error("failed to marshal nfts")
+			return
+		}
+		n.nftsCacheUpdateQueue.QueueUpdate(pUserID.String(), asJSON, nftsTTL)
+	}()
+	return nfts, nil
 }
 
 // GetByAddresses finds an nft by its owner user id
@@ -147,12 +223,13 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 		return err
 	}
 	go n.galleryRepo.resetCache(pCtx, pUserID)
+	go n.resetCache(pCtx, pUserID)
 	return nil
 }
 
 // BulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNfts []persist.NFTDB) ([]persist.DBID, error) {
 
 	ids := make(chan persist.DBID)
 	errs := make(chan error)
@@ -181,11 +258,14 @@ func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pNfts []persist.NF
 		}
 	}
 
+	go n.resetCache(pCtx, pUserID)
+
 	return result, nil
 
 }
 
-// OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses
+// OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses as well as ensures
+// that the nfts for user cache is most up to date
 func (n *NFTMongoRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []persist.NFT) error {
 	for i, v := range pWalletAddresses {
 		pWalletAddresses[i] = v
@@ -226,6 +306,14 @@ func (n *NFTMongoRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddres
 		return nil, err
 	}
 	return nfts, nil
+}
+
+func (n *NFTMongoRepository) resetCache(pCtx context.Context, pUserID persist.DBID) error {
+	_, err := n.getByUserIDSkipCache(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func newNFTPipeline(matchFilter bson.M) mongo.Pipeline {

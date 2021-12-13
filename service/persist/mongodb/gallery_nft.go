@@ -141,9 +141,6 @@ func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID)
 }
 
 func (g *GalleryMongoRepository) resetCache(pCtx context.Context, ownerUserID persist.DBID) error {
-	if ownerUserID == "" {
-		return errNoUserIDProvided
-	}
 	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID)
 	if err != nil {
 		return err
