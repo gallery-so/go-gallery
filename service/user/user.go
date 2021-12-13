@@ -49,6 +49,7 @@ type AddUserAddressesInput struct {
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
 	Signature  string          `json:"signature" binding:"signature"`
+	Nonce      string          `json:"nonce"`
 	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
 	WalletType auth.WalletType `json:"wallet_type"`
 }
@@ -99,16 +100,22 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		}
 	}()
 
-	nonceValueStr, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonceValueStr == "" {
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	if nonce == "" {
 		return CreateUserOutput{}, errNonceNotFound{address: pInput.Address}
 	}
 	if id != "" {
 		return CreateUserOutput{}, errUserExistsWithAddress{address: pInput.Address}
 	}
 
+	if pInput.WalletType != auth.WalletTypeEOA {
+		if auth.NoncePrepend+nonce != pInput.Nonce {
+			return CreateUserOutput{}, auth.ErrNonceMismatch
+		}
+	}
+
 	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
-		nonceValueStr,
+		nonce,
 		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
 		return CreateUserOutput{}, err
@@ -159,16 +166,22 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 
 	output := CreateUserOutput{}
 
-	nonceValueStr, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonceValueStr == "" {
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	if nonce == "" {
 		return CreateUserOutput{}, errNonceNotFound{pInput.Address}
 	}
 	if id != "" {
 		return CreateUserOutput{}, errUserExistsWithAddress{address: pInput.Address}
 	}
 
+	if pInput.WalletType != auth.WalletTypeEOA {
+		if auth.NoncePrepend+nonce != pInput.Nonce {
+			return CreateUserOutput{}, auth.ErrNonceMismatch
+		}
+	}
+
 	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
-		nonceValueStr,
+		nonce,
 		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
 		return CreateUserOutput{}, err
@@ -236,24 +249,30 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
 func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUserAddressesInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*AddUserAddressOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (AddUserAddressOutput, error) {
 
-	output := &AddUserAddressOutput{}
+	output := AddUserAddressOutput{}
 
-	nonceValueStr, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonceValueStr == "" {
-		return nil, errNonceNotFound{pInput.Address}
+	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	if nonce == "" {
+		return AddUserAddressOutput{}, errNonceNotFound{pInput.Address}
 	}
 	if userID != "" {
-		return nil, errUserExistsWithAddress{pInput.Address}
+		return AddUserAddressOutput{}, errUserExistsWithAddress{pInput.Address}
 	}
 
-	dataStr := nonceValueStr
+	if pInput.WalletType != auth.WalletTypeEOA {
+		if auth.NoncePrepend+nonce != pInput.Nonce {
+			return AddUserAddressOutput{}, auth.ErrNonceMismatch
+		}
+	}
+
+	dataStr := nonce
 	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
 		dataStr,
 		pInput.Address, pInput.WalletType, ethClient)
 	if err != nil {
-		return nil, err
+		return AddUserAddressOutput{}, err
 	}
 
 	output.SignatureValid = sigValidBool
@@ -262,12 +281,12 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 	}
 
 	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address}); err != nil {
-		return nil, err
+		return AddUserAddressOutput{}, err
 	}
 
 	err = auth.NonceRotate(pCtx, pInput.Address, pUserID, nonceRepo)
 	if err != nil {
-		return nil, err
+		return AddUserAddressOutput{}, err
 	}
 
 	return output, nil

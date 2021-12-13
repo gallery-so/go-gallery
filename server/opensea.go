@@ -93,11 +93,6 @@ type errNoSingleNFTForOpenseaID struct {
 func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
 	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) ([]persist.NFT, error) {
 
-	nfts, err := nftRepo.OpenseaCacheGet(pCtx, pOwnerWalletAddresses)
-	if err == nil && len(nfts) > 0 {
-		return nfts, nil
-	}
-
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return nil, err
@@ -123,11 +118,6 @@ func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOw
 	}
 
 	result, err := dbToGalleryNFTs(pCtx, asDBNfts, user, nftRepo)
-	if err != nil {
-		return nil, err
-	}
-
-	err = nftRepo.OpenseaCacheSet(pCtx, pOwnerWalletAddresses, result)
 	if err != nil {
 		return nil, err
 	}
