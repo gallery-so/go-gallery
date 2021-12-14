@@ -11,7 +11,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -102,24 +101,6 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	assert.Greater(len(mikeNFTs), 0)
 
-}
-
-func TestOpenseaRateLimit_Failure(t *testing.T) {
-	assert := setupTest(t, 1)
-	var resp *http.Response
-	for i := 0; i < 100; i++ {
-		resp = openseaSyncRequest(assert, tc.user1.address, tc.user1.jwt)
-	}
-	assertErrorResponse(assert, resp)
-	type OpenseaSyncResp struct {
-		getNftsOutput
-		Error string `json:"error"`
-	}
-	output := &OpenseaSyncResp{}
-	err := util.UnmarshallBody(output, resp.Body)
-	assert.Nil(err)
-	assert.NotEmpty(output.Error)
-	assert.Equal(output.Error, "rate limited")
 }
 
 func openseaSyncRequest(assert *assert.Assertions, address persist.Address, jwt string) *http.Response {
