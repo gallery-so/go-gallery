@@ -46,4 +46,5 @@ type GalleryRepository interface {
 	AddCollections(context.Context, DBID, DBID, []DBID) error
 	GetByUserID(context.Context, DBID) ([]Gallery, error)
 	GetByID(context.Context, DBID) (Gallery, error)
+	RefreshCache(context.Context, DBID) error
 }
