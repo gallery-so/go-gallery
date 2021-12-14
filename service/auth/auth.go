@@ -302,15 +302,19 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 
 		}
 
-		nonce := persist.UserNonce{
-			Address: pInput.Address,
-			Value:   generateNonce(),
+		nonce, err := nonceRepo.Get(pCtx, pInput.Address)
+		if err != nil || nonce.ID == "" {
+			nonce = persist.UserNonce{
+				Address: pInput.Address,
+				Value:   generateNonce(),
+			}
+
+			err = nonceRepo.Create(pCtx, nonce)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		err := nonceRepo.Create(pCtx, nonce)
-		if err != nil {
-			return nil, err
-		}
 		output.Nonce = NoncePrepend + nonce.Value
 
 	} else {
