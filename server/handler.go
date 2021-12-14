@@ -37,7 +37,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.POST("/update/addresses/add", middleware.JWTRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient.EthClient))
 	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
 	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
-	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
+	usersGroup.GET("/membership", getMembershipTiersToken(repos.membershipRepository, repos.userRepository, repos.tokenRepository, ethClient))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub, ethClient.EthClient))
 
 }
@@ -60,7 +60,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.POST("/update/addresses/add", middleware.JWTRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient.EthClient))
 	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddresses(repos.userRepository, repos.collectionRepository))
 	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
-	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, ethClient))
+	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, repos.nftRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub, ethClient.EthClient))
 
 }

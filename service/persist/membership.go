@@ -10,10 +10,18 @@ type MembershipTier struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	Name     string   `bson:"name" json:"name"`
-	TokenID  TokenID  `bson:"token_id" json:"token_id"`
-	AssetURL string   `bson:"asset_url" json:"asset_url"`
-	Owners   []string `bson:"owners" json:"owners"`
+	Name     string            `bson:"name" json:"name"`
+	TokenID  TokenID           `bson:"token_id" json:"token_id"`
+	AssetURL string            `bson:"asset_url" json:"asset_url"`
+	Owners   []MembershipOwner `bson:"owners" json:"owners"`
+}
+
+// MembershipOwner represents a user who owns a membership card
+type MembershipOwner struct {
+	UserID      DBID     `bson:"user_id" json:"user_id"`
+	Address     Address  `bson:"address" json:"address"`
+	Username    string   `bson:"username" json:"username"`
+	PreviewNFTs []string `bson:"preview_nfts" json:"preview_nfts"`
 }
 
 // MembershipRepository represents the interface for interacting with the persisted state of users

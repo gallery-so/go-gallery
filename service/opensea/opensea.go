@@ -1,4 +1,4 @@
-package server
+package opensea
 
 import (
 	"bytes"
@@ -15,13 +15,13 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-// mongodb.GLRYnft struct tags reflect the json data of an open sea response and therefore
-// can be unmarshalled from the api response
-type openseaAssets struct {
-	Assets []openseaAsset `json:"assets"`
+// Assets is a list of NFTs from OpenSea
+type Assets struct {
+	Assets []Asset `json:"assets"`
 }
 
-type openseaAsset struct {
+// Asset is an NFT from OpenSea
+type Asset struct {
 	Version int64 `json:"version"` // schema version for this model
 	ID      int   `json:"id"`
 
@@ -30,10 +30,10 @@ type openseaAsset struct {
 
 	ExternalURL      string              `json:"external_link"`
 	TokenMetadataURL string              `json:"token_metadata_url"`
-	Creator          openseaAccount      `json:"creator"`
-	Owner            openseaAccount      `json:"owner"`
+	Creator          Account             `json:"creator"`
+	Owner            Account             `json:"owner"`
 	Contract         persist.NftContract `json:"asset_contract"`
-	Collection       openseaCollection   `json:"collection"`
+	Collection       Collection          `json:"collection"`
 
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
@@ -48,37 +48,44 @@ type openseaAsset struct {
 	AnimationURL         string `json:"animation_url"`
 	AnimationOriginalURL string `json:"animation_original_url"`
 
-	Orders []openseaOrder `json:"orders"`
+	Orders []Order `json:"orders"`
 
 	AcquisitionDateStr string `json:"acquisition_date"`
 }
 
-type openseaEvents struct {
-	Events []openseaEvent `json:"asset_events"`
-}
-type openseaEvent struct {
-	Asset       openseaAsset   `json:"asset"`
-	FromAccount openseaAccount `json:"from_account"`
-	ToAccount   openseaAccount `json:"to_account"`
-	CreatedDate string         `json:"created_date"`
+// Events is a list of events from OpenSea
+type Events struct {
+	Events []Event `json:"asset_events"`
 }
 
-type openseaAccount struct {
-	User    openseaUser     `json:"user"`
+// Event is an event from OpenSea
+type Event struct {
+	Asset       Asset   `json:"asset"`
+	FromAccount Account `json:"from_account"`
+	ToAccount   Account `json:"to_account"`
+	CreatedDate string  `json:"created_date"`
+}
+
+// Account is a user account from OpenSea
+type Account struct {
+	User    User            `json:"user"`
 	Address persist.Address `json:"address"`
 }
 
-type openseaUser struct {
+// User is a user from OpenSea
+type User struct {
 	Username string `json:"username"`
 }
 
-type openseaCollection struct {
+// Collection is a collection from OpenSea
+type Collection struct {
 	Name string `json:"name"`
 }
 
-type openseaOrder struct {
-	Maker openseaAccount `json:"maker"`
-	Taker openseaAccount `json:"taker"`
+// Order is an order from OpenSea representing an NFT's maker and buyer
+type Order struct {
+	Maker Account `json:"maker"`
+	Taker Account `json:"taker"`
 }
 
 type errNoNFTForTokenIdentifiers struct {
@@ -90,7 +97,8 @@ type errNoSingleNFTForOpenseaID struct {
 	openseaID int
 }
 
-func openSeaPipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
+// PipelineAssetsForAcc is a pipeline for getting assets for an account
+func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
 	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) ([]persist.NFT, error) {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
@@ -172,7 +180,7 @@ func openseaSyncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenCo
 	if _, err := io.Copy(buf, resp.Body); err != nil {
 		return persist.OwnershipHistory{}, err
 	}
-	openseaEvents := &openseaEvents{}
+	openseaEvents := &Events{}
 	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
 		return persist.OwnershipHistory{}, err
 	}
@@ -239,9 +247,9 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persi
 }
 
 // recursively fetches all assets for a wallet
-func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([]openseaAsset, error) {
+func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([]Asset, error) {
 
-	result := []openseaAsset{}
+	result := []Asset{}
 	qsArgsMap := map[string]interface{}{
 		"owner":           pWalletAddress,
 		"order_direction": "desc",
@@ -269,7 +277,7 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	response := openseaAssets{}
+	response := Assets{}
 	err = util.UnmarshallBody(&response, resp.Body)
 	if err != nil {
 		return nil, err
@@ -285,12 +293,12 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([
 	return result, nil
 }
 
-func openseaToDBNfts(pCtx context.Context, pWalletAddress persist.Address, openseaNfts []openseaAsset, nftRepo persist.NFTRepository) ([]persist.NFTDB, error) {
+func openseaToDBNfts(pCtx context.Context, pWalletAddress persist.Address, openseaNfts []Asset, nftRepo persist.NFTRepository) ([]persist.NFTDB, error) {
 
 	nfts := make([]persist.NFTDB, len(openseaNfts))
 	nftChan := make(chan persist.NFTDB)
 	for _, openseaNft := range openseaNfts {
-		go func(nft openseaAsset) {
+		go func(nft Asset) {
 			nftChan <- openseaToDBNft(pCtx, pWalletAddress, nft, nftRepo)
 		}(openseaNft)
 	}
@@ -361,7 +369,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []persist.NFTDB, pUser persist.
 	return nfts, nil
 }
 
-func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft openseaAsset, nftRepo persist.NFTRepository) persist.NFTDB {
+func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft Asset, nftRepo persist.NFTRepository) persist.NFTDB {
 
 	result := persist.NFTDB{
 		OwnerAddress:         pWalletAddress,
@@ -394,7 +402,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft op
 
 }
 
-func openseaToGalleryEvents(pCtx context.Context, pEvents *openseaEvents, userRepo persist.UserRepository) (persist.OwnershipHistory, error) {
+func openseaToGalleryEvents(pCtx context.Context, pEvents *Events, userRepo persist.UserRepository) (persist.OwnershipHistory, error) {
 	timeLayout := "2006-01-02T15:04:05"
 	ownershipHistory := persist.OwnershipHistory{Owners: []persist.Owner{}}
 	for _, event := range pEvents.Events {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
@@ -199,7 +200,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 		}
 
-		nfts, err := openSeaPipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
+		nfts, err := opensea.PipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
 		if nfts == nil || err != nil {
 			nfts = []persist.NFT{}
 		}

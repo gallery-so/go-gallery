@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -51,10 +52,10 @@ func TestOpenseaSync_Success(t *testing.T) {
 	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
-	robinOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, robinUserID, []persist.Address{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	robinOpenseaNFTs, err := opensea.PipelineAssetsForAcc(ctx, robinUserID, []persist.Address{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
-	mikeOpenseaNFTs, err := openSeaPipelineAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	mikeOpenseaNFTs, err := opensea.PipelineAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
 	time.Sleep(time.Second * 3)
