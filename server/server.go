@@ -61,7 +61,7 @@ func CoreInit() *gin.Engine {
 	setDefaults()
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.ErrLogger(), middleware.RateLimited())
+	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
