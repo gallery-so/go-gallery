@@ -57,7 +57,7 @@ func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBI
 	pUpdate persist.GalleryUpdateInput,
 ) error {
 
-	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pOwnerUserID})
 	if err != nil {
 		return err
 	}
