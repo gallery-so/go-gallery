@@ -128,88 +128,53 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 				TokenID: id,
 			}
 
-			events, err := openseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), persist.TokenID(id), 0)
-			if err != nil || len(events) == 0 {
+			tokens, err := nftRepository.GetByTokenIdentifiers(pCtx, persist.TokenID(id), persist.Address(viper.GetString("CONTRACT_ADDRESS")), -1, 0)
+			if err != nil || len(tokens) == 0 {
 				tierChan <- tier
 				return
 			}
-			asset := events[0].Asset
-			tier.Name = asset.Name
-			tier.AssetURL = asset.ImageURL
-			tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
+			initialToken := tokens[0]
 
-			ownersChan := make(chan []persist.MembershipOwner)
-			for _, e := range events {
-				go func(event opensea.Event) {
-					owners := make([]persist.MembershipOwner, 0, 2)
-					hasNFT, _ := ethClient.HasNFT(pCtx, id, event.FromAccount.Address)
-					if hasNFT {
-						membershipOwner := persist.MembershipOwner{}
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
-							membershipOwner.Username = glryUser.UserName
-							membershipOwner.UserID = glryUser.ID
-							membershipOwner.Address = event.FromAccount.Address
+			tier.Name = initialToken.Name
+			tier.AssetURL = initialToken.Media.MediaURL
+			tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
 
-							nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID, -1, 0)
-							if err == nil && len(nfts) > 0 {
-								nftURLs := make([]string, 0, 3)
-								for i, nft := range nfts {
-									if i == 3 {
-										break
-									}
-									if nft.Media.PreviewURL != "" {
-										nftURLs = append(nftURLs, nft.Media.PreviewURL)
-									} else if nft.Media.MediaURL != "" {
-										nftURLs = append(nftURLs, nft.Media.MediaURL)
-									} else {
-										i--
-										continue
-									}
+			ownersChan := make(chan persist.MembershipOwner)
+			for _, e := range tokens {
+				go func(token persist.Token) {
+					membershipOwner := persist.MembershipOwner{}
+					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
+						membershipOwner.Username = glryUser.UserName
+						membershipOwner.UserID = glryUser.ID
+						membershipOwner.Address = token.OwnerAddress
+
+						nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID, -1, 0)
+						if err == nil && len(nfts) > 0 {
+							nftURLs := make([]string, 0, 3)
+							for i, nft := range nfts {
+								if i == 3 {
+									break
 								}
-								membershipOwner.PreviewNFTs = nftURLs
-							}
-						} else {
-							membershipOwner.Address = event.FromAccount.Address
-						}
-						owners = append(owners, membershipOwner)
-					}
-					hasNFT, _ = ethClient.HasNFT(pCtx, id, event.ToAccount.Address)
-					if hasNFT {
-						membershipOwner := persist.MembershipOwner{}
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
-							membershipOwner.Username = glryUser.UserName
-							membershipOwner.UserID = glryUser.ID
-							membershipOwner.Address = event.FromAccount.Address
-
-							nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID, -1, 0)
-							if err == nil && len(nfts) > 0 {
-								nftURLs := make([]string, 0, 3)
-								for i, nft := range nfts {
-									if i == 3 {
-										break
-									}
-									if nft.Media.PreviewURL != "" {
-										nftURLs = append(nftURLs, nft.Media.PreviewURL)
-									} else if nft.Media.MediaURL != "" {
-										nftURLs = append(nftURLs, nft.Media.MediaURL)
-									} else {
-										i--
-										continue
-									}
+								if nft.Media.PreviewURL != "" {
+									nftURLs = append(nftURLs, nft.Media.PreviewURL)
+								} else if nft.Media.MediaURL != "" {
+									nftURLs = append(nftURLs, nft.Media.MediaURL)
+								} else {
+									i--
+									continue
 								}
-								membershipOwner.PreviewNFTs = nftURLs
 							}
-						} else {
-							membershipOwner.Address = event.FromAccount.Address
+							membershipOwner.PreviewNFTs = nftURLs
 						}
-						owners = append(owners, membershipOwner)
+					} else {
+						membershipOwner.Address = token.OwnerAddress
 					}
-					ownersChan <- owners
+					ownersChan <- membershipOwner
 				}(e)
 			}
-			for i := 0; i < len(events); i++ {
-				incomingOwners := <-ownersChan
-				tier.Owners = append(tier.Owners, incomingOwners...)
+			for i := 0; i < len(tokens); i++ {
+				incomingOwner := <-ownersChan
+				tier.Owners = append(tier.Owners, incomingOwner)
 			}
 			go membershipRepository.UpsertByTokenID(pCtx, id, tier)
 			tierChan <- tier
