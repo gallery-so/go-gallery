@@ -104,8 +104,7 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 				}(e)
 			}
 			for i := 0; i < len(events); i++ {
-				incomingOwners := <-ownersChan
-				tier.Owners = append(tier.Owners, incomingOwners...)
+				tier.Owners = append(tier.Owners, <-ownersChan...)
 			}
 			go membershipRepository.UpsertByTokenID(pCtx, id, tier)
 			tierChan <- tier
@@ -173,8 +172,7 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 				}(e)
 			}
 			for i := 0; i < len(tokens); i++ {
-				incomingOwner := <-ownersChan
-				tier.Owners = append(tier.Owners, incomingOwner)
+				tier.Owners = append(tier.Owners, <-ownersChan)
 			}
 			go membershipRepository.UpsertByTokenID(pCtx, id, tier)
 			tierChan <- tier
