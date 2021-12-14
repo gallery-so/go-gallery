@@ -138,7 +138,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.GET("/get", middleware.JWTOptional(), getNftByID(repos.nftRepository))
 	nftsGroup.GET("/user_get", middleware.JWTOptional(), getNftsForUser(repos.nftRepository))
 	nftsGroup.GET("/opensea/get", middleware.JWTRequired(repos.userRepository, ethClient), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
-	nftsGroup.POST("/opensea/refresh", middleware.RateLimited(), middleware.JWTRequired(repos.userRepository, ethClient), refreshOpenseaNFTs(repos.nftRepository, repos.userRepository))
+	nftsGroup.POST("/opensea/refresh", middleware.JWTRequired(repos.userRepository, ethClient), refreshOpenseaNFTs(repos.nftRepository, repos.userRepository))
 	nftsGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/unassigned/get", middleware.JWTRequired(repos.userRepository, ethClient), getUnassignedNftsForUser(repos.collectionRepository))
 	nftsGroup.POST("/unassigned/refresh", middleware.JWTRequired(repos.userRepository, ethClient), refreshUnassignedNftsForUser(repos.collectionRepository))
