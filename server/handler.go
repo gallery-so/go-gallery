@@ -78,7 +78,6 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	galleriesGroup.GET("/get", middleware.JWTOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	galleriesGroup.GET("/user_get", middleware.JWTOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient.EthClient))
 	galleriesGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateGalleryToken(repos.galleryTokenRepository))
-
 	// COLLECTIONS
 
 	collectionsGroup := parent.Group("/collections")
@@ -118,6 +117,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	galleriesGroup.GET("/get", middleware.JWTOptional(), getGalleryByID(repos.galleryRepository))
 	galleriesGroup.GET("/user_get", middleware.JWTOptional(), getGalleriesByUserID(repos.galleryRepository))
 	galleriesGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateGallery(repos.galleryRepository, repos.backupRepository))
+	galleriesGroup.POST("/refresh", middleware.RateLimited(), refreshGallery(repos.galleryRepository))
 
 	// COLLECTIONS
 

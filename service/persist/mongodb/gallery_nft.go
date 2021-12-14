@@ -140,6 +140,11 @@ func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID)
 	return result[0], nil
 }
 
+// RefreshCache deletes what is in the cache for a given user
+func (g *GalleryMongoRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
+	return g.galleriesCache.Delete(pCtx, pUserID.String())
+}
+
 func (g *GalleryMongoRepository) resetCache(pCtx context.Context, ownerUserID persist.DBID) error {
 	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID)
 	if err != nil {

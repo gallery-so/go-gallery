@@ -32,6 +32,10 @@ type galleryGetOutput struct {
 	Galleries []persist.Gallery `json:"galleries"`
 }
 
+type galleryRefreshCacheInput struct {
+	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
 // HANDLERS
 
 func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
@@ -116,6 +120,23 @@ func updateGallery(galleryRepository persist.GalleryRepository, backupRepository
 			}
 
 		}(c.Copy())
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func refreshGallery(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &galleryRefreshCacheInput{}
+		if err := c.ShouldBindJSON(input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		if err := galleryRepository.RefreshCache(c, input.UserID); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
