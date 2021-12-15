@@ -1,14 +1,19 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,9 +25,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 11300000
+var defaultStartingBlock persist.BlockNumber = 5000000
+
+var logSize = unsafe.Sizeof(types.Log{})
 
 const blocksPerLogsCall = 50
 
@@ -46,14 +54,6 @@ type tokenMetadata struct {
 	ti tokenIdentifiers
 	md persist.TokenMetadata
 }
-
-// type tokenBalanceChange struct {
-// 	ti    tokenIdentifiers
-// 	from  persist.Address
-// 	to    persist.Address
-// 	amt   *big.Int
-// 	block persist.BlockNumber
-// }
 
 type tokenBalances struct {
 	ti      tokenIdentifiers
@@ -88,10 +88,11 @@ type balanceAtBlock struct {
 // Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type Indexer struct {
-	ethClient    *ethclient.Client
-	ipfsClient   *shell.Shell
-	tokenRepo    persist.TokenRepository
-	contractRepo persist.ContractRepository
+	ethClient     *ethclient.Client
+	ipfsClient    *shell.Shell
+	storageClient *storage.Client
+	tokenRepo     persist.TokenRepository
+	contractRepo  persist.ContractRepository
 
 	chain persist.Chain
 
@@ -105,7 +106,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
 	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -113,10 +114,11 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 	return &Indexer{
 
-		ethClient:    ethClient,
-		ipfsClient:   ipfsClient,
-		tokenRepo:    tokenRepo,
-		contractRepo: contractRepo,
+		ethClient:     ethClient,
+		ipfsClient:    ipfsClient,
+		storageClient: storageClient,
+		tokenRepo:     tokenRepo,
+		contractRepo:  contractRepo,
 
 		chain: pChain,
 
@@ -128,7 +130,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, tokenRepo 
 
 // Start begins indexing events from the blockchain
 func (i *Indexer) Start() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
 	if err == nil && recentDBBlock > defaultStartingBlock {
@@ -201,14 +203,41 @@ func (i *Indexer) processLogs(transfersChan chan<- []*transfer, startingBlock pe
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
-	logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
-		FromBlock: curBlock,
-		ToBlock:   nextBlock,
-		Topics:    topics,
-	})
-	if err != nil {
-		logrus.WithError(err).Error("Error getting logs")
-		return
+
+	var logsTo []types.Log
+	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewReader(ctx)
+	if err == nil {
+		defer reader.Close()
+		buf := new(bytes.Buffer)
+		amount, err := io.Copy(buf, reader)
+		if err != nil {
+			panic(err)
+		}
+		logsTo = make([]types.Log, 0, amount/int64(logSize))
+		err = json.Unmarshal(buf.Bytes(), &logsTo)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: curBlock,
+			ToBlock:   nextBlock,
+			Topics:    topics,
+		})
+		if err != nil {
+			logrus.WithError(err).Error("Error getting logs")
+			return
+		}
+		asJSON, err := json.Marshal(logsTo)
+		if err != nil {
+			panic(err)
+		}
+		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewWriter(ctx)
+		defer storageWriter.Close()
+		_, err = storageWriter.Write(asJSON)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())

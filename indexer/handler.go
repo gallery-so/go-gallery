@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"google.golang.org/api/option"
 )
 
 // Init initializes the indexer
@@ -38,7 +40,17 @@ func coreInit() (*gin.Engine, *Indexer) {
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
 	tokenRepo, contractRepo := newRepos()
-	i := NewIndexer(newEthClient(), newIPFSShell(), tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./decrypted/service-key.json"))
+	}
+	if err != nil {
+		panic(err)
+	}
+	i := NewIndexer(newEthClient(), newIPFSShell(), s, tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
@@ -78,9 +90,9 @@ func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("CHAIN", "ETH")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("ENV", "local")
+	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
 	viper.AutomaticEnv()
 }
 
