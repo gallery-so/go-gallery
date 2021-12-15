@@ -8,7 +8,7 @@ type MembershipTier struct {
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Name     string            `bson:"name" json:"name"`
 	TokenID  TokenID           `bson:"token_id" json:"token_id"`

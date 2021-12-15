@@ -13,7 +13,7 @@ type CollectionDB struct {
 	ID           DBID            `bson:"_id" json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Layout TokenLayout `bson:"layout" json:"layout"`
 
@@ -35,7 +35,7 @@ type Collection struct {
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Layout TokenLayout `bson:"layout" json:"layout"`
 

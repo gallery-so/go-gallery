@@ -10,7 +10,7 @@ type Backup struct {
 	ID           DBID            `bson:"_id" json:"id"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	GalleryID DBID    `bson:"gallery_id" json:"gallery_id" `
 	Gallery   Gallery `bson:"gallery" json:"gallery"`

@@ -14,7 +14,7 @@ type GalleryTokenDB struct {
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []DBID `bson:"collections"          json:"collections"`
@@ -29,7 +29,7 @@ type GalleryToken struct {
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID              `bson:"owner_user_id" json:"owner_user_id"`
 	Collections []CollectionToken `bson:"collections"          json:"collections"`
