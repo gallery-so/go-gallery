@@ -74,6 +74,10 @@ func CoreInit() *gin.Engine {
 
 	}
 
+	if err := redis.ClearCache(); err != nil {
+		panic(err)
+	}
+
 	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
 }
 

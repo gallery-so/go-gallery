@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -50,7 +49,6 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 		}
 
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
-		logrus.Infof("GALLERY %+v", galleries)
 		if galleries == nil || err != nil {
 			galleries = []persist.Gallery{}
 		}

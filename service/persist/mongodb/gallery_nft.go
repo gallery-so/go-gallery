@@ -88,6 +88,7 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 
 	fromCache, err := g.galleriesCache.Get(pCtx, pUserID.String())
 	if err == nil && len(fromCache) > 0 {
+		logrus.Info("gallery cache hit")
 		galleries := []persist.Gallery{}
 		err = json.Unmarshal(fromCache, &galleries)
 		if err != nil {
@@ -98,7 +99,7 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 		}
 	}
 
-	logrus.Info("got galleries from cache")
+	logrus.Info("gallery cache miss")
 
 	return g.getByUserIDSkipCache(pCtx, pUserID)
 }

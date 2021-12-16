@@ -30,6 +30,20 @@ func NewCache(db int) *Cache {
 	return &Cache{client: client}
 }
 
+// ClearCache deletes the entire cache
+func ClearCache() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	redisURL := viper.GetString("REDIS_URL")
+	redisPass := viper.GetString("REDIS_PASS")
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisURL,
+		Password: redisPass,
+		DB:       0,
+	})
+	return client.FlushAll(ctx).Err()
+}
+
 // Set sets a value in the redis cache
 func (c *Cache) Set(pCtx context.Context, key string, value []byte, expiration time.Duration) error {
 	return c.client.Set(pCtx, key, value, expiration).Err()
