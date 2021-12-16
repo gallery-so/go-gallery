@@ -8,3 +8,13 @@ services:
     image: "mongo:5"
     ports:
       - "27017:27017"
+  postgres:
+    build:
+      context: "."
+      dockerfile: "docker/postgres/DOCKERFILE"
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=gallery
