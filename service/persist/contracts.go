@@ -3,17 +3,15 @@ package persist
 import (
 	"context"
 	"fmt"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Contract represents an ethereum contract in the database
 type Contract struct {
-	Version      int64              `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
-	Deleted      bool               `bson:"deleted" json:"-"`
-	LastUpdated  primitive.DateTime `bson:"last_updated,update_time" json:"last_updated"`
+	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
+	Deleted      bool            `bson:"deleted" json:"-"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Address Address `bson:"address" json:"address"`
 	Symbol  string  `bson:"symbol" json:"symbol"`

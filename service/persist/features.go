@@ -4,17 +4,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // FeatureFlag represents a feature flag in the database
 type FeatureFlag struct {
-	Version      int64              `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID               `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime primitive.DateTime `bson:"created_at"        json:"created_at"`
-	Deleted      bool               `bson:"deleted" json:"-"`
-	LastUpdated  primitive.DateTime `bson:"last_updated,update_time" json:"last_updated"`
+	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
+	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
+	Deleted      bool            `bson:"deleted" json:"-"`
+	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
 	RequiredAmount      uint64           `json:"required_amount" bson:"required_amount"`
