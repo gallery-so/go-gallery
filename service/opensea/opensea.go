@@ -142,7 +142,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NFTDB, userRepo
 	for _, nft := range pNfts {
 		go func(n *persist.NFTDB) {
 			if !n.MultipleOwners {
-				history, err := openseaSyncHistory(pCtx, n.OpenSeaTokenID, n.Contract.ContractAddress, n.OwnerAddress, userRepo, nftRepo, historyRepo)
+				history, err := openseaSyncHistory(pCtx, n.OpenseaTokenID, n.Contract.ContractAddress, n.OwnerAddress, userRepo, nftRepo, historyRepo)
 				if err != nil {
 					errorChan <- err
 					return
@@ -333,8 +333,8 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []persist.NFTDB, pUser persist.
 				CreatorName:          n.CreatorName,
 				OwnerAddress:         n.OwnerAddress,
 				Contract:             n.Contract,
-				OpenSeaID:            n.OpenseaID,
-				OpenSeaTokenID:       n.OpenSeaTokenID,
+				OpenseaID:            n.OpenseaID,
+				OpenseaTokenID:       n.OpenseaTokenID,
 				ImageThumbnailURL:    n.ImageThumbnailURL,
 				ImagePreviewURL:      n.ImagePreviewURL,
 				ImageOriginalURL:     n.ImageOriginalURL,
@@ -380,7 +380,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 		ImageURL:             nft.ImageURL,
 		CreatorAddress:       nft.Creator.Address,
 		AnimationURL:         nft.AnimationURL,
-		OpenSeaTokenID:       nft.TokenID,
+		OpenseaTokenID:       nft.TokenID,
 		OpenseaID:            nft.ID,
 		TokenCollectionName:  nft.Collection.Name,
 		ImageThumbnailURL:    nft.ImageThumbnailURL,

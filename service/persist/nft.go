@@ -32,7 +32,7 @@ type NFTDB struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenseaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `bson:"image_url"           json:"image_url"`
@@ -70,11 +70,11 @@ type NFT struct {
 	Contract            NftContract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string      `bson:"token_collection_name" json:"token_collection_name"`
 
-	OpenSeaID int `bson:"opensea_id"       json:"opensea_id"`
+	OpenseaID int `bson:"opensea_id"       json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenSeaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenseaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `bson:"image_url"           json:"image_url"`
