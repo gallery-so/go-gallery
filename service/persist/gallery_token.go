@@ -37,6 +37,8 @@ type GalleryToken struct {
 
 // GalleryTokenUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
 type GalleryTokenUpdateInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Collections []DBID `bson:"collections" json:"collections"`
 }
 

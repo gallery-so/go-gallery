@@ -50,23 +50,31 @@ type Collection struct {
 
 // CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionUpdateInfoInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Name           string `bson:"name" json:"name"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 // CollectionUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateNftsInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Nfts   []DBID      `bson:"nfts" json:"nfts"`
 	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionUpdateHiddenInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
 // CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionUpdateDeletedInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Deleted bool `bson:"deleted" json:"-"`
 }
 

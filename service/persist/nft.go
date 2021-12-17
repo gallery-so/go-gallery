@@ -130,6 +130,8 @@ type ContractCollectionNFT struct {
 // UpdateNFTInfoInput represents a MongoDB input to update the user defined info
 // associated with a given NFT in the DB
 type UpdateNFTInfoInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	CollectorsNote string `bson:"collectors_note"`
 }
 

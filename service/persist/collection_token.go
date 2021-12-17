@@ -58,23 +58,31 @@ type TokenLayout struct {
 
 // CollectionTokenUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionTokenUpdateInfoInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Name           string `bson:"name" json:"name"`
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 // CollectionTokenUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionTokenUpdateNftsInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Nfts   []DBID      `bson:"nfts" json:"nfts"`
 	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
 // CollectionTokenUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionTokenUpdateHiddenInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Hidden bool `bson:"hidden" json:"hidden"`
 }
 
 // CollectionTokenUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionTokenUpdateDeletedInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Deleted bool `bson:"deleted" json:"-"`
 }
 

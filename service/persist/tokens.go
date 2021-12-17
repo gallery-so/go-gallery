@@ -184,11 +184,15 @@ type TokenInCollection struct {
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
 	Media    Media         `bson:"media" json:"media"`
 	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
 	TokenURI TokenURI      `bson:"token_uri" json:"token_uri"`

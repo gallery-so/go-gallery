@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -16,6 +17,7 @@ import (
 type CollectionMongoRepository struct {
 	collectionsStorage *storage
 	nftsStorage        *storage
+	galleriesStorage   *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
 	cacheUpdateQueue   *memstore.UpdateQueue
@@ -29,6 +31,7 @@ func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memst
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		nftsStorage:        newStorage(mgoClient, 0, galleryDBName, nftColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
+		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
 		unassignedCache:    unassignedCache,
 		cacheUpdateQueue:   memstore.NewUpdateQueue(unassignedCache),
 		galleryRepo:        galleryRepo,
@@ -107,11 +110,16 @@ func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DB
 // Update will update a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 // pUpdate will be a struct with bson tags that represent the fields to be updated
-func (c *CollectionMongoRepository) Update(pCtx context.Context, pIDstr persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
+func (c *CollectionMongoRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
-	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, pUpdate); err != nil {
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate); err != nil {
 		return err
 	}
+
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
+		return err
+	}
+
 	go c.galleryRepo.resetCache(pCtx, pUserID)
 	go c.RefreshUnassigned(pCtx, pUserID)
 	return nil
@@ -148,6 +156,10 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 	// }
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
+		return err
+	}
+
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
 		return err
 	}
 
@@ -228,11 +240,15 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 
 // Delete will delete a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
-func (c *CollectionMongoRepository) Delete(pCtx context.Context, pIDstr persist.DBID, pUserID persist.DBID) error {
+func (c *CollectionMongoRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
 
 	update := &persist.CollectionUpdateDeletedInput{Deleted: true}
 
-	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pIDstr, "owner_user_id": pUserID}, update); err != nil {
+	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, update); err != nil {
+		return err
+	}
+
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
 		return err
 	}
 
