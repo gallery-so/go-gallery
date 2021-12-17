@@ -116,7 +116,7 @@ func (c *CollectionMongoRepository) Update(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
 		return err
 	}
 
@@ -159,7 +159,7 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 		return err
 	}
 
-	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
 		return err
 	}
 
@@ -248,7 +248,7 @@ func (c *CollectionMongoRepository) Delete(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": pID}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
+	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
 		return err
 	}
 
