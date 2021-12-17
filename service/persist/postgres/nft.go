@@ -113,7 +113,7 @@ func (n *NFTPostgresRepository) GetByAddresses(pCtx context.Context, pAddresses 
 	nfts := make([]persist.NFT, 0, len(pAddresses)*25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func (n *NFTPostgresRepository) GetByAddresses(pCtx context.Context, pAddresses 
 func (n *NFTPostgresRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.NFT, error) {
 	sqlStr := `SELECT * FROM nfts WHERE ID = $1`
 	var nft persist.NFT
-	err := n.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL)
+	err := n.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime)
 	if err != nil {
 		return persist.NFT{}, err
 	}
@@ -146,7 +146,7 @@ func (n *NFTPostgresRepository) GetByContractData(pCtx context.Context, pTokenID
 	nfts := make([]persist.NFT, 0, 25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func (n *NFTPostgresRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID 
 	nfts := make([]persist.NFT, 0, 25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime)
 		if err != nil {
 			return nil, err
 		}

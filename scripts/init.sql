@@ -14,12 +14,12 @@ FROM
 ALTER TABLE
     users
 ADD
-    COLUMN LAST_UPDATED timestamp;
+    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     users
 ADD
-    COLUMN CREATED_AT timestamp;
+    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE galleries (
     ID char(32) PRIMARY KEY,
@@ -36,12 +36,12 @@ FROM
 ALTER TABLE
     galleries
 ADD
-    COLUMN LAST_UPDATED timestamp;
+    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     galleries
 ADD
-    COLUMN CREATED_AT timestamp;
+    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nfts (
     ID char(32) PRIMARY KEY,
@@ -72,12 +72,12 @@ FROM
 ALTER TABLE
     nfts
 ADD
-    COLUMN LAST_UPDATED timestamp;
+    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     nfts
 ADD
-    COLUMN CREATED_AT timestamp;
+    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE collections (
     ID char(32) PRIMARY KEY,
@@ -97,12 +97,12 @@ FROM
 ALTER TABLE
     collections
 ADD
-    COLUMN LAST_UPDATED timestamp;
+    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     collections
 ADD
-    COLUMN CREATED_AT timestamp;
+    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nonces (
     ID char(32) PRIMARY KEY,
@@ -120,9 +120,18 @@ FROM
 ALTER TABLE
     nonces
 ADD
-    COLUMN LAST_UPDATED timestamp;
+    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     nonces
 ADD
-    COLUMN CREATED_AT timestamp;
+    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+
+CREATE
+OR REPLACE FUNCTION ARRAY_DIFF(array1 anyarray, array2 anyarray) RETURNS anyarray LANGUAGE SQL IMMUTABLE AS $ $
+SELECT
+    COALESCE(array_agg(elem), '{}')
+from
+    UNNEST(array1) elem
+where
+    elem <> ALL(array2) $ $;

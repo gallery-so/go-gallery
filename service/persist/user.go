@@ -13,8 +13,8 @@ type User struct {
 	Deleted      bool            `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	UserName           string    `bson:"username,omitempty"         json:"username"` // mutable
-	UserNameIdempotent string    `bson:"username_idempotent,omitempty" json:"username_idempotent"`
+	Username           string    `bson:"username,omitempty"         json:"username"` // mutable
+	UsernameIdempotent string    `bson:"username_idempotent,omitempty" json:"username_idempotent"`
 	Addresses          []Address `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
 	Bio                string    `bson:"bio"  json:"bio"`
 }

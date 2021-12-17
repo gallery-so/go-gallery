@@ -41,8 +41,8 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					hasNFT, _ := ethClient.HasNFT(pCtx, id, event.FromAccount.Address)
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
-							membershipOwner.Username = glryUser.UserName
+						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.Username != "" {
+							membershipOwner.Username = glryUser.Username
 							membershipOwner.UserID = glryUser.ID
 							membershipOwner.Address = event.FromAccount.Address
 
@@ -72,8 +72,8 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					hasNFT, _ = ethClient.HasNFT(pCtx, id, event.ToAccount.Address)
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
-						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
-							membershipOwner.Username = glryUser.UserName
+						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
+							membershipOwner.Username = glryUser.Username
 							membershipOwner.UserID = glryUser.ID
 							membershipOwner.Address = event.FromAccount.Address
 
@@ -142,8 +142,8 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 			for _, e := range tokens {
 				go func(token persist.Token) {
 					membershipOwner := persist.MembershipOwner{}
-					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
-						membershipOwner.Username = glryUser.UserName
+					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.Username != "" {
+						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 						membershipOwner.Address = token.OwnerAddress
 

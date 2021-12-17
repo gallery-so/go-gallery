@@ -18,8 +18,8 @@ func TestOpenseaSync_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 	ctx := context.Background()
 
-	mike := persist.User{UserNameIdempotent: "mikey", UserName: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
-	robin := persist.User{UserName: "robin", UserNameIdempotent: "robin", Addresses: []persist.Address{persist.Address(strings.ToLower("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"))}}
+	mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
+	robin := persist.User{Username: "robin", UsernameIdempotent: "robin", Addresses: []persist.Address{persist.Address(strings.ToLower("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"))}}
 
 	robinUserID, err := tc.repos.userRepository.Create(ctx, robin)
 	assert.Nil(err)

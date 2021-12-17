@@ -346,7 +346,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 
 	output := GetUserOutput{
 		UserID:      user.ID,
-		UserNameStr: user.UserName,
+		UserNameStr: user.Username,
 		BioStr:      user.Bio,
 		CreatedAt:   user.CreationTime,
 		Addresses:   user.Addresses,

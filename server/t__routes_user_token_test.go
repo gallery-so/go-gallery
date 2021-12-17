@@ -28,7 +28,7 @@ func TestGetUserByID_Success_Token(t *testing.T) {
 
 	body := persist.User{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(tc.user1.username, body.UserName)
+	assert.Equal(tc.user1.username, body.Username)
 }
 
 func TestGetUserByAddress_Success_Token(t *testing.T) {
@@ -40,7 +40,7 @@ func TestGetUserByAddress_Success_Token(t *testing.T) {
 
 	body := persist.User{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(tc.user2.username, body.UserName)
+	assert.Equal(tc.user2.username, body.Username)
 }
 
 func TestGetUserByUsername_Success_Token(t *testing.T) {
@@ -52,7 +52,7 @@ func TestGetUserByUsername_Success_Token(t *testing.T) {
 
 	body := persist.User{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(tc.user1.username, body.UserName)
+	assert.Equal(tc.user1.username, body.Username)
 }
 
 func TestGetUserAuthenticated_ShouldIncludeAddress_Token(t *testing.T) {
@@ -84,7 +84,7 @@ func TestUpdateUserAuthenticated_Success_Token(t *testing.T) {
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
-	assert.Equal(update.UserName, user.UserName)
+	assert.Equal(update.UserName, user.Username)
 }
 
 // Updating the username to itself should not trigger an error, despite the DB
@@ -100,7 +100,7 @@ func TestUpdateUserAuthenticated_NoChange_Success_Token(t *testing.T) {
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
-	assert.Equal(update.UserName, user.UserName)
+	assert.Equal(update.UserName, user.Username)
 }
 
 func TestUpdateUserUnauthenticated_Failure_Token(t *testing.T) {
@@ -118,7 +118,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure_Token(t *testing.T) {
 
 	user2, err := tc.repos.userRepository.GetByID(context.Background(), tc.user2.id)
 	assert.Nil(err)
-	log.Println(user2.UserName)
+	log.Println(user2.Username)
 
 	update := user.UpdateUserInput{
 		UserName: tc.user2.username,
@@ -128,7 +128,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure_Token(t *testing.T) {
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
-	assert.NotEqual(update.UserName, user.UserName)
+	assert.NotEqual(update.UserName, user.Username)
 }
 func TestUpdateUserAuthenticated_UsernameInvalid_Failure_Token(t *testing.T) {
 	assert := setupTest(t, 2)
@@ -141,7 +141,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure_Token(t *testing.T) {
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
-	assert.NotEqual(update.UserName, user.UserName)
+	assert.NotEqual(update.UserName, user.Username)
 }
 
 func TestUserAddAddresses_Success_Token(t *testing.T) {
@@ -217,8 +217,8 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 
 	u := persist.User{
 		Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
-		UserName:           "TestUser",
-		UserNameIdempotent: "testuser",
+		Username:           "TestUser",
+		UsernameIdempotent: "testuser",
 	}
 	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)

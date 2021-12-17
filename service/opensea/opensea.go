@@ -416,7 +416,7 @@ func openseaToGalleryEvents(pCtx context.Context, pEvents *Events, userRepo pers
 		user, err := userRepo.GetByAddress(pCtx, event.ToAccount.Address)
 		if err == nil {
 			owner.UserID = user.ID
-			owner.Username = user.UserName
+			owner.Username = user.Username
 		}
 		ownershipHistory.Owners = append(ownershipHistory.Owners, owner)
 	}
