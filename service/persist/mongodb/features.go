@@ -12,13 +12,13 @@ import (
 
 const featuresCollName = "features"
 
-// FeaturesMongoRepository is a mongoDB repository for storing feature flags in the database
-type FeaturesMongoRepository struct {
+// FeaturesRepository is a mongoDB repository for storing feature flags in the database
+type FeaturesRepository struct {
 	featuresStorage *storage
 }
 
-// NewFeaturesMongoRepository returns a new instance of a feature flag repository
-func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepository {
+// NewFeaturesRepository returns a new instance of a feature flag repository
+func NewFeaturesRepository(mgoClient *mongo.Client) *FeaturesRepository {
 	featureStorage := newStorage(mgoClient, 0, galleryDBName, featuresCollName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -32,13 +32,13 @@ func NewFeaturesMongoRepository(mgoClient *mongo.Client) *FeaturesMongoRepositor
 	if err != nil {
 		panic(err)
 	}
-	return &FeaturesMongoRepository{
+	return &FeaturesRepository{
 		featuresStorage: featureStorage,
 	}
 }
 
 // GetByRequiredTokens returns an feature by given token identifiers
-func (c *FeaturesMongoRepository) GetByRequiredTokens(pCtx context.Context, pRequiredtokens map[persist.TokenIdentifiers]uint64) ([]persist.FeatureFlag, error) {
+func (c *FeaturesRepository) GetByRequiredTokens(pCtx context.Context, pRequiredtokens map[persist.TokenIdentifiers]uint64) ([]persist.FeatureFlag, error) {
 
 	result := []persist.FeatureFlag{}
 	keys := make([]persist.TokenIdentifiers, len(pRequiredtokens))
@@ -66,7 +66,7 @@ func (c *FeaturesMongoRepository) GetByRequiredTokens(pCtx context.Context, pReq
 }
 
 // GetByName returns an feature by a given name
-func (c *FeaturesMongoRepository) GetByName(pCtx context.Context, pName string) (persist.FeatureFlag, error) {
+func (c *FeaturesRepository) GetByName(pCtx context.Context, pName string) (persist.FeatureFlag, error) {
 
 	opts := options.Find()
 	opts.SetSort(bson.M{"created_at": -1})
@@ -87,7 +87,7 @@ func (c *FeaturesMongoRepository) GetByName(pCtx context.Context, pName string) 
 }
 
 // GetAll returns all features
-func (c *FeaturesMongoRepository) GetAll(pCtx context.Context) ([]persist.FeatureFlag, error) {
+func (c *FeaturesRepository) GetAll(pCtx context.Context) ([]persist.FeatureFlag, error) {
 
 	result := []persist.FeatureFlag{}
 	err := c.featuresStorage.find(pCtx, bson.M{}, &result)

@@ -2,7 +2,10 @@ package persist
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+
+	"github.com/sirupsen/logrus"
 )
 
 // NFTDB represents an nft in the database
@@ -151,6 +154,13 @@ type NFTRepository interface {
 	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
 	OpenseaCacheSet(context.Context, []Address, []NFT) error
 	OpenseaCacheDelete(context.Context, []Address) error
+}
+
+// Scan implements the sql.Scanner interface for the CollectionNFT type
+func (n *CollectionNFT) Scan(src interface{}) error {
+	bs := []byte(src.([]uint8))
+	logrus.Info("Scanning NFT: ", string(bs))
+	return json.Unmarshal(bs, n)
 }
 
 // ErrNFTNotFoundByID is an error that occurs when an NFT is not found by its ID

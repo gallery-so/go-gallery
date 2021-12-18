@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -100,6 +101,13 @@ type CollectionTokenRepository interface {
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (CollectionToken, error)
 	RefreshUnassigned(context.Context, DBID) error
+}
+
+// Scan implements the Scanner interface for the TokenLayout type
+func (l *TokenLayout) Scan(value interface{}) error {
+	bs := []byte(value.([]uint8))
+
+	return json.Unmarshal(bs, l)
 }
 
 // ErrCollectionNotFoundByID is returned when a collection is not found by ID

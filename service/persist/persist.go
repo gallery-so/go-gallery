@@ -50,6 +50,14 @@ func (c *CreationTime) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+
+	// // TODO this is a hack to work with postgres timestamp :(
+	// s := strings.ReplaceAll(string(b), `"`, "")
+	// logrus.Infof("s: %s", s)
+	// t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	// if err != nil {
+	// 	return err
+	// }
 	*c = CreationTime(t)
 	return nil
 }
@@ -75,6 +83,14 @@ func (l *LastUpdatedTime) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+
+	// // TODO this is a hack to work with postgres timestamp :(
+	// s := strings.ReplaceAll(string(b), `"`, "")
+	// logrus.Infof("s: %s", s)
+	// t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	// if err != nil {
+	// 	return err
+	// }
 	*l = LastUpdatedTime(t)
 	return nil
 }

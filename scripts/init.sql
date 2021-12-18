@@ -1,6 +1,6 @@
 CREATE TABLE users (
-    ID char(32) PRIMARY KEY,
-    DELETED boolean,
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
@@ -22,10 +22,10 @@ ADD
     COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE galleries (
-    ID char(32) PRIMARY KEY,
-    DELETED boolean,
-    OWNER_USER_ID char(32),
-    COLLECTIONS char(32) [],
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    OWNER_USER_ID varchar(32),
+    COLLECTIONS varchar(32) [],
     VERSION int
 );
 
@@ -44,8 +44,8 @@ ADD
     COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nfts (
-    ID char(32) PRIMARY KEY,
-    DELETED boolean,
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     NAME varchar,
     DESCRIPTION varchar,
@@ -79,15 +79,21 @@ ALTER TABLE
 ADD
     COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
+ALTER TABLE
+    nfts
+ADD
+    COLUMN TOKEN_COLLECTION_NAME varchar;
+
 CREATE TABLE collections (
-    ID char(32) PRIMARY KEY,
-    DELETED boolean,
-    OWNER_USER_ID char(32),
-    NFTS char(32) [],
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    OWNER_USER_ID varchar(32),
+    NFTS varchar(32) [],
     VERSION int,
-    HIDDEN boolean,
+    HIDDEN boolean NOT NULL DEFAULT false,
     COLLECTORS_NOTE varchar,
-    NAME varchar(255)
+    NAME varchar(255),
+    LAYOUT json
 );
 
 COPY collections
@@ -105,10 +111,10 @@ ADD
     COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nonces (
-    ID char(32) PRIMARY KEY,
-    DELETED boolean,
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
-    USER_ID char(32),
+    USER_ID varchar(32),
     ADDRESS varchar(255),
     VALUE varchar(255)
 );
@@ -126,12 +132,3 @@ ALTER TABLE
     nonces
 ADD
     COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
-
-CREATE
-OR REPLACE FUNCTION ARRAY_DIFF(array1 anyarray, array2 anyarray) RETURNS anyarray LANGUAGE SQL IMMUTABLE AS $ $
-SELECT
-    COALESCE(array_agg(elem), '{}')
-from
-    UNNEST(array1) elem
-where
-    elem <> ALL(array2) $ $;

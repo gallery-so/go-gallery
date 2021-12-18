@@ -12,21 +12,21 @@ import (
 
 const accountCollName = "accounts"
 
-// AccountMongoRepository is a repository for storing authentication nonces in a MongoDB database
-type AccountMongoRepository struct {
+// AccountRepository is a repository for storing authentication nonces in a MongoDB database
+type AccountRepository struct {
 	accountStorage *storage
 }
 
-// NewAccountMongoRepository returns a new instance of a login attempt repository
-func NewAccountMongoRepository(mgoClient *mongo.Client) *AccountMongoRepository {
-	return &AccountMongoRepository{
+// NewAccountRepository returns a new instance of a login attempt repository
+func NewAccountRepository(mgoClient *mongo.Client) *AccountRepository {
+	return &AccountRepository{
 		accountStorage: newStorage(mgoClient, 0, galleryDBName, accountCollName),
 	}
 }
 
 // UpsertByAddress upserts an account by a given address
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert persist.Account) error {
+func (a *AccountRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pUpsert persist.Account) error {
 
 	_, err := a.accountStorage.upsert(pCtx, bson.M{
 		"address": strings.ToLower(pAddress.String()),
@@ -39,7 +39,7 @@ func (a *AccountMongoRepository) UpsertByAddress(pCtx context.Context, pAddress 
 }
 
 // GetByAddress returns an account by a given address
-func (a *AccountMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Account, error) {
+func (a *AccountRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Account, error) {
 
 	result := []persist.Account{}
 	err := a.accountStorage.find(pCtx, bson.M{"address": strings.ToLower(pAddress.String())}, &result)

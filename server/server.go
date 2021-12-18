@@ -113,24 +113,24 @@ func newRepos() *repositories {
 	openseaCache, unassignedCache, galleriesCache := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
 	galleriesCacheToken, unassignedCacheToken := redis.NewCache(3), redis.NewCache(4)
 	nftsCache := redis.NewCache(5)
-	galleryTokenRepo := mongodb.NewGalleryTokenMongoRepository(mgoClient, galleriesCacheToken)
-	galleryRepo := mongodb.NewGalleryMongoRepository(mgoClient, galleriesCache)
-	nftRepo := mongodb.NewNFTMongoRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
+	galleryTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
+	galleryRepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
+	nftRepo := mongodb.NewNFTRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
 	return &repositories{
 		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
-		loginRepository:           mongodb.NewLoginMongoRepository(mgoClient),
-		collectionRepository:      mongodb.NewCollectionMongoRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
-		tokenRepository:           mongodb.NewTokenMongoRepository(mgoClient, galleryTokenRepo),
-		collectionTokenRepository: mongodb.NewCollectionTokenMongoRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
+		loginRepository:           mongodb.NewLoginRepository(mgoClient),
+		collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
+		tokenRepository:           mongodb.NewTokenRepository(mgoClient, galleryTokenRepo),
+		collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
 		galleryTokenRepository:    galleryTokenRepo,
 		galleryRepository:         galleryRepo,
-		historyRepository:         mongodb.NewHistoryMongoRepository(mgoClient),
+		historyRepository:         mongodb.NewHistoryRepository(mgoClient),
 		nftRepository:             nftRepo,
-		userRepository:            mongodb.NewUserMongoRepository(mgoClient),
-		accountRepository:         mongodb.NewAccountMongoRepository(mgoClient),
-		contractRepository:        mongodb.NewContractMongoRepository(mgoClient),
-		backupRepository:          mongodb.NewBackupMongoRepository(mgoClient),
-		membershipRepository:      mongodb.NewMembershipMongoRepository(mgoClient),
+		userRepository:            mongodb.NewUserRepository(mgoClient),
+		accountRepository:         mongodb.NewAccountRepository(mgoClient),
+		contractRepository:        mongodb.NewContractRepository(mgoClient),
+		backupRepository:          mongodb.NewBackupRepository(mgoClient),
+		membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
 	}
 }
 

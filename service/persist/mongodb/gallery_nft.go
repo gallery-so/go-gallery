@@ -12,8 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// GalleryMongoRepository is a repository that stores collections in a MongoDB database
-type GalleryMongoRepository struct {
+// GalleryRepository is a repository that stores collections in a MongoDB database
+type GalleryRepository struct {
 	galleriesStorage   *storage
 	collectionsStorage *storage
 	galleriesCache     memstore.Cache
@@ -22,9 +22,9 @@ type GalleryMongoRepository struct {
 
 var errNoUserIDProvided = errors.New("no user ID provided")
 
-// NewGalleryMongoRepository creates a new instance of the collection mongo repository
-func NewGalleryMongoRepository(mgoClient *mongo.Client, galleriesCache memstore.Cache) *GalleryMongoRepository {
-	return &GalleryMongoRepository{
+// NewGalleryRepository creates a new instance of the collection mongo repository
+func NewGalleryRepository(mgoClient *mongo.Client, galleriesCache memstore.Cache) *GalleryRepository {
+	return &GalleryRepository{
 		galleriesStorage:   newStorage(mgoClient, 0, galleryDBName, galleryColName),
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		galleriesCache:     galleriesCache,
@@ -33,7 +33,7 @@ func NewGalleryMongoRepository(mgoClient *mongo.Client, galleriesCache memstore.
 }
 
 // Create inserts a new gallery into the database and returns the ID of the new gallery
-func (g *GalleryMongoRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
+func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
 
 	if pGallery.Collections == nil {
 		pGallery.Collections = []persist.DBID{}
@@ -52,7 +52,7 @@ func (g *GalleryMongoRepository) Create(pCtx context.Context, pGallery persist.G
 // Update updates a gallery in the database by ID, also ensuring the gallery
 // is owned by a given authorized user.
 // pUpdate is a struct that contains bson tags representing the fields to be updated
-func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBID,
+func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 	pOwnerUserID persist.DBID,
 	pUpdate persist.GalleryUpdateInput,
 ) error {
@@ -74,7 +74,7 @@ func (g *GalleryMongoRepository) Update(pCtx context.Context, pIDstr persist.DBI
 }
 
 // AddCollections adds collections to the specified gallery
-func (g *GalleryMongoRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
+func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
 	if err := g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs); err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (g *GalleryMongoRepository) AddCollections(pCtx context.Context, pID persis
 
 // GetByUserID gets a gallery by its owner user ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
+func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
 
 	fromCache, err := g.galleriesCache.Get(pCtx, pUserID.String())
 	if err == nil && len(fromCache) > 0 {
@@ -104,7 +104,7 @@ func (g *GalleryMongoRepository) GetByUserID(pCtx context.Context, pUserID persi
 	return g.getByUserIDSkipCache(pCtx, pUserID)
 }
 
-func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
+func (g *GalleryRepository) getByUserIDSkipCache(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
 
 	result := []persist.Gallery{}
 
@@ -126,7 +126,7 @@ func (g *GalleryMongoRepository) getByUserIDSkipCache(pCtx context.Context, pUse
 
 // GetByID gets a gallery by its ID and will variably return
 // hidden collections depending on the auth status of the caller
-func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
+func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
 
 	result := []persist.Gallery{}
 
@@ -142,11 +142,11 @@ func (g *GalleryMongoRepository) GetByID(pCtx context.Context, pID persist.DBID)
 }
 
 // RefreshCache deletes what is in the cache for a given user
-func (g *GalleryMongoRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
+func (g *GalleryRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
 	return g.galleriesCache.Delete(pCtx, pUserID.String())
 }
 
-func (g *GalleryMongoRepository) resetCache(pCtx context.Context, ownerUserID persist.DBID) error {
+func (g *GalleryRepository) resetCache(pCtx context.Context, ownerUserID persist.DBID) error {
 	_, err := g.getByUserIDSkipCache(pCtx, ownerUserID)
 	if err != nil {
 		return err

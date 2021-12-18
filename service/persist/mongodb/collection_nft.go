@@ -13,21 +13,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// CollectionMongoRepository is a repository that stores collections in a MongoDB database
-type CollectionMongoRepository struct {
+// CollectionRepository is a repository that stores collections in a MongoDB database
+type CollectionRepository struct {
 	collectionsStorage *storage
 	nftsStorage        *storage
 	galleriesStorage   *storage
 	usersStorage       *storage
 	unassignedCache    memstore.Cache
 	cacheUpdateQueue   *memstore.UpdateQueue
-	galleryRepo        *GalleryMongoRepository
-	nftRepo            *NFTMongoRepository
+	galleryRepo        *GalleryRepository
+	nftRepo            *NFTRepository
 }
 
-// NewCollectionMongoRepository creates a new instance of the collection mongo repository
-func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryMongoRepository, nftRepo *NFTMongoRepository) *CollectionMongoRepository {
-	return &CollectionMongoRepository{
+// NewCollectionRepository creates a new instance of the collection mongo repository
+func NewCollectionRepository(mgoClient *mongo.Client, unassignedCache memstore.Cache, galleryRepo *GalleryRepository, nftRepo *NFTRepository) *CollectionRepository {
+	return &CollectionRepository{
 		collectionsStorage: newStorage(mgoClient, 0, galleryDBName, collectionColName),
 		nftsStorage:        newStorage(mgoClient, 0, galleryDBName, nftColName),
 		usersStorage:       newStorage(mgoClient, 0, galleryDBName, usersCollName),
@@ -40,7 +40,7 @@ func NewCollectionMongoRepository(mgoClient *mongo.Client, unassignedCache memst
 }
 
 // Create inserts a single CollectionDB into the database and will return the ID of the inserted document
-func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl persist.CollectionDB) (persist.DBID, error) {
+func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.CollectionDB) (persist.DBID, error) {
 
 	if pColl.OwnerUserID == "" {
 		return "", errors.New("owner_user_id is required")
@@ -70,7 +70,7 @@ func (c *CollectionMongoRepository) Create(pCtx context.Context, pColl persist.C
 
 // GetByUserID will form an aggregation pipeline to get all collections owned by a user
 // and variably show hidden collections depending on the auth status of the caller
-func (c *CollectionMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
+func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
 
 	result := []persist.Collection{}
 
@@ -88,7 +88,7 @@ func (c *CollectionMongoRepository) GetByUserID(pCtx context.Context, pUserID pe
 
 // GetByID will form an aggregation pipeline to get a single collection by ID and
 // variably show hidden collections depending on the auth status of the caller
-func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
+func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
 
 	result := []persist.Collection{}
 
@@ -110,7 +110,7 @@ func (c *CollectionMongoRepository) GetByID(pCtx context.Context, pID persist.DB
 // Update will update a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
 // pUpdate will be a struct with bson tags that represent the fields to be updated
-func (c *CollectionMongoRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
+func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
 	if err := c.collectionsStorage.update(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, pUpdate); err != nil {
 		return err
@@ -129,7 +129,7 @@ func (c *CollectionMongoRepository) Update(pCtx context.Context, pID persist.DBI
 // by a given authorized user as well as that no other collection contains the NFTs
 // being included in the updated collection. This is to ensure that the NFTs are not
 // being shared between collections.
-func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
+func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
 
 	users := []*persist.User{}
 	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
@@ -169,7 +169,7 @@ func (c *CollectionMongoRepository) UpdateNFTs(pCtx context.Context, pID persist
 }
 
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
-func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pWalletAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
+func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pWalletAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
 
 	for i, addr := range pWalletAddresses {
 		pWalletAddresses[i] = addr
@@ -207,7 +207,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 
 // RemoveNFTsOfAddresses will remove all NFTs from a user's collections that are associated with
 // an array of addresses
-func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
+func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
 
 	for i, addr := range pAddresses {
 		pAddresses[i] = addr
@@ -240,7 +240,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 
 // Delete will delete a single collection by ID, also ensuring that the collection is owned
 // by a given authorized user.
-func (c *CollectionMongoRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
+func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
 
 	update := &persist.CollectionUpdateDeletedInput{Deleted: true}
 
@@ -259,7 +259,7 @@ func (c *CollectionMongoRepository) Delete(pCtx context.Context, pID persist.DBI
 
 // GetUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
-func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.Collection, error) {
+func (c *CollectionRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.Collection, error) {
 
 	result := []persist.Collection{}
 
@@ -321,7 +321,7 @@ func (c *CollectionMongoRepository) GetUnassigned(pCtx context.Context, pUserID 
 
 // RefreshUnassigned returns a collection that is empty except for a list of nfts that are not
 // assigned to any collection
-func (c *CollectionMongoRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
+func (c *CollectionRepository) RefreshUnassigned(pCtx context.Context, pUserID persist.DBID) error {
 	err := c.unassignedCache.Delete(pCtx, pUserID.String())
 	if err != nil {
 		return err

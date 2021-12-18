@@ -13,7 +13,8 @@ import (
 // NewPostgresClient creates a new postgres client
 func NewPostgresClient() *sql.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		viper.GetString("POSTGRES_HOST"), viper.GetInt("POSTGRES_PORT"), viper.GetString("POSTGRES_USER"), viper.GetString("POSTGRES_PASS"), viper.GetString("POSTGRES_PASSWORD"))
+		viper.GetString("POSTGRES_HOST"), viper.GetInt("POSTGRES_PORT"), viper.GetString("POSTGRES_USER"), viper.GetString("POSTGRES_PASSWORD"), viper.GetString("POSTGRES_DB"))
+
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic(err)
@@ -41,4 +42,12 @@ func prepareSet(update interface{}) string {
 
 	return set[0 : len(set)-1]
 
+}
+
+func generateValuesPlaceholders(l, offset int) string {
+	values := "("
+	for i := 0; i < l; i++ {
+		values += fmt.Sprintf("$%d,", i+1+offset)
+	}
+	return values[0:len(values)-1] + ")"
 }

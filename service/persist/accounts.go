@@ -53,6 +53,12 @@ func (a Address) Address() common.Address {
 	return common.HexToAddress(a.String())
 }
 
+// Scan implements the database/sql Scanner interface
+func (a *Address) Scan(i interface{}) error {
+	*a = Address(string([]byte(i.([]uint8))))
+	return nil
+}
+
 // Uint64 returns the ethereum block number as a uint64
 func (b BlockNumber) Uint64() uint64 {
 	return uint64(b)
