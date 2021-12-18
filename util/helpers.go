@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"strings"
@@ -24,16 +23,7 @@ func Contains(s []string, str string) bool {
 // UnmarshallBody takes a request body and unmarshals it into the given struct
 // input must be a pointer to a struct with json tags
 func UnmarshallBody(pInput interface{}, body io.Reader) error {
-	buf := &bytes.Buffer{}
-
-	if _, err := io.Copy(buf, body); err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(buf.Bytes(), pInput); err != nil {
-		return err
-	}
-	return nil
+	return json.NewDecoder(body).Decode(pInput)
 }
 
 // GetValueFromMap is a function that returns the value at the first occurence of a given key in a map that potentially contains nested maps

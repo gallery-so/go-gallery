@@ -9,6 +9,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -117,7 +118,7 @@ func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pU
 	}
 
 	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
-		return err
+		logrus.WithError(err).Error("failed to update last_updated time for galleries")
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
@@ -160,7 +161,7 @@ func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID
 	}
 
 	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
-		return err
+		logrus.WithError(err).Error("failed to update last_updated time for galleries")
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)
@@ -249,7 +250,7 @@ func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pU
 	}
 
 	if err := c.galleriesStorage.update(pCtx, bson.M{"owner_user_id": pUserID, "collections": bson.M{"$in": []interface{}{pID}}}, bson.M{"last_updated": persist.LastUpdatedTime(time.Time{})}); err != nil {
-		return err
+		logrus.WithError(err).Error("failed to update last_updated time for galleries")
 	}
 
 	go c.galleryRepo.resetCache(pCtx, pUserID)

@@ -26,7 +26,13 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	// build update request body
 	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
 	resp := updateCollectionInfoRequest(assert, update, tc.user1.jwt)
-	assertValidResponse(assert, resp)
+
+	errResp := &util.ErrorResponse{}
+	err = util.UnmarshallBody(errResp, resp.Body)
+	assert.Nil(err)
+	assert.Empty(errResp.Error)
+
+	// assertValidResponse(assert, resp)
 
 	// retrieve updated nft
 	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
