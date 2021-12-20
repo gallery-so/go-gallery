@@ -263,7 +263,7 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []persist.TokenInCol
 			n.TokenURI = newURI
 			nftChan <- tokenCollectionIndexTuple{n, index}
 			go func(id persist.DBID) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				defer cancel()
 				err := tokenRepo.UpdateByIDUnsafe(ctx, id, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata})
 				if err != nil {

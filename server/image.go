@@ -9,6 +9,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -276,15 +277,27 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 }
 
 func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {
-	c := exec.Command("ffmpeg", "-i", "pipe:0", "-ss=00:00:01.000", "-vframes=1", "-f=singlejpeg", "pipe:1")
+	c := exec.Command("ffmpeg", "-y", "-i", "pipe:0", "-ss=00:00:01.000", "-vsync", "2", "-vframes=1", "-f", "singlejpeg", "pipe:1")
 
 	return pipeIOForCmd(c, vid)
 }
 
 func scaleVideo(pCtx context.Context, vid []byte, w, h int) ([]byte, error) {
-	c := exec.Command("ffmpeg", "-f", "mp4", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "pipe:1")
+	testFile, err := os.CreateTemp("/tmp", "resize-*.mp4")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(testFile.Name())
 
-	return pipeIOForCmd(c, vid)
+	c := exec.Command("ffmpeg", "-y", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "-f", "mp4", testFile.Name())
+
+	err = pipeIOForCmdNoOut(c, vid)
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(testFile)
+
 }
 
 func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
@@ -317,6 +330,38 @@ func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func pipeIOForCmdNoOut(c *exec.Cmd, input []byte) error {
+
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	stdin, err := c.StdinPipe()
+	if err != nil {
+		return err
+	}
+	err = c.Start()
+	if err != nil {
+		return err
+	}
+
+	_, err = stdin.Write(input)
+	if err != nil {
+		return err
+	}
+
+	err = stdin.Close()
+	if err != nil {
+		return err
+	}
+
+	err = c.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e errUnsupportedURL) Error() string {

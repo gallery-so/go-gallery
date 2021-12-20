@@ -227,7 +227,13 @@ type ErrTokenNotFoundByID struct {
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
-	contentType := http.DetectContentType(buf[:512])
+	var slice []byte
+	if len(buf) > 512 {
+		slice = buf[:512]
+	} else {
+		slice = buf
+	}
+	contentType := http.DetectContentType(slice)
 	spl := strings.Split(contentType, "/")
 
 	switch spl[0] {
