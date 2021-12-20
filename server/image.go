@@ -102,12 +102,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			if err.(indexer.ErrHTTP).Status == http.StatusNotFound {
 				mediaType = persist.MediaTypeInvalid
 			} else {
-				return nil, err
+				return nil, fmt.Errorf("HTTP error downloading img %s: %s", imgURL, err)
 			}
 		case *net.DNSError:
 			mediaType = persist.MediaTypeInvalid
+			logrus.WithError(err).Warnf("DNS error downloading img %s: %s", imgURL, err)
 		default:
-			return nil, err
+			return nil, fmt.Errorf("error downloading img %s: %s", imgURL, err)
 		}
 	}
 	if vURL != "" {
@@ -118,12 +119,13 @@ func makePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 				if err.(indexer.ErrHTTP).Status == http.StatusNotFound {
 					mediaType = persist.MediaTypeInvalid
 				} else {
-					return nil, err
+					return nil, fmt.Errorf("HTTP error downloading video %s: %s", vURL, err)
 				}
 			case *net.DNSError:
 				mediaType = persist.MediaTypeInvalid
+				logrus.WithError(err).Warnf("DNS error downloading video %s: %s", vURL, err)
 			default:
-				return nil, err
+				return nil, fmt.Errorf("error downloading video %s: %s", vURL, err)
 			}
 		}
 	}
@@ -217,38 +219,38 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	case persist.MediaTypeVideo:
 		scaled, err := scaleVideo(pCtx, bs, -1, 720)
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error scaling video: %s", err)
 		}
 		err = cacheRawMedia(pCtx, scaled, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error caching video: %s", err)
 		}
 
 		jp, err := thumbnailVideo(pCtx, bs)
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error generating thumbnail: %s", err)
 		}
 		jpg, err := jpeg.Decode(bytes.NewBuffer(jp))
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error decoding thumbnail as jpeg: %s", err)
 		}
 		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
 		buf = &bytes.Buffer{}
 		err = jpeg.Encode(buf, jpg, nil)
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error encoding thumbnail as jpeg: %s", err)
 		}
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	case persist.MediaTypeGIF:
 		// thumbnails a gif, do we need to store the whole gif?
 		asGif, err := gif.DecodeAll(bytes.NewReader(buf.Bytes()))
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error decoding gif: %s", err)
 		}
 		buf = &bytes.Buffer{}
 		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
 		if err != nil {
-			return mediaType, err
+			return mediaType, fmt.Errorf("error encoding gif thumbnail as jpeg: %s", err)
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	default:
@@ -280,7 +282,7 @@ func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {
 }
 
 func scaleVideo(pCtx context.Context, vid []byte, w, h int) ([]byte, error) {
-	c := exec.Command("ffmpeg", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "pipe:1")
+	c := exec.Command("ffmpeg", "-f", "mp4", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "pipe:1")
 
 	return pipeIOForCmd(c, vid)
 }

@@ -105,7 +105,7 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding base64 data: %s", err)
 		}
 
 		return decoded, nil
@@ -115,13 +115,13 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 
 		it, err := ipfsClient.Cat(pathMinusExtra)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting data from ipfs: %s", err)
 		}
 		defer it.Close()
 
 		buf := &bytes.Buffer{}
 		if _, err = io.Copy(buf, it); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error copying data from ipfs: %s", err)
 		}
 
 		return buf.Bytes(), nil
@@ -131,13 +131,13 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			toCat := asString[strings.Index(asString, "ipfs/")+5:]
 			it, err := ipfsClient.Cat(toCat)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error getting data from http IPFS: %s", err)
 			}
 			body = it
 		} else {
 			resp, err := client.Get(asString)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error getting data from http: %s", err)
 			}
 			if resp.StatusCode > 299 || resp.StatusCode < 200 {
 				return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
