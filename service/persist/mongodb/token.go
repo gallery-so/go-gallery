@@ -96,11 +96,14 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"owner_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -162,11 +165,14 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"contract_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -182,11 +188,14 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -195,8 +204,12 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"_id": pID})
 	if err != nil {
+		return persist.Token{}, err
+	}
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, result); err != nil {
 		return persist.Token{}, err
 	}
 
