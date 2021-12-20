@@ -101,7 +101,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 		return nil, err
 	}
 	defer cur.Close(pCtx)
-	if err := cur.All(pCtx, result); err != nil {
+	if err := cur.All(pCtx, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -170,7 +170,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 		return nil, err
 	}
 	defer cur.Close(pCtx)
-	if err := cur.All(pCtx, result); err != nil {
+	if err := cur.All(pCtx, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -193,7 +193,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 		return nil, err
 	}
 	defer cur.Close(pCtx)
-	if err := cur.All(pCtx, result); err != nil {
+	if err := cur.All(pCtx, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -209,7 +209,7 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 		return persist.Token{}, err
 	}
 	defer cur.Close(pCtx)
-	if err := cur.All(pCtx, result); err != nil {
+	if err := cur.All(pCtx, &result); err != nil {
 		return persist.Token{}, err
 	}
 
