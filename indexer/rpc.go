@@ -79,11 +79,18 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
-	// parse the json
-	metadata := persist.TokenMetadata{}
-	err = json.Unmarshal(bs, &metadata)
-	if err != nil {
-		return nil, err
+
+	var metadata persist.TokenMetadata
+	switch turi.Type() {
+
+	case persist.URITypeBase64SVG, persist.URITypeSVG:
+		metadata = persist.TokenMetadata{"image": string(bs)}
+	default:
+		err = json.Unmarshal(bs, &metadata)
+		if err != nil {
+			return persist.TokenMetadata{}, err
+		}
+
 	}
 
 	return metadata, nil
@@ -119,12 +126,16 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 		}
 		defer it.Close()
 
-		buf := &bytes.Buffer{}
-		if _, err = io.Copy(buf, it); err != nil {
-			return nil, fmt.Errorf("error copying data from ipfs: %s", err)
-		}
+		// buf := &bytes.Buffer{}
+		// if _, err = io.Copy(buf, it); err != nil {
+		// 	return nil, fmt.Errorf("error copying data from ipfs: %s", err)
+		// }
 
-		return buf.Bytes(), nil
+		bs, err := io.ReadAll(it)
+		if err != nil {
+			return nil, fmt.Errorf("error reading data from ipfs: %s", err)
+		}
+		return bs, nil
 	case persist.URITypeHTTP:
 		var body io.ReadCloser
 		if strings.Contains(asString, "ipfs/") {

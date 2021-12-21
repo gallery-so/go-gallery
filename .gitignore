@@ -12,3 +12,6 @@ node_modules/
 yarn.lock
 # SECRITS
 decrypted*
+
+*.mp4
+*.jpg

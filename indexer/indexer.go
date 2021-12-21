@@ -448,7 +448,7 @@ func processTransfers(i *Indexer, transfers []*transfer, uris chan<- tokenURI, m
 				panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
 			}
 
-			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.String()))
+			uriReplaced := persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", id.Text(16)))
 
 			go func() {
 				defer wg.Done()

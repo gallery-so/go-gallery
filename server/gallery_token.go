@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -40,7 +41,7 @@ type errNoGalleriesFoundWithID struct {
 
 // HANDLERS
 
-func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -58,7 +59,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 		aeCtx := appengine.NewContext(c.Request)
 		for i, gallery := range galleries {
 			for i, collection := range gallery.Collections {
-				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
+				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
 				gallery.Collections[i] = collection
 			}
 			galleries[i] = gallery
@@ -69,7 +70,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 	}
 }
 
-func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -94,7 +95,7 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 
 		aeCtx := appengine.NewContext(c.Request)
 		for i, collection := range gallery.Collections {
-			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient)
+			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
 			gallery.Collections[i] = collection
 		}
 

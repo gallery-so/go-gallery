@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -71,7 +72,7 @@ type errNoCollectionsFoundWithID struct {
 
 // HANDLERS
 
-func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -91,7 +92,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient)
+			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutputtoken{Collections: colls})
@@ -99,7 +100,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 	}
 }
 
-func getCollectionByIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getCollectionByIDToken(collectionsRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//------------------
 		// INPUT
@@ -123,7 +124,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient, ethClient)
+		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
 		return

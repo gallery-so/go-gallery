@@ -285,6 +285,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64JSON
 	case strings.Contains(asString, "data:image/svg+xml;base64,"):
 		return URITypeBase64SVG
+	case strings.Contains(asString, "base64,"):
+		return URITypeBase64JSON
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
@@ -306,7 +308,10 @@ func (id TokenID) String() string {
 func (id TokenID) BigInt() *big.Int {
 	i, ok := new(big.Int).SetString(id.String(), 16)
 	if !ok {
-		i, _ = new(big.Int).SetString(id.String(), 10)
+		i, ok = new(big.Int).SetString(id.String(), 10)
+		if !ok {
+			panic("failed to convert token ID to big.Int")
+		}
 	}
 	return i
 }

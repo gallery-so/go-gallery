@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -78,7 +79,7 @@ func CoreInit() *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
+	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
 }
 
 func setDefaults() {
@@ -178,5 +179,15 @@ func newGCPPubSub() pubsub.PubSub {
 		panic(err)
 	}
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	return client
+}
+
+func newGCPStorageClient() *storage.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
+	defer cancel()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
 	return client
 }
