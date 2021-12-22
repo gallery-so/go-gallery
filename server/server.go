@@ -26,6 +26,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"google.golang.org/api/option"
 )
 
 type repositories struct {
@@ -185,9 +186,17 @@ func newGCPPubSub() pubsub.PubSub {
 func newGCPStorageClient() *storage.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
+	if viper.GetString("ENV") == "local" {
+		client, err := storage.NewClient(ctx, option.WithCredentialsFile("./decrypted/service-key.json"))
+		if err != nil {
+			panic(err)
+		}
+		return client
+	}
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		panic(err)
 	}
 	return client
+
 }
