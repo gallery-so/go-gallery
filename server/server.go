@@ -186,8 +186,8 @@ func newGCPPubSub() pubsub.PubSub {
 func newGCPStorageClient() *storage.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
-	if viper.GetString("ENV") == "local" {
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile("./decrypted/service-key.json"))
+	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
+		client, err := storage.NewClient(ctx, option.WithCredentialsFile("service-key.json"))
 		if err != nil {
 			panic(err)
 		}
