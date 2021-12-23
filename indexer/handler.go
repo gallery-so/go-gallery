@@ -39,7 +39,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
-	tokenRepo, contractRepo := newRepos()
+	tokenRepo, contractRepo, userRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -50,9 +50,14 @@ func coreInit() (*gin.Engine, *Indexer) {
 	if err != nil {
 		panic(err)
 	}
-	i := NewIndexer(newEthClient(), newIPFSShell(), s, tokenRepo, contractRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	i := NewIndexer(newEthClient(), newIPFSShell(), s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
+
+	if viper.GetString("ENV") == "local" {
+		gin.SetMode(gin.DebugMode)
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
 	logrus.Info("Registering handlers...")
 	return handlersInit(router, i, tokenRepo), i
@@ -93,6 +98,8 @@ func setDefaults() {
 	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
+
 	viper.AutomaticEnv()
 }
 
@@ -117,9 +124,9 @@ func newIPFSShell() *shell.Shell {
 	return sh
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository) {
+func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
 	mgoClient := newMongoClient()
-	return mongodb.NewTokenMongoRepository(mgoClient, nil), mongodb.NewContractMongoRepository(mgoClient)
+	return mongodb.NewTokenMongoRepository(mgoClient, nil), mongodb.NewContractMongoRepository(mgoClient), mongodb.NewUserMongoRepository(mgoClient)
 }
 
 func newMongoClient() *mongo.Client {

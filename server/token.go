@@ -11,10 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/appengine"
@@ -281,36 +282,36 @@ func ensureCollectionTokenMedia(aeCtx context.Context, nfts []persist.TokenInCol
 	return nfts
 }
 
-func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, media persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
+func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, med persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
 	if tokenURI == "" {
 		logrus.Infof("Token URI is empty for token %s-%s", contractAddress, id)
-		uri, err := indexer.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
+		uri, err := rpc.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not get token URI for token")
-			return media, metadata, tokenURI
+			return med, metadata, tokenURI
 		}
 		tokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", tokenID.BigInt().Text(16)))
 
 	}
 	if metadata == nil || len(metadata) == 0 {
 		logrus.Infof("Token metadata is empty for token %s-%s", contractAddress, id)
-		m, err := indexer.GetMetadataFromURI(tokenURI, ipfsClient)
+		m, err := rpc.GetMetadataFromURI(tokenURI, ipfsClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"uri": tokenURI}).Error("could not get metadata for token")
-			return media, metadata, tokenURI
+			return med, metadata, tokenURI
 		}
 		metadata = m
 	}
-	if media.MediaType == "" || media.MediaURL == "" {
+	if med.MediaType == "" || med.MediaURL == "" {
 		logrus.Infof("Token media type is empty for token %s-%s", contractAddress, id)
-		newMedia, err := makePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient, storageClient)
+		newMedia, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient, storageClient)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not make previews for token")
-			return media, metadata, tokenURI
+			return med, metadata, tokenURI
 		}
-		media = newMedia
+		med = newMedia
 	}
-	return media, metadata, tokenURI
+	return med, metadata, tokenURI
 }
 
 func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {

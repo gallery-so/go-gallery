@@ -143,7 +143,7 @@ type Token struct {
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
 	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
 	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
+	OwnershipHistory []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
@@ -279,7 +279,7 @@ func (uri TokenURI) String() string {
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
 	switch {
-	case strings.Contains(asString, "ipfs://"):
+	case strings.Contains(asString, "ipfs://"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
 	case strings.Contains(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
@@ -291,7 +291,7 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
 		return URITypeHTTP
-	case strings.HasPrefix(asString, "{"):
+	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
 	case strings.HasPrefix(asString, "<svg"):
 		return URITypeSVG
