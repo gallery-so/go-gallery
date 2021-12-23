@@ -70,6 +70,11 @@ type tokenURI struct {
 	uri persist.TokenURI
 }
 
+type transfersAtBlock struct {
+	block     persist.BlockNumber
+	transfers []rpc.Transfer
+}
+
 type uniqueMetadataHandler func(*Indexer, persist.TokenURI, persist.Address, persist.TokenID) (persist.TokenMetadata, error)
 
 type uniqueMetadatas map[persist.Address]uniqueMetadataHandler
@@ -180,7 +185,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
-	transfers := make(chan []rpc.Transfer)
+	transfers := make(chan []transfersAtBlock)
 
 	go i.processLogs(transfers, start, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
@@ -192,14 +197,14 @@ func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]c
 	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
-	transfers := make(chan []rpc.Transfer)
+	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
 	go i.subscribeNewLogs(start, transfers, subscriptions, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
 	i.processTokens(uris, metadatas, owners, previousOwners, balances)
 }
 
-func (i *Indexer) processLogs(transfersChan chan<- []rpc.Transfer, startingBlock persist.BlockNumber, topics [][]common.Hash) {
+func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
 	defer close(transfersChan)
 
 	curBlock := startingBlock.BigInt()
@@ -259,18 +264,20 @@ func (i *Indexer) processLogs(transfersChan chan<- []rpc.Transfer, startingBlock
 
 	logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
-	if len(transfers) > 0 && transfers != nil {
+	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
+
+	if len(transfersAtBlocks) > 0 && transfersAtBlocks != nil {
 		logrus.Infof("Sending %d total transfers to transfers channel", len(transfers))
-		interval := len(transfers) / 4
+		interval := len(transfersAtBlocks) / 4
 		if interval == 0 {
 			interval = 1
 		}
-		for j := 0; j < len(transfers); j += interval {
+		for j := 0; j < len(transfersAtBlocks); j += interval {
 			to := j + interval
-			if to > len(transfers) {
-				to = len(transfers)
+			if to > len(transfersAtBlocks) {
+				to = len(transfersAtBlocks)
 			}
-			transfersChan <- transfers[j:to]
+			transfersChan <- transfersAtBlocks[j:to]
 		}
 
 	}
@@ -400,7 +407,7 @@ func (i *Indexer) listenForNewBlocks() {
 	}
 }
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []rpc.Transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
 	defer close(metadatas)
 	defer close(owners)
@@ -416,7 +423,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []rpc.Transfer, uris
 		}
 
 		logrus.Infof("Processing %d transfers", len(transfers))
-		it := make([]rpc.Transfer, len(transfers))
+		it := make([]transfersAtBlock, len(transfers))
 		copy(it, transfers)
 		wp.Submit(func() {
 			submit := it
@@ -428,120 +435,122 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []rpc.Transfer, uris
 	logrus.Info("Closing field channels...")
 }
 
-func processTransfers(i *Indexer, transfers []rpc.Transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 
-	// TODO what if an NFT gets transferred twice in the same block?
-	for _, transfer := range transfers {
-		initial := time.Now()
-		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
+	for _, transferAtBlock := range transfers {
+		for _, transfer := range transferAtBlock.transfers {
+			initial := time.Now()
+			func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
 
-			wg := &sync.WaitGroup{}
-			contractAddress := transfer.ContractAddress
-			from := transfer.From
-			to := transfer.To
-			tokenID := transfer.TokenID
+				wg := &sync.WaitGroup{}
+				contractAddress := transfer.ContractAddress
+				from := transfer.From
+				to := transfer.To
+				tokenID := transfer.TokenID
 
-			key := makeKeyForToken(contractAddress, tokenID)
-			// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
+				key := makeKeyForToken(contractAddress, tokenID)
+				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-			switch persist.TokenType(transfer.TokenType) {
-			case persist.TokenTypeERC721:
+				switch persist.TokenType(transfer.TokenType) {
+				case persist.TokenTypeERC721:
 
-				wg.Add(4)
+					wg.Add(4)
 
-				go func() {
-					defer wg.Done()
-					owners <- ownerAtBlock{key, to, transfer.BlockNumber}
-				}()
+					go func() {
+						defer wg.Done()
+						owners <- ownerAtBlock{key, to, transfer.BlockNumber}
+					}()
 
-				go func() {
-					defer wg.Done()
-					previousOwners <- ownerAtBlock{key, from, transfer.BlockNumber}
-				}()
+					go func() {
+						defer wg.Done()
+						previousOwners <- ownerAtBlock{key, from, transfer.BlockNumber}
+					}()
 
-			case persist.TokenTypeERC1155:
-				wg.Add(3)
+				case persist.TokenTypeERC1155:
+					wg.Add(3)
 
-				go func() {
-					defer wg.Done()
-					ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), i.ethClient)
-					if err != nil {
-						logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
-						return
-					}
-					var fromBalance, toBalance *big.Int
-					if from.String() != "0x0000000000000000000000000000000000000000" {
-						fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
+					go func() {
+						defer wg.Done()
+						ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), i.ethClient)
 						if err != nil {
-							// TODO Scary this might fail and that won't be good
-							logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
-							panic(err)
+							logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
+							return
 						}
-					}
-					if to.String() != "0x0000000000000000000000000000000000000000" {
-						toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
-						if err != nil {
-							// TODO Scary this might fail and that won't be good
-							logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
-							panic(err)
+						var fromBalance, toBalance *big.Int
+						if from.String() != "0x0000000000000000000000000000000000000000" {
+							fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
+							if err != nil {
+								// TODO Scary this might fail and that won't be good
+								logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
+								panic(err)
+							}
 						}
-					}
+						if to.String() != "0x0000000000000000000000000000000000000000" {
+							toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
+							if err != nil {
+								// TODO Scary this might fail and that won't be good
+								logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
+								panic(err)
+							}
+						}
 
-					balances <- tokenBalances{key, from, to, fromBalance, toBalance, transfer.BlockNumber}
-				}()
+						balances <- tokenBalances{key, from, to, fromBalance, toBalance, transfer.BlockNumber}
+					}()
 
-			default:
-				panic("unknown token type")
-			}
-
-			u, err := rpc.GetTokenURI(ctx, transfer.TokenType, contractAddress, tokenID, i.ethClient)
-			if err != nil {
-				// TODO figuring out what different error mean and making sure we don't keep trying to get the token URI if we won't ever be able to
-				logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
-			}
-
-			id, err := util.HexToBigInt(string(tokenID))
-			if err != nil {
-				panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
-			}
-
-			uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", id.Text(16))))
-
-			go func() {
-				defer wg.Done()
-				uris <- tokenURI{key, uriReplaced}
-			}()
-
-			if uriReplaced != "" {
-
-				var metadata persist.TokenMetadata
-				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-					metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
-					if err != nil {
-						logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-						atomic.AddUint64(&i.badURIs, 1)
-					}
-				} else {
-
-					metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
-					if err != nil {
-						logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-						atomic.AddUint64(&i.badURIs, 1)
-					}
+				default:
+					panic("unknown token type")
 				}
 
+				u, err := rpc.GetTokenURI(ctx, transfer.TokenType, contractAddress, tokenID, i.ethClient)
+				if err != nil {
+					// TODO figuring out what different error mean and making sure we don't keep trying to get the token URI if we won't ever be able to
+					logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
+				}
+
+				id, err := util.HexToBigInt(string(tokenID))
+				if err != nil {
+					panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
+				}
+
+				uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", id.Text(16))))
+
 				go func() {
 					defer wg.Done()
-					metadatas <- tokenMetadata{key, metadata}
+					uris <- tokenURI{key, uriReplaced}
 				}()
-			} else {
-				wg.Done()
-			}
-			wg.Wait()
-			logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
-		}()
+
+				if uriReplaced != "" {
+
+					var metadata persist.TokenMetadata
+					if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+						metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+						if err != nil {
+							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+							atomic.AddUint64(&i.badURIs, 1)
+						}
+					} else {
+
+						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
+						if err != nil {
+							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+							atomic.AddUint64(&i.badURIs, 1)
+						}
+					}
+
+					go func() {
+						defer wg.Done()
+						metadatas <- tokenMetadata{key, metadata}
+					}()
+				} else {
+					wg.Done()
+				}
+				wg.Wait()
+				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
+			}()
+		}
+
 	}
 
 }
@@ -831,7 +840,7 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 	return c
 }
 
-func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []rpc.Transfer, subscriptions chan types.Log, topics [][]common.Hash) {
+func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfers)
 
@@ -847,7 +856,8 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 		case log := <-subscriptions:
 			logrus.Infof("Got log at: %d", log.BlockNumber)
 			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
-			transfers <- logsToTransfers([]types.Log{log}, i.ethClient)
+			ts := logsToTransfers([]types.Log{log}, i.ethClient)
+			transfers <- transfersToTransfersAtBlock(ts)
 		case err := <-sub.Err():
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}
@@ -894,4 +904,31 @@ func parseTokenIdentifiers(key tokenIdentifiers) (persist.Address, persist.Token
 		return "", "", fmt.Errorf("invalid key: %s", key)
 	}
 	return persist.Address(parts[0]), persist.TokenID(parts[1]), nil
+}
+
+func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
+	transfersMap := map[persist.BlockNumber]transfersAtBlock{}
+
+	for _, transfer := range transfers {
+		if _, ok := transfersMap[transfer.BlockNumber]; !ok {
+			transfers := make([]rpc.Transfer, 0, 10)
+			transfers = append(transfers, transfer)
+			transfersMap[transfer.BlockNumber] = transfersAtBlock{
+				block:     transfer.BlockNumber,
+				transfers: transfers,
+			}
+		} else {
+			tab := transfersMap[transfer.BlockNumber]
+			tab.transfers = append(tab.transfers, transfer)
+			transfersMap[transfer.BlockNumber] = tab
+		}
+	}
+
+	allTransfersAtBlock := make([]transfersAtBlock, len(transfersMap))
+	i := 0
+	for _, transfersAtBlock := range transfersMap {
+		allTransfersAtBlock[i] = transfersAtBlock
+		i++
+	}
+	return allTransfersAtBlock
 }
