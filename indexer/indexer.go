@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -482,7 +484,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						if from.String() != "0x0000000000000000000000000000000000000000" {
 							fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
 							if err != nil {
-								// TODO Scary this might fail and that won't be good
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
 								panic(err)
 							}
@@ -490,7 +491,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						if to.String() != "0x0000000000000000000000000000000000000000" {
 							toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
 							if err != nil {
-								// TODO Scary this might fail and that won't be good
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
 								panic(err)
 							}
@@ -505,8 +505,10 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 				u, err := rpc.GetTokenURI(ctx, transfer.TokenType, contractAddress, tokenID, i.ethClient)
 				if err != nil {
-					// TODO figuring out what different error mean and making sure we don't keep trying to get the token URI if we won't ever be able to
 					logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
+					if strings.Contains(err.Error(), "execution reverted") {
+						u = persist.InvalidTokenURI
+					}
 				}
 
 				id, err := util.HexToBigInt(string(tokenID))
@@ -521,7 +523,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					uris <- tokenURI{key, uriReplaced}
 				}()
 
-				if uriReplaced != "" {
+				if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
 
 					var metadata persist.TokenMetadata
 					if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
@@ -534,6 +536,14 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
 						if err != nil {
+							switch err.(type) {
+							case rpc.ErrHTTP:
+								if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
+									metadata = persist.TokenMetadata{"error": "not found"}
+								}
+							case *net.DNSError:
+								metadata = persist.TokenMetadata{"error": "dns error"}
+							}
 							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 							atomic.AddUint64(&i.badURIs, 1)
 						}
@@ -701,25 +711,27 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			BlockNumber:      v.block,
 		}
 		if metadata.md != nil && len(metadata.md) > 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-			exists, err := i.userRepo.ExistsByAddress(ctx, t.OwnerAddress)
-			cancel()
-			if err != nil {
-				logrus.WithError(err).Error("error checking if user exists")
-				panic(err)
-			} else if exists {
-				ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
-				med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, t.TokenURI, i.ipfsClient, i.storageClient)
+			if _, ok := metadata.md["error"]; !ok {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				exists, err := i.userRepo.ExistsByAddress(ctx, t.OwnerAddress)
 				cancel()
 				if err != nil {
-					logrus.WithError(err).Error("error making previews")
-				} else {
-					t.Media = med
+					logrus.WithError(err).Error("error checking if user exists")
+					panic(err)
+				} else if exists {
+					ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
+					med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, t.TokenURI, i.ipfsClient, i.storageClient)
+					cancel()
+					if err != nil {
+						logrus.WithError(err).Error("error making previews")
+					} else {
+						t.Media = med
+					}
 				}
 			}
+			result[j] = t
+			j++
 		}
-		result[j] = t
-		j++
 	}
 	for k, v := range balances {
 		contractAddress, tokenID, err := parseTokenIdentifiers(k)
@@ -746,24 +758,26 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 
 		for addr, balance := range v {
 			if hasMetadata && m.MediaType == "" && m.MediaURL == "" {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-				exists, err := i.userRepo.ExistsByAddress(ctx, addr)
-				cancel()
-				if err != nil {
-					logrus.WithError(err).Error("error checking if user exists")
-					panic(err)
-				} else if exists {
-					aeCtx := appengine.BackgroundContext()
-
-					ctx, cancel = context.WithTimeout(aeCtx, time.Second*30)
-					med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, uri.uri, i.ipfsClient, i.storageClient)
+				if _, ok := metadata.md["error"]; !ok {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+					exists, err := i.userRepo.ExistsByAddress(ctx, addr)
 					cancel()
 					if err != nil {
-						logrus.WithError(err).Error("error making previews")
-					} else {
-						m = med
-					}
+						logrus.WithError(err).Error("error checking if user exists")
+						panic(err)
+					} else if exists {
+						aeCtx := appengine.BackgroundContext()
 
+						ctx, cancel = context.WithTimeout(aeCtx, time.Second*30)
+						med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, uri.uri, i.ipfsClient, i.storageClient)
+						cancel()
+						if err != nil {
+							logrus.WithError(err).Error("error making previews")
+						} else {
+							m = med
+						}
+
+					}
 				}
 			}
 			t := persist.Token{
