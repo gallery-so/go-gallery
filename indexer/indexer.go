@@ -430,6 +430,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []rpc.Transfer, uris
 
 func processTransfers(i *Indexer, transfers []rpc.Transfer, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 
+	// TODO what if an NFT gets transferred twice in the same block?
 	for _, transfer := range transfers {
 		initial := time.Now()
 		func() {

@@ -75,6 +75,10 @@ const (
 	URITypeSVG URIType = "svg"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
+	// URITypeInvalid represents an invalid URI type
+	URITypeInvalid URIType = "invalid"
+	// URITypeNone represents no URI
+	URITypeNone URIType = "none"
 )
 
 const (
@@ -87,6 +91,9 @@ const (
 	// CountTypeERC1155 represents the count of ERC1155 tokens
 	CountTypeERC1155 TokenCountType = "erc1155"
 )
+
+// InvalidTokenURI represents an invalid token URI
+const InvalidTokenURI TokenURI = "INVALID"
 
 // TokenType represents the contract specification of the token
 type TokenType string
@@ -211,6 +218,7 @@ type TokenRepository interface {
 	Upsert(context.Context, Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
@@ -295,6 +303,10 @@ func (uri TokenURI) Type() URIType {
 		return URITypeJSON
 	case strings.HasPrefix(asString, "<svg"):
 		return URITypeSVG
+	case asString == InvalidTokenURI.String():
+		return URITypeInvalid
+	case asString == "":
+		return URITypeNone
 	default:
 		return URITypeUnknown
 	}

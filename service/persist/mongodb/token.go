@@ -390,6 +390,15 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 
 }
 
+// UpdateByTokenIdentifiersUnsafe will update a given token by its token identifiers without ensuring the token is owned by a given wallet or user
+func (t *TokenMongoRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pUpdate interface{}) error {
+	if err := t.tokensStorage.update(pCtx, bson.M{"token_id": pTokenID, "contract_address": pContractAddress}, pUpdate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // MostRecentBlock will find the most recent block stored for all tokens
 func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
 
