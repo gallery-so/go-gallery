@@ -172,9 +172,10 @@ func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID
 // ClaimNFTs will remove all NFTs from anyone's collections EXCEPT the user who is claiming them
 func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pWalletAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
 
-	for i, addr := range pWalletAddresses {
-		pWalletAddresses[i] = addr
-	}
+	// What in the world was I thinking when I wrote these three lines of code...
+	// for i, addr := range pWalletAddresses {
+	// 	pWalletAddresses[i] = addr
+	// }
 
 	nftsToBeRemoved := []*persist.NFTDB{}
 
@@ -210,9 +211,10 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 // an array of addresses
 func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
 
-	for i, addr := range pAddresses {
-		pAddresses[i] = addr
-	}
+	// Once again :facepalm:
+	// for i, addr := range pAddresses {
+	// 	pAddresses[i] = addr
+	// }
 
 	nftsToBeRemoved := []*persist.NFTDB{}
 

@@ -27,10 +27,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 	sqlStr += prepareSet(pUpdate)
 	sqlStr += ` WHERE ID = $1`
 	_, err := u.db.ExecContext(pCtx, sqlStr, pID)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 
 }
 

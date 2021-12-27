@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -86,28 +87,93 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 }
 
 // Update updates a collection in the database
-func (c *CollectionRepository) Update(context.Context, persist.DBID, persist.DBID, interface{}) error {
-	return nil
+func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
+	sqlStr := fmt.Sprintf("UPDATE collections %s WHERE ID = $1 AND OWNER_USER_ID = $2;", prepareSet(pUpdate))
+	_, err := c.db.ExecContext(pCtx, sqlStr, pID, pUserID)
+	return err
 }
 
 // UpdateNFTs updates the nfts of a collection in the database
-func (c *CollectionRepository) UpdateNFTs(context.Context, persist.DBID, persist.DBID, persist.CollectionUpdateNftsInput) error {
-	return nil
+func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
+	sqlStr := `UPDATE collections SET NFTS = $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`
+	_, err := c.db.ExecContext(pCtx, sqlStr, pUpdate.Nfts, pID, pUserID)
+	return err
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionRepository) ClaimNFTs(context.Context, persist.DBID, []persist.Address, persist.CollectionUpdateNftsInput) error {
+func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pID persist.DBID, pOwnerAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
+	nftsToRemoveSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`
+	nftsToRemove, err := c.db.QueryContext(pCtx, nftsToRemoveSQLStr, pq.Array(pOwnerAddresses), pq.Array(pUpdate.Nfts))
+	if err != nil {
+		return err
+	}
+	defer nftsToRemove.Close()
+
+	nftsToRemoveIDs := []persist.DBID{}
+	for nftsToRemove.Next() {
+		var id persist.DBID
+		err = nftsToRemove.Scan(&id)
+		if err != nil {
+			return err
+		}
+		nftsToRemoveIDs = append(nftsToRemoveIDs, id)
+	}
+
+	deleteNFTsSQLStr := `UPDATE nfts SET DELETED = true WHERE ID = ANY($1);`
+	_, err = c.db.ExecContext(pCtx, deleteNFTsSQLStr, pq.Array(nftsToRemoveIDs))
+	if err != nil {
+		return err
+	}
+
+	removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, ANY($1)) WHERE ID = $2;`
+	_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, pq.Array(nftsToRemoveIDs), pID)
+	if err != nil {
+		return err
+	}
+
 	return nil
+
 }
 
 // RemoveNFTsOfAddresses removes nfts of addresses from a collection in the database
-func (c *CollectionRepository) RemoveNFTsOfAddresses(context.Context, persist.DBID, []persist.Address) error {
+func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
+	findNFTsForAddressesSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1);`
+	nfts, err := c.db.QueryContext(pCtx, findNFTsForAddressesSQLStr, pq.Array(pAddresses))
+	if err != nil {
+		return err
+	}
+	defer nfts.Close()
+
+	nftsIDs := []persist.DBID{}
+	for nfts.Next() {
+		var id persist.DBID
+		err = nfts.Scan(&id)
+		if err != nil {
+			return err
+		}
+		nftsIDs = append(nftsIDs, id)
+	}
+
+	deleteNFTsSQLStr := `UPDATE nfts SET DELETED = true WHERE ID = ANY($1);`
+	_, err = c.db.ExecContext(pCtx, deleteNFTsSQLStr, pq.Array(nftsIDs))
+	if err != nil {
+		return err
+	}
+
+	removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, ANY($1)) WHERE ID = $2;`
+	_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, pq.Array(nftsIDs), pID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // Delete deletes a collection from the database
-func (c *CollectionRepository) Delete(context.Context, persist.DBID, persist.DBID) error {
-	return nil
+func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
+	sqlStr := `UPDATE collections SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`
+	_, err := c.db.ExecContext(pCtx, sqlStr, pID, pUserID)
+	return err
 }
 
 // GetUnassigned returns all unassigned nfts

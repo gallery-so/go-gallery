@@ -19,7 +19,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/lib/pq v1.0.0
-	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.16
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/segmentio/ksuid v1.0.4
