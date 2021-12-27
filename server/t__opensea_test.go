@@ -61,7 +61,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	mikeColl, err := tc.repos.collectionRepository.GetByID(ctx, collID, true)
 	assert.Nil(err)
-	assert.Len(mikeColl.Nfts, 0)
+	assert.Len(mikeColl.NFTs, 0)
 
 	robinNFTs, err := tc.repos.nftRepository.GetByUserID(ctx, robinUserID)
 	assert.Nil(err)

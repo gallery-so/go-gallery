@@ -142,10 +142,10 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID)
 		if err != nil {
-			coll = persist.Collection{Nfts: []persist.CollectionNFT{}}
+			coll = persist.Collection{NFTs: []persist.CollectionNFT{}}
 		}
 
-		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.Nfts})
+		c.JSON(http.StatusOK, getUnassignedNftsOutput{Nfts: coll.NFTs})
 	}
 }
 

@@ -55,7 +55,7 @@ func TestCollectionGetByUserID_Success(t *testing.T) {
 
 	a.Equal(1, len(collections))
 
-	a.Greater(len(collections[0].Nfts), 0)
+	a.Greater(len(collections[0].NFTs), 0)
 }
 
 func TestCollectionGetByID_Success(t *testing.T) {
@@ -108,6 +108,6 @@ func TestCollectionGetByID_Success(t *testing.T) {
 
 	a.Equal(collection.Name, coll.Name)
 
-	a.Greater(len(coll.Nfts), 0)
+	a.Greater(len(coll.NFTs), 0)
 
 }

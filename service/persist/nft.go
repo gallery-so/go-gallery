@@ -135,9 +135,9 @@ type ContractCollectionNFT struct {
 // UpdateNFTInfoInput represents a MongoDB input to update the user defined info
 // associated with a given NFT in the DB
 type UpdateNFTInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	CollectorsNote string `bson:"collectors_note"`
+	CollectorsNote string `bson:"collectors_note" postgres:"COLLECTORS_NOTE"`
 }
 
 // NFTRepository represents the interface for interacting with persisted NFTs
@@ -161,6 +161,12 @@ func (n *CollectionNFT) Scan(src interface{}) error {
 	bs := []byte(src.([]uint8))
 	logrus.Info("Scanning NFT: ", string(bs))
 	return json.Unmarshal(bs, n)
+}
+
+// Scan implements the sql.Scanner interface for the ContractCollectionNFT type
+func (c *ContractCollectionNFT) Scan(src interface{}) error {
+	bs := []byte(src.([]uint8))
+	return json.Unmarshal(bs, c)
 }
 
 // ErrNFTNotFoundByID is an error that occurs when an NFT is not found by its ID

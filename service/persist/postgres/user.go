@@ -47,6 +47,11 @@ func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.
 			return false, err
 		}
 	}
+
+	if err = res.Err(); err != nil {
+		return false, err
+	}
+
 	return exists, nil
 }
 
@@ -80,6 +85,11 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 			return persist.User{}, err
 		}
 	}
+
+	if err = res.Err(); err != nil {
+		return persist.User{}, err
+	}
+
 	return user, nil
 }
 
@@ -100,6 +110,11 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 			return persist.User{}, err
 		}
 	}
+
+	if err = res.Err(); err != nil {
+		return persist.User{}, err
+	}
+
 	return user, nil
 
 }
@@ -121,6 +136,11 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 			return persist.User{}, err
 		}
 	}
+
+	if err = res.Err(); err != nil {
+		return persist.User{}, err
+	}
+
 	return user, nil
 
 }
@@ -149,6 +169,11 @@ func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pA
 
 // RemoveAddresses removes the given addresses from the user with the given ID
 func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
-	// TODO
+	sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2) WHERE u.ID = $1`
+
+	_, err := u.db.ExecContext(pCtx, sqlStr, pID, pAddresses)
+	if err != nil {
+		return err
+	}
 	return nil
 }

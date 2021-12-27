@@ -1,10 +1,11 @@
 package persist
 
 import (
-	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/segmentio/ksuid"
+	"github.com/sirupsen/logrus"
 )
 
 // DBID represents a database ID
@@ -45,19 +46,19 @@ func (c CreationTime) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON sets the CreationTime from the JSON representation
 func (c *CreationTime) UnmarshalJSON(b []byte) error {
-	t := time.Time{}
-	err := json.Unmarshal(b, &t)
-	if err != nil {
-		return err
-	}
-
-	// // TODO this is a hack to work with postgres timestamp :(
-	// s := strings.ReplaceAll(string(b), `"`, "")
-	// logrus.Infof("s: %s", s)
-	// t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	// t := time.Time{}
+	// err := json.Unmarshal(b, &t)
 	// if err != nil {
 	// 	return err
 	// }
+
+	// TODO this is a hack to work with postgres timestamp :(
+	s := strings.ReplaceAll(string(b), `"`, "")
+	logrus.Infof("s: %s", s)
+	t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	if err != nil {
+		return err
+	}
 	*c = CreationTime(t)
 	return nil
 }
@@ -78,19 +79,19 @@ func (l LastUpdatedTime) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON sets the LastUpdatedTime from the JSON representation
 func (l *LastUpdatedTime) UnmarshalJSON(b []byte) error {
-	t := time.Time{}
-	err := json.Unmarshal(b, &t)
-	if err != nil {
-		return err
-	}
-
-	// // TODO this is a hack to work with postgres timestamp :(
-	// s := strings.ReplaceAll(string(b), `"`, "")
-	// logrus.Infof("s: %s", s)
-	// t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	// t := time.Time{}
+	// err := json.Unmarshal(b, &t)
 	// if err != nil {
 	// 	return err
 	// }
+
+	// TODO this is a hack to work with postgres timestamp :(
+	s := strings.ReplaceAll(string(b), `"`, "")
+	logrus.Infof("s: %s", s)
+	t, err := time.Parse("2006-01-02T15:04:05.999999", s)
+	if err != nil {
+		return err
+	}
 	*l = LastUpdatedTime(t)
 	return nil
 }

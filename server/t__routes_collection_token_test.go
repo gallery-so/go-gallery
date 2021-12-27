@@ -80,7 +80,7 @@ func TestCreateCollection_Success_Token(t *testing.T) {
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.NotNil(body.Collection)
-	assert.Len(body.Collection.Nfts, 3)
+	assert.Len(body.Collection.NFTs, 3)
 	assert.Empty(body.Error)
 
 	gallery, err := tc.repos.galleryTokenRepository.GetByID(context.Background(), gid)
@@ -246,8 +246,8 @@ func TestUpdateCollectionNftsOrder_Success_Token(t *testing.T) {
 	util.UnmarshallBody(&body, resp.Body)
 
 	assert.Empty(body.Error)
-	assert.NotEqual(updatedIDs[1], body.Collection.Nfts[2].ID)
-	assert.Equal(updatedIDs[1], body.Collection.Nfts[1].ID)
+	assert.NotEqual(updatedIDs[1], body.Collection.NFTs[2].ID)
+	assert.Equal(updatedIDs[1], body.Collection.NFTs[1].ID)
 }
 func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
@@ -283,7 +283,7 @@ func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 	util.UnmarshallBody(&body, resp.Body)
 
 	assert.Empty(body.Error)
-	assert.Len(body.Collection.Nfts, 2)
+	assert.Len(body.Collection.NFTs, 2)
 }
 
 func verifyCollectionExistsInDbForIDToken(assert *assert.Assertions, collID persist.DBID) {

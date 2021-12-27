@@ -73,6 +73,10 @@ func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) 
 		resultIDs[i] = persist.DBID(id)
 	}
 
+	if err := res.Err(); err != nil {
+		return nil, err
+	}
+
 	return resultIDs, nil
 }
 
@@ -124,6 +128,10 @@ func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persis
 		nfts = append(nfts, nft)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return nfts, nil
 }
 
@@ -157,6 +165,10 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 		nfts = append(nfts, nft)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return nfts, nil
 }
 
@@ -177,6 +189,10 @@ func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWa
 			return nil, err
 		}
 		nfts = append(nfts, nft)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return nfts, nil
@@ -234,6 +250,10 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 		}
 
 		resultIDs[i] = persist.DBID(id)
+	}
+
+	if err := res.Err(); err != nil {
+		return nil, err
 	}
 
 	return resultIDs, nil

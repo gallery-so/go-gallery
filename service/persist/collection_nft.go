@@ -42,7 +42,7 @@ type Collection struct {
 	Name           string          `bson:"name"          json:"name"`
 	CollectorsNote string          `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID            `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []CollectionNFT `bson:"nfts"          json:"nfts"`
+	NFTs           []CollectionNFT `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -50,32 +50,32 @@ type Collection struct {
 
 // CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Name           string `bson:"name" json:"name"`
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	Name           string `bson:"name" json:"name" postgres:"NAME"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note" postgres:"COLLECTORS_NOTE"`
 }
 
 // CollectionUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateNftsInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Nfts   []DBID      `bson:"nfts" json:"nfts"`
-	Layout TokenLayout `bson:"layout" json:"layout"`
+	Nfts   []DBID      `bson:"nfts" json:"nfts" postgres:"NFT_IDS"`
+	Layout TokenLayout `bson:"layout" json:"layout" postgres:"LAYOUT"`
 }
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionUpdateHiddenInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Hidden bool `bson:"hidden" json:"hidden"`
+	Hidden bool `bson:"hidden" json:"hidden" postgres:"HIDDEN"`
 }
 
 // CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionUpdateDeletedInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Deleted bool `bson:"deleted" json:"-"`
+	Deleted bool `bson:"deleted" json:"-" postgres:"DELETED"`
 }
 
 // CollectionRepository represents the interface for interacting with the collection persistence layer

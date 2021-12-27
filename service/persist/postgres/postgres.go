@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"strings"
 
 	// register postgres driver
 	_ "github.com/lib/pq"
@@ -36,6 +37,10 @@ func prepareSet(update interface{}) string {
 		name, ok := tp.Field(i).Tag.Lookup("postgres")
 		if !ok {
 			continue
+		}
+		if spl := strings.Split(name, ","); len(spl) > 1 {
+			name = spl[0]
+			// TODO handle multiple values
 		}
 		set += fmt.Sprintf("%s = $%d,", name, i+1)
 	}

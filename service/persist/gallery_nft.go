@@ -36,9 +36,9 @@ type Gallery struct {
 
 // GalleryUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
 type GalleryUpdateInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Collections []DBID `bson:"collections" json:"collections"`
+	Collections []DBID `bson:"collections" json:"collections" postgres:"COLLECTIONS"`
 }
 
 // GalleryRepository is an interface for interacting with the gallery persistence layer

@@ -302,7 +302,7 @@ func (c *CollectionRepository) GetUnassigned(pCtx context.Context, pUserID persi
 			collNfts = append(collNfts, nftToCollectionNft(nft))
 		}
 
-		result = []persist.Collection{{Nfts: collNfts}}
+		result = []persist.Collection{{NFTs: collNfts}}
 	} else {
 		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionPipeline(pUserID, users[0].Addresses), &result); err != nil {
 			return persist.Collection{}, err

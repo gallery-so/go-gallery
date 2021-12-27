@@ -55,7 +55,7 @@ func (a Address) Address() common.Address {
 
 // Scan implements the database/sql Scanner interface
 func (a *Address) Scan(i interface{}) error {
-	*a = Address(string([]byte(i.([]uint8))))
+	*a = Address(i.(string))
 	return nil
 }
 
