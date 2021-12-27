@@ -1,4 +1,4 @@
-package indexer
+package rpc
 
 import (
 	"bytes"
@@ -23,19 +23,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// transfer represents a transfer from the RPC response
-type transfer struct {
-	blockNumber     persist.BlockNumber
-	from            persist.Address
-	to              persist.Address
-	tokenID         persist.TokenID
-	tokenType       persist.TokenType
-	amount          uint64
-	contractAddress persist.Address
+// Transfer represents a Transfer from the RPC response
+type Transfer struct {
+	BlockNumber     persist.BlockNumber
+	From            persist.Address
+	To              persist.Address
+	TokenID         persist.TokenID
+	TokenType       persist.TokenType
+	Amount          uint64
+	ContractAddress persist.Address
 }
 
-// tokenContractMetadata represents a token contract's metadata
-type tokenContractMetadata struct {
+// TokenContractMetadata represents a token contract's metadata
+type TokenContractMetadata struct {
 	Name   string
 	Symbol string
 }
@@ -46,8 +46,8 @@ type ErrHTTP struct {
 	Status int
 }
 
-// getTokenContractMetadata returns the metadata for a given contract (without URI)
-func getTokenContractMetadata(address persist.Address, ethClient *ethclient.Client) (*tokenContractMetadata, error) {
+// GetTokenContractMetadata returns the metadata for a given contract (without URI)
+func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	contract := address.Address()
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
@@ -69,7 +69,7 @@ func getTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 		return nil, err
 	}
 
-	return &tokenContractMetadata{Name: name, Symbol: symbol}, nil
+	return &TokenContractMetadata{Name: name, Symbol: symbol}, nil
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
@@ -112,7 +112,7 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return nil, fmt.Errorf("error decoding base64 data: %s", err)
+			return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
 		}
 
 		return decoded, nil
@@ -125,11 +125,6 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 			return nil, fmt.Errorf("error getting data from ipfs: %s", err)
 		}
 		defer it.Close()
-
-		// buf := &bytes.Buffer{}
-		// if _, err = io.Copy(buf, it); err != nil {
-		// 	return nil, fmt.Errorf("error copying data from ipfs: %s", err)
-		// }
 
 		bs, err := io.ReadAll(it)
 		if err != nil {
@@ -181,6 +176,8 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 
 		return buf.Bytes(), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
+		asString = strings.Replace(asString, "data:application/json;utf8,", "", 0)
+		asString = strings.Replace(asString, "data:text/plain,{,", "{", 0)
 		return []byte(asString), nil
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
@@ -234,36 +231,13 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
 
-		// topics := [][]common.Hash{{common.HexToHash("0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b")}, {common.HexToHash("0x" + padHex(string(pTokenID), 64))}}
-		// logs, err := ethClient.FilterLogs(newCtx, ethereum.FilterQuery{
-		// 	FromBlock: defaultStartingBlock.BigInt(),
-		// 	Addresses: []common.Address{contract},
-		// 	Topics:    topics,
-		// })
-		// if err != nil {
-		// 	return "", err
-		// }
-		// if len(logs) == 0 {
-		// 	return "", errors.New("no logs found")
-		// }
-
-		// sort.Slice(logs, func(i, j int) bool {
-		// 	return logs[i].BlockNumber > logs[j].BlockNumber
-		// })
-		// if len(logs[0].Data) < 128 {
-		// 	return "", errors.New("invalid data")
-		// }
-
-		// offset := new(big.Int).SetBytes(logs[0].Data[:32])
-		// length := new(big.Int).SetBytes(logs[0].Data[32:64])
-		// uri := persist.TokenURI(logs[0].Data[offset.Uint64()+32 : offset.Uint64()+32+length.Uint64()])
-		// return uri, nil
 	default:
 		return "", fmt.Errorf("unknown token type: %s", pTokenType)
 	}
 }
 
-func getBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+// GetBalanceOfERC1155Token returns the balance of an ERC1155 token
+func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)

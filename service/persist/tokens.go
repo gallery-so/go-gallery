@@ -75,6 +75,10 @@ const (
 	URITypeSVG URIType = "svg"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
+	// URITypeInvalid represents an invalid URI type
+	URITypeInvalid URIType = "invalid"
+	// URITypeNone represents no URI
+	URITypeNone URIType = "none"
 )
 
 const (
@@ -87,6 +91,9 @@ const (
 	// CountTypeERC1155 represents the count of ERC1155 tokens
 	CountTypeERC1155 TokenCountType = "erc1155"
 )
+
+// InvalidTokenURI represents an invalid token URI
+const InvalidTokenURI TokenURI = "INVALID"
 
 // TokenType represents the contract specification of the token
 type TokenType string
@@ -143,7 +150,7 @@ type Token struct {
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
 	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
 	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
+	OwnershipHistory []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
@@ -211,6 +218,7 @@ type TokenRepository interface {
 	Upsert(context.Context, Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
@@ -279,7 +287,7 @@ func (uri TokenURI) String() string {
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
 	switch {
-	case strings.Contains(asString, "ipfs://"):
+	case strings.Contains(asString, "ipfs://"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
 	case strings.Contains(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
@@ -291,10 +299,14 @@ func (uri TokenURI) Type() URIType {
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
 		return URITypeHTTP
-	case strings.HasPrefix(asString, "{"):
+	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
 	case strings.HasPrefix(asString, "<svg"):
 		return URITypeSVG
+	case asString == InvalidTokenURI.String():
+		return URITypeInvalid
+	case asString == "":
+		return URITypeNone
 	default:
 		return URITypeUnknown
 	}

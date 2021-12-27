@@ -12,7 +12,7 @@ interface IERC721 {
     event Transfer(
         address indexed from,
         address indexed to,
-        uint256 indexed tokenId
+        uint256 indexed id
     );
 
     /**
