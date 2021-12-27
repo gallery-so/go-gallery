@@ -75,6 +75,10 @@ const (
 	URITypeSVG URIType = "svg"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
+	// URITypeInvalid represents an invalid URI type
+	URITypeInvalid URIType = "invalid"
+	// URITypeNone represents no URI
+	URITypeNone URIType = "none"
 )
 
 const (
@@ -87,6 +91,9 @@ const (
 	// CountTypeERC1155 represents the count of ERC1155 tokens
 	CountTypeERC1155 TokenCountType = "erc1155"
 )
+
+// InvalidTokenURI represents an invalid token URI
+const InvalidTokenURI TokenURI = "INVALID"
 
 // TokenType represents the contract specification of the token
 type TokenType string
@@ -143,7 +150,7 @@ type Token struct {
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
 	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
 	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	OwnershipHistoty []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
+	OwnershipHistory []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
@@ -211,6 +218,7 @@ type TokenRepository interface {
 	Upsert(context.Context, Token) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
@@ -227,7 +235,13 @@ type ErrTokenNotFoundByID struct {
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
-	contentType := http.DetectContentType(buf[:512])
+	var slice []byte
+	if len(buf) > 512 {
+		slice = buf[:512]
+	} else {
+		slice = buf
+	}
+	contentType := http.DetectContentType(slice)
 	spl := strings.Split(contentType, "/")
 
 	switch spl[0] {
@@ -273,20 +287,26 @@ func (uri TokenURI) String() string {
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
 	switch {
-	case strings.Contains(asString, "ipfs://"):
+	case strings.Contains(asString, "ipfs://"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
 	case strings.Contains(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
 	case strings.Contains(asString, "data:image/svg+xml;base64,"):
 		return URITypeBase64SVG
+	case strings.Contains(asString, "base64,"):
+		return URITypeBase64JSON
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
 		return URITypeHTTP
-	case strings.HasPrefix(asString, "{"):
+	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
 	case strings.HasPrefix(asString, "<svg"):
 		return URITypeSVG
+	case asString == InvalidTokenURI.String():
+		return URITypeInvalid
+	case asString == "":
+		return URITypeNone
 	default:
 		return URITypeUnknown
 	}
@@ -300,7 +320,10 @@ func (id TokenID) String() string {
 func (id TokenID) BigInt() *big.Int {
 	i, ok := new(big.Int).SetString(id.String(), 16)
 	if !ok {
-		i, _ = new(big.Int).SetString(id.String(), 10)
+		i, ok = new(big.Int).SetString(id.String(), 10)
+		if !ok {
+			panic("failed to convert token ID to big.Int")
+		}
 	}
 	return i
 }

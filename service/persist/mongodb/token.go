@@ -42,6 +42,19 @@ func NewTokenRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenReposi
 			{Key: "block_number", Value: -1},
 		},
 	}
+	walletAddressIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "owner_address", Value: 1},
+		},
+	}
+	allIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "contract_address", Value: 1},
+			{Key: "owner_address", Value: 1},
+			{Key: "token_id", Value: 1},
+			{Key: "block_number", Value: -1},
+		},
+	}
 
 	tiName, err := tokenStorage.createIndex(ctx, tokenIdentifiersIndex)
 	if err != nil {
@@ -51,8 +64,16 @@ func NewTokenRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenReposi
 	if err != nil {
 		panic(err)
 	}
+	waName, err := tokenStorage.createIndex(ctx, walletAddressIndex)
+	if err != nil {
+		panic(err)
+	}
+	allName, err := tokenStorage.createIndex(ctx, allIndex)
+	if err != nil {
+		panic(err)
+	}
 
-	logrus.Infof("created indexes %s and %s", tiName, bnName)
+	logrus.Infof("created indexes %s and %s and %s and %s", tiName, bnName, waName, allName)
 	return &TokenRepository{
 		tokensStorage: tokenStorage,
 		usersStorage:  newStorage(mgoClient, 0, galleryDBName, usersCollName),
@@ -96,11 +117,14 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Add
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"owner_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"owner_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, &result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -162,11 +186,14 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pAddress persist.A
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"contract_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"contract_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, &result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -182,11 +209,14 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, &result, opts)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"token_id": pTokenID, "contract_address": pAddress}, opts)
 	if err != nil {
 		return nil, err
 	}
-
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, &result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -195,8 +225,12 @@ func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persi
 
 	result := []persist.Token{}
 
-	err := t.tokensStorage.find(pCtx, bson.M{"_id": pID}, &result)
+	cur, err := t.tokensStorage.collection.Find(pCtx, bson.M{"_id": pID})
 	if err != nil {
+		return persist.Token{}, err
+	}
+	defer cur.Close(pCtx)
+	if err := cur.All(pCtx, &result); err != nil {
 		return persist.Token{}, err
 	}
 
@@ -268,7 +302,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 
 		if v.TokenType == persist.TokenTypeERC721 {
-			ownerHistory := bson.E{Key: "$push", Value: bson.M{"ownership_history": bson.M{"$each": v.OwnershipHistoty, "$sort": bson.M{"block": -1}}}}
+			ownerHistory := bson.E{Key: "$push", Value: bson.M{"ownership_history": bson.M{"$each": v.OwnershipHistory, "$sort": bson.M{"block": -1}}}}
 			setDocs = append(setDocs, ownerHistory)
 
 			delete(asMap, "owner_address")
@@ -356,6 +390,15 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUs
 
 }
 
+// UpdateByTokenIdentifiersUnsafe will update a given token by its token identifiers without ensuring the token is owned by a given wallet or user
+func (t *TokenRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pUpdate interface{}) error {
+	if err := t.tokensStorage.update(pCtx, bson.M{"token_id": pTokenID, "contract_address": pContractAddress}, pUpdate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // MostRecentBlock will find the most recent block stored for all tokens
 func (t *TokenRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
 
@@ -384,7 +427,7 @@ func (t *TokenRepository) Count(pCtx context.Context, countType persist.TokenCou
 
 	switch countType {
 	case persist.CountTypeNoMetadata:
-		filter = bson.M{"token_metadata": nil}
+		filter = bson.M{"metadata": nil}
 	case persist.CountTypeERC721:
 		filter = bson.M{"token_type": persist.TokenTypeERC721}
 	case persist.CountTypeERC1155:

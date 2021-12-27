@@ -18,11 +18,11 @@ interface ERC1155 {
         When burning/destroying tokens, the `_to` argument MUST be set to `0x0` (i.e. zero address).        
     */
     event TransferSingle(
-        address indexed _operator,
-        address indexed _from,
-        address indexed _to,
-        uint256 _id,
-        uint256 _value
+        address indexed operator,
+        address indexed from,
+        address indexed to,
+        uint256 id,
+        uint256 value
     );
 
     /**
@@ -36,11 +36,11 @@ interface ERC1155 {
         When burning/destroying tokens, the `_to` argument MUST be set to `0x0` (i.e. zero address).                
     */
     event TransferBatch(
-        address indexed _operator,
-        address indexed _from,
-        address indexed _to,
-        uint256[] _ids,
-        uint256[] _values
+        address indexed operator,
+        address indexed from,
+        address indexed to,
+        uint256[] ids,
+        uint256[] values
     );
 
     /**

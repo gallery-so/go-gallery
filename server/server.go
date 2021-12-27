@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -25,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"google.golang.org/api/option"
 )
 
 type repositories struct {
@@ -78,7 +81,7 @@ func CoreInit() *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub())
+	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
 }
 
 func setDefaults() {
@@ -99,6 +102,7 @@ func setDefaults() {
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
+	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 
 	viper.AutomaticEnv()
 
@@ -179,4 +183,29 @@ func newGCPPubSub() pubsub.PubSub {
 	}
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	return client
+}
+
+func newGCPStorageClient() *storage.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
+	defer cancel()
+	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
+		if _, err := os.Stat(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")); err != nil {
+			client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
+			if err != nil {
+				panic(err)
+			}
+			return client
+		}
+		client, err := storage.NewClient(ctx, option.WithCredentialsFile(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+		if err != nil {
+			panic(err)
+		}
+		return client
+	}
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return client
+
 }

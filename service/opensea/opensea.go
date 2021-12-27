@@ -212,14 +212,14 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persi
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
 		go func(wa persist.Address) {
-			assets, err := openseaFetchAssetsForWallet(wa, 0)
+			assets, err := openseaFetchAssetsForWallet(wa, 0, 0)
 			if err != nil {
 				errChan <- err
 				return
 			}
 			if len(assets) == 0 {
 				time.Sleep(time.Second)
-				assets, err = openseaFetchAssetsForWallet(wa, 0)
+				assets, err = openseaFetchAssetsForWallet(wa, 0, 0)
 				if err != nil {
 					errChan <- err
 					return
@@ -247,7 +247,7 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persi
 }
 
 // recursively fetches all assets for a wallet
-func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([]Asset, error) {
+func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([]Asset, error) {
 
 	result := []Asset{}
 	qsArgsMap := map[string]interface{}{
@@ -275,6 +275,13 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		if resp.StatusCode == 429 {
+			if retry < 3 {
+				time.Sleep(time.Second * 2)
+				return openseaFetchAssetsForWallet(pWalletAddress, pOffset, retry+1)
+			}
+			return nil, fmt.Errorf("opensea api rate limit exceeded")
+		}
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	response := Assets{}
@@ -284,7 +291,7 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset int) ([
 	}
 	result = append(result, response.Assets...)
 	if len(response.Assets) == 50 {
-		next, err := openseaFetchAssetsForWallet(pWalletAddress, pOffset+50)
+		next, err := openseaFetchAssetsForWallet(pWalletAddress, pOffset+50, 0)
 		if err != nil {
 			return nil, err
 		}

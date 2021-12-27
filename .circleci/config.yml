@@ -62,6 +62,9 @@ jobs:
           name: "Copy Indexer app.yaml"
           command: cp -R decrypted/app-dev-indexer.yaml ./app-indexer.yaml 
       - run:
+          name: "Copy GCP service key"
+          command: cp -R decrypted/service-key.json ./service-key.json
+      - run:
           command: |
               install () {
                 # Set sudo to work whether logged in as root user or non-root user
