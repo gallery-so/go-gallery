@@ -34,6 +34,9 @@ const (
 // NoncePrepend is what is prepended to every nonce
 const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
+// NewNoncePrepend is what will now be prepended to every nonce
+const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
+
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
 // ErrNonceMismatch is returned when the nonce does not match the expected nonce
@@ -135,7 +138,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 	}
 
 	if pInput.WalletType != WalletTypeEOA {
-		if NoncePrepend+nonce != pInput.Nonce {
+		if NewNoncePrepend+nonce != pInput.Nonce || NoncePrepend+nonce != pInput.Nonce {
 			return LoginOutput{}, ErrNonceMismatch
 		}
 	}
@@ -174,18 +177,32 @@ func VerifySignatureAllMethods(pSignatureStr string,
 	pNonce string,
 	pAddressStr persist.Address, pWalletType WalletType, ec *ethclient.Client) (bool, error) {
 
+	nonce := NewNoncePrepend + pNonce
 	// personal_sign
 	validBool, err := VerifySignature(pSignatureStr,
-		pNonce,
+		nonce,
 		pAddressStr, pWalletType,
 		true, ec)
 
 	if !validBool || err != nil {
 		// eth_sign
 		validBool, err = VerifySignature(pSignatureStr,
-			pNonce,
+			nonce,
 			pAddressStr, pWalletType,
 			false, ec)
+		if err != nil || !validBool {
+			nonce = NoncePrepend + pNonce
+			validBool, err = VerifySignature(pSignatureStr,
+				nonce,
+				pAddressStr, pWalletType,
+				true, ec)
+			if err != nil || !validBool {
+				validBool, err = VerifySignature(pSignatureStr,
+					nonce,
+					pAddressStr, pWalletType,
+					false, ec)
+			}
+		}
 	}
 
 	if err != nil {
@@ -197,7 +214,7 @@ func VerifySignatureAllMethods(pSignatureStr string,
 
 // VerifySignature will verify a signature using either personal_sign or eth_sign
 func VerifySignature(pSignatureStr string,
-	pDataStr string,
+	pData string,
 	pAddress persist.Address, pWalletType WalletType,
 	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
 
@@ -206,18 +223,16 @@ func VerifySignature(pSignatureStr string,
 	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
 	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
 
-	nonceWithPrepend := NoncePrepend + pDataStr
-
-	var dataStr string
+	var data string
 	if pUseDataHeaderBool {
-		dataStr = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(nonceWithPrepend), nonceWithPrepend)
+		data = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(pData), pData)
 	} else {
-		dataStr = nonceWithPrepend
+		data = pData
 	}
 
 	switch pWalletType {
 	case WalletTypeEOA:
-		dataHash := crypto.Keccak256Hash([]byte(dataStr))
+		dataHash := crypto.Keccak256Hash([]byte(data))
 
 		sig, err := hexutil.Decode(pSignatureStr)
 		if err != nil {
@@ -258,7 +273,7 @@ func VerifySignature(pSignatureStr string,
 			return false, err
 		}
 
-		hashedData := crypto.Keccak256([]byte(dataStr))
+		hashedData := crypto.Keccak256([]byte(data))
 		var input [32]byte
 		copy(input[:], hashedData)
 
@@ -315,14 +330,14 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 			}
 		}
 
-		output.Nonce = NoncePrepend + nonce.Value
+		output.Nonce = NewNoncePrepend + nonce.Value
 
 	} else {
 		nonce, err := nonceRepo.Get(pCtx, pInput.Address)
 		if err != nil {
 			return nil, err
 		}
-		output.Nonce = NoncePrepend + nonce.Value
+		output.Nonce = NewNoncePrepend + nonce.Value
 	}
 
 	return output, nil
