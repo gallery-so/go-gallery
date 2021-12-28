@@ -39,7 +39,7 @@ func (d *DBID) Scan(i interface{}) error {
 // Value implements the database/sql driver Valuer interface for the DBID type
 func (d DBID) Value() (driver.Value, error) {
 	if d.String() == "" {
-		return GenerateID(), nil
+		return GenerateID().String, nil
 	}
 	return d.String(), nil
 }
