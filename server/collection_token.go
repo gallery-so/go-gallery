@@ -92,7 +92,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 
 		aeCtx := appengine.NewContext(c.Request)
 		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
+			coll.NFTs = ensureCollectionTokenMedia(aeCtx, coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)
 		}
 
 		c.JSON(http.StatusOK, collectionGetOutputtoken{Collections: colls})
@@ -124,7 +124,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
+		coll.NFTs = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
 		return
@@ -290,7 +290,7 @@ func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputT
 	}
 	coll := persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
-		Nfts:           pInput.Nfts,
+		NFTs:           pInput.Nfts,
 		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
 		Layout:         layout,
 		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),

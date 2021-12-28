@@ -52,8 +52,8 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 		return "", errUserIDRequired
 	}
 
-	if pColl.Nfts == nil {
-		pColl.Nfts = []persist.DBID{}
+	if pColl.NFTs == nil {
+		pColl.NFTs = []persist.DBID{}
 	} /* else {
 		TODO this is to ensure that the NFTs are not being shared between collections
 
@@ -320,7 +320,7 @@ func (c *CollectionTokenRepository) GetUnassigned(pCtx context.Context, pUserID 
 			collNfts = append(collNfts, tokenToCollectionToken(nft))
 		}
 
-		result = []persist.CollectionToken{{Nfts: collNfts}}
+		result = []persist.CollectionToken{{NFTs: collNfts}}
 	} else {
 		if err := c.collectionsStorage.aggregate(pCtx, newUnassignedCollectionTokenPipeline(pUserID, users[0].Addresses), &result); err != nil {
 			return persist.CollectionToken{}, err

@@ -230,7 +230,7 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), nft)
 
 	coll := persist.CollectionTokenDB{
-		Nfts:        []persist.DBID{nftID},
+		NFTs:        []persist.DBID{nftID},
 		Name:        "test-coll",
 		OwnerUserID: userID,
 	}

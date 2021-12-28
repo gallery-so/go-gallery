@@ -96,7 +96,7 @@ func TestGetUnassignedCollection_Success_Token(t *testing.T) {
 	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs[:2],
+		NFTs:        nftIDs[:2],
 	})
 	assert.Nil(err)
 
@@ -158,7 +158,7 @@ func TestGetHiddenCollections_Success_Token(t *testing.T) {
 	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs,
+		NFTs:        nftIDs,
 		Hidden:      true,
 	})
 	assert.Nil(err)
@@ -183,13 +183,13 @@ func TestGetNoHiddenCollections_Success_Token(t *testing.T) {
 	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs[0:1],
+		NFTs:        nftIDs[0:1],
 		Hidden:      false,
 	})
 	_, err = tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs[1:],
+		NFTs:        nftIDs[1:],
 		Hidden:      true,
 	})
 	assert.Nil(err)
@@ -215,7 +215,7 @@ func TestUpdateCollectionNftsOrder_Success_Token(t *testing.T) {
 	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs,
+		NFTs:        nftIDs,
 	})
 	assert.Nil(err)
 
@@ -257,7 +257,7 @@ func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
-		Nfts:        nftIDs,
+		NFTs:        nftIDs,
 	})
 	assert.Nil(err)
 

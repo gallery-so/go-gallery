@@ -180,12 +180,12 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 		}
 		coll, err := collectionRepository.GetUnassigned(c, userID)
 		if err != nil {
-			coll.Nfts = []persist.TokenInCollection{}
+			coll.NFTs = []persist.TokenInCollection{}
 		}
 
 		aeCtx := appengine.NewContext(c.Request)
 
-		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)})
+		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)})
 	}
 }
 

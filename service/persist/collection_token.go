@@ -23,7 +23,7 @@ type CollectionTokenDB struct {
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []DBID `bson:"nfts"          json:"nfts"`
+	NFTs           []DBID `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -45,7 +45,7 @@ type CollectionToken struct {
 	Name           string              `bson:"name"          json:"name"`
 	CollectorsNote string              `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID                `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []TokenInCollection `bson:"nfts"          json:"nfts"`
+	NFTs           []TokenInCollection `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
