@@ -206,7 +206,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	erc721Vals := make([]interface{}, 0, len(erc721s)*17)
 	for i, token := range erc721s {
 		erc721SqlStr += generateValuesPlaceholders(17, i*17)
-		erc721Vals = append(erc721Vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		erc721Vals = append(erc721Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	erc721SqlStr = erc721SqlStr[:len(erc721SqlStr)-1]
@@ -215,7 +215,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	erc1155Vals := make([]interface{}, 0, len(erc1155s)*17)
 	for i, token := range erc1155s {
 		erc1155SqlStr += generateValuesPlaceholders(17, i*17)
-		erc1155Vals = append(erc1155Vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		erc1155Vals = append(erc1155Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	erc1155SqlStr = erc1155SqlStr[:len(erc1155SqlStr)-1]
@@ -246,7 +246,7 @@ func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) err
 	}
 	conflict += ")"
 	sqlStr := fmt.Sprintf(`INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ON CONFLICT %s DO UPDATE SET COLLECTORS_NOTE = $2,MEDIA = $3,TOKEN_TYPE = $4,CHAIN = $5,NAME = $6,DESCRIPTION = $7,TOKEN_URI = $9,QUANTITY = $10,OWNER_ADDRESS = $11,OWNERSHIP_HISTORY = $12,TOKEN_METADATA = $13,EXTERNAL_URL = $15,BLOCK_NUMBER = $16,VERSION = $17,CREATED_AT = $18,LAST_UPDATED = $19`, conflict)
-	_, err := t.db.ExecContext(pCtx, sqlStr, pToken.ID, pToken.CollectorsNote, pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
+	_, err := t.db.ExecContext(pCtx, sqlStr, persist.GenerateID(), pToken.CollectorsNote, pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
 	return err
 }
 
