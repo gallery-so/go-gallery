@@ -21,7 +21,7 @@ type FeatureFlag struct {
 	Name                string           `json:"name" bson:"name"`
 	IsEnabled           bool             `json:"is_enabled" bson:"is_enabled"`
 	AdminOnly           bool             `json:"admin_only" bson:"admin_only"`
-	ForceEnabledUserIds []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
+	ForceEnabledUserIDs []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
 }
 
 // TokenIdentifiers represents a unique identifier for a token

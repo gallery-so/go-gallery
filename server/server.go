@@ -41,7 +41,6 @@ type repositories struct {
 	galleryRepository         persist.GalleryRepository
 	galleryTokenRepository    persist.GalleryTokenRepository
 	historyRepository         persist.OwnershipHistoryRepository
-	accountRepository         persist.AccountRepository
 	contractRepository        persist.ContractRepository
 	backupRepository          persist.BackupRepository
 	membershipRepository      persist.MembershipRepository
@@ -131,7 +130,6 @@ func newRepos() *repositories {
 		historyRepository:         mongodb.NewHistoryRepository(mgoClient),
 		nftRepository:             nftRepo,
 		userRepository:            mongodb.NewUserRepository(mgoClient),
-		accountRepository:         mongodb.NewAccountRepository(mgoClient),
 		contractRepository:        mongodb.NewContractRepository(mgoClient),
 		backupRepository:          mongodb.NewBackupRepository(mgoClient),
 		membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
