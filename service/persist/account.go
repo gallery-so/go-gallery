@@ -2,21 +2,10 @@ package persist
 
 import (
 	"context"
-	"database/sql/driver"
 	"fmt"
-	"math/big"
-	"strings"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 const accountCollName = "accounts"
-
-// Address represents an Ethereum address
-type Address string
-
-// BlockNumber represents an Ethereum block number
-type BlockNumber uint64
 
 // Account represents an ethereum account in the database
 type Account struct {
@@ -43,62 +32,4 @@ type ErrAccountNotFoundByAddress struct {
 
 func (e ErrAccountNotFoundByAddress) Error() string {
 	return fmt.Sprintf("account not found by address: %s", e.Address)
-}
-
-func (a Address) String() string {
-	return normalizeAddress(strings.ToLower(string(a)))
-}
-
-// Address returns the ethereum address byte array
-func (a Address) Address() common.Address {
-	return common.HexToAddress(a.String())
-}
-
-// Value implements the database/sql/driver Valuer interface for the address type
-func (a Address) Value() (driver.Value, error) {
-	return a.String(), nil
-}
-
-// Scan implements the database/sql Scanner interface
-func (a *Address) Scan(i interface{}) error {
-	*a = Address(i.(string))
-	return nil
-}
-
-// Uint64 returns the ethereum block number as a uint64
-func (b BlockNumber) Uint64() uint64 {
-	return uint64(b)
-}
-
-// BigInt returns the ethereum block number as a big.Int
-func (b BlockNumber) BigInt() *big.Int {
-	return new(big.Int).SetUint64(b.Uint64())
-}
-
-func (b BlockNumber) String() string {
-	return strings.ToLower(b.BigInt().String())
-}
-
-// Hex returns the ethereum block number as a hex string
-func (b BlockNumber) Hex() string {
-	return strings.ToLower(b.BigInt().Text(16))
-}
-
-// Value implements the database/sql/driver Valuer interface for the block number type
-func (b BlockNumber) Value() (driver.Value, error) {
-	return b.Uint64(), nil
-}
-
-// Scan implements the database/sql Scanner interface for the block number type
-func (b *BlockNumber) Scan(src interface{}) error {
-	*b = BlockNumber(src.(uint64))
-	return nil
-}
-
-func normalizeAddress(address string) string {
-	withoutPrefix := strings.TrimPrefix(address, "0x")
-	if len(withoutPrefix) < 40 {
-		return ""
-	}
-	return "0x" + withoutPrefix[len(withoutPrefix)-40:]
 }

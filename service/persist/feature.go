@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"strings"
 )
@@ -52,7 +53,7 @@ func (t TokenIdentifiers) String() string {
 	if t.Valid() {
 		return string(t)
 	}
-	panic("invalid token identifiers")
+	return ""
 }
 
 // Valid returns true if the token identifiers are valid
@@ -65,6 +66,17 @@ func (t TokenIdentifiers) GetParts() (Address, TokenID) {
 	parts := strings.Split(t.String(), "+")
 
 	return Address(parts[0]), TokenID(parts[1])
+}
+
+// Value implements the driver.Valuer interface
+func (t TokenIdentifiers) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenIdentifiers type
+func (t *TokenIdentifiers) Scan(i interface{}) error {
+	*t = TokenIdentifiers(i.(string))
+	return nil
 }
 
 func (e ErrFeatureNotFoundByTokenIdentifiers) Error() string {
