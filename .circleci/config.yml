@@ -15,7 +15,7 @@ jobs:
       - image: cimg/go:1.16
       - image: mongo:latest
       - image: redis:latest
-      - image: bcgallery/gallery-postgres:0.0.0
+      - image: bcgallery/gallery-postgres:latest
     steps:
       - checkout
       - restore_cache:
