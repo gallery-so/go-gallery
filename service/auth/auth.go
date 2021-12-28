@@ -138,7 +138,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 	}
 
 	if pInput.WalletType != WalletTypeEOA {
-		if NewNoncePrepend+nonce != pInput.Nonce || NoncePrepend+nonce != pInput.Nonce {
+		if NewNoncePrepend+nonce != pInput.Nonce && NoncePrepend+nonce != pInput.Nonce {
 			return LoginOutput{}, ErrNonceMismatch
 		}
 	}

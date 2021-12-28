@@ -109,7 +109,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return CreateUserOutput{}, auth.ErrNonceMismatch
 		}
 	}
@@ -175,7 +175,7 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return CreateUserOutput{}, auth.ErrNonceMismatch
 		}
 	}
@@ -262,7 +262,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return AddUserAddressOutput{}, auth.ErrNonceMismatch
 		}
 	}

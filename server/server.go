@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -187,7 +188,15 @@ func newGCPStorageClient() *storage.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
 	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
-		if _, err := os.Stat(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")); err != nil {
+
+		_, err := os.Stat(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS"))
+		if err != nil {
+			_, err = os.Stat(filepath.Join("..", viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+			if err == nil {
+				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join("..", viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+			}
+		}
+		if err != nil {
 			client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
 			if err != nil {
 				panic(err)
