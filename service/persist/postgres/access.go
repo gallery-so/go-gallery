@@ -20,9 +20,9 @@ func NewAccessRepository(db *sql.DB) *AccessRepository {
 
 // GetByUserID returns the access for the given user ID
 func (a *AccessRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (persist.Access, error) {
-	sqlStr := `SELECT ID,USER_ID,MOST_RECENT_BLOCK,REQUIRED_TOKENS_OWNED,IS_ADMIN FROM access WHERE USER_ID = $1 LIMIT 1`
+	sqlStr := `SELECT ID,CREATED_AT,LAST_UPDATED,DELETED,VERSION,USER_ID,MOST_RECENT_BLOCK,REQUIRED_TOKENS_OWNED,IS_ADMIN FROM access WHERE USER_ID = $1 LIMIT 1`
 	access := persist.Access{}
-	err := a.db.QueryRowContext(pCtx, sqlStr, pUserID).Scan(&access.ID, &access.UserID, &access.MostRecentBlock, &access.RequiredTokensOwned, &access.IsAdmin)
+	err := a.db.QueryRowContext(pCtx, sqlStr, pUserID).Scan(&access.ID, &access.CreationTime, &access.LastUpdated, &access.Deleted, &access.Version, &access.UserID, &access.MostRecentBlock, &access.RequiredTokensOwned, &access.IsAdmin)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.Access{}, persist.ErrAccessNotFoundByUserID{UserID: pUserID}

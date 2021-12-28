@@ -7,6 +7,8 @@ CREATE TABLE users (
     ADDRESSES varchar(255) []
 );
 
+CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
+
 COPY users
 FROM
     '/import/users.csv' with (FORMAT csv);
@@ -14,12 +16,12 @@ FROM
 ALTER TABLE
     users
 ADD
-    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     users
 ADD
-    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE galleries (
     ID varchar(32) PRIMARY KEY,
@@ -36,12 +38,12 @@ FROM
 ALTER TABLE
     galleries
 ADD
-    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     galleries
 ADD
-    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nfts (
     ID varchar(32) PRIMARY KEY,
@@ -52,7 +54,7 @@ CREATE TABLE nfts (
     EXTERNAL_URL varchar,
     CREATOR_ADDRESS varchar(255),
     CREATOR_NAME varchar,
-    OWNER_ADDRESS varchar(255),
+    OWNER_ADDRESS char(42),
     MULTIPLE_OWNERS boolean,
     CONTRACT json,
     OPENSEA_ID bigint,
@@ -72,12 +74,12 @@ FROM
 ALTER TABLE
     nfts
 ADD
-    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     nfts
 ADD
-    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     nfts
@@ -103,19 +105,19 @@ FROM
 ALTER TABLE
     collections
 ADD
-    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     collections
 ADD
-    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nonces (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     USER_ID varchar(32),
-    ADDRESS varchar(255),
+    ADDRESS char(42),
     VALUE varchar(255)
 );
 
@@ -126,9 +128,117 @@ FROM
 ALTER TABLE
     nonces
 ADD
-    COLUMN LAST_UPDATED timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 ALTER TABLE
     nonces
 ADD
-    COLUMN CREATED_AT timestamp DEFAULT CURRENT_TIMESTAMP;
+    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE TABLE tokens (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    NAME varchar,
+    DESCRIPTION varchar,
+    CONTRACT_ADDRESS char(42),
+    COLLECTORS_NOTE varchar,
+    MEDIA json,
+    OWNER_ADDRESS char(42),
+    TOKEN_URI varchar,
+    TOKEN_TYPE varchar,
+    TOKEN_ID varchar,
+    QUANTITY varchar,
+    OWNERSHIP_HISTORY json [],
+    TOKEN_METADATA json,
+    EXTERNAL_URL varchar,
+    BLOCK_NUMBER bigint
+);
+
+CREATE UNIQUE INDEX token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
+
+CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
+
+CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
+
+CREATE TABLE contracts (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    NAME varchar,
+    SYMBOL varchar,
+    ADDRESS char(42),
+    LATEST_BLOCK bigint
+);
+
+CREATE UNIQUE INDEX address_idx ON contracts (ADDRESS);
+
+CREATE TABLE login_attempts (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADDRESS char(42),
+    REQUEST_HOST_ADDRESS varchar(255),
+    USER_EXISTS boolean,
+    SIGNATURE varchar(255),
+    SIGNATURE_VALID boolean,
+    REQUEST_HEADERS json,
+    NONCE_VALUE varchar
+);
+
+CREATE TABLE features (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    REQUIRED_TOKEN varchar,
+    REQUIRED_AMOUNT bigint,
+    TOKEN_TYPE varchar,
+    NAME varchar,
+    IS_ENABLED boolean,
+    ADMIN_ONLY boolean,
+    FORCE_ENABLED_USER_IDS varchar(32) []
+);
+
+CREATE UNIQUE INDEX feature_name_idx ON features (NAME);
+
+CREATE UNIQUE INDEX feature_required_token_idx ON features (REQUIRED_TOKEN);
+
+CREATE TABLE backups (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    GALLERY_ID varchar(32),
+    GALLERY json
+);
+
+CREATE TABLE membership (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    NAME varchar,
+    ASSET_URL varchar,
+    OWNERS json []
+);
+
+CREATE TABLE access (
+    ID varchar(32) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    USER_ID varchar(32),
+    MOST_RECENT_BLOCK bigint,
+    REQUIRED_TOKENS_OWNED json,
+    IS_ADMIN boolean
+);

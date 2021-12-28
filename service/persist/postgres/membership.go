@@ -27,9 +27,9 @@ func (m *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID pe
 
 // GetByTokenID returns the tier with the given token ID
 func (m *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (persist.MembershipTier, error) {
-	sqlStr := `SELECT ID,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1`
+	sqlStr := `SELECT ID,CREATED_AT,LAST_UPDATED,DELETED,VERSION,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1`
 	tier := persist.MembershipTier{TokenID: pTokenID}
-	err := m.db.QueryRowContext(pCtx, sqlStr, pTokenID).Scan(&tier.ID, &tier.Name, &tier.AssetURL, &tier.Owners)
+	err := m.db.QueryRowContext(pCtx, sqlStr, pTokenID).Scan(&tier.ID, &tier.CreationTime, &tier.LastUpdated, &tier.Deleted, &tier.Deleted, &tier.Name, &tier.AssetURL, &tier.Owners)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.MembershipTier{}, persist.ErrMembershipNotFoundByTokenID{TokenID: pTokenID}
