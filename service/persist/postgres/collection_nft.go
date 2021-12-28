@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -150,9 +150,26 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 
 // Update updates a collection in the database
 func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
-	sqlStr := fmt.Sprintf("UPDATE collections %s WHERE ID = $1 AND OWNER_USER_ID = $2;", prepareSet(pUpdate))
-	_, err := c.db.ExecContext(pCtx, sqlStr, pID, pUserID)
-	return err
+	sqlStr := `UPDATE COLLECTIONS `
+	switch pUpdate.(type) {
+	case persist.CollectionUpdateDeletedInput:
+		update := pUpdate.(persist.CollectionUpdateDeletedInput)
+		sqlStr += `SET DELETED = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
+		_, err := c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID, pUserID)
+		return err
+	case persist.CollectionUpdateInfoInput:
+		update := pUpdate.(persist.CollectionUpdateInfoInput)
+		sqlStr += `SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5`
+		_, err := c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
+		return err
+	case persist.CollectionUpdateHiddenInput:
+		update := pUpdate.(persist.CollectionUpdateHiddenInput)
+		sqlStr += `SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
+		_, err := c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID, pUserID)
+		return err
+	default:
+		return errors.New("invalid update type")
+	}
 }
 
 // UpdateNFTs updates the nfts of a collection in the database

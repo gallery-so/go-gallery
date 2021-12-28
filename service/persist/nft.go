@@ -132,9 +132,9 @@ type ContractCollectionNFT struct {
 	ContractImage string `bson:"contract_image_url" json:"image_url"`
 }
 
-// UpdateNFTInfoInput represents a MongoDB input to update the user defined info
+// NFTUpdateInfoInput represents a MongoDB input to update the user defined info
 // associated with a given NFT in the DB
-type UpdateNFTInfoInput struct {
+type NFTUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
 	CollectorsNote string `bson:"collectors_note" postgres:"COLLECTORS_NOTE"`

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/lib/pq"
@@ -24,10 +25,19 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 // UpdateByID updates the user with the given ID
 func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 	sqlStr := `UPDATE users `
-	sqlStr += prepareSet(pUpdate)
-	sqlStr += ` WHERE ID = $1`
-	_, err := u.db.ExecContext(pCtx, sqlStr, pID)
-	return err
+	switch pUpdate.(type) {
+	case persist.UserUpdateInfoInput:
+		update := pUpdate.(persist.UserUpdateInfoInput)
+		sqlStr += `SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4 WHERE ID = $1`
+		_, err := u.db.ExecContext(pCtx, sqlStr, pID, update.Username, strings.ToLower(update.UsernameIdempotent), update.LastUpdated)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("unsupported update type")
+	}
+
+	return nil
 
 }
 
@@ -70,7 +80,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persi
 
 // GetByID gets the user with the given ID
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
-	sqlStr := `SELECT * FROM users WHERE ID = $1`
+	sqlStr := `SELECT ID,DELETED,VERSION,USERNANE,USERNAME_IDEMPOTENET,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1`
 
 	res, err := u.db.QueryContext(pCtx, sqlStr, pID)
 	if err != nil {

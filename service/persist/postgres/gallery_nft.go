@@ -36,10 +36,8 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
 func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.GalleryUpdateInput) error {
-	sqlStr := `UPDATE galleries `
-	sqlStr += prepareSet(pUpdate)
-	sqlStr += ` WHERE ID = $1 AND OWNER_USER_ID = $2`
-	_, err := g.db.ExecContext(pCtx, sqlStr, pID, pUserID)
+	sqlStr := `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
+	_, err := g.db.ExecContext(pCtx, sqlStr, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
 	return err
 }
 

@@ -3,8 +3,6 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"reflect"
-	"strings"
 
 	// register postgres driver
 	_ "github.com/lib/pq"
@@ -26,27 +24,6 @@ func NewPostgresClient() *sql.DB {
 		panic(err)
 	}
 	return db
-}
-
-func prepareSet(update interface{}) string {
-	val := reflect.ValueOf(update)
-	tp := reflect.TypeOf(update)
-
-	set := "SET "
-	for i := 0; i < val.NumField(); i++ {
-		name, ok := tp.Field(i).Tag.Lookup("postgres")
-		if !ok {
-			continue
-		}
-		if spl := strings.Split(name, ","); len(spl) > 1 {
-			name = spl[0]
-			// TODO handle multiple values
-		}
-		set += fmt.Sprintf("%s = $%d,", name, i+1)
-	}
-
-	return set[0 : len(set)-1]
-
 }
 
 func generateValuesPlaceholders(l, offset int) string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -209,12 +210,18 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 	}
 
 	sqlStr := `UPDATE nfts `
-	sqlStr += prepareSet(pUpdate)
-	sqlStr += ` WHERE ID = $1 AND OWNER_ADDRESS = ANY($2)`
-	_, err = n.db.ExecContext(pCtx, sqlStr, pID, userAddresses)
-	if err != nil {
-		return err
+	switch pUpdate.(type) {
+	case persist.NFTUpdateInfoInput:
+		update := pUpdate.(persist.NFTUpdateInfoInput)
+		sqlStr += `SET LAST_UPDATED = $1, COLLECTORS_NOTE = $3 WHERE ID = $2 AND OWNER_ADDRESS = ANY($4)`
+		_, err = n.db.ExecContext(pCtx, sqlStr, time.Now(), pID, update.CollectorsNote, pq.Array(userAddresses))
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("unsupported update type")
 	}
+
 	return nil
 }
 

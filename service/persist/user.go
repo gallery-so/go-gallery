@@ -23,8 +23,8 @@ type User struct {
 type UserUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	UserName           string `bson:"username" postgres:"USERNAME"`
-	UserNameIdempotent string `bson:"username_idempotent" postgres:"USERNAME_IDEMPOTENT"`
+	Username           string `bson:"username" postgres:"USERNAME"`
+	UsernameIdempotent string `bson:"username_idempotent" postgres:"USERNAME_IDEMPOTENT"`
 	Bio                string `bson:"bio" postgres:"BIO"`
 }
 

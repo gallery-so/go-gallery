@@ -191,18 +191,18 @@ type TokenInCollection struct {
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note" postgres:"COLLECTORS_NOTE"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Media    Media         `bson:"media" json:"media"`
-	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
-	TokenURI TokenURI      `bson:"token_uri" json:"token_uri"`
+	Media    Media         `bson:"media" json:"media" postgres:"MEDIA"`
+	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata" postgres:"TOKEN_METADATA"`
+	TokenURI TokenURI      `bson:"token_uri" json:"token_uri" postgres:"TOKEN_URI"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens

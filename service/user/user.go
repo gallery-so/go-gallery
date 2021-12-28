@@ -378,8 +378,8 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		pCtx,
 		userID,
 		persist.UserUpdateInfoInput{
-			UserNameIdempotent: strings.ToLower(input.UserName),
-			UserName:           input.UserName,
+			UsernameIdempotent: strings.ToLower(input.UserName),
+			Username:           input.UserName,
 			Bio:                validate.SanitizationPolicy.Sanitize(input.BioStr),
 		},
 	)

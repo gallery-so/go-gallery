@@ -78,6 +78,12 @@ func (b BlockNumber) Hex() string {
 	return strings.ToLower(b.BigInt().Text(16))
 }
 
+// Scan implements the database/sql Scanner interface for the block number type
+func (b *BlockNumber) Scan(src interface{}) error {
+	*b = BlockNumber(src.(uint64))
+	return nil
+}
+
 func normalizeAddress(address string) string {
 	withoutPrefix := strings.TrimPrefix(address, "0x")
 	if len(withoutPrefix) < 40 {

@@ -30,6 +30,12 @@ func (d DBID) String() string {
 	return string(d)
 }
 
+// Scan implements the database/sql Scanner interface for the DBID type
+func (d *DBID) Scan(i interface{}) error {
+	*d = DBID(i.(string))
+	return nil
+}
+
 // Time returns the time.Time representation of the CreationTime
 func (c CreationTime) Time() time.Time {
 	return time.Time(c)
