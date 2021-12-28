@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math/big"
 	"strings"
@@ -53,6 +54,11 @@ func (a Address) Address() common.Address {
 	return common.HexToAddress(a.String())
 }
 
+// Value implements the database/sql/driver Valuer interface for the address type
+func (a Address) Value() (driver.Value, error) {
+	return a.String(), nil
+}
+
 // Scan implements the database/sql Scanner interface
 func (a *Address) Scan(i interface{}) error {
 	*a = Address(i.(string))
@@ -76,6 +82,11 @@ func (b BlockNumber) String() string {
 // Hex returns the ethereum block number as a hex string
 func (b BlockNumber) Hex() string {
 	return strings.ToLower(b.BigInt().Text(16))
+}
+
+// Value implements the database/sql/driver Valuer interface for the block number type
+func (b BlockNumber) Value() (driver.Value, error) {
+	return b.Uint64(), nil
 }
 
 // Scan implements the database/sql Scanner interface for the block number type

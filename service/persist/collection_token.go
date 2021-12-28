@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 )
@@ -103,13 +104,6 @@ type CollectionTokenRepository interface {
 	RefreshUnassigned(context.Context, DBID) error
 }
 
-// Scan implements the Scanner interface for the TokenLayout type
-func (l *TokenLayout) Scan(value interface{}) error {
-	bs := []byte(value.([]uint8))
-
-	return json.Unmarshal(bs, l)
-}
-
 // ErrCollectionNotFoundByID is returned when a collection is not found by ID
 type ErrCollectionNotFoundByID struct {
 	ID DBID
@@ -138,4 +132,20 @@ func ValidateLayout(layout TokenLayout) (TokenLayout, error) {
 		layout.Columns = 3
 	}
 	return layout, nil
+}
+
+// Value implements the driver.Valuer interface for the TokenLayout type
+func (l TokenLayout) Value() (driver.Value, error) {
+	bs, err := json.Marshal(l)
+	if err != nil {
+		return nil, err
+	}
+	return string(bs), nil
+}
+
+// Scan implements the Scanner interface for the TokenLayout type
+func (l *TokenLayout) Scan(value interface{}) error {
+	bs := []byte(value.([]uint8))
+
+	return json.Unmarshal(bs, l)
 }

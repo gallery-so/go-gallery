@@ -2,6 +2,8 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -283,6 +285,17 @@ func (uri TokenURI) String() string {
 	return string(uri)
 }
 
+// Value implements the driver.Valuer interface for token URIs
+func (uri TokenURI) Value() (driver.Value, error) {
+	return uri.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for token URIs
+func (uri *TokenURI) Scan(src interface{}) error {
+	*uri = TokenURI(src.(string))
+	return nil
+}
+
 // Type returns the type of the token URI
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
@@ -316,6 +329,17 @@ func (id TokenID) String() string {
 	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
 
+// Value implements the driver.Valuer interface for token IDs
+func (id TokenID) Value() (driver.Value, error) {
+	return id.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for token IDs
+func (id *TokenID) Scan(src interface{}) error {
+	*id = TokenID(src.(string))
+	return nil
+}
+
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
 	i, ok := new(big.Int).SetString(id.String(), 16)
@@ -342,6 +366,17 @@ func (hex HexString) String() string {
 	return strings.TrimPrefix(strings.ToLower(string(hex)), "0x")
 }
 
+// Value implements the driver.Valuer interface for hex strings
+func (hex HexString) Value() (driver.Value, error) {
+	return hex.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for hex strings
+func (hex *HexString) Scan(src interface{}) error {
+	*hex = HexString(src.(string))
+	return nil
+}
+
 // BigInt returns the hex string as a big.Int
 func (hex HexString) BigInt() *big.Int {
 	it, ok := big.NewInt(0).SetString(hex.String(), 16)
@@ -349,4 +384,13 @@ func (hex HexString) BigInt() *big.Int {
 		it, _ = big.NewInt(0).SetString(hex.String(), 10)
 	}
 	return it
+}
+
+// Value implements the driver.Valuer interface for media
+func (m Media) Value() (driver.Value, error) {
+	bs, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return string(bs), nil
 }

@@ -2,10 +2,9 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-
-	"github.com/sirupsen/logrus"
 )
 
 // NFTDB represents an nft in the database
@@ -29,7 +28,7 @@ type NFTDB struct {
 	TokenMetadataURL    string      `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress      Address     `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string      `bson:"creator_name" json:"creator_name"`
-	Contract            NftContract `bson:"contract"     json:"asset_contract"`
+	Contract            NFTContract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string      `bson:"token_collection_name" json:"token_collection_name"`
 
 	OpenseaID int `bson:"opensea_id"       json:"opensea_id"`
@@ -72,7 +71,7 @@ type NFT struct {
 	TokenMetadataURL    string      `bson:"token_metadata_url" json:"token_metadata_url"`
 	CreatorAddress      Address     `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string      `bson:"creator_name" json:"creator_name"`
-	Contract            NftContract `bson:"contract"     json:"asset_contract"`
+	Contract            NFTContract `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string      `bson:"token_collection_name" json:"token_collection_name"`
 
 	OpenseaID int `bson:"opensea_id"       json:"opensea_id"`
@@ -114,8 +113,8 @@ type CollectionNFT struct {
 	ImagePreviewURL   string `bson:"image_preview_url"   json:"image_preview_url"`
 }
 
-// NftContract represents a smart contract's information for a given NFT
-type NftContract struct {
+// NFTContract represents a smart contract's information for a given NFT
+type NFTContract struct {
 	ContractAddress      Address `bson:"contract_address"     json:"address"`
 	ContractName         string  `bson:"contract_name" json:"name"`
 	ContractImage        string  `bson:"contract_image_url" json:"image_url"`
@@ -156,16 +155,34 @@ type NFTRepository interface {
 	OpenseaCacheDelete(context.Context, []Address) error
 }
 
-// Scan implements the sql.Scanner interface for the CollectionNFT type
-func (n *CollectionNFT) Scan(src interface{}) error {
-	bs := []byte(src.([]uint8))
-	logrus.Info("Scanning NFT: ", string(bs))
-	return json.Unmarshal(bs, n)
+// Value implements the driver.Valuer interface for the ContractCollectionNFT type
+func (c ContractCollectionNFT) Value() (driver.Value, error) {
+	bs, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	return string(bs), nil
+
 }
 
 // Scan implements the sql.Scanner interface for the ContractCollectionNFT type
 func (c *ContractCollectionNFT) Scan(src interface{}) error {
-	bs := []byte(src.([]uint8))
+	bs := []byte(src.(string))
+	return json.Unmarshal(bs, c)
+}
+
+// Value implements the driver.Valuer interface for the NFTContract type
+func (c NFTContract) Value() (driver.Value, error) {
+	bs, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	return string(bs), nil
+}
+
+// Scan implements the sql.Scanner interface for the NFTContract type
+func (c *NFTContract) Scan(src interface{}) error {
+	bs := []byte(src.(string))
 	return json.Unmarshal(bs, c)
 }
 

@@ -32,7 +32,7 @@ type Asset struct {
 	TokenMetadataURL string              `json:"token_metadata_url"`
 	Creator          Account             `json:"creator"`
 	Owner            Account             `json:"owner"`
-	Contract         persist.NftContract `json:"asset_contract"`
+	Contract         persist.NFTContract `json:"asset_contract"`
 	Collection       Collection          `json:"collection"`
 
 	// OPEN_SEA_TOKEN_ID

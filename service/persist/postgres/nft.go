@@ -45,11 +45,7 @@ func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) 
 
 	for i, nft := range pNFTs {
 		sqlStr += generateValuesPlaceholders(20, i*20) + ","
-		contract, err := json.Marshal(nft.Contract)
-		if err != nil {
-			return nil, err
-		}
-		vals = append(vals, persist.GenerateID(), nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, string(contract), nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName)
+		vals = append(vals, persist.GenerateID(), nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName)
 	}
 
 	sqlStr = sqlStr[0 : len(sqlStr)-1]
