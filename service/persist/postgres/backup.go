@@ -36,6 +36,10 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		currentBackups = append(currentBackups, id)
 	}
 
+	if err = res.Err(); err != nil {
+		return err
+	}
+
 	if len(currentBackups) > 2 {
 		// delete the oldest backup
 		deleteBackup := `DELETE FROM backups WHERE ID = $1`

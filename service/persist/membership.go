@@ -1,6 +1,10 @@
 package persist
 
-import "context"
+import (
+	"context"
+	"database/sql/driver"
+	"encoding/json"
+)
 
 // MembershipTier represents the membership tier of a user
 type MembershipTier struct {
@@ -29,6 +33,15 @@ type MembershipRepository interface {
 	UpsertByTokenID(context.Context, TokenID, MembershipTier) error
 	GetByTokenID(context.Context, TokenID) (MembershipTier, error)
 	GetAll(context.Context) ([]MembershipTier, error)
+}
+
+// Value implements the database/sql/driver Valuer interface for the membership owner type
+func (o MembershipOwner) Value() (driver.Value, error) {
+	bs, err := json.Marshal(o)
+	if err != nil {
+		return nil, err
+	}
+	return string(bs), nil
 }
 
 // ErrMembershipNotFoundByTokenID represents an error when a membership is not found by token id
