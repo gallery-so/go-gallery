@@ -104,7 +104,7 @@ type CollectionNFT struct {
 
 	Contract            ContractCollectionNFT `bson:"contract"     json:"asset_contract"`
 	TokenCollectionName string                `bson:"token_collection_name" json:"token_collection_name"`
-	CreatorAddress      string                `bson:"creator_address"      json:"creator_address"`
+	CreatorAddress      Address               `bson:"creator_address"      json:"creator_address"`
 	CreatorName         string                `bson:"creator_name" json:"creator_name"`
 
 	// IMAGES - OPENSEA
@@ -167,7 +167,7 @@ func (c ContractCollectionNFT) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface for the ContractCollectionNFT type
 func (c *ContractCollectionNFT) Scan(src interface{}) error {
-	bs := []byte(src.(string))
+	bs := []byte(src.([]uint8))
 	return json.Unmarshal(bs, c)
 }
 
@@ -182,7 +182,7 @@ func (c NFTContract) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface for the NFTContract type
 func (c *NFTContract) Scan(src interface{}) error {
-	bs := []byte(src.(string))
+	bs := []byte(src.([]uint8))
 	return json.Unmarshal(bs, c)
 }
 

@@ -16,7 +16,7 @@ func TestNFTCreate_Success(t *testing.T) {
 	nft := persist.NFTDB{
 		Deleted:      false,
 		Version:      1,
-		OwnerAddress: "owner",
+		OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 		Name:         "name",
 	}
 

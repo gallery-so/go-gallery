@@ -21,7 +21,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
 		Addresses: []persist.Address{
-			"address-1",
+			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 		},
 	}
 
@@ -30,11 +30,11 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 
 	nfts := []persist.NFTDB{
 		{
-			OwnerAddress: "owner",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
 		},
 		{
-			OwnerAddress: "next owner",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
 			Name:         "blah blah",
 		},
 	}

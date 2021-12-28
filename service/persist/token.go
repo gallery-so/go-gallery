@@ -418,7 +418,11 @@ func (a Address) Value() (driver.Value, error) {
 
 // Scan implements the database/sql Scanner interface
 func (a *Address) Scan(i interface{}) error {
-	*a = Address(i.(string))
+	if it, ok := i.(string); ok {
+		*a = Address(it)
+		return nil
+	}
+	*a = Address(i.([]uint8))
 	return nil
 }
 

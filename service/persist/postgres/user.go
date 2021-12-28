@@ -10,8 +10,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-var insertUsersSQL = "INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6)"
-
 // UserRepository represents a user repository in the postgres database
 type UserRepository struct {
 	db *sql.DB
@@ -67,39 +65,26 @@ func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.
 
 // Create creates a new user
 func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persist.DBID, error) {
-	sqlStr := insertUsersSQL + " RETURNING ID"
+	sqlStr := "INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID"
 
-	var id string
+	var id persist.DBID
 	err := u.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pUser.Deleted, pUser.Version, pUser.Username, pUser.UsernameIdempotent, pq.Array(pUser.Addresses)).Scan(&id)
 	if err != nil {
 		return "", err
 	}
 
-	return persist.DBID(id), nil
+	return id, nil
 }
 
 // GetByID gets the user with the given ID
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
-	sqlStr := `SELECT ID,DELETED,VERSION,USERNANE,USERNAME_IDEMPOTENET,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1`
+	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1`
 
-	res, err := u.db.QueryContext(pCtx, sqlStr, pID)
+	user := persist.User{}
+	err := u.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		return persist.User{}, err
 	}
-	defer res.Close()
-
-	var user persist.User
-	for res.Next() {
-		err = res.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.CreationTime, &user.LastUpdated)
-		if err != nil {
-			return persist.User{}, err
-		}
-	}
-
-	if err = res.Err(); err != nil {
-		return persist.User{}, err
-	}
-
 	return user, nil
 }
 
