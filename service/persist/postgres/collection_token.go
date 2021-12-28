@@ -15,7 +15,7 @@ type CollectionTokenRepository struct {
 	db *sql.DB
 }
 
-// NewCollectionTokenRepository creates a new CollectionPostgresRepository
+// NewCollectionTokenRepository creates a new CollectionTokenRepository
 func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 	return &CollectionTokenRepository{db: db}
 }
@@ -36,7 +36,7 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.CollectionToken, error) {
 	sqlStr := `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
-		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CREATED_AT 
+		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 		FROM collections c 
 		JOIN tokens n ON n.ID = ANY (c.NFTS) 
 		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = $2 GROUP BY c.ID,n.ID;`
@@ -51,7 +51,7 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 	for res.Next() {
 		var collection persist.CollectionToken
 		var nft persist.TokenInCollection
-		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.CreationTime)
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 
 	sqlStr := `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
-		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CREATED_AT 
+		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 		FROM collections c 
 		JOIN nfts n ON n.ID = ANY (c.NFTS) 
 		WHERE c.ID = $1 AND c.HIDDEN = $2 GROUP BY c.ID,n.ID;`
@@ -99,7 +99,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	for res.Next() {
 		colID := collection.ID
 		var nft persist.TokenInCollection
-		err = res.Scan(&colID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.CreationTime)
+		err = res.Scan(&colID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
 			return persist.CollectionToken{}, err
 		}

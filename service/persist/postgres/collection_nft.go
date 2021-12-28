@@ -15,7 +15,7 @@ type CollectionRepository struct {
 	db *sql.DB
 }
 
-// NewCollectionRepository creates a new CollectionPostgresRepository
+// NewCollectionRepository creates a new CollectionRepository
 func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	return &CollectionRepository{db: db}
 }
