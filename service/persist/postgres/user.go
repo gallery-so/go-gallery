@@ -176,7 +176,7 @@ func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pA
 // RemoveAddresses removes the given addresses from the user with the given ID
 func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
 	for _, address := range pAddresses {
-		sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES)`
+		sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2::varchar) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES)`
 		res, err := u.db.ExecContext(pCtx, sqlStr, pID, address)
 		if err != nil {
 			return err
