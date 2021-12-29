@@ -26,12 +26,12 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.CollectionTokenDB) (persist.DBID, error) {
 	sqlStr := `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS, HIDDEN) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`
 
-	var id string
+	var id persist.DBID
 	err := c.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
 	if err != nil {
 		return "", err
 	}
-	return persist.DBID(id), nil
+	return id, nil
 }
 
 // GetByUserID returns all collections owned by a user
@@ -149,25 +149,35 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 // Update updates a collection in the database
 func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 	sqlStr := `UPDATE COLLECTIONS `
+	var res sql.Result
+	var err error
 	switch pUpdate.(type) {
 	case persist.CollectionTokenUpdateDeletedInput:
 		update := pUpdate.(persist.CollectionTokenUpdateDeletedInput)
 		sqlStr += `SET DELETED = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID, pUserID)
-		return err
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID, pUserID)
 	case persist.CollectionTokenUpdateInfoInput:
 		update := pUpdate.(persist.CollectionTokenUpdateInfoInput)
 		sqlStr += `SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
-		return err
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
 	case persist.CollectionTokenUpdateHiddenInput:
 		update := pUpdate.(persist.CollectionTokenUpdateHiddenInput)
 		sqlStr += `SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID, pUserID)
-		return err
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID, pUserID)
 	default:
 		return errors.New("invalid update type")
 	}
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrCollectionNotFoundByID{ID: pID}
+	}
+	return nil
 }
 
 // UpdateNFTs updates the nfts of a collection in the database
@@ -190,42 +200,33 @@ func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist
 // UpdateUnsafe updates a collection in the database
 func (c *CollectionTokenRepository) UpdateUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 	sqlStr := `UPDATE COLLECTIONS `
+	var res sql.Result
+	var err error
 	switch pUpdate.(type) {
 	case persist.CollectionTokenUpdateDeletedInput:
 		update := pUpdate.(persist.CollectionTokenUpdateDeletedInput)
 		sqlStr += `SET DELETED = $1, LAST_UPDATED = $2 WHERE ID = $3;`
-		res, err := c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID)
-		rowsAffected, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return persist.ErrCollectionNotFoundByID{ID: pID}
-		}
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID)
 	case persist.CollectionTokenUpdateInfoInput:
 		update := pUpdate.(persist.CollectionTokenUpdateInfoInput)
 		sqlStr += `SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4;`
-		res, err := c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID)
-		rowsAffected, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return persist.ErrCollectionNotFoundByID{ID: pID}
-		}
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID)
 	case persist.CollectionTokenUpdateHiddenInput:
 		update := pUpdate.(persist.CollectionTokenUpdateHiddenInput)
 		sqlStr += `SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3;`
-		res, err := c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID)
-		rowsAffected, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return persist.ErrCollectionNotFoundByID{ID: pID}
-		}
+		res, err = c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID)
 	default:
 		return errors.New("invalid update type")
+	}
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 	return nil
 }

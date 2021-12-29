@@ -141,7 +141,5 @@ func (l TokenLayout) Value() (driver.Value, error) {
 
 // Scan implements the Scanner interface for the TokenLayout type
 func (l *TokenLayout) Scan(value interface{}) error {
-	bs := []byte(value.([]uint8))
-
-	return json.Unmarshal(bs, l)
+	return json.Unmarshal(value.([]uint8), l)
 }

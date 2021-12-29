@@ -177,6 +177,10 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 		return nil, err
 	}
 
+	if len(tokens) == 0 {
+		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
+	}
+
 	return tokens, nil
 }
 
@@ -255,23 +259,29 @@ func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) err
 func (t *TokenRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
 	sqlStr := `UPDATE tokens SET `
+	var res sql.Result
+	var err error
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
 		sqlStr += "COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3"
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID)
-		if err != nil {
-			return err
-		}
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		sqlStr += "MEDIA = $1, LAST_UPDATED = $2 WHERE ID = $3"
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID)
-		if err != nil {
-			return err
-		}
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID)
 	default:
 		return errors.New("unsupported update type")
+	}
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrTokenNotFoundByID{ID: pID}
 	}
 	return nil
 }
@@ -286,30 +296,28 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUs
 	}
 
 	sqlStr := `UPDATE tokens `
+	var res sql.Result
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
 		sqlStr += `SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4)`
-		res, err := t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID, pq.Array(addresses))
-		if err != nil {
-			return err
-		}
-		if rows, err := res.RowsAffected(); rows == 0 || err != nil {
-			return persist.ErrTokenNotFoundByID{ID: pID}
-		}
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID, pq.Array(addresses))
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		sqlStr += `SET MEDIA = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4)`
-		res, err := t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID, pq.Array(addresses))
-		if err != nil {
-			return err
-		}
-		if rows, err := res.RowsAffected(); rows == 0 || err != nil {
-			return persist.ErrTokenNotFoundByID{ID: pID}
-		}
-
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID, pq.Array(addresses))
 	default:
 		return errors.New("unsupported update type")
+	}
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return persist.ErrTokenNotFoundByID{ID: pID}
 	}
 	return nil
 }
@@ -317,23 +325,29 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUs
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user
 func (t *TokenRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pUpdate interface{}) error {
 	sqlStr := `UPDATE tokens SET `
+	var res sql.Result
+	var err error
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
 		sqlStr += "COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4"
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pTokenID, pContractAddress)
-		if err != nil {
-			return err
-		}
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		sqlStr += "MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4"
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pTokenID, pContractAddress)
-		if err != nil {
-			return err
-		}
+		res, err = t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return errors.New("unsupported update type")
+	}
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 	return nil
 }

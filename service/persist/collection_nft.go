@@ -50,32 +50,32 @@ type Collection struct {
 
 // CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Name           string `bson:"name" json:"name" postgres:"NAME"`
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note" postgres:"COLLECTORS_NOTE"`
+	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
 }
 
 // CollectionUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionUpdateNftsInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	NFTs   []DBID      `bson:"nfts" json:"nfts" postgres:"NFT_IDS"`
-	Layout TokenLayout `bson:"layout" json:"layout" postgres:"LAYOUT"`
+	NFTs   []DBID      `bson:"nfts" json:"nfts"`
+	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionUpdateHiddenInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	Hidden bool `bson:"hidden" json:"hidden" postgres:"HIDDEN"`
 }
 
 // CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionUpdateDeletedInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Deleted bool `bson:"deleted" json:"-" postgres:"DELETED"`
+	Deleted bool `bson:"deleted" json:"-"`
 }
 
 // CollectionRepository represents the interface for interacting with the collection persistence layer

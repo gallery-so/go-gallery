@@ -21,11 +21,11 @@ type User struct {
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
 type UserUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Username           string `bson:"username" postgres:"USERNAME"`
-	UsernameIdempotent string `bson:"username_idempotent" postgres:"USERNAME_IDEMPOTENT"`
-	Bio                string `bson:"bio" postgres:"BIO"`
+	Username           string `bson:"username"`
+	UsernameIdempotent string `bson:"username_idempotent"`
+	Bio                string `bson:"bio"`
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users

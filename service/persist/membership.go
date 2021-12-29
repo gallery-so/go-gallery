@@ -37,11 +37,7 @@ type MembershipRepository interface {
 
 // Value implements the database/sql/driver Valuer interface for the membership owner type
 func (o MembershipOwner) Value() (driver.Value, error) {
-	bs, err := json.Marshal(o)
-	if err != nil {
-		return nil, err
-	}
-	return string(bs), nil
+	return json.Marshal(o)
 }
 
 // ErrMembershipNotFoundByTokenID represents an error when a membership is not found by token id
