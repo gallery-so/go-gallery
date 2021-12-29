@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
@@ -22,10 +24,10 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 
 // Create creates a new collection in the database
 func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.CollectionTokenDB) (persist.DBID, error) {
-	sqlStr := `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`
+	sqlStr := `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS, HIDDEN) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`
 
 	var id string
-	err := c.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs)).Scan(&id)
+	err := c.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -39,16 +41,16 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-		FROM collections c 
-		JOIN tokens n ON n.ID = ANY (c.NFTS) 
-		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+		JOIN tokens n ON n.ID = nft 
+		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`
 	} else {
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-		FROM collections c 
-		JOIN tokens n ON n.ID = ANY (c.NFTS) 
-		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+		JOIN tokens n ON n.ID = nft 
+		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`
 	}
 
 	res, err := c.db.QueryContext(pCtx, sqlStr, pUserID)
@@ -95,16 +97,16 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-		FROM collections c 
-		JOIN tokens n ON n.ID = ANY (c.NFTS) 
-		WHERE c.ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+		JOIN tokens n ON n.ID = nft
+		WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`
 	} else {
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-		FROM collections c 
-		JOIN tokens n ON n.ID = ANY (c.NFTS) 
-		WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
+		JOIN tokens n ON n.ID = nft
+		WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`
 	}
 
 	res, err := c.db.QueryContext(pCtx, sqlStr, pID)
@@ -116,15 +118,17 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	var collection persist.CollectionToken
 	var nfts []persist.TokenInCollection
 
-	for res.Next() {
+	i := 0
+	for ; res.Next(); i++ {
 		colID := collection.ID
 		var nft persist.TokenInCollection
-		err = res.Scan(&colID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
 			return persist.CollectionToken{}, err
 		}
 		if colID != "" && colID != collection.ID {
-			return persist.CollectionToken{}, errors.New("multiple collections found")
+			logrus.Infof("colID: %s, collection.ID: %s", colID, collection.ID)
+			return persist.CollectionToken{}, fmt.Errorf("mismatched coll ids colID: %s, collection.ID: %s", colID, collection.ID)
 		}
 
 		nfts = append(nfts, nft)
@@ -132,6 +136,11 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	if err := res.Err(); err != nil {
 		return persist.CollectionToken{}, err
 	}
+
+	if i == 0 {
+		return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
+	}
+
 	collection.NFTs = nfts
 
 	return collection, nil
@@ -163,8 +172,8 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBI
 
 // UpdateNFTs updates the nfts of a collection in the database
 func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionTokenUpdateNftsInput) error {
-	sqlStr := `UPDATE collections SET NFTS = $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`
-	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pID, pUserID)
+	sqlStr := `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`
+	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID, pUserID)
 	if err != nil {
 		return err
 	}
@@ -223,8 +232,8 @@ func (c *CollectionTokenRepository) UpdateUnsafe(pCtx context.Context, pID persi
 
 // UpdateNFTsUnsafe updates the nfts of a collection in the database
 func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID, pUpdate persist.CollectionTokenUpdateNftsInput) error {
-	sqlStr := `UPDATE collections SET NFTS = $1 WHERE ID = $2;`
-	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pID)
+	sqlStr := `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4;`
+	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID)
 	if err != nil {
 		return err
 	}
@@ -281,7 +290,7 @@ func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 
 // RemoveNFTsOfAddresses removes nfts of addresses from a collection in the database
 func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
-	findNFTsForAddressesSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1);`
+	findNFTsForAddressesSQLStr := `SELECT ID FROM tokens WHERE OWNER_ADDRESS = ANY($1);`
 	nfts, err := c.db.QueryContext(pCtx, findNFTsForAddressesSQLStr, pq.Array(pAddresses))
 	if err != nil {
 		return err
@@ -302,7 +311,7 @@ func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 		return err
 	}
 
-	deleteNFTsSQLStr := `UPDATE nfts SET DELETED = true WHERE ID = ANY($1);`
+	deleteNFTsSQLStr := `UPDATE tokens SET DELETED = true WHERE ID = ANY($1);`
 	_, err = c.db.ExecContext(pCtx, deleteNFTsSQLStr, pq.Array(nftsIDs))
 	if err != nil {
 		return err
@@ -310,7 +319,7 @@ func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 
 	for _, nft := range nftsIDs {
 		removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`
-		_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, nft, pID)
+		_, err := c.db.ExecContext(pCtx, removeFromNFTsSQLStr, nft, pID)
 		if err != nil {
 			return err
 		}

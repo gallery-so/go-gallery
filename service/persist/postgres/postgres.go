@@ -21,7 +21,7 @@ func NewClient() *sql.DB {
 
 	err = db.Ping()
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Error connecting to postgres: %s %T", err, err))
 	}
 	return db
 }

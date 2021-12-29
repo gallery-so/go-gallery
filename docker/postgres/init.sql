@@ -14,9 +14,11 @@ CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
 CREATE TABLE galleries (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    VERSION int,
     OWNER_USER_ID varchar(32),
-    COLLECTIONS varchar(32) [],
-    VERSION int
+    COLLECTIONS varchar(32) []
 );
 
 CREATE TABLE nfts (

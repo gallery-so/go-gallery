@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -82,7 +83,7 @@ func CoreInit() *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
+	return handlersInit(router, newRepos(newMongoClient(), postgres.NewClient()), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
 }
 
 func setDefaults() {
@@ -117,10 +118,8 @@ func setDefaults() {
 	}
 }
 
-func newRepos() *repositories {
+func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
 
-	mgoClient := newMongoClient()
-	db := postgres.NewClient()
 	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
 	galleriesCacheToken := redis.NewCache(2)
 	nftsCache := redis.NewCache(3)

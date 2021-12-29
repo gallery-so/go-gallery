@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -75,7 +74,6 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 
 		userID := middleware.GetUserIDFromCtx(c)
 		auth := userID == input.UserID
-		logrus.Info("AUTH ", auth)
 		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
 			colls = []persist.Collection{}
@@ -107,8 +105,6 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 			})
 			return
 		}
-
-		logrus.Infof("coll %+v", coll)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
 		return

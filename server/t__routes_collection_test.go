@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"testing"
 
@@ -42,17 +43,6 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert.Empty(errResp.Error)
 
 	assertValidResponse(assert, resp)
-
-	rows, err := tc.db.Query(`SELECT ID,HIDDEN,DELETED,NAME FROM collections`)
-	assert.Nil(err)
-	defer rows.Close()
-
-	for rows.Next() {
-		coll := persist.CollectionDB{}
-		err = rows.Scan(&coll.ID, &coll.Hidden, &coll.Deleted, &coll.Name)
-		assert.Nil(err)
-		logrus.Infof("WE GOT ONE COLLECTION: %+v ", coll)
-	}
 
 	// retrieve updated nft
 	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
@@ -335,6 +325,7 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	util.UnmarshallBody(&body, resp.Body)
 	assert.NotNil(body.Collection)
 	assert.Empty(body.Error)
+	logrus.Infof("nfts body: %v", body.Collection.NFTs)
 	assert.Equal(update.Nfts[1], body.Collection.NFTs[1].ID)
 }
 
@@ -443,15 +434,19 @@ func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpda
 }
 
 func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
-	nft := persist.NFTDB{
-		OwnerAddress: tc.user1.address,
+
+	nfts := []persist.NFTDB{
+		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
+		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
+		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
 	}
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
+
 	assert.Nil(err)
 	collID, err := tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
 		Name:        collectionName,
 		OwnerUserID: userID,
-		NFTs:        []persist.DBID{nftID},
+		NFTs:        nftIDs,
 	})
 	assert.Nil(err)
 

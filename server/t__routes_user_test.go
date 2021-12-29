@@ -229,8 +229,14 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	}
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
 
+	nft2 := persist.NFTDB{
+		OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+		Name:         "blah",
+	}
+	nftID2, err := tc.repos.nftRepository.Create(context.Background(), nft2)
+
 	coll := persist.CollectionDB{
-		NFTs:        []persist.DBID{nftID},
+		NFTs:        []persist.DBID{nftID, nftID2},
 		Name:        "test-coll",
 		OwnerUserID: userID,
 	}
@@ -251,11 +257,11 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 
 	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
 	assert.Nil(err)
-	assert.Empty(nfts)
+	assert.Len(nfts, 1)
 
 	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
-	assert.Empty(res.NFTs)
+	assert.Len(res.NFTs, 1)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
 	assert.Nil(err)

@@ -40,16 +40,18 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY(c.NFTS) 
-		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
+		LEFT JOIN nfts n ON n.ID = nft
+		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`
 	} else {
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY(c.NFTS) 
-		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+		FROM collections c,unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+		LEFT JOIN nfts n ON n.ID = nft 
+		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`
 	}
 	res, err := c.db.QueryContext(pCtx, sqlStr, pUserID)
 	if err != nil {
@@ -79,10 +81,6 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 		return nil, err
 	}
 
-	if len(collections) == 0 {
-		return nil, persist.ErrAccessNotFoundByUserID{UserID: pUserID}
-	}
-
 	result := make([]persist.Collection, 0, len(collections))
 	for _, collection := range collections {
 		result = append(result, collection)
@@ -99,16 +97,18 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY(c.NFTS) 
-		WHERE c.ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
+		LEFT JOIN nfts n ON n.ID = nft
+		WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`
 	} else {
 		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
-		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY(c.NFTS) 
-		WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
+		LEFT JOIN nfts n ON n.ID = nft
+		WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`
 	}
 
 	res, err := c.db.QueryContext(pCtx, sqlStr, pID)
@@ -119,9 +119,8 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 
 	var collection persist.Collection
 	var nfts []persist.CollectionNFT
-
-	for res.Next() {
-
+	i := 0
+	for ; res.Next(); i++ {
 		colID := collection.ID
 		var nft persist.CollectionNFT
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.CreationTime)
@@ -135,13 +134,9 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 		nfts = append(nfts, nft)
 	}
 	if err := res.Err(); err != nil {
-		if err == sql.ErrNoRows {
-			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
-		}
 		return persist.Collection{}, err
 	}
-
-	if collection.ID == "" {
+	if i == 0 {
 		return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 
@@ -205,8 +200,8 @@ func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pU
 
 // UpdateNFTs updates the nfts of a collection in the database
 func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
-	sqlStr := `UPDATE collections SET NFTS = $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`
-	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pID, pUserID)
+	sqlStr := `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`
+	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID, pUserID)
 	if err != nil {
 		return err
 	}
@@ -239,8 +234,6 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 			return err
 		}
 		nftsToRemoveIDs = append(nftsToRemoveIDs, id)
-
-		logrus.Infof("ID: %s, OpenseaID: %d, USER: %s ", id, openseaID, pUserID)
 	}
 
 	if err := nftsToRemove.Err(); err != nil {

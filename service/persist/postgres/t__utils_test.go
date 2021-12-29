@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var db *sql.DB
-
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 	viper.Set("POSTGRES_HOST", "0.0.0.0")
 	viper.Set("POSTGRES_PORT", 5432)
@@ -17,7 +15,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 	viper.Set("POSTGRES_PASSWORD", "")
 	viper.Set("POSTGRES_DB", "postgres")
 
-	db = NewClient()
+	db := NewClient()
 
 	t.Cleanup(func() {
 		defer db.Close()

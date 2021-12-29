@@ -65,5 +65,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	a.Equal(1, len(galleries))
 
 	a.Equal(userID, galleries[0].OwnerUserID)
+	a.Equal(1, len(galleries[0].Collections))
+	a.Equal(2, len(galleries[0].Collections[0].NFTs))
 
 }
