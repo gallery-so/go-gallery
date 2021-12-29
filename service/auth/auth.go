@@ -115,7 +115,7 @@ func LoginAndMemorizeAttempt(pCtx context.Context, pInput LoginInput,
 		SignatureValid: output.SignatureValid,
 
 		ReqHostAddr: pReq.RemoteAddr,
-		ReqHeaders:  map[string][]string(pReq.Header),
+		ReqHeaders:  persist.ReqHeaders(pReq.Header),
 	}
 
 	_, err = loginRepo.Create(pCtx, loginAttempt)

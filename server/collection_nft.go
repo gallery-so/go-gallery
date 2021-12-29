@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -65,8 +66,6 @@ type collectionDeleteInput struct {
 
 func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//------------------
-		// INPUT
 
 		input := &collectionGetByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -76,6 +75,7 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 
 		userID := middleware.GetUserIDFromCtx(c)
 		auth := userID == input.UserID
+		logrus.Info("AUTH ", auth)
 		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
 		if len(colls) == 0 || err != nil {
 			colls = []persist.Collection{}
@@ -88,8 +88,6 @@ func getCollectionsByUserID(collectionsRepository persist.CollectionRepository) 
 
 func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//------------------
-		// INPUT
 
 		input := &collectionGetByIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -109,6 +107,8 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 			})
 			return
 		}
+
+		logrus.Infof("coll %+v", coll)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
 		return
@@ -132,9 +132,6 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
-
-		//------------------
-		// CREATE
 
 		id, err := collectionCreateDb(c, input, userID, collectionsRepository, galleryRepository)
 		if err != nil {
@@ -162,7 +159,7 @@ func updateCollectionInfo(collectionsRepository persist.CollectionRepository) gi
 			return
 		}
 
-		update := &persist.CollectionUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := persist.CollectionUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -188,7 +185,7 @@ func updateCollectionHidden(collectionsRepository persist.CollectionRepository) 
 			return
 		}
 
-		update := &persist.CollectionUpdateHiddenInput{Hidden: input.Hidden}
+		update := persist.CollectionUpdateHiddenInput{Hidden: input.Hidden}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -228,7 +225,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 			return
 		}
 
-		update := persist.CollectionUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+		update := persist.CollectionUpdateNftsInput{NFTs: withNoRepeats, Layout: layout}
 
 		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
@@ -286,7 +283,7 @@ func collectionCreateDb(pCtx context.Context, pInput collectionCreateInput,
 	}
 	coll := persist.CollectionDB{
 		OwnerUserID:    pUserID,
-		Nfts:           pInput.Nfts,
+		NFTs:           pInput.Nfts,
 		Layout:         layout,
 		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
 		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),

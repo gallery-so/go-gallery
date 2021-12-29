@@ -228,6 +228,7 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 		Name:         "test",
 	}
 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), nft)
+	assert.Nil(err)
 
 	coll := persist.CollectionTokenDB{
 		NFTs:        []persist.DBID{nftID},
@@ -249,13 +250,17 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	util.UnmarshallBody(errResp, resp.Body)
 	assert.Empty(errResp.Error)
 
-	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
+	nfts, err := tc.repos.tokenRepository.GetByUserID(context.Background(), userID, -1, 0)
 	assert.Nil(err)
 	assert.Empty(nfts)
 
-	resultColl, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	resultColl, err := tc.repos.collectionTokenRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
 	assert.Empty(resultColl.NFTs)
+
+	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	assert.Nil(err)
+	assert.Len(user.Addresses, 1)
 
 }
 

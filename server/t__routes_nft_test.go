@@ -79,6 +79,9 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
 	assertValidResponse(assert, resp)
+	errResp := util.ErrorResponse{}
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Empty(errResp.Error)
 
 	// retrieve updated nft
 	resp, err = http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
@@ -139,7 +142,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal("document not found", body.Error)
+	assert.NotEmpty(body.Error)
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {

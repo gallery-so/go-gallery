@@ -2,9 +2,14 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	// "github.com/davecgh/go-spew/spew"
 )
+
+// ReqHeaders is a type that holds the headers for a request
+type ReqHeaders map[string][]string
 
 // UserNonce represents a short lived nonce that holds a value to be signed
 // by a user cryptographically to prove they are the owner of a given address.
@@ -34,8 +39,8 @@ type UserLoginAttempt struct {
 	UserExists     bool    `bson:"user_exists"`
 	SignatureValid bool    `bson:"signature_valid"`
 
-	ReqHostAddr string              `bson:"req_host_addr"`
-	ReqHeaders  map[string][]string `bson:"req_headers"`
+	ReqHostAddr string     `bson:"req_host_addr"`
+	ReqHeaders  ReqHeaders `bson:"req_headers"`
 }
 
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
@@ -47,6 +52,16 @@ type NonceRepository interface {
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
 type LoginAttemptRepository interface {
 	Create(context.Context, UserLoginAttempt) (DBID, error)
+}
+
+// Scan implements the sql.Scanner interface for the ReqHeaders type
+func (h *ReqHeaders) Scan(src interface{}) error {
+	return json.Unmarshal(src.([]byte), h)
+}
+
+// Value implements the driver.Valuer interface for the ReqHeaders type
+func (h ReqHeaders) Value() (driver.Value, error) {
+	return json.Marshal(h)
 }
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address

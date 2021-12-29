@@ -57,15 +57,16 @@ func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Tok
 
 // Create creates a token in the database
 func (t *TokenRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
-	insertSQL := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION) VALUES 
-	($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,13,$14,$15,$16,$17) RETURNING ID`
 
-	var id string
-	err := t.db.QueryRowContext(pCtx, insertSQL, pToken.ID, pToken.CollectorsNote, pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pq.Array(pToken.OwnershipHistory), pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version).Scan(&id)
+	insertSQL := `INSERT INTO tokens (ID,VERSION,COLLECTORS_NOTE,MEDIA,TOKEN_METADATA,TOKEN_TYPE,TOKEN_ID,CHAIN,NAME,DESCRIPTION,EXTERNAL_URL,BLOCK_NUMBER,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,CONTRACT_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING ID`
+
+	var id persist.DBID
+	err := t.db.QueryRowContext(pCtx, insertSQL, pToken.ID, pToken.Version, pToken.CollectorsNote, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pq.Array(pToken.OwnershipHistory), pToken.ContractAddress).Scan(&id)
 	if err != nil {
 		return "", err
 	}
-	return persist.DBID(id), nil
+
+	return id, nil
 }
 
 // GetByWallet retrieves all tokens associated with a wallet
@@ -84,7 +85,7 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Add
 	tokens := make([]persist.Token, 0, 10)
 	for rows.Next() {
 		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, &token.OwnershipHistory, &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -100,14 +101,14 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Add
 
 // GetByUserID retrieves all tokens associated with a user
 func (t *TokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit int64, page int64) ([]persist.Token, error) {
-	getUserSQLStr := `SELECT ID,DELETED,VERSION,USERNANE,USERNAME_IDEMPOTENET,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1`
-	user := persist.User{}
-	err := t.db.QueryRowContext(pCtx, getUserSQLStr, pUserID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Addresses, &user.CreationTime, &user.LastUpdated)
+	getUserSQLStr := `SELECT ADDRESSES FROM users WHERE ID = $1 AND DELETED = false`
+	addresses := make([]persist.Address, 0, 10)
+	err := t.db.QueryRowContext(pCtx, getUserSQLStr, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return nil, err
 	}
 	tokens := make([]persist.Token, 0, 10)
-	for i, address := range user.Addresses {
+	for i, address := range addresses {
 		t, err := t.GetByWallet(pCtx, address, limit, int64(i))
 		if err != nil {
 			return nil, err
@@ -137,7 +138,7 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 	tokens := make([]persist.Token, 0, 10)
 	for rows.Next() {
 		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, &token.OwnershipHistory, &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -166,7 +167,7 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 	tokens := make([]persist.Token, 0, 10)
 	for rows.Next() {
 		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, &token.OwnershipHistory, &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -183,7 +184,7 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Token, error) {
 	sqlStr := `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE ID = $1`
 	token := persist.Token{}
-	err := t.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, &token.OwnershipHistory, &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated)
+	err := t.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated)
 	if err != nil {
 		return persist.Token{}, err
 	}
@@ -277,22 +278,36 @@ func (t *TokenRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBI
 
 // UpdateByID updates a token by its ID
 func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
+	getUserSQL := `SELECT ADDRESSES FROM users WHERE ID = $1`
+	var addresses []persist.Address
+	err := t.db.QueryRowContext(pCtx, getUserSQL, pUserID).Scan(pq.Array(&addresses))
+	if err != nil {
+		return err
+	}
+
 	sqlStr := `UPDATE tokens `
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
-		sqlStr += `SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = $4`
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID, pUserID)
+		sqlStr += `SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4)`
+		res, err := t.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.LastUpdated, pID, pq.Array(addresses))
 		if err != nil {
 			return err
+		}
+		if rows, err := res.RowsAffected(); rows == 0 || err != nil {
+			return persist.ErrTokenNotFoundByID{ID: pID}
 		}
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		sqlStr += `SET MEDIA = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = $4`
-		_, err := t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID, pUserID)
+		sqlStr += `SET MEDIA = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4)`
+		res, err := t.db.ExecContext(pCtx, sqlStr, update.Media, update.LastUpdated, pID, pq.Array(addresses))
 		if err != nil {
 			return err
 		}
+		if rows, err := res.RowsAffected(); rows == 0 || err != nil {
+			return persist.ErrTokenNotFoundByID{ID: pID}
+		}
+
 	default:
 		return errors.New("unsupported update type")
 	}

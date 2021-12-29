@@ -103,7 +103,7 @@ func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWall
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
 	}
 	if len(pOwnerWalletAddresses) == 0 {
 		pOwnerWalletAddresses = user.Addresses
@@ -111,23 +111,23 @@ func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWall
 
 	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch assets for user %s: %s", pUserID, err)
 	}
 
 	ids, err := nftRepo.BulkUpsert(pCtx, pUserID, asDBNfts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to bulk upsert NFTs: %v", err)
 	}
 
 	// update other user's collections and this user's collection so that they and ONLY they can display these
 	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
-	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{Nfts: ids}); err != nil {
-		return nil, err
+	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
+		return nil, fmt.Errorf("failed to claim NFTs: %v", err)
 	}
 
 	result, err := dbToGalleryNFTs(pCtx, asDBNfts, user, nftRepo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert NFTs to Gallery NFTs: %v", err)
 	}
 
 	return result, nil

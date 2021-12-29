@@ -70,7 +70,7 @@ type CollectionTokenUpdateInfoInput struct {
 type CollectionTokenUpdateNftsInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Nfts   []DBID      `bson:"nfts" json:"nfts"`
+	NFTs   []DBID      `bson:"nfts" json:"nfts"`
 	Layout TokenLayout `bson:"layout" json:"layout"`
 }
 
@@ -136,11 +136,7 @@ func ValidateLayout(layout TokenLayout) (TokenLayout, error) {
 
 // Value implements the driver.Valuer interface for the TokenLayout type
 func (l TokenLayout) Value() (driver.Value, error) {
-	bs, err := json.Marshal(l)
-	if err != nil {
-		return nil, err
-	}
-	return string(bs), nil
+	return json.Marshal(l)
 }
 
 // Scan implements the Scanner interface for the TokenLayout type

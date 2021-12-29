@@ -8,6 +8,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // UserRepository represents a user repository in the postgres database
@@ -41,7 +42,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 // ExistsByAddress checks if a user exists with the given address
 func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address) (bool, error) {
-	sqlStr := `SELECT EXISTS(SELECT 1 FROM users WHERE ADDRESSES @> ARRAY[$1])`
+	sqlStr := `SELECT EXISTS(SELECT 1 FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[]) AND DELETED = false`
 
 	res, err := u.db.QueryContext(pCtx, sqlStr, pAddress)
 	if err != nil {
@@ -78,11 +79,14 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persi
 
 // GetByID gets the user with the given ID
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
-	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1`
+	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false`
 
 	user := persist.User{}
 	err := u.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.CreationTime, &user.LastUpdated)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.User{}, persist.ErrUserNotFoundByID{ID: pID}
+		}
 		return persist.User{}, err
 	}
 	return user, nil
@@ -90,10 +94,11 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 // GetByAddress gets the user with the given address in their list of addresses
 func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
-	sqlStr := `SELECT * FROM users WHERE ADDRESSES @> ARRAY[$1]`
+	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[]`
 
 	res, err := u.db.QueryContext(pCtx, sqlStr, pAddress)
 	if err != nil {
+		logrus.Info("ASLDKJASD")
 		return persist.User{}, err
 	}
 	defer res.Close()
@@ -107,6 +112,9 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 	}
 
 	if err = res.Err(); err != nil {
+		if err == sql.ErrNoRows {
+			return persist.User{}, persist.ErrUserNotFoundByAddress{Address: pAddress}
+		}
 		return persist.User{}, err
 	}
 
@@ -116,7 +124,7 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 
 // GetByUsername gets the user with the given username
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
-	sqlStr := `SELECT * FROM users WHERE USERNAME_IDEMPOTENT = $1`
+	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1`
 
 	res, err := u.db.QueryContext(pCtx, sqlStr, strings.ToLower(pUsername))
 	if err != nil {
@@ -133,6 +141,9 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 	}
 
 	if err = res.Err(); err != nil {
+		if err == sql.ErrNoRows {
+			return persist.User{}, persist.ErrUserNotFoundByUsername{Username: pUsername}
+		}
 		return persist.User{}, err
 	}
 
@@ -155,7 +166,7 @@ func (u *UserRepository) Delete(pCtx context.Context, pID persist.DBID) error {
 func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
 	sqlStr := `UPDATE users SET ADDRESSES = ADDRESSES || $2 WHERE ID = $1`
 
-	_, err := u.db.ExecContext(pCtx, sqlStr, pID, pAddresses)
+	_, err := u.db.ExecContext(pCtx, sqlStr, pID, pq.Array(pAddresses))
 	if err != nil {
 		return err
 	}
@@ -164,11 +175,20 @@ func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pA
 
 // RemoveAddresses removes the given addresses from the user with the given ID
 func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
-	sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2) WHERE u.ID = $1`
-
-	_, err := u.db.ExecContext(pCtx, sqlStr, pID, pAddresses)
-	if err != nil {
-		return err
+	for _, address := range pAddresses {
+		sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES)`
+		res, err := u.db.ExecContext(pCtx, sqlStr, pID, address)
+		if err != nil {
+			return err
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return persist.ErrUserNotFoundByAddress{Address: address}
+		}
 	}
+
 	return nil
 }

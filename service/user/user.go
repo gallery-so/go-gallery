@@ -236,7 +236,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return err
 	}
 
-	if len(user.Addresses) < len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pInput.Addresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 
@@ -244,7 +244,11 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 	if err != nil {
 		return err
 	}
-	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	err = collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
@@ -301,7 +305,7 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 		return err
 	}
 
-	if len(user.Addresses) < len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pInput.Addresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 

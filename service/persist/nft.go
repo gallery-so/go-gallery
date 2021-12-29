@@ -157,11 +157,7 @@ type NFTRepository interface {
 
 // Value implements the driver.Valuer interface for the ContractCollectionNFT type
 func (c ContractCollectionNFT) Value() (driver.Value, error) {
-	bs, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	return string(bs), nil
+	return json.Marshal(c)
 
 }
 
@@ -173,11 +169,7 @@ func (c *ContractCollectionNFT) Scan(src interface{}) error {
 
 // Value implements the driver.Valuer interface for the NFTContract type
 func (c NFTContract) Value() (driver.Value, error) {
-	bs, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	return string(bs), nil
+	return json.Marshal(c)
 }
 
 // Scan implements the sql.Scanner interface for the NFTContract type

@@ -283,6 +283,21 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }
 
+// Value implements the driver.Valuer interface for the Chain type
+func (c Chain) Value() (driver.Value, error) {
+	return string(c), nil
+}
+
+// Scan implements the sql.Scanner interface for the Chain type
+func (c *Chain) Scan(src interface{}) error {
+	if src == nil {
+		*c = Chain("")
+		return nil
+	}
+	*c = Chain(src.(string))
+	return nil
+}
+
 // URL turns a token's URI into a URL
 func (uri TokenURI) URL() (*url.URL, error) {
 	return url.Parse(uri.String())
@@ -299,6 +314,10 @@ func (uri TokenURI) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface for token URIs
 func (uri *TokenURI) Scan(src interface{}) error {
+	if src == nil {
+		*uri = TokenURI("")
+		return nil
+	}
 	*uri = TokenURI(src.(string))
 	return nil
 }
@@ -343,6 +362,10 @@ func (id TokenID) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface for token IDs
 func (id *TokenID) Scan(src interface{}) error {
+	if src == nil {
+		*id = TokenID("")
+		return nil
+	}
 	*id = TokenID(src.(string))
 	return nil
 }
@@ -380,6 +403,10 @@ func (hex HexString) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface for hex strings
 func (hex *HexString) Scan(src interface{}) error {
+	if src == nil {
+		*hex = HexString("")
+		return nil
+	}
 	*hex = HexString(src.(string))
 	return nil
 }
@@ -395,11 +422,16 @@ func (hex HexString) BigInt() *big.Int {
 
 // Value implements the driver.Valuer interface for media
 func (m Media) Value() (driver.Value, error) {
-	bs, err := json.Marshal(m)
-	if err != nil {
-		return nil, err
+	return json.Marshal(m)
+}
+
+// Scan implements the sql.Scanner interface for media
+func (m *Media) Scan(src interface{}) error {
+	if src == nil {
+		*m = Media{}
+		return nil
 	}
-	return string(bs), nil
+	return json.Unmarshal(src.([]uint8), &m)
 }
 
 func (a Address) String() string {
@@ -418,6 +450,10 @@ func (a Address) Value() (driver.Value, error) {
 
 // Scan implements the database/sql Scanner interface
 func (a *Address) Scan(i interface{}) error {
+	if i == nil {
+		*a = Address("")
+		return nil
+	}
 	if it, ok := i.(string); ok {
 		*a = Address(it)
 		return nil
@@ -447,13 +483,45 @@ func (b BlockNumber) Hex() string {
 
 // Value implements the database/sql/driver Valuer interface for the block number type
 func (b BlockNumber) Value() (driver.Value, error) {
-	return b.Uint64(), nil
+	return b.BigInt().Int64(), nil
 }
 
 // Scan implements the database/sql Scanner interface for the block number type
 func (b *BlockNumber) Scan(src interface{}) error {
-	*b = BlockNumber(src.(uint64))
+	if src == nil {
+		*b = BlockNumber(0)
+		return nil
+	}
+	*b = BlockNumber(src.(int64))
 	return nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenMetadata type
+func (m *TokenMetadata) Scan(src interface{}) error {
+	if src == nil {
+		*m = TokenMetadata{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), m)
+}
+
+// Value implements the database/sql/driver Valuer interface for the TokenMetadata type
+func (m TokenMetadata) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+// Scan implements the database/sql Scanner interface for the AddressAtBlock type
+func (a *AddressAtBlock) Scan(src interface{}) error {
+	if src == nil {
+		*a = AddressAtBlock{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), a)
+}
+
+// Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
+func (a AddressAtBlock) Value() (driver.Value, error) {
+	return json.Marshal(a)
 }
 
 func normalizeAddress(address string) string {

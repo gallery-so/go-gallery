@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NewPostgresClient creates a new postgres client
-func NewPostgresClient() *sql.DB {
+// NewClient creates a new postgres client
+func NewClient() *sql.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		viper.GetString("POSTGRES_HOST"), viper.GetInt("POSTGRES_PORT"), viper.GetString("POSTGRES_USER"), viper.GetString("POSTGRES_PASSWORD"), viper.GetString("POSTGRES_DB"))
 

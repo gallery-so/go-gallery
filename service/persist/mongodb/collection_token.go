@@ -143,11 +143,11 @@ func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist
 		return persist.ErrUserNotFoundByID{ID: pUserID}
 	}
 
-	ct, err := c.tokensStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
+	ct, err := c.tokensStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.NFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
 	if err != nil {
 		return err
 	}
-	if int(ct) != len(pUpdate.Nfts) {
+	if int(ct) != len(pUpdate.NFTs) {
 		return errNotAllNFTsOwnedByUser{pUserID}
 	}
 
@@ -203,7 +203,7 @@ func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 
 	nftsToBeRemoved := []*persist.Token{}
 
-	if err := c.tokensStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := c.tokensStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.NFTs}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 

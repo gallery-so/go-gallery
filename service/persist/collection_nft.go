@@ -20,7 +20,7 @@ type CollectionDB struct {
 	Name           string `bson:"name"          json:"name"`
 	CollectorsNote string `bson:"collectors_note"   json:"collectors_note"`
 	OwnerUserID    DBID   `bson:"owner_user_id" json:"owner_user_id"`
-	Nfts           []DBID `bson:"nfts"          json:"nfts"`
+	NFTs           []DBID `bson:"nfts"          json:"nfts"`
 
 	// collections can be hidden from public-viewing
 	Hidden bool `bson:"hidden" json:"hidden"`
@@ -60,7 +60,7 @@ type CollectionUpdateInfoInput struct {
 type CollectionUpdateNftsInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated" postgres:"LAST_UPDATED"`
 
-	Nfts   []DBID      `bson:"nfts" json:"nfts" postgres:"NFT_IDS"`
+	NFTs   []DBID      `bson:"nfts" json:"nfts" postgres:"NFT_IDS"`
 	Layout TokenLayout `bson:"layout" json:"layout" postgres:"LAYOUT"`
 }
 

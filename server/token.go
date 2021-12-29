@@ -136,7 +136,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 			return
 		}
 
-		update := &persist.TokenUpdateInfoInput{CollectorsNote: input.CollectorsNote}
+		update := persist.TokenUpdateInfoInput{CollectorsNote: input.CollectorsNote}
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {

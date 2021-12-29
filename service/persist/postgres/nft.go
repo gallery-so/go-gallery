@@ -11,12 +11,11 @@ import (
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 var openseaAssetsTTL time.Duration = time.Minute * 5
 
-var insertNFTsSQL = `INSERT INTO nfts (ID, DELETED, VERSION, NAME, DESCRIPTION, EXTERNAL_URL, CREATOR_ADDRESS, CREATOR_NAME, OWNER_ADDRESS, MULTIPLE_OWNERS, CONTRACT, OPENSEA_ID, OPENSEA_TOKEN_ID, IMAGE_URL, IMAGE_THUMBNAIL_URL, IMAGE_PREVIEW_URL, IMAGE_ORIGINAL_URL, ANIMATION_URL, ANIMATION_ORIGINAL_URL, TOKEN_COLLECTION_NAME) VALUES `
+var insertNFTsSQL = `INSERT INTO nfts (ID, DELETED, VERSION, NAME, DESCRIPTION, EXTERNAL_URL, CREATOR_ADDRESS, CREATOR_NAME, OWNER_ADDRESS, MULTIPLE_OWNERS, CONTRACT, OPENSEA_ID, OPENSEA_TOKEN_ID, IMAGE_URL, IMAGE_THUMBNAIL_URL, IMAGE_PREVIEW_URL, IMAGE_ORIGINAL_URL, ANIMATION_URL, ANIMATION_ORIGINAL_URL, TOKEN_COLLECTION_NAME, COLLECTORS_NOTE) VALUES `
 
 // NFTRepository is a repository that stores collections in a postgres database
 type NFTRepository struct {
@@ -39,11 +38,11 @@ func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstor
 // CreateBulk creates many new NFTs in the database
 func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
-	vals := make([]interface{}, 0, len(pNFTs)*20)
+	vals := make([]interface{}, 0, len(pNFTs)*21)
 
 	for i, nft := range pNFTs {
-		sqlStr += generateValuesPlaceholders(20, i*20) + ","
-		vals = append(vals, persist.GenerateID(), nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName)
+		sqlStr += generateValuesPlaceholders(21, i*21) + ","
+		vals = append(vals, persist.GenerateID(), nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName, nft.CollectorsNote)
 	}
 
 	sqlStr = sqlStr[0 : len(sqlStr)-1]
@@ -77,25 +76,24 @@ func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) 
 
 // Create creates a new NFT in the database
 func (n *NFTRepository) Create(pCtx context.Context, pNFT persist.NFTDB) (persist.DBID, error) {
-	sqlStr := insertNFTsSQL + `($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)` + " RETURNING ID"
+	sqlStr := insertNFTsSQL + `($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)` + " RETURNING ID"
 
-	logrus.Infof("Create NFT: %s", sqlStr)
 	contract, err := json.Marshal(pNFT.Contract)
 	if err != nil {
 		return "", err
 	}
-	var id string
-	err = n.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pNFT.Deleted, pNFT.Version, pNFT.Name, pNFT.Description, pNFT.ExternalURL, pNFT.CreatorAddress, pNFT.CreatorName, pNFT.OwnerAddress, pNFT.MultipleOwners, string(contract), pNFT.OpenseaID, pNFT.OpenseaTokenID, pNFT.ImageURL, pNFT.ImageThumbnailURL, pNFT.ImagePreviewURL, pNFT.ImageOriginalURL, pNFT.AnimationURL, pNFT.AnimationOriginalURL, pNFT.TokenCollectionName).Scan(&id)
+	var id persist.DBID
+	err = n.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pNFT.Deleted, pNFT.Version, pNFT.Name, pNFT.Description, pNFT.ExternalURL, pNFT.CreatorAddress, pNFT.CreatorName, pNFT.OwnerAddress, pNFT.MultipleOwners, string(contract), pNFT.OpenseaID, pNFT.OpenseaTokenID, pNFT.ImageURL, pNFT.ImageThumbnailURL, pNFT.ImagePreviewURL, pNFT.ImageOriginalURL, pNFT.AnimationURL, pNFT.AnimationOriginalURL, pNFT.TokenCollectionName, pNFT.CollectorsNote).Scan(&id)
 	if err != nil {
 		return "", err
 	}
 
-	return persist.DBID(id), nil
+	return id, nil
 }
 
 // GetByUserID gets all NFTs for a user
 func (n *NFTRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.NFT, error) {
-	sqlStr := `SELECT addresses FROM users WHERE ID = $1`
+	sqlStr := `SELECT ADDRESSES FROM users WHERE ID = $1`
 	pAddresses := []persist.Address{}
 	err := n.db.QueryRowContext(pCtx, sqlStr, pUserID).Scan(pq.Array(&pAddresses))
 	if err != nil {
@@ -106,8 +104,8 @@ func (n *NFTRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) 
 
 // GetByAddresses gets all NFTs owned by a set of addresses
 func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]persist.NFT, error) {
-	sqlStr := `SELECT * FROM nfts WHERE OWNER_ADDRESS = ANY($1)`
-	rows, err := n.db.QueryContext(pCtx, sqlStr, pAddresses)
+	sqlStr := `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND DELETED = false`
+	rows, err := n.db.QueryContext(pCtx, sqlStr, pq.Array(pAddresses))
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +114,7 @@ func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persis
 	nfts := make([]persist.NFT, 0, len(pAddresses)*25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime, &nft.TokenCollectionName)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 		if err != nil {
 			return nil, err
 		}
@@ -132,10 +130,13 @@ func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persis
 
 // GetByID gets a NFT by its ID
 func (n *NFTRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.NFT, error) {
-	sqlStr := `SELECT * FROM nfts WHERE ID = $1`
+	sqlStr := `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE ID = $1 AND DELETED = false`
 	var nft persist.NFT
-	err := n.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime, &nft.TokenCollectionName)
+	err := n.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.NFT{}, persist.ErrNFTNotFoundByID{ID: pID}
+		}
 		return persist.NFT{}, err
 	}
 	return nft, nil
@@ -143,7 +144,7 @@ func (n *NFTRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist
 
 // GetByContractData gets a NFT by its contract data (contract address and token ID)
 func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContract persist.Address) ([]persist.NFT, error) {
-	sqlStr := `SELECT * FROM nfts WHERE CONTRACT -> 'contract_address' = $1 AND OPENSEA_TOKEN_ID = $2`
+	sqlStr := `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE CONTRACT -> 'contract_address' = $1 AND OPENSEA_TOKEN_ID = $2 AND DELETED = false`
 	rows, err := n.db.QueryContext(pCtx, sqlStr, pContract.String(), pTokenID)
 	if err != nil {
 		return nil, err
@@ -153,7 +154,7 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 	nfts := make([]persist.NFT, 0, 25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime, &nft.TokenCollectionName)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 		if err != nil {
 			return nil, err
 		}
@@ -161,6 +162,9 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 	}
 
 	if err := rows.Err(); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, persist.ErrNFTNotFoundByContractData{TokenID: pTokenID.String(), ContractAddress: pContract.String()}
+		}
 		return nil, err
 	}
 
@@ -169,7 +173,7 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 
 // GetByOpenseaID gets a NFT by its Opensea ID and owner address
 func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address) ([]persist.NFT, error) {
-	sqlStr := `SELECT * FROM nfts WHERE OPENSEA_ID = $1 AND OWNER_ADDRESS = $2`
+	sqlStr := `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE OPENSEA_ID = $1 AND OWNER_ADDRESS = $2 AND DELETED = false`
 	rows, err := n.db.QueryContext(pCtx, sqlStr, pOpenseaID, pWalletAddress)
 	if err != nil {
 		return nil, err
@@ -179,7 +183,7 @@ func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWa
 	nfts := make([]persist.NFT, 0, 25)
 	for rows.Next() {
 		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.CreationTime, &nft.LastUpdatedTime, &nft.TokenCollectionName)
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 		if err != nil {
 			return nil, err
 		}
@@ -208,9 +212,12 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 	case persist.NFTUpdateInfoInput:
 		update := pUpdate.(persist.NFTUpdateInfoInput)
 		sqlStr += `SET LAST_UPDATED = $1, COLLECTORS_NOTE = $3 WHERE ID = $2 AND OWNER_ADDRESS = ANY($4)`
-		_, err = n.db.ExecContext(pCtx, sqlStr, time.Now(), pID, update.CollectorsNote, pq.Array(userAddresses))
+		it, err := n.db.ExecContext(pCtx, sqlStr, time.Now(), pID, update.CollectorsNote, pq.Array(userAddresses))
 		if err != nil {
 			return err
+		}
+		if rows, _ := it.RowsAffected(); rows == 0 {
+			return persist.ErrNFTNotFoundByID{ID: pID}
 		}
 	default:
 		return errors.New("unsupported update type")
@@ -222,18 +229,16 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 // BulkUpsert inserts or updates multiple NFTs
 func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFTDB) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
-	vals := make([]interface{}, 0, len(pNFTs)*20)
+	vals := make([]interface{}, 0, len(pNFTs)*21)
 
 	for i, nft := range pNFTs {
-		sqlStr += generateValuesPlaceholders(20, i*20) + ","
-		vals = append(vals, persist.GenerateID(), nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName)
+		sqlStr += generateValuesPlaceholders(21, i*21) + ","
+		vals = append(vals, nft.ID, nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName, nft.CollectorsNote)
 	}
 
-	sqlStr = sqlStr[0 : len(sqlStr)-1]
+	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (OPENSEA_ID, OWNER_ADDRESS) DO UPDATE SET DELETED = EXCLUDED.DELETED, VERSION = EXCLUDED.VERSION, NAME = EXCLUDED.NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, EXTERNAL_URL = EXCLUDED.EXTERNAL_URL, CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS, CREATOR_NAME = EXCLUDED.CREATOR_NAME, OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS, MULTIPLE_OWNERS EXCLUDED.MULTIPLE_OWNERS, string(contract) = EXCLUDED.CONTRACT, OPENSEA_ID = EXCLUDED.OPENSEA_ID, OPENSEA_TOKEN_ID = EXCLUDED.OPENSEA_TOKEN_ID, IMAGE_URL = EXCLUDED.IMAGE_URL, IMAGE_THUMBNAIL_URL EXCLUDED.IMAGE_THUMBNAIL_URL, IMAGE_PREVIEW_URL = EXCLUDED.IMAGE_PREVIEW_URL, IMAGE_ORIGINAL_URL = EXCLUDED.IMAGE_ORIGINAL_URL, ANIMATION_URL = EXCLUDED.ANIMATION_URL, ANIMATION_ORIGINAL_URL = EXCLUDED.ANIMATION_ORIGINAL_URL, TOKEN_COLLECTION_NAME = EXCLUDED.TOKEN_COLLECTION_NAME`
-
-	sqlStr += " RETURNING ID"
+	sqlStr += ` ON CONFLICT (OPENSEA_ID, OWNER_ADDRESS) DO UPDATE SET DELETED = EXCLUDED.DELETED, VERSION = EXCLUDED.VERSION, NAME = EXCLUDED.NAME, DESCRIPTION = EXCLUDED.DESCRIPTION, EXTERNAL_URL = EXCLUDED.EXTERNAL_URL, CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS, CREATOR_NAME = EXCLUDED.CREATOR_NAME, MULTIPLE_OWNERS = EXCLUDED.MULTIPLE_OWNERS, CONTRACT = EXCLUDED.CONTRACT, OPENSEA_TOKEN_ID = EXCLUDED.OPENSEA_TOKEN_ID, IMAGE_URL = EXCLUDED.IMAGE_URL, IMAGE_THUMBNAIL_URL = EXCLUDED.IMAGE_THUMBNAIL_URL, IMAGE_PREVIEW_URL = EXCLUDED.IMAGE_PREVIEW_URL, IMAGE_ORIGINAL_URL = EXCLUDED.IMAGE_ORIGINAL_URL, ANIMATION_URL = EXCLUDED.ANIMATION_URL, ANIMATION_ORIGINAL_URL = EXCLUDED.ANIMATION_ORIGINAL_URL, TOKEN_COLLECTION_NAME = EXCLUDED.TOKEN_COLLECTION_NAME, COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE RETURNING ID`
 
 	res, err := n.db.QueryContext(pCtx, sqlStr, vals...)
 	if err != nil {

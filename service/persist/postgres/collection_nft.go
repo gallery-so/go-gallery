@@ -8,6 +8,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // CollectionRepository is the repository for interacting with collections in a postgres database
@@ -22,10 +23,10 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 
 // Create creates a new collection in the database
 func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.CollectionDB) (persist.DBID, error) {
-	sqlStr := `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`
+	sqlStr := `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS, HIDDEN) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`
 
 	var id string
-	err := c.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.Nfts)).Scan(&id)
+	err := c.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -34,14 +35,23 @@ func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.Collec
 
 // GetByUserID returns all collections owned by a user
 func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
-	sqlStr := `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	var sqlStr string
+	if pShowHidden {
+		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY (c.NFTS) 
-		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = $2 GROUP BY c.ID,n.ID;`
-
-	res, err := c.db.QueryContext(pCtx, sqlStr, pUserID, !pShowHidden)
+		JOIN nfts n ON n.ID = ANY(c.NFTS) 
+		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+	} else {
+		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
+		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
+		JOIN nfts n ON n.ID = ANY(c.NFTS) 
+		WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+	}
+	res, err := c.db.QueryContext(pCtx, sqlStr, pUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +79,10 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 		return nil, err
 	}
 
+	if len(collections) == 0 {
+		return nil, persist.ErrAccessNotFoundByUserID{UserID: pUserID}
+	}
+
 	result := make([]persist.Collection, 0, len(collections))
 	for _, collection := range collections {
 		result = append(result, collection)
@@ -79,15 +93,25 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 
 // GetByID returns a collection by its ID
 func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
-
-	sqlStr := `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	var sqlStr string
+	// TODO if c.NFTS is empty no rows get returned :(
+	if pShowHidden {
+		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
-		JOIN nfts n ON n.ID = ANY (c.NFTS) 
-		WHERE c.ID = $1 AND c.HIDDEN = $2 GROUP BY c.ID,n.ID;`
+		JOIN nfts n ON n.ID = ANY(c.NFTS) 
+		WHERE c.ID = $1 AND c.DELETED = false GROUP BY c.ID,n.ID;`
+	} else {
+		sqlStr = `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+		c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
+		n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
+		n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM collections c 
+		JOIN nfts n ON n.ID = ANY(c.NFTS) 
+		WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false GROUP BY c.ID,n.ID;`
+	}
 
-	res, err := c.db.QueryContext(pCtx, sqlStr, pID, !pShowHidden)
+	res, err := c.db.QueryContext(pCtx, sqlStr, pID)
 	if err != nil {
 		return persist.Collection{}, err
 	}
@@ -97,6 +121,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	var nfts []persist.CollectionNFT
 
 	for res.Next() {
+
 		colID := collection.ID
 		var nft persist.CollectionNFT
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.CreationTime)
@@ -110,8 +135,16 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 		nfts = append(nfts, nft)
 	}
 	if err := res.Err(); err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+		}
 		return persist.Collection{}, err
 	}
+
+	if collection.ID == "" {
+		return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+	}
+
 	collection.NFTs = nfts
 
 	return collection, nil
@@ -124,34 +157,73 @@ func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pU
 	case persist.CollectionUpdateDeletedInput:
 		update := pUpdate.(persist.CollectionUpdateDeletedInput)
 		sqlStr += `SET DELETED = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID, pUserID)
-		return err
+		res, err := c.db.ExecContext(pCtx, sqlStr, update.Deleted, time.Now(), pID, pUserID)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return persist.ErrCollectionNotFoundByID{ID: pID}
+		}
 	case persist.CollectionUpdateInfoInput:
 		update := pUpdate.(persist.CollectionUpdateInfoInput)
 		sqlStr += `SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
-		return err
+		res, err := c.db.ExecContext(pCtx, sqlStr, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return persist.ErrCollectionNotFoundByID{ID: pID}
+		}
+		logrus.Info("WOW UPDATED ", rowsAffected)
 	case persist.CollectionUpdateHiddenInput:
 		update := pUpdate.(persist.CollectionUpdateHiddenInput)
 		sqlStr += `SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-		_, err := c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID, pUserID)
-		return err
+		res, err := c.db.ExecContext(pCtx, sqlStr, update.Hidden, time.Now(), pID, pUserID)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return persist.ErrCollectionNotFoundByID{ID: pID}
+		}
 	default:
 		return errors.New("invalid update type")
 	}
+	return nil
 }
 
 // UpdateNFTs updates the nfts of a collection in the database
 func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
 	sqlStr := `UPDATE collections SET NFTS = $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`
-	_, err := c.db.ExecContext(pCtx, sqlStr, pUpdate.Nfts, pID, pUserID)
-	return err
+	res, err := c.db.ExecContext(pCtx, sqlStr, pq.Array(pUpdate.NFTs), pID, pUserID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return persist.ErrCollectionNotFoundByID{ID: pID}
+	}
+	return nil
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pID persist.DBID, pOwnerAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
-	nftsToRemoveSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`
-	nftsToRemove, err := c.db.QueryContext(pCtx, nftsToRemoveSQLStr, pq.Array(pOwnerAddresses), pq.Array(pUpdate.Nfts))
+func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
+	nftsToRemoveSQLStr := `SELECT ID,OPENSEA_ID FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`
+	nftsToRemove, err := c.db.QueryContext(pCtx, nftsToRemoveSQLStr, pq.Array(pOwnerAddresses), pq.Array(pUpdate.NFTs))
 	if err != nil {
 		return err
 	}
@@ -160,14 +232,21 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pID persist.DBID,
 	nftsToRemoveIDs := []persist.DBID{}
 	for nftsToRemove.Next() {
 		var id persist.DBID
-		err = nftsToRemove.Scan(&id)
+		var openseaID int64
+
+		err = nftsToRemove.Scan(&id, &openseaID)
 		if err != nil {
 			return err
 		}
 		nftsToRemoveIDs = append(nftsToRemoveIDs, id)
+
+		logrus.Infof("ID: %s, OpenseaID: %d, USER: %s ", id, openseaID, pUserID)
 	}
 
 	if err := nftsToRemove.Err(); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
 		return err
 	}
 
@@ -177,10 +256,12 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pID persist.DBID,
 		return err
 	}
 
-	removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, ANY($1)) WHERE ID = $2;`
-	_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, pq.Array(nftsToRemoveIDs), pID)
-	if err != nil {
-		return err
+	for _, nft := range nftsToRemoveIDs {
+		removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`
+		_, err := c.db.ExecContext(pCtx, removeFromNFTsSQLStr, nft, pUserID)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -189,7 +270,7 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pID persist.DBID,
 
 // RemoveNFTsOfAddresses removes nfts of addresses from a collection in the database
 func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
-	findNFTsForAddressesSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1);`
+	findNFTsForAddressesSQLStr := `SELECT ID FROM nfts WHERE OWNER_ADDRESS = ANY($1)`
 	nfts, err := c.db.QueryContext(pCtx, findNFTsForAddressesSQLStr, pq.Array(pAddresses))
 	if err != nil {
 		return err
@@ -210,16 +291,18 @@ func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID p
 		return err
 	}
 
-	deleteNFTsSQLStr := `UPDATE nfts SET DELETED = true WHERE ID = ANY($1);`
+	deleteNFTsSQLStr := `UPDATE nfts SET DELETED = true WHERE ID = ANY($1)`
 	_, err = c.db.ExecContext(pCtx, deleteNFTsSQLStr, pq.Array(nftsIDs))
 	if err != nil {
 		return err
 	}
 
-	removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, ANY($1)) WHERE ID = $2;`
-	_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, pq.Array(nftsIDs), pID)
-	if err != nil {
-		return err
+	for _, nft := range nftsIDs {
+		removeFromNFTsSQLStr := `UPDATE collections SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`
+		_, err = c.db.ExecContext(pCtx, removeFromNFTsSQLStr, nft, pID)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -228,8 +311,18 @@ func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID p
 // Delete deletes a collection from the database
 func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
 	sqlStr := `UPDATE collections SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`
-	_, err := c.db.ExecContext(pCtx, sqlStr, pID, pUserID)
-	return err
+	res, err := c.db.ExecContext(pCtx, sqlStr, pID, pUserID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrCollectionNotFoundByID{ID: pID}
+	}
+	return nil
 }
 
 // GetUnassigned returns all unassigned nfts

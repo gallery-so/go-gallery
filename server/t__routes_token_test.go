@@ -80,6 +80,10 @@ func TestUpdateTokenByID_Success(t *testing.T) {
 	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1.jwt)
 	assertValidResponse(assert, resp)
 
+	errResp := util.ErrorResponse{}
+	assert.NoError(util.UnmarshallBody(&errResp, resp.Body))
+	assert.Empty(errResp.Error)
+
 	// retrieve updated nft
 	resp, err = http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
 	assert.Nil(err)

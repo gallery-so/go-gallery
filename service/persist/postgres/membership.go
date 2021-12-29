@@ -27,9 +27,9 @@ func (m *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID pe
 
 // GetByTokenID returns the tier with the given token ID
 func (m *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID) (persist.MembershipTier, error) {
-	sqlStr := `SELECT ID,CREATED_AT,LAST_UPDATED,DELETED,VERSION,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1`
+	sqlStr := `SELECT ID,CREATED_AT,LAST_UPDATED,VERSION,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1 AND DELETED = false`
 	tier := persist.MembershipTier{TokenID: pTokenID}
-	err := m.db.QueryRowContext(pCtx, sqlStr, pTokenID).Scan(&tier.ID, &tier.CreationTime, &tier.LastUpdated, &tier.Deleted, &tier.Deleted, &tier.Name, &tier.AssetURL, &tier.Owners)
+	err := m.db.QueryRowContext(pCtx, sqlStr, pTokenID).Scan(&tier.ID, &tier.CreationTime, &tier.LastUpdated, &tier.Version, &tier.Name, &tier.AssetURL, pq.Array(&tier.Owners))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.MembershipTier{}, persist.ErrMembershipNotFoundByTokenID{TokenID: pTokenID}
@@ -42,7 +42,7 @@ func (m *MembershipRepository) GetByTokenID(pCtx context.Context, pTokenID persi
 
 // GetAll returns all the tiers
 func (m *MembershipRepository) GetAll(pCtx context.Context) ([]persist.MembershipTier, error) {
-	sqlStr := `SELECT ID,TOKEN_ID,NAME,ASSET_URL,OWNERS FROM membership`
+	sqlStr := `SELECT ID,TOKEN_ID,NAME,ASSET_URL,OWNERS FROM membership WHERE DELETED = false`
 	rows, err := m.db.QueryContext(pCtx, sqlStr)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (m *MembershipRepository) GetAll(pCtx context.Context) ([]persist.Membershi
 	tiers := make([]persist.MembershipTier, 0, 10)
 	for rows.Next() {
 		tier := persist.MembershipTier{}
-		err := rows.Scan(&tier.ID, &tier.TokenID, &tier.Name, &tier.AssetURL, &tier.Owners)
+		err := rows.Scan(&tier.ID, &tier.TokenID, &tier.Name, &tier.AssetURL, pq.Array(&tier.Owners))
 		if err != nil {
 			return nil, err
 		}

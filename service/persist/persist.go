@@ -32,6 +32,14 @@ func (d DBID) String() string {
 
 // Scan implements the database/sql Scanner interface for the DBID type
 func (d *DBID) Scan(i interface{}) error {
+	if i == nil {
+		*d = DBID("")
+		return nil
+	}
+	if it, ok := i.([]uint8); ok {
+		*d = DBID(it)
+		return nil
+	}
 	*d = DBID(i.(string))
 	return nil
 }
@@ -39,7 +47,7 @@ func (d *DBID) Scan(i interface{}) error {
 // Value implements the database/sql driver Valuer interface for the DBID type
 func (d DBID) Value() (driver.Value, error) {
 	if d.String() == "" {
-		return GenerateID().String, nil
+		return GenerateID().String(), nil
 	}
 	return d.String(), nil
 }
@@ -72,6 +80,10 @@ func (c *CreationTime) UnmarshalJSON(b []byte) error {
 
 // Scan implements the database/sql Scanner interface for the CreationTime type
 func (c *CreationTime) Scan(i interface{}) error {
+	if i == nil {
+		*c = CreationTime{}
+		return nil
+	}
 	*c = CreationTime(i.(time.Time))
 	return nil
 }
@@ -91,6 +103,10 @@ func (l LastUpdatedTime) Time() time.Time {
 
 // Scan implements the database/sql Scanner interface for the LastUpdatedTime type
 func (l *LastUpdatedTime) Scan(i interface{}) error {
+	if i == nil {
+		*l = LastUpdatedTime{}
+		return nil
+	}
 	*l = LastUpdatedTime(i.(time.Time))
 	return nil
 }

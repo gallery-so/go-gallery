@@ -176,7 +176,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := persist.CollectionTokenUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -202,7 +202,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateHiddenInput{Hidden: input.Hidden}
+		update := persist.CollectionTokenUpdateHiddenInput{Hidden: input.Hidden}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -243,7 +243,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+		update := persist.CollectionTokenUpdateNftsInput{NFTs: withNoRepeats, Layout: layout}
 
 		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {

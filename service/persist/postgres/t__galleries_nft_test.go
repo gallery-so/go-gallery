@@ -45,7 +45,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	collection := persist.CollectionDB{
 		Name:        "name",
 		OwnerUserID: userID,
-		Nfts:        ids,
+		NFTs:        ids,
 	}
 
 	collID, err := collectionRepo.Create(context.Background(), collection)

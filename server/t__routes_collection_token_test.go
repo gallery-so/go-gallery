@@ -16,10 +16,12 @@ import (
 func TestUpdateCollectionNameByID_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
+	nft := seedTokens(assert)[0]
 	// seed DB with collection
 	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
+		NFTs:        []persist.DBID{nft},
 	})
 	assert.Nil(err)
 
@@ -402,8 +404,8 @@ func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionNam
 
 func seedTokens(assert *assert.Assertions) []persist.DBID {
 	nfts := []persist.Token{
-		{CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
+		{CollectorsNote: "asd", OwnerAddress: tc.user1.address, TokenID: "1", ContractAddress: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
+		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address, TokenID: "2", ContractAddress: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC2"},
 		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
 	}
 	nftIDs, err := tc.repos.tokenRepository.CreateBulk(context.Background(), nfts)

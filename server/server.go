@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/util"
@@ -119,27 +120,43 @@ func setDefaults() {
 func newRepos() *repositories {
 
 	mgoClient := newMongoClient()
-	openseaCache, unassignedCache, galleriesCache := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2)
-	galleriesCacheToken, unassignedCacheToken := redis.NewCache(3), redis.NewCache(4)
-	nftsCache := redis.NewCache(5)
-	galleryTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
-	galleryRepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
-	nftRepo := mongodb.NewNFTRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
+	db := postgres.NewClient()
+	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
+	galleriesCacheToken := redis.NewCache(2)
+	nftsCache := redis.NewCache(3)
 	return &repositories{
-		nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
-		loginRepository:           mongodb.NewLoginRepository(mgoClient),
-		collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
-		tokenRepository:           mongodb.NewTokenRepository(mgoClient, galleryTokenRepo),
-		collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
-		galleryTokenRepository:    galleryTokenRepo,
-		galleryRepository:         galleryRepo,
+		userRepository:            postgres.NewUserRepository(db),
+		nonceRepository:           postgres.NewNonceRepository(db),
+		loginRepository:           postgres.NewLoginRepository(db),
+		nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+		tokenRepository:           postgres.NewTokenRepository(db),
+		collectionRepository:      postgres.NewCollectionRepository(db),
+		collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
+		galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
+		galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
 		historyRepository:         mongodb.NewHistoryRepository(mgoClient),
-		nftRepository:             nftRepo,
-		userRepository:            mongodb.NewUserRepository(mgoClient),
-		contractRepository:        mongodb.NewContractRepository(mgoClient),
-		backupRepository:          mongodb.NewBackupRepository(mgoClient),
-		membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
+		contractRepository:        postgres.NewContractRepository(db),
+		backupRepository:          postgres.NewBackupRepository(db),
+		membershipRepository:      postgres.NewMembershipRepository(db),
 	}
+	// galleryTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
+	// galleryRepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
+	// nftRepo := mongodb.NewNFTRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
+	// return &repositories{
+	// 	nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
+	// 	loginRepository:           mongodb.NewLoginRepository(mgoClient),
+	// 	collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
+	// 	tokenRepository:           mongodb.NewTokenRepository(mgoClient, galleryTokenRepo),
+	// 	collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
+	// 	galleryTokenRepository:    galleryTokenRepo,
+	// 	galleryRepository:         galleryRepo,
+	// 	historyRepository:         mongodb.NewHistoryRepository(mgoClient),
+	// 	nftRepository:             nftRepo,
+	// 	userRepository:            mongodb.NewUserRepository(mgoClient),
+	// 	contractRepository:        mongodb.NewContractRepository(mgoClient),
+	// 	backupRepository:          mongodb.NewBackupRepository(mgoClient),
+	// 	membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
+	// }
 }
 
 func newMongoClient() *mongo.Client {

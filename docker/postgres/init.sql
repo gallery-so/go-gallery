@@ -6,7 +6,7 @@ CREATE TABLE users (
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
-    ADDRESSES varchar(255) []
+    ADDRESSES varchar(42) []
 );
 
 CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
@@ -27,12 +27,13 @@ CREATE TABLE nfts (
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     DESCRIPTION varchar,
+    COLLECTORS_NOTE varchar,
     EXTERNAL_URL varchar,
     CREATOR_ADDRESS varchar(255),
     CREATOR_NAME varchar,
     OWNER_ADDRESS varchar(42),
     MULTIPLE_OWNERS boolean,
-    CONTRACT json,
+    CONTRACT jsonb,
     OPENSEA_ID bigint,
     OPENSEA_TOKEN_ID varchar(255),
     TOKEN_COLLECTION_NAME varchar,
@@ -43,6 +44,8 @@ CREATE TABLE nfts (
     ANIMATION_URL varchar,
     ANIMATION_ORIGINAL_URL varchar
 );
+
+CREATE UNIQUE INDEX opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
 CREATE TABLE collections (
     ID varchar(32) PRIMARY KEY,
@@ -55,7 +58,7 @@ CREATE TABLE collections (
     HIDDEN boolean NOT NULL DEFAULT false,
     COLLECTORS_NOTE varchar,
     NAME varchar(255),
-    LAYOUT json
+    LAYOUT jsonb
 );
 
 CREATE TABLE nonces (
@@ -74,18 +77,20 @@ CREATE TABLE tokens (
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     DESCRIPTION varchar,
     CONTRACT_ADDRESS varchar(42),
     COLLECTORS_NOTE varchar,
-    MEDIA json,
+    MEDIA jsonb,
+    CHAIN varchar,
     OWNER_ADDRESS varchar(42),
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,
     QUANTITY varchar,
-    OWNERSHIP_HISTORY json [],
-    TOKEN_METADATA json,
+    OWNERSHIP_HISTORY jsonb [],
+    TOKEN_METADATA jsonb,
     EXTERNAL_URL varchar,
     BLOCK_NUMBER bigint
 );
@@ -121,7 +126,7 @@ CREATE TABLE login_attempts (
     USER_EXISTS boolean,
     SIGNATURE varchar(255),
     SIGNATURE_VALID boolean,
-    REQUEST_HEADERS json,
+    REQUEST_HEADERS jsonb,
     NONCE_VALUE varchar
 );
 
@@ -151,7 +156,7 @@ CREATE TABLE backups (
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     GALLERY_ID varchar(32),
-    GALLERY json
+    GALLERY jsonb
 );
 
 CREATE TABLE membership (
@@ -160,9 +165,10 @@ CREATE TABLE membership (
     VERSION int,
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    TOKEN_ID varchar,
     NAME varchar,
     ASSET_URL varchar,
-    OWNERS json []
+    OWNERS jsonb []
 );
 
 CREATE TABLE access (
@@ -173,6 +179,6 @@ CREATE TABLE access (
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     USER_ID varchar(32),
     MOST_RECENT_BLOCK bigint,
-    REQUIRED_TOKENS_OWNED json,
+    REQUIRED_TOKENS_OWNED jsonb,
     IS_ADMIN boolean
 );

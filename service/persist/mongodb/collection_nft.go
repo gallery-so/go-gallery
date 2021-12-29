@@ -47,8 +47,8 @@ func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.Collec
 		return "", errors.New("owner_user_id is required")
 	}
 
-	if pColl.Nfts == nil {
-		pColl.Nfts = []persist.DBID{}
+	if pColl.NFTs == nil {
+		pColl.NFTs = []persist.DBID{}
 	} /* else {
 		TODO this is to ensure that the NFTs are not being shared between collections
 
@@ -141,11 +141,11 @@ func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID
 		return fmt.Errorf("user not found")
 	}
 
-	ct, err := c.nftsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Nfts}, "owner_address": bson.M{"$in": users[0].Addresses}})
+	ct, err := c.nftsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.NFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
 	if err != nil {
 		return err
 	}
-	if int(ct) != len(pUpdate.Nfts) {
+	if int(ct) != len(pUpdate.NFTs) {
 		return errors.New("not all nfts are owned by the user")
 	}
 
@@ -179,7 +179,7 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 
 	nftsToBeRemoved := []*persist.NFTDB{}
 
-	if err := c.nftsStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
+	if err := c.nftsStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.NFTs}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
 	}
 

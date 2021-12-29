@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +27,7 @@ type TestConfig struct {
 	serverURL           string
 	repos               *repositories
 	mgoClient           *mongo.Client
+	db                  *sql.DB
 	user1               *TestUser
 	user2               *TestUser
 	openseaCache        memstore.Cache
@@ -79,6 +82,7 @@ func initializeTestEnv(v int) *TestConfig {
 		serverURL:           fmt.Sprintf("%s/glry/v%d", ts.URL, v),
 		repos:               repos,
 		mgoClient:           mclient,
+		db:                  postgres.NewClient(),
 		user1:               generateTestUser(repos, "bob"),
 		user2:               generateTestUser(repos, "john"),
 		openseaCache:        opensea,
@@ -97,6 +101,12 @@ func teardown() {
 
 func clearDB() {
 	tc.mgoClient.Database("gallery").Drop(context.Background())
+	defer tc.db.Close()
+	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
+	_, err := tc.db.Exec(dropSQL)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {

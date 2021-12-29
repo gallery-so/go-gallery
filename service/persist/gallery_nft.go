@@ -2,6 +2,8 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 )
 
 // GalleryDB represents a group of collections of NFTs in the database.
@@ -49,4 +51,9 @@ type GalleryRepository interface {
 	GetByUserID(context.Context, DBID) ([]Gallery, error)
 	GetByID(context.Context, DBID) (Gallery, error)
 	RefreshCache(context.Context, DBID) error
+}
+
+// Value implements the driver.Valuer interface for Gallery
+func (g Gallery) Value() (driver.Value, error) {
+	return json.Marshal(g)
 }

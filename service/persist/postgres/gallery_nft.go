@@ -37,15 +37,32 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
 func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.GalleryUpdateInput) error {
 	sqlStr := `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-	_, err := g.db.ExecContext(pCtx, sqlStr, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
-	return err
+	res, err := g.db.ExecContext(pCtx, sqlStr, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrGalleryNotFoundByID{ID: pID}
+	}
+	return nil
 }
 
 // AddCollections adds the given collections to the gallery with the given ID
 func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollections []persist.DBID) error {
-	sqlStr := `UPDATE galleries SET COLLECTIONS = array_append(COLLECTIONS, $1) WHERE ID = $2 AND OWNER_USER_ID = $3`
-	_, err := g.db.ExecContext(pCtx, sqlStr, pCollections, pID, pUserID)
-	return err
+	sqlStr := `UPDATE galleries SET COLLECTIONS = COLLECTIONS || $1 WHERE ID = $2 AND OWNER_USER_ID = $3`
+	res, err := g.db.ExecContext(pCtx, sqlStr, pq.Array(pCollections), pID, pUserID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return persist.ErrGalleryNotFoundByID{ID: pID}
+	}
+	return nil
 }
 
 // GetByUserID returns the galleries owned by the given userID
@@ -58,7 +75,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM galleries g
 	JOIN collections c on c.ID = ANY(g.COLLECTIONS)
 	JOIN nfts n on n.ID = ANY(c.NFTS)
-	WHERE g.OWNER_USER_ID = $1 GROUP BY g.ID,c.ID,n.ID;`
+	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false GROUP BY g.ID,c.ID,n.ID;`
 	rows, err := g.db.QueryContext(pCtx, sqlStr, pUserID)
 	if err != nil {
 		return nil, err
@@ -122,7 +139,7 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT FROM galleries g JOIN collections c on c.ID = ANY(g.COLLECTIONS) 
 	JOIN nfts n on n.ID = ANY(c.NFTS) 
-	WHERE g.ID = $1 GROUP BY g.ID,c.ID,n.ID;`
+	WHERE g.ID = $1 AND g.DELETED = false GROUP BY g.ID,c.ID,n.ID;`
 	rows, err := g.db.QueryContext(pCtx, sqlStr, pID)
 	if err != nil {
 		return persist.Gallery{}, err

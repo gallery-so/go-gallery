@@ -41,7 +41,7 @@ func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Address) (p
 // Create creates a new nonce in the DB
 func (n *NonceRepository) Create(pCtx context.Context, pNonce persist.UserNonce) error {
 	sqlStr := `INSERT INTO nonces (ID,VALUE,ADDRESS,VERSION,DELETED) VALUES ($1,$2,$3,$4,$5)`
-	_, err := n.db.ExecContext(pCtx, sqlStr, pNonce.ID, pNonce.Value, pNonce.Address, pNonce.Version, pNonce.Deleted)
+	_, err := n.db.ExecContext(pCtx, sqlStr, persist.GenerateID(), pNonce.Value, pNonce.Address, pNonce.Version, pNonce.Deleted)
 	return err
 }
 
@@ -49,7 +49,7 @@ func (n *NonceRepository) Create(pCtx context.Context, pNonce persist.UserNonce)
 func (l *LoginRepository) Create(pCtx context.Context, pAttempt persist.UserLoginAttempt) (persist.DBID, error) {
 	sqlStr := `INSERT INTO login_attempts (ID,USER_EXISTS,ADDRESS,VERSION,NONCE_VALUE,REQUEST_HEADERS,REQUEST_HOST_ADDRESS,SIGNATURE,SIGNATURE_VALID) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID`
 	var id persist.DBID
-	err := l.db.QueryRowContext(pCtx, sqlStr, pAttempt.ID, pAttempt.UserExists, pAttempt.Address, pAttempt.Version, pAttempt.NonceValue, pAttempt.ReqHeaders, pAttempt.ReqHostAddr, pAttempt.Signature).Scan(&id)
+	err := l.db.QueryRowContext(pCtx, sqlStr, pAttempt.ID, pAttempt.UserExists, pAttempt.Address, pAttempt.Version, pAttempt.NonceValue, pAttempt.ReqHeaders, pAttempt.ReqHostAddr, pAttempt.Signature, pAttempt.SignatureValid).Scan(&id)
 	if err != nil {
 		return "", err
 	}
