@@ -73,8 +73,7 @@ func generateTestUser(repos *repositories) *TestUser {
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
 func initializeTestEnv(v int) *TestConfig {
-	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
-	ts := httptest.NewServer(CoreInit())
+	setDefaults()
 
 	if db == nil {
 		db = postgres.NewClient()
@@ -82,6 +81,9 @@ func initializeTestEnv(v int) *TestConfig {
 	if mgoClient == nil {
 		mgoClient = newMongoClient()
 	}
+
+	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
+	ts := httptest.NewServer(CoreInit(mgoClient, db))
 
 	repos := newRepos(mgoClient, db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)

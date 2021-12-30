@@ -51,19 +51,19 @@ type repositories struct {
 
 // Init initializes the server
 func init() {
-	router := CoreInit()
+	setDefaults()
+
+	router := CoreInit(newMongoClient(), postgres.NewClient())
 
 	http.Handle("/", router)
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit() *gin.Engine {
+func CoreInit(mgoClient *mongo.Client, pqClient *sql.DB) *gin.Engine {
 	log.Info("initializing server...")
 
 	log.SetReportCaller(true)
-
-	setDefaults()
 
 	router := gin.Default()
 	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
@@ -83,7 +83,7 @@ func CoreInit() *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(newMongoClient(), postgres.NewClient()), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
+	return handlersInit(router, newRepos(mgoClient, pqClient), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
 }
 
 func setDefaults() {
