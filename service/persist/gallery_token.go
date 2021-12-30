@@ -10,10 +10,10 @@ import (
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryTokenDB struct {
-	Version      int64           `bson:"version"       json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
@@ -25,10 +25,10 @@ type GalleryTokenDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type GalleryToken struct {
-	Version      int64           `bson:"version"       json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	OwnerUserID DBID              `bson:"owner_user_id" json:"owner_user_id"`

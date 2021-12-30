@@ -28,7 +28,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 	case persist.UserUpdateInfoInput:
 		update := pUpdate.(persist.UserUpdateInfoInput)
 		sqlStr += `SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4 WHERE ID = $1`
-		_, err := u.db.ExecContext(pCtx, sqlStr, pID, update.Username, strings.ToLower(update.UsernameIdempotent), update.LastUpdated)
+		_, err := u.db.ExecContext(pCtx, sqlStr, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated)
 		if err != nil {
 			return err
 		}

@@ -71,9 +71,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	thumbnailURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 	if err == nil {
-		res.ThumbnailURL = thumbnailURL + "=256"
-		res.PreviewURL = thumbnailURL + "=512"
-		res.MediaURL = thumbnailURL + "=s1024"
+		res.ThumbnailURL = persist.NullString(thumbnailURL + "=256")
+		res.PreviewURL = persist.NullString(thumbnailURL + "=512")
+		res.MediaURL = persist.NullString(thumbnailURL + "=s1024")
 		res.MediaType = persist.MediaTypeImage
 		return res, nil
 	}
@@ -84,9 +84,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		if err != nil {
 			return persist.Media{}, err
 		}
-		res.ThumbnailURL = thumbnail + "=256"
-		res.PreviewURL = thumbnail + "=512"
-		res.MediaURL = videoURL
+		res.ThumbnailURL = persist.NullString(thumbnail + "=256")
+		res.PreviewURL = persist.NullString(thumbnail + "=512")
+		res.MediaURL = persist.NullString(videoURL)
 		res.MediaType = persist.MediaTypeVideo
 	}
 
@@ -115,13 +115,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		if err != nil {
 			return persist.Media{}, fmt.Errorf("error getting data from base64 svg uri %s: %s", asURI, err)
 		}
-		res.MediaURL = string(data)
+		res.MediaURL = persist.NullString(data)
 		res.PreviewURL = res.MediaURL
 		res.ThumbnailURL = res.MediaURL
 		return res, nil
 	case persist.URITypeSVG:
 		res.MediaType = persist.MediaTypeSVG
-		res.MediaURL = asURI.String()
+		res.MediaURL = persist.NullString(asURI.String())
 		res.PreviewURL = res.MediaURL
 		res.ThumbnailURL = res.MediaURL
 
@@ -168,17 +168,17 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	case persist.MediaTypeImage:
 		thumbnailURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
-			res.ThumbnailURL = thumbnailURL + "=s256"
-			res.PreviewURL = thumbnailURL + "=s512"
-			res.MediaURL = thumbnailURL + "=s1024"
+			res.ThumbnailURL = persist.NullString(thumbnailURL + "=s256")
+			res.PreviewURL = persist.NullString(thumbnailURL + "=s512")
+			res.MediaURL = persist.NullString(thumbnailURL + "=s1024")
 		} else {
 			logrus.WithError(err).Error("could not get image serving URL")
 		}
 	case persist.MediaTypeVideo:
 		thumbnailURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 		if err == nil {
-			res.ThumbnailURL = thumbnailURL + "=s256"
-			res.PreviewURL = thumbnailURL + "=s512"
+			res.ThumbnailURL = persist.NullString(thumbnailURL + "=s256")
+			res.PreviewURL = persist.NullString(thumbnailURL + "=s512")
 		} else {
 			logrus.WithError(err).Error("could not get image serving URL")
 		}
@@ -186,11 +186,11 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		if err != nil {
 			return persist.Media{}, err
 		}
-		res.MediaURL = videoURL
+		res.MediaURL = persist.NullString(videoURL)
 	default:
-		res.MediaURL = imgURL
-		res.ThumbnailURL = imgURL
-		res.PreviewURL = imgURL
+		res.MediaURL = persist.NullString(imgURL)
+		res.ThumbnailURL = persist.NullString(imgURL)
+		res.PreviewURL = persist.NullString(imgURL)
 	}
 
 	return res, nil

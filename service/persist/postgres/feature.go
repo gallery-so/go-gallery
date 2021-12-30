@@ -46,7 +46,7 @@ func (f *FeatureFlagRepository) GetByRequiredTokens(pCtx context.Context, pRequi
 	}
 
 	for i, f := range flags {
-		if f.RequiredAmount > pRequiredTokens[f.RequiredToken] {
+		if uint64(f.RequiredAmount) > pRequiredTokens[f.RequiredToken] {
 			flags = append(flags[:i], flags[i+1:]...)
 		}
 	}

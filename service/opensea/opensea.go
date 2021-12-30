@@ -356,7 +356,7 @@ func dbToGalleryNFTs(pCtx context.Context, pNfts []persist.NFTDB, pUser persist.
 					return
 				}
 				if len(dbNFT) == 0 {
-					errChan <- errNoSingleNFTForOpenseaID{n.OpenseaID}
+					errChan <- errNoSingleNFTForOpenseaID{int(n.OpenseaID.Int64())}
 					return
 				}
 				result.ID = dbNFT[0].ID
@@ -381,26 +381,26 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 	result := persist.NFTDB{
 		OwnerAddress:         pWalletAddress,
 		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
-		Name:                 nft.Name,
-		Description:          nft.Description,
-		ExternalURL:          nft.ExternalURL,
-		ImageURL:             nft.ImageURL,
+		Name:                 persist.NullString(nft.Name),
+		Description:          persist.NullString(nft.Description),
+		ExternalURL:          persist.NullString(nft.ExternalURL),
+		ImageURL:             persist.NullString(nft.ImageURL),
 		CreatorAddress:       nft.Creator.Address,
-		AnimationURL:         nft.AnimationURL,
+		AnimationURL:         persist.NullString(nft.AnimationURL),
 		OpenseaTokenID:       nft.TokenID,
-		OpenseaID:            nft.ID,
-		TokenCollectionName:  nft.Collection.Name,
-		ImageThumbnailURL:    nft.ImageThumbnailURL,
-		ImagePreviewURL:      nft.ImagePreviewURL,
-		ImageOriginalURL:     nft.ImageOriginalURL,
-		TokenMetadataURL:     nft.TokenMetadataURL,
+		OpenseaID:            persist.NullInt64(nft.ID),
+		TokenCollectionName:  persist.NullString(nft.Collection.Name),
+		ImageThumbnailURL:    persist.NullString(nft.ImageThumbnailURL),
+		ImagePreviewURL:      persist.NullString(nft.ImagePreviewURL),
+		ImageOriginalURL:     persist.NullString(nft.ImageOriginalURL),
+		TokenMetadataURL:     persist.NullString(nft.TokenMetadataURL),
 		Contract:             nft.Contract,
-		AcquisitionDateStr:   nft.AcquisitionDateStr,
-		CreatorName:          nft.Creator.User.Username,
-		AnimationOriginalURL: nft.AnimationOriginalURL,
+		AcquisitionDateStr:   persist.NullString(nft.AcquisitionDateStr),
+		CreatorName:          persist.NullString(nft.Creator.User.Username),
+		AnimationOriginalURL: persist.NullString(nft.AnimationOriginalURL),
 	}
 
-	dbNFT, _ := nftRepo.GetByOpenseaID(pCtx, nft.ID, pWalletAddress)
+	dbNFT, _ := nftRepo.GetByOpenseaID(pCtx, persist.NullInt64(nft.ID), pWalletAddress)
 	if dbNFT != nil && len(dbNFT) == 1 {
 		result.ID = dbNFT[0].ID
 	}
@@ -423,7 +423,7 @@ func openseaToGalleryEvents(pCtx context.Context, pEvents *Events, userRepo pers
 		user, err := userRepo.GetByAddress(pCtx, event.ToAccount.Address)
 		if err == nil {
 			owner.UserID = user.ID
-			owner.Username = user.Username
+			owner.Username = persist.NullString(user.Username)
 		}
 		ownershipHistory.Owners = append(ownershipHistory.Owners, owner)
 	}

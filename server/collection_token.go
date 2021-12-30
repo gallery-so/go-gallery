@@ -176,7 +176,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 			return
 		}
 
-		update := persist.CollectionTokenUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := persist.CollectionTokenUpdateInfoInput{Name: persist.NullString(validate.SanitizationPolicy.Sanitize(input.Name)), CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(input.CollectorsNote))}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -202,7 +202,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := persist.CollectionTokenUpdateHiddenInput{Hidden: input.Hidden}
+		update := persist.CollectionTokenUpdateHiddenInput{Hidden: persist.NullBool(input.Hidden)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -291,9 +291,9 @@ func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputT
 	coll := persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
 		NFTs:           pInput.Nfts,
-		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
+		Name:           persist.NullString(validate.SanitizationPolicy.Sanitize(pInput.Name)),
 		Layout:         layout,
-		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),
+		CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote)),
 	}
 
 	collID, err := collectionsRepo.Create(pCtx, coll)

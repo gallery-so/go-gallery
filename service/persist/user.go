@@ -7,25 +7,25 @@ import (
 
 // User represents a user in the datase and throughout the application
 type User struct {
-	Version      int64           `bson:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Username           string    `bson:"username,omitempty"         json:"username"` // mutable
-	UsernameIdempotent string    `bson:"username_idempotent,omitempty" json:"username_idempotent"`
-	Addresses          []Address `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	Bio                string    `bson:"bio"  json:"bio"`
+	Username           NullString `bson:"username,omitempty"         json:"username"` // mutable
+	UsernameIdempotent NullString `bson:"username_idempotent,omitempty" json:"username_idempotent"`
+	Addresses          []Address  `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	Bio                NullString `bson:"bio"  json:"bio"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
 type UserUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Username           string `bson:"username"`
-	UsernameIdempotent string `bson:"username_idempotent"`
-	Bio                string `bson:"bio"`
+	Username           NullString `bson:"username"`
+	UsernameIdempotent NullString `bson:"username_idempotent"`
+	Bio                NullString `bson:"bio"`
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users

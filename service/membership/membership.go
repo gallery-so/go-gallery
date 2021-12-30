@@ -30,8 +30,8 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 				return
 			}
 			asset := events[0].Asset
-			tier.Name = asset.Name
-			tier.AssetURL = asset.ImageURL
+			tier.Name = persist.NullString(asset.Name)
+			tier.AssetURL = persist.NullString(asset.ImageURL)
 			tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
 
 			ownersChan := make(chan []persist.MembershipOwner)
@@ -42,13 +42,13 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
 						if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.Username != "" {
-							membershipOwner.Username = glryUser.Username
+							membershipOwner.Username = persist.NullString(glryUser.Username)
 							membershipOwner.UserID = glryUser.ID
 							membershipOwner.Address = event.FromAccount.Address
 
 							nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID)
 							if err == nil && len(nfts) > 0 {
-								nftURLs := make([]string, 0, 3)
+								nftURLs := make([]persist.NullString, 0, 3)
 								for i, nft := range nfts {
 									if i == 3 {
 										break
@@ -73,13 +73,13 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
 						if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
-							membershipOwner.Username = glryUser.Username
+							membershipOwner.Username = persist.NullString(glryUser.Username)
 							membershipOwner.UserID = glryUser.ID
 							membershipOwner.Address = event.FromAccount.Address
 
 							nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID)
 							if err == nil && len(nfts) > 0 {
-								nftURLs := make([]string, 0, 3)
+								nftURLs := make([]persist.NullString, 0, 3)
 								for i, nft := range nfts {
 									if i == 3 {
 										break
@@ -143,13 +143,13 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 				go func(token persist.Token) {
 					membershipOwner := persist.MembershipOwner{}
 					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.Username != "" {
-						membershipOwner.Username = glryUser.Username
+						membershipOwner.Username = persist.NullString(glryUser.Username)
 						membershipOwner.UserID = glryUser.ID
 						membershipOwner.Address = token.OwnerAddress
 
 						nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID, -1, 0)
 						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]string, 0, 3)
+							nftURLs := make([]persist.NullString, 0, 3)
 							for i, nft := range nfts {
 								if i == 3 {
 									break

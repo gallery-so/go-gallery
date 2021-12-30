@@ -108,13 +108,16 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.Collection, 0, 10)
-			collections[gallery.ID] = colls
-		}
-		if lastCollID != collection.ID {
 			collection.NFTs = []persist.CollectionNFT{nft}
 			colls = append(colls, collection)
+			collections[gallery.ID] = colls
 		} else {
-			colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
+			if lastCollID != collection.ID {
+				collection.NFTs = []persist.CollectionNFT{nft}
+				colls = append(colls, collection)
+			} else {
+				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
+			}
 		}
 		collections[gallery.ID] = colls
 		logrus.Infof("Gallery: %s Collection: %s NFT: %s", gallery.ID, collection.ID, nft.ID)
@@ -179,13 +182,16 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.Collection, 0, 10)
-			collections[gallery.ID] = colls
-		}
-		if lastCollID != collection.ID {
 			collection.NFTs = []persist.CollectionNFT{nft}
 			colls = append(colls, collection)
+			collections[gallery.ID] = colls
 		} else {
-			colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
+			if lastCollID != collection.ID {
+				collection.NFTs = []persist.CollectionNFT{nft}
+				colls = append(colls, collection)
+			} else {
+				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
+			}
 		}
 		collections[gallery.ID] = colls
 	}

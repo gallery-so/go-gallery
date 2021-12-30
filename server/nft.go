@@ -100,7 +100,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 			return
 		}
 
-		update := persist.NFTUpdateInfoInput{CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := persist.NFTUpdateInfoInput{CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(input.CollectorsNote))}
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {

@@ -3,6 +3,7 @@ package persist
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/segmentio/ksuid"
@@ -16,6 +17,15 @@ type CreationTime time.Time
 
 // LastUpdatedTime represents the time a record was last updated
 type LastUpdatedTime time.Time
+
+// NullString represents a string that may be null in the DB
+type NullString string
+
+// NullInt64 represents an int64 that may be null in the DB
+type NullInt64 int64
+
+// NullBool represents a bool that may be null in the DB
+type NullBool bool
 
 // GenerateID generates a application-wide unique ID
 func GenerateID() DBID {
@@ -137,5 +147,75 @@ func (l *LastUpdatedTime) UnmarshalJSON(b []byte) error {
 	}
 
 	*l = LastUpdatedTime(t)
+	return nil
+}
+
+func (n NullString) String() string {
+	return string(n)
+}
+
+// Value implements the database/sql driver Valuer interface for the NullString type
+func (n NullString) Value() (driver.Value, error) {
+	if n.String() == "" {
+		return "", nil
+	}
+	return n.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullString type
+func (n *NullString) Scan(value interface{}) error {
+	if value == nil {
+		*n = NullString("")
+		return nil
+	}
+	*n = NullString(value.(string))
+	return nil
+}
+
+// Int64 returns the int64 representation of the NullInt64
+func (n NullInt64) Int64() int64 {
+	return int64(n)
+}
+
+func (n NullInt64) String() string {
+	return fmt.Sprint(n.Int64())
+}
+
+// Value implements the database/sql driver Valuer interface for the NullInt64 type
+func (n NullInt64) Value() (driver.Value, error) {
+	return n.Int64(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullInt64 type
+func (n *NullInt64) Scan(value interface{}) error {
+	if value == nil {
+		*n = NullInt64(0)
+		return nil
+	}
+	*n = NullInt64(value.(int64))
+	return nil
+}
+
+// Bool returns the bool representation of the NullBool
+func (n NullBool) Bool() bool {
+	return bool(n)
+}
+
+func (n NullBool) String() string {
+	return fmt.Sprint(n.Bool())
+}
+
+// Value implements the database/sql driver Valuer interface for the NullBool type
+func (n NullBool) Value() (driver.Value, error) {
+	return n.Bool(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullBool type
+func (n *NullBool) Scan(value interface{}) error {
+	if value == nil {
+		*n = NullBool(false)
+		return nil
+	}
+	*n = NullBool(value.(bool))
 	return nil
 }

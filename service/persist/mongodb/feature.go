@@ -57,7 +57,7 @@ func (c *FeaturesRepository) GetByRequiredTokens(pCtx context.Context, pRequired
 	}
 
 	for i, feature := range result {
-		if feature.RequiredAmount > pRequiredtokens[feature.RequiredToken] {
+		if uint64(feature.RequiredAmount) > pRequiredtokens[feature.RequiredToken] {
 			result = append(result[:i], result[i+1:]...)
 		}
 	}

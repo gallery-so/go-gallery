@@ -84,10 +84,10 @@ func TestOpenseaSync_Success(t *testing.T) {
 	ids1 := make([]int, len(robinOpenseaNFTs))
 	ids2 := make([]int, len(robinNFTs))
 	for i, nft := range robinOpenseaNFTs {
-		ids1[i] = nft.OpenseaID
+		ids1[i] = int(nft.OpenseaID.Int64())
 	}
 	for i, nft := range robinNFTs {
-		ids2[i] = nft.OpenseaID
+		ids2[i] = int(nft.OpenseaID.Int64())
 	}
 
 	// a function that finds the difference between two arrays

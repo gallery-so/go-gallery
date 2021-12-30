@@ -9,18 +9,18 @@ import (
 
 // FeatureFlag represents a feature flag in the database
 type FeatureFlag struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
-	RequiredAmount      uint64           `json:"required_amount" bson:"required_amount"`
+	RequiredAmount      NullInt64        `json:"required_amount" bson:"required_amount"`
 	TokenType           TokenType        `json:"token_type" bson:"token_type"`
-	Name                string           `json:"name" bson:"name"`
-	IsEnabled           bool             `json:"is_enabled" bson:"is_enabled"`
-	AdminOnly           bool             `json:"admin_only" bson:"admin_only"`
+	Name                NullString       `json:"name" bson:"name"`
+	IsEnabled           NullBool         `json:"is_enabled" bson:"is_enabled"`
+	AdminOnly           NullBool         `json:"admin_only" bson:"admin_only"`
 	ForceEnabledUserIDs []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
 }
 
@@ -75,6 +75,10 @@ func (t TokenIdentifiers) Value() (driver.Value, error) {
 
 // Scan implements the database/sql Scanner interface for the TokenIdentifiers type
 func (t *TokenIdentifiers) Scan(i interface{}) error {
+	if i == nil {
+		*t = TokenIdentifiers("")
+		return nil
+	}
 	*t = TokenIdentifiers(i.(string))
 	return nil
 }

@@ -20,7 +20,7 @@ func TestGetTokenByID_Success(t *testing.T) {
 	// seed DB with nft
 	name := "very cool nft"
 	nftID, err := tc.repos.tokenRepository.Create(context.Background(), persist.Token{
-		Name:           name,
+		Name:           persist.NullString(name),
 		CollectorsNote: "this is a bad note",
 		OwnerAddress:   tc.user1.address,
 	})

@@ -701,8 +701,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
 			Quantity:         persist.HexString("1"),
-			Name:             name,
-			Description:      description,
+			Name:             persist.NullString(name),
+			Description:      persist.NullString(description),
 			OwnershipHistory: previousOwnerAddresses,
 			TokenType:        persist.TokenTypeERC721,
 			TokenMetadata:    metadata.md,
@@ -788,8 +788,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
-				Name:            name,
-				Description:     description,
+				Name:            persist.NullString(name),
+				Description:     persist.NullString(description),
 				Chain:           i.chain,
 				BlockNumber:     balance.block,
 				Media:           m,
@@ -848,8 +848,8 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 		// TODO figure out what type of error this is
 		logrus.WithError(err).WithField("address", contractAddress).Error("error getting contract metadata")
 	} else {
-		c.Name = cMetadata.Name
-		c.Symbol = cMetadata.Symbol
+		c.Name = persist.NullString(cMetadata.Name)
+		c.Symbol = persist.NullString(cMetadata.Symbol)
 	}
 	return c
 }

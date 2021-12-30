@@ -194,7 +194,7 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 }
 
 // GetByOpenseaID finds an nft by its opensea ID
-func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address) ([]persist.NFT, error) {
+func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.Address) ([]persist.NFT, error) {
 
 	result := []persist.NFT{}
 

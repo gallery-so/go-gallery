@@ -36,11 +36,11 @@ type GetUserInput struct {
 
 // GetUserOutput is the output of the user get pipeline
 type GetUserOutput struct {
-	UserID      persist.DBID         `json:"id"`
-	UserNameStr string               `json:"username"`
-	BioStr      string               `json:"bio"`
-	Addresses   []persist.Address    `json:"addresses"`
-	CreatedAt   persist.CreationTime `json:"created_at"`
+	UserID    persist.DBID         `json:"id"`
+	Username  string               `json:"username"`
+	BioStr    string               `json:"bio"`
+	Addresses []persist.Address    `json:"addresses"`
+	CreatedAt persist.CreationTime `json:"created_at"`
 }
 
 // AddUserAddressesInput is the input for the user add addresses pipeline and also user creation pipeline given that they have the same requirements
@@ -349,11 +349,11 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	output := GetUserOutput{
-		UserID:      user.ID,
-		UserNameStr: user.Username,
-		BioStr:      user.Bio,
-		CreatedAt:   user.CreationTime,
-		Addresses:   user.Addresses,
+		UserID:    user.ID,
+		Username:  user.Username.String(),
+		BioStr:    user.Bio.String(),
+		CreatedAt: user.CreationTime,
+		Addresses: user.Addresses,
 	}
 
 	return output, nil
@@ -382,9 +382,9 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		pCtx,
 		userID,
 		persist.UserUpdateInfoInput{
-			UsernameIdempotent: strings.ToLower(input.UserName),
-			Username:           input.UserName,
-			Bio:                validate.SanitizationPolicy.Sanitize(input.BioStr),
+			UsernameIdempotent: persist.NullString(strings.ToLower(input.UserName)),
+			Username:           persist.NullString(input.UserName),
+			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(input.BioStr)),
 		},
 	)
 	if err != nil {

@@ -397,7 +397,7 @@ func updateCollectionNftsRequestToken(assert *assert.Assertions, input collectio
 func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
 	nfts := seedTokens(assert)
 	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-		Name:        collectionName,
+		Name:        persist.NullString(collectionName),
 		OwnerUserID: userID,
 		NFTs:        nfts,
 	})

@@ -14,32 +14,32 @@ type ReqHeaders map[string][]string
 // UserNonce represents a short lived nonce that holds a value to be signed
 // by a user cryptographically to prove they are the owner of a given address.
 type UserNonce struct {
-	Version int64 `bson:"version" mapstructure:"version"`
+	Version NullInt64 `bson:"version" mapstructure:"version"`
 
 	ID           DBID            `bson:"_id"           json:"id"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      bool            `bson:"deleted"       json:"-"`
+	Deleted      NullBool        `bson:"deleted"       json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Value   string  `bson:"value"   json:"value"`
-	Address Address `bson:"address"     json:"address"`
+	Value   NullString `bson:"value"   json:"value"`
+	Address Address    `bson:"address"     json:"address"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
-	Version      int64        `bson:"version"`
+	Version      NullInt64    `bson:"version"`
 	ID           DBID         `bson:"_id"`
 	CreationTime CreationTime `bson:"created_at"`
-	Deleted      bool         `bson:"deleted"       json:"-"`
+	Deleted      NullBool     `bson:"deleted"       json:"-"`
 
-	Address        Address `bson:"address"     json:"address"`
-	Signature      string  `bson:"signature"`
-	NonceValue     string  `bson:"nonce_value"`
-	UserExists     bool    `bson:"user_exists"`
-	SignatureValid bool    `bson:"signature_valid"`
+	Address        Address    `bson:"address"     json:"address"`
+	Signature      NullString `bson:"signature"`
+	NonceValue     NullString `bson:"nonce_value"`
+	UserExists     NullBool   `bson:"user_exists"`
+	SignatureValid NullBool   `bson:"signature_valid"`
 
-	ReqHostAddr string     `bson:"req_host_addr"`
+	ReqHostAddr NullString `bson:"req_host_addr"`
 	ReqHeaders  ReqHeaders `bson:"req_headers"`
 }
 
@@ -56,6 +56,10 @@ type LoginAttemptRepository interface {
 
 // Scan implements the sql.Scanner interface for the ReqHeaders type
 func (h *ReqHeaders) Scan(src interface{}) error {
+	if src == nil {
+		*h = make(ReqHeaders)
+		return nil
+	}
 	return json.Unmarshal(src.([]byte), h)
 }
 

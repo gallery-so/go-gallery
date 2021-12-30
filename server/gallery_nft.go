@@ -49,7 +49,11 @@ func getGalleriesByUserID(galleryRepository persist.GalleryRepository) gin.Handl
 		}
 
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
-		if galleries == nil || err != nil {
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		if galleries == nil {
 			galleries = []persist.Gallery{}
 		}
 

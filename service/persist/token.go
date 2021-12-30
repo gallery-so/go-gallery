@@ -139,21 +139,21 @@ type AddressAtBlock struct {
 
 // Token represents an individual Token token
 type Token struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note,omitempty" json:"collectors_note"`
-	Media          Media  `bson:"media,omitempty" json:"media"`
+	CollectorsNote NullString `bson:"collectors_note,omitempty" json:"collectors_note"`
+	Media          Media      `bson:"media,omitempty" json:"media"`
 
 	TokenType TokenType `bson:"token_type,omitempty" json:"token_type"`
 
 	Chain Chain `bson:"chain,omitempty" json:"chain"`
 
-	Name        string `bson:"name,omitempty" json:"name"`
-	Description string `bson:"description,omitempty" json:"description"`
+	Name        NullString `bson:"name,omitempty" json:"name"`
+	Description NullString `bson:"description,omitempty" json:"description"`
 
 	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
@@ -163,17 +163,17 @@ type Token struct {
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
-	ExternalURL string `bson:"external_url,omitempty" json:"external_url"`
+	ExternalURL NullString `bson:"external_url,omitempty" json:"external_url"`
 
 	BlockNumber BlockNumber `bson:"block_number,omitempty" json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL string    `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
-	PreviewURL   string    `bson:"preview_url,omitempty" json:"preview_url"`
-	MediaURL     string    `bson:"media_url,omitempty" json:"media_url"`
-	MediaType    MediaType `bson:"media_type,omitempty" json:"media_type"`
+	ThumbnailURL NullString `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
+	PreviewURL   NullString `bson:"preview_url,omitempty" json:"preview_url"`
+	MediaURL     NullString `bson:"media_url,omitempty" json:"media_url"`
+	MediaType    MediaType  `bson:"media_type,omitempty" json:"media_type"`
 }
 
 // TokenInCollection represents a token within a collection
@@ -185,8 +185,8 @@ type TokenInCollection struct {
 
 	Chain Chain `bson:"chain" json:"chain"`
 
-	Name        string `bson:"name" json:"name"`
-	Description string `bson:"description" json:"description"`
+	Name        NullString `bson:"name" json:"name"`
+	Description NullString `bson:"description" json:"description"`
 
 	TokenType TokenType `bson:"token_type" json:"token_type"`
 
@@ -202,7 +202,7 @@ type TokenInCollection struct {
 type TokenUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
@@ -523,6 +523,20 @@ func (a *AddressAtBlock) Scan(src interface{}) error {
 // Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
 func (a AddressAtBlock) Value() (driver.Value, error) {
 	return json.Marshal(a)
+}
+
+// Value implements the database/sql/driver Valuer interface for the MediaType type
+func (m MediaType) Value() (driver.Value, error) {
+	return string(m), nil
+}
+
+// Scan implements the database/sql Scanner interface for the MediaType type
+func (m *MediaType) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	*m = MediaType(src.(string))
+	return nil
 }
 
 func normalizeAddress(address string) string {

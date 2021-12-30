@@ -172,7 +172,7 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 }
 
 // GetByOpenseaID gets a NFT by its Opensea ID and owner address
-func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID int, pWalletAddress persist.Address) ([]persist.NFT, error) {
+func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.Address) ([]persist.NFT, error) {
 	sqlStr := `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE OPENSEA_ID = $1 AND OWNER_ADDRESS = $2 AND DELETED = false`
 	rows, err := n.db.QueryContext(pCtx, sqlStr, pOpenseaID, pWalletAddress)
 	if err != nil {

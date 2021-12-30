@@ -436,15 +436,15 @@ func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpda
 func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
 
 	nfts := []persist.NFTDB{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: rand.Intn(10000000)},
+		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},
+		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},
+		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},
 	}
 	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
 
 	assert.Nil(err)
 	collID, err := tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        collectionName,
+		Name:        persist.NullString(collectionName),
 		OwnerUserID: userID,
 		NFTs:        nftIDs,
 	})

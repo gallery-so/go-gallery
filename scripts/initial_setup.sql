@@ -7,19 +7,6 @@ CREATE TABLE users (
     ADDRESSES varchar(255) []
 );
 
-CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
-
-COPY users
-FROM
-    '/import/users.csv' with (FORMAT csv);
-
-ALTER TABLE
-    users
-ADD
-    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
 CREATE TABLE galleries (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -27,17 +14,6 @@ CREATE TABLE galleries (
     COLLECTIONS varchar(32) [],
     VERSION int
 );
-
-COPY galleries
-FROM
-    '/import/galleries.csv' with (FORMAT csv);
-
-ALTER TABLE
-    galleries
-ADD
-    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE nfts (
     ID varchar(32) PRIMARY KEY,
@@ -61,23 +37,6 @@ CREATE TABLE nfts (
     ANIMATION_ORIGINAL_URL varchar
 );
 
-COPY nfts
-FROM
-    '/import/nfts.csv' with (FORMAT csv);
-
-ALTER TABLE
-    nfts
-ADD
-    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN TOKEN_COLLECTION_NAME varchar,
-ADD
-    COLUMN COLLECTORS_NOTE varchar;
-
-CREATE UNIQUE INDEX opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
-
 CREATE TABLE collections (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -90,17 +49,6 @@ CREATE TABLE collections (
     LAYOUT json
 );
 
-COPY collections
-FROM
-    '/import/collections.csv' with (FORMAT csv);
-
-ALTER TABLE
-    collections
-ADD
-    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
 CREATE TABLE nonces (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -109,17 +57,6 @@ CREATE TABLE nonces (
     ADDRESS char(42),
     VALUE varchar(255)
 );
-
-COPY nonces
-FROM
-    '/import/nonces.csv' with (FORMAT csv);
-
-ALTER TABLE
-    nonces
-ADD
-    COLUMN LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD
-    COLUMN CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE tokens (
     ID varchar(32) PRIMARY KEY,
