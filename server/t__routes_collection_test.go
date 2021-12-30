@@ -108,37 +108,36 @@ func TestCreateCollection_Success(t *testing.T) {
 	assert.Len(gallery.Collections, 1)
 }
 
-// TODO unassigned is not implemented yet
-// func TestGetUnassignedCollection_Success(t *testing.T) {
-// 	assert := setupTest(t, 1)
+func TestGetUnassignedCollection_Success(t *testing.T) {
+	assert := setupTest(t, 1)
 
-// 	nfts := []persist.NFTDB{
-// 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address},
-// 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address},
-// 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address},
-// 	}
-// 	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
-// 	// seed DB with collection
-// 	_, err = tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
-// 		Name:        "very cool collection",
-// 		OwnerUserID: tc.user1.id,
-// 		NFTs:        nftIDs[:2],
-// 	})
-// 	assert.Nil(err)
+	nfts := []persist.NFTDB{
+		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+	}
+	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
+	// seed DB with collection
+	_, err = tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		NFTs:        nftIDs[:2],
+	})
+	assert.Nil(err)
 
-// 	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1.jwt)
-// 	assertValidResponse(assert, resp)
+	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1.jwt)
+	assertValidResponse(assert, resp)
 
-// 	type NftsResponse struct {
-// 		Nfts  []*persist.NFTDB `json:"nfts"`
-// 		Error string           `json:"error"`
-// 	}
-// 	// ensure nft was updated
-// 	body := NftsResponse{}
-// 	util.UnmarshallBody(&body, resp.Body)
-// 	assert.Len(body.Nfts, 1)
-// 	assert.Empty(body.Error)
-// }
+	type NftsResponse struct {
+		Nfts  []*persist.NFTDB `json:"nfts"`
+		Error string           `json:"error"`
+	}
+	// ensure nft was updated
+	body := NftsResponse{}
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Len(body.Nfts, 1)
+	assert.Empty(body.Error)
+}
 
 func TestDeleteCollection_Success(t *testing.T) {
 	assert := setupTest(t, 1)

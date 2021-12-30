@@ -232,3 +232,55 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 
 	a.Equal(ids, idsResult)
 }
+
+func TestCollectionGetUnassigned_Success(t *testing.T) {
+	a, db := setupTest(t)
+
+	collectionRepo := NewCollectionRepository(db)
+	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	userRepo := NewUserRepository(db)
+
+	user := persist.User{
+
+		Username:           "username",
+		UsernameIdempotent: "username-idempotent",
+		Addresses: []persist.Address{
+			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		},
+	}
+
+	userID, err := userRepo.Create(context.Background(), user)
+	a.NoError(err)
+	a.NotEmpty(userID)
+
+	nfts := []persist.NFTDB{
+		{
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
+			Name:         "name",
+		},
+		{
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+			Name:         "blah blah",
+		},
+	}
+
+	ids, err := nftRepo.CreateBulk(context.Background(), nfts)
+	a.NoError(err)
+	a.NotEmpty(ids)
+
+	collection := persist.CollectionDB{
+		Name:        "name",
+		OwnerUserID: userID,
+		NFTs:        ids[:1],
+	}
+
+	collID, err := collectionRepo.Create(context.Background(), collection)
+	a.NoError(err)
+	a.NotEmpty(collID)
+
+	unassigned, err := collectionRepo.GetUnassigned(context.Background(), userID)
+	a.NoError(err)
+
+	a.Len(unassigned.NFTs, 1)
+	a.Equal(unassigned.NFTs[0].ID, ids[1])
+}

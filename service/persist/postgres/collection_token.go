@@ -347,8 +347,39 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 }
 
 // GetUnassigned returns all unassigned nfts
-func (c *CollectionTokenRepository) GetUnassigned(context.Context, persist.DBID) (persist.CollectionToken, error) {
-	return persist.CollectionToken{}, nil
+func (c *CollectionTokenRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.CollectionToken, error) {
+	getUserSQLStr := `SELECT ADDRESSES FROM users WHERE ID = $1;`
+	var addresses []persist.Address
+	err := c.db.QueryRowContext(pCtx, getUserSQLStr, pUserID).Scan(pq.Array(&addresses))
+
+	// sql statement that gets all nfts that are not in any of a user's collections
+	sqlStr := `SELECT n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
+	FROM tokens n
+	JOIN collections c on n.ID <> ALL(c.NFTS)
+	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`
+	rows, err := c.db.QueryContext(pCtx, sqlStr, pUserID, pq.Array(addresses))
+	if err != nil {
+		return persist.CollectionToken{}, err
+	}
+	defer rows.Close()
+
+	nfts := []persist.TokenInCollection{}
+	for rows.Next() {
+		var nft persist.TokenInCollection
+		err = rows.Scan(&nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
+		if err != nil {
+			return persist.CollectionToken{}, err
+		}
+		nfts = append(nfts, nft)
+	}
+
+	if err := rows.Err(); err != nil {
+		return persist.CollectionToken{}, err
+	}
+
+	return persist.CollectionToken{
+		NFTs: nfts,
+	}, nil
 }
 
 // RefreshUnassigned refreshes the unassigned nfts

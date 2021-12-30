@@ -14,6 +14,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 	viper.Set("POSTGRES_USER", "postgres")
 	viper.Set("POSTGRES_PASSWORD", "")
 	viper.Set("POSTGRES_DB", "postgres")
+	viper.Set("ENV", "local")
 
 	db := NewClient()
 

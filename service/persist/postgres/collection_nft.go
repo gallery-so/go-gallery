@@ -300,11 +300,17 @@ func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pU
 
 // GetUnassigned returns all unassigned nfts
 func (c *CollectionRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.Collection, error) {
+
+	getUserSQLStr := `SELECT ADDRESSES FROM users WHERE ID = $1;`
+	var addresses []persist.Address
+	err := c.db.QueryRowContext(pCtx, getUserSQLStr, pUserID).Scan(pq.Array(&addresses))
+
 	// sql statement that gets all nfts that are not in any of a user's collections
-	sqlStr := `SELECT ID,CREATED_AT,NAME,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,TOKEN_COLLECTION_NAME 
-	FROM nfts n 
-	JOIN (SELECT ID FROM nfts WHERE NOT EXISTS (SELECT 1 FROM collections c WHERE c.OWNER_USER_ID = $1 AND n.ID = ANY(c.NFTS))) n2 ON n.ID = n2.ID;`
-	rows, err := c.db.QueryContext(pCtx, sqlStr, pUserID)
+	sqlStr := `SELECT n.ID,n.CREATED_AT,n.NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,n.OWNER_ADDRESS,n.MULTIPLE_OWNERS,n.CONTRACT,n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.TOKEN_COLLECTION_NAME 
+	FROM nfts n
+	JOIN collections c on n.ID <> ALL(c.NFTS)
+	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`
+	rows, err := c.db.QueryContext(pCtx, sqlStr, pUserID, pq.Array(addresses))
 	if err != nil {
 		return persist.Collection{}, err
 	}

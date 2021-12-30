@@ -91,32 +91,31 @@ func TestCreateCollection_Success_Token(t *testing.T) {
 	assert.Len(gallery.Collections, 1)
 }
 
-// TODO get unassigned to work
-// func TestGetUnassignedCollection_Success_Token(t *testing.T) {
-// 	assert := setupTest(t, 2)
+func TestGetUnassignedCollection_Success_Token(t *testing.T) {
+	assert := setupTest(t, 2)
 
-// 	nftIDs := seedTokens(assert)
-// 	// seed DB with collection
-// 	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-// 		Name:        "very cool collection",
-// 		OwnerUserID: tc.user1.id,
-// 		NFTs:        nftIDs[:2],
-// 	})
-// 	assert.Nil(err)
+	nftIDs := seedTokens(assert)
+	// seed DB with collection
+	_, err := tc.repos.collectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		NFTs:        nftIDs[:2],
+	})
+	assert.Nil(err)
 
-// 	resp := getUnassignedNFTsRequestToken(assert, tc.user1.id, tc.user1.jwt)
-// 	assertValidResponse(assert, resp)
+	resp := getUnassignedNFTsRequestToken(assert, tc.user1.id, tc.user1.jwt)
+	assertValidResponse(assert, resp)
 
-// 	type NftsResponse struct {
-// 		Nfts  []*persist.Token `json:"nfts"`
-// 		Error string           `json:"error"`
-// 	}
-// 	// ensure nft was updated
-// 	body := NftsResponse{}
-// 	util.UnmarshallBody(&body, resp.Body)
-// 	assert.Len(body.Nfts, 1)
-// 	assert.Empty(body.Error)
-// }
+	type NftsResponse struct {
+		Nfts  []*persist.Token `json:"nfts"`
+		Error string           `json:"error"`
+	}
+	// ensure nft was updated
+	body := NftsResponse{}
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Len(body.Nfts, 1)
+	assert.Empty(body.Error)
+}
 
 func TestDeleteCollection_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
