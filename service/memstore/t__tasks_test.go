@@ -36,7 +36,7 @@ func TestUpdateQueue(t *testing.T) {
 	result := persist.NFT{}
 	err = json.Unmarshal([]byte(bs), &result)
 	assert.Nil(err)
-	assert.Equal(nft.CollectorsNote, result.CollectorsNote)
+	assert.Equal(nft.CollectorsNote.String(), result.CollectorsNote.String())
 
 	uq := NewUpdateQueue(redisCache)
 
@@ -61,6 +61,6 @@ func TestUpdateQueue(t *testing.T) {
 	result = persist.NFT{}
 	err = json.Unmarshal([]byte(bs), &result)
 	assert.Nil(err)
-	assert.Equal(result.Description, "updated2")
+	assert.Equal(result.Description.String(), "updated2")
 
 }
