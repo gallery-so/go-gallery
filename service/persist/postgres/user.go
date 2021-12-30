@@ -3,37 +3,81 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // UserRepository represents a user repository in the postgres database
 type UserRepository struct {
-	db *sql.DB
+	db                  *sql.DB
+	updateInfoStmt      *sql.Stmt
+	existsByAddressStmt *sql.Stmt
+	createStmt          *sql.Stmt
+	getByIDStmt         *sql.Stmt
+	getByAddressStmt    *sql.Stmt
+	getByUsernameStmt   *sql.Stmt
+	deleteStmt          *sql.Stmt
+	addAddressStmt      *sql.Stmt
+	removeAddressStmt   *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
 func NewUserRepository(db *sql.DB) *UserRepository {
-	return &UserRepository{db: db}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4 WHERE ID = $1;`)
+	checkNoErr(err)
+
+	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false);`)
+	checkNoErr(err)
+
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
+	checkNoErr(err)
+
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
+	checkNoErr(err)
+
+	addAddressStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = ADDRESSES || $2 WHERE ID = $1;`)
+	checkNoErr(err)
+
+	removeAddressStmt, err := db.PrepareContext(ctx, `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2::varchar) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES);`)
+	checkNoErr(err)
+
+	return &UserRepository{db: db, updateInfoStmt: updateInfoStmt, existsByAddressStmt: existsByAddressStmt, createStmt: createStmt, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, getByUsernameStmt: getByUsernameStmt, deleteStmt: deleteStmt, addAddressStmt: addAddressStmt, removeAddressStmt: removeAddressStmt}
 }
 
 // UpdateByID updates the user with the given ID
 func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
-	sqlStr := `UPDATE users `
 	switch pUpdate.(type) {
 	case persist.UserUpdateInfoInput:
 		update := pUpdate.(persist.UserUpdateInfoInput)
-		sqlStr += `SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4 WHERE ID = $1`
-		_, err := u.db.ExecContext(pCtx, sqlStr, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated)
+		res, err := u.updateInfoStmt.ExecContext(pCtx, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated)
 		if err != nil {
 			return err
 		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return persist.ErrUserNotFoundByID{ID: pID}
+		}
 	default:
-		return errors.New("unsupported update type")
+		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
 
 	return nil
@@ -42,9 +86,8 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 // ExistsByAddress checks if a user exists with the given address
 func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address) (bool, error) {
-	sqlStr := `SELECT EXISTS(SELECT 1 FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[]) AND DELETED = false`
 
-	res, err := u.db.QueryContext(pCtx, sqlStr, pAddress)
+	res, err := u.existsByAddressStmt.QueryContext(pCtx, pAddress)
 	if err != nil {
 		return false, err
 	}
@@ -66,10 +109,9 @@ func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.
 
 // Create creates a new user
 func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persist.DBID, error) {
-	sqlStr := "INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID"
 
 	var id persist.DBID
-	err := u.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pUser.Deleted, pUser.Version, pUser.Username, pUser.UsernameIdempotent, pq.Array(pUser.Addresses)).Scan(&id)
+	err := u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pUser.Deleted, pUser.Version, pUser.Username, pUser.UsernameIdempotent, pq.Array(pUser.Addresses)).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -79,10 +121,9 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persi
 
 // GetByID gets the user with the given ID
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
-	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false`
 
 	user := persist.User{}
-	err := u.db.QueryRowContext(pCtx, sqlStr, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.CreationTime, &user.LastUpdated)
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFoundByID{ID: pID}
@@ -94,11 +135,9 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 // GetByAddress gets the user with the given address in their list of addresses
 func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
-	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[]`
 
-	res, err := u.db.QueryContext(pCtx, sqlStr, pAddress)
+	res, err := u.getByAddressStmt.QueryContext(pCtx, pAddress)
 	if err != nil {
-		logrus.Info("ASLDKJASD")
 		return persist.User{}, err
 	}
 	defer res.Close()
@@ -124,9 +163,8 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 
 // GetByUsername gets the user with the given username
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
-	sqlStr := `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1`
 
-	res, err := u.db.QueryContext(pCtx, sqlStr, strings.ToLower(pUsername))
+	res, err := u.getByUsernameStmt.QueryContext(pCtx, strings.ToLower(pUsername))
 	if err != nil {
 		return persist.User{}, err
 	}
@@ -153,22 +191,35 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 
 // Delete deletes the user with the given ID
 func (u *UserRepository) Delete(pCtx context.Context, pID persist.DBID) error {
-	sqlStr := `UPDATE users SET DELETED = TRUE WHERE ID = $1`
 
-	_, err := u.db.ExecContext(pCtx, sqlStr, pID)
+	res, err := u.deleteStmt.ExecContext(pCtx, pID)
 	if err != nil {
 		return err
 	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return persist.ErrUserNotFoundByID{ID: pID}
+	}
+
 	return nil
 }
 
 // AddAddresses adds the given addresses to the user with the given ID
 func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
-	sqlStr := `UPDATE users SET ADDRESSES = ADDRESSES || $2 WHERE ID = $1`
 
-	_, err := u.db.ExecContext(pCtx, sqlStr, pID, pq.Array(pAddresses))
+	res, err := u.addAddressStmt.ExecContext(pCtx, pID, pq.Array(pAddresses))
 	if err != nil {
 		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return persist.ErrUserNotFoundByID{ID: pID}
 	}
 	return nil
 }
@@ -176,8 +227,7 @@ func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pA
 // RemoveAddresses removes the given addresses from the user with the given ID
 func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
 	for _, address := range pAddresses {
-		sqlStr := `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2::varchar) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES)`
-		res, err := u.db.ExecContext(pCtx, sqlStr, pID, address)
+		res, err := u.removeAddressStmt.ExecContext(pCtx, pID, address)
 		if err != nil {
 			return err
 		}

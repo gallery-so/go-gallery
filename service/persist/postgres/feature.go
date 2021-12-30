@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -10,12 +11,27 @@ import (
 
 // FeatureFlagRepository is a repository for feature flags
 type FeatureFlagRepository struct {
-	db *sql.DB
+	db                      *sql.DB
+	getByRequiredTokensStmt *sql.Stmt
+	getByNameStmt           *sql.Stmt
+	getAllStmt              *sql.Stmt
 }
 
 // NewFeatureFlagRepository returns a new FeatureFlagRepository
 func NewFeatureFlagRepository(db *sql.DB) *FeatureFlagRepository {
-	return &FeatureFlagRepository{db: db}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	getByRequiredTokensStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE REQUIRED_TOKEN = ANY($1) AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByNameStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE NAME = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	getAllStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE DELETED = false;`)
+	checkNoErr(err)
+
+	return &FeatureFlagRepository{db: db, getByRequiredTokensStmt: getByRequiredTokensStmt, getByNameStmt: getByNameStmt, getAllStmt: getAllStmt}
 }
 
 // GetByRequiredTokens returns all feature flags with the given required tokens and ensures that the amount is greater than or equal to the given amount
@@ -24,8 +40,7 @@ func (f *FeatureFlagRepository) GetByRequiredTokens(pCtx context.Context, pRequi
 	for k := range pRequiredTokens {
 		keys = append(keys, k)
 	}
-	getFlagsSQLStr := `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE REQUIRED_TOKEN = ANY($1) AND DELETED = false`
-	rows, err := f.db.QueryContext(pCtx, getFlagsSQLStr, keys)
+	rows, err := f.getByRequiredTokensStmt.QueryContext(pCtx, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +72,8 @@ func (f *FeatureFlagRepository) GetByRequiredTokens(pCtx context.Context, pRequi
 
 // GetByName returns a feature flag by name
 func (f *FeatureFlagRepository) GetByName(pCtx context.Context, pName string) (persist.FeatureFlag, error) {
-	getFlagSQLStr := `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE NAME = $1 AND DELETED = false`
 	var flag persist.FeatureFlag
-	err := f.db.QueryRowContext(pCtx, getFlagSQLStr, pName).Scan(&flag.ID, &flag.Version, &flag.LastUpdated, &flag.CreationTime, &flag.RequiredToken, &flag.RequiredAmount, &flag.TokenType, &flag.Name, &flag.IsEnabled, &flag.AdminOnly, pq.Array(&flag.ForceEnabledUserIDs))
+	err := f.getByNameStmt.QueryRowContext(pCtx, pName).Scan(&flag.ID, &flag.Version, &flag.LastUpdated, &flag.CreationTime, &flag.RequiredToken, &flag.RequiredAmount, &flag.TokenType, &flag.Name, &flag.IsEnabled, &flag.AdminOnly, pq.Array(&flag.ForceEnabledUserIDs))
 	if err != nil {
 		return flag, err
 	}
@@ -68,8 +82,7 @@ func (f *FeatureFlagRepository) GetByName(pCtx context.Context, pName string) (p
 
 // GetAll returns all feature flags
 func (f *FeatureFlagRepository) GetAll(pCtx context.Context) ([]persist.FeatureFlag, error) {
-	getFlagsSQLStr := `SELECT ID,VERSION,LAST_UPDATED,CREATED_AT,REQUIRED_TOKEN,REQUIRED_AMOUNT,TOKEN_TYPE,NAME,IS_ENABLED,ADMIN_ONLY,FORCE_ENABLED_USER_IDS FROM features WHERE DELETED = false`
-	rows, err := f.db.QueryContext(pCtx, getFlagsSQLStr)
+	rows, err := f.getAllStmt.QueryContext(pCtx)
 	if err != nil {
 		return nil, err
 	}

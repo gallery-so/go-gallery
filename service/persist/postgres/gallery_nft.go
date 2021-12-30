@@ -4,30 +4,70 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // GalleryRepository is the repository for interacting with galleries in a postgres database
 type GalleryRepository struct {
-	db             *sql.DB
+	db                 *sql.DB
+	createStmt         *sql.Stmt
+	updateStmt         *sql.Stmt
+	addCollectionsStmt *sql.Stmt
+	getByUserIDStmt    *sql.Stmt
+	getByIDStmt        *sql.Stmt
+
 	galleriesCache memstore.Cache
 }
 
 // NewGalleryRepository creates a new GalleryRepository
 func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository {
-	return &GalleryRepository{db: db, galleriesCache: gCache}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO galleries (ID, VERSION, COLLECTIONS, OWNER_USER_ID) VALUES ($1, $2, $3, $4) RETURNING ID;`)
+	checkNoErr(err)
+
+	updateStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
+	checkNoErr(err)
+
+	addCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = COLLECTIONS || $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`)
+	checkNoErr(err)
+
+	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
+	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
+	n.ID,n.OWNER_ADDRESS,
+	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
+	LEFT JOIN collections c ON c.ID = coll 
+	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
+	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
+	checkNoErr(err)
+
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
+	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
+	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
+	LEFT JOIN collections c ON c.ID = coll 
+	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
+	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
+	checkNoErr(err)
+
+	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache}
 }
 
 // Create creates a new gallery
 func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
-	sqlStr := `INSERT INTO galleries (ID, VERSION, COLLECTIONS, OWNER_USER_ID) VALUES ($1, $2, $3, $4) RETURNING ID`
 
 	var id persist.DBID
-	err := g.db.QueryRowContext(pCtx, sqlStr, persist.GenerateID(), pGallery.Version, pq.Array(pGallery.Collections), pGallery.OwnerUserID).Scan(&id)
+	err := g.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pGallery.Version, pq.Array(pGallery.Collections), pGallery.OwnerUserID).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -36,8 +76,7 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
 func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.GalleryUpdateInput) error {
-	sqlStr := `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3 AND OWNER_USER_ID = $4`
-	res, err := g.db.ExecContext(pCtx, sqlStr, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
+	res, err := g.updateStmt.ExecContext(pCtx, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
 	if err != nil {
 		return err
 	}
@@ -53,8 +92,7 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 
 // AddCollections adds the given collections to the gallery with the given ID
 func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollections []persist.DBID) error {
-	sqlStr := `UPDATE galleries SET COLLECTIONS = COLLECTIONS || $1 WHERE ID = $2 AND OWNER_USER_ID = $3`
-	res, err := g.db.ExecContext(pCtx, sqlStr, pq.Array(pCollections), pID, pUserID)
+	res, err := g.addCollectionsStmt.ExecContext(pCtx, pq.Array(pCollections), pID, pUserID)
 	if err != nil {
 		return err
 	}
@@ -70,17 +108,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
-	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
-	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
-	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
-	n.ID,n.OWNER_ADDRESS,
-	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
-	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll 
-	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
-	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`
-	rows, err := g.db.QueryContext(pCtx, sqlStr, pUserID)
+	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,14 +148,9 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			}
 		}
 		collections[gallery.ID] = colls
-		logrus.Infof("Gallery: %s Collection: %s NFT: %s", gallery.ID, collection.ID, nft.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
-	}
-
-	if len(galleries) == 0 {
-		return nil, errors.New("no galleries found")
 	}
 
 	result := make([]persist.Gallery, 0, len(galleries))
@@ -145,16 +168,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 
 // GetByID returns the gallery with the given ID
 func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
-	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
-	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
-	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
-	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
-	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll 
-	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
-	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`
-	rows, err := g.db.QueryContext(pCtx, sqlStr, pID)
+	rows, err := g.getByIDStmt.QueryContext(pCtx, pID)
 	if err != nil {
 		return persist.Gallery{}, err
 	}
@@ -211,7 +225,7 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		}
 		return gallery, nil
 	}
-	return persist.Gallery{}, errors.New("no gallery found")
+	return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
 }
 
 // RefreshCache deletes the given key in the cache

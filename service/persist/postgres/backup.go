@@ -3,24 +3,39 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // BackupRepository is the postgres implementation for interacting with backed up versions of galleries
 type BackupRepository struct {
-	db *sql.DB
+	db                    *sql.DB
+	getCurrentBackupsStmt *sql.Stmt
+	deleteBackupStmt      *sql.Stmt
+	insertBackupStmt      *sql.Stmt
 }
 
 // NewBackupRepository creates a new postgres repository for interacting with backed up versions of galleries
 func NewBackupRepository(db *sql.DB) *BackupRepository {
-	return &BackupRepository{db: db}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	getCurrentBackupsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM backups WHERE GALLERY_ID = $1 AND DELETED = false ORDER BY CREATED_AT ASC`)
+	checkNoErr(err)
+
+	deleteBackupStmt, err := db.PrepareContext(ctx, `DELETE FROM backups WHERE ID = $1`)
+	checkNoErr(err)
+
+	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY) VALUES ($1, $2, $3, $4)`)
+	checkNoErr(err)
+
+	return &BackupRepository{db: db, getCurrentBackupsStmt: getCurrentBackupsStmt, deleteBackupStmt: deleteBackupStmt, insertBackupStmt: insertBackupStmt}
 }
 
 // Insert inserts a new backup of a gallery into the database and ensures that old backups are removed
 func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery) error {
-	getCurrentBackups := `SELECT ID FROM backups WHERE GALLERY_ID = $1 AND DELETED = false ORDER BY CREATED_AT ASC`
-	res, err := b.db.QueryContext(pCtx, getCurrentBackups, pGallery.ID)
+	res, err := b.getCurrentBackupsStmt.QueryContext(pCtx, pGallery.ID)
 	if err != nil {
 		return err
 	}
@@ -42,15 +57,13 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 
 	if len(currentBackups) > 2 {
 		// delete the oldest backup
-		deleteBackup := `DELETE FROM backups WHERE ID = $1`
-		_, err = b.db.ExecContext(pCtx, deleteBackup, currentBackups[0])
+		_, err = b.deleteBackupStmt.ExecContext(pCtx, currentBackups[0])
 		if err != nil {
 			return err
 		}
 	}
 
-	insertBackup := `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY) VALUES ($1, $2, $3, $4)`
-	_, err = b.db.ExecContext(pCtx, insertBackup, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
+	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
 	if err != nil {
 		return err
 	}

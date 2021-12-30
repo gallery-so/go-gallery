@@ -46,3 +46,9 @@ func generateValuesPlaceholders(l, offset int) string {
 	}
 	return values[0:len(values)-1] + ")"
 }
+
+func checkNoErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
