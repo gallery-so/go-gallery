@@ -48,7 +48,7 @@ CREATE TABLE nfts (
     EXTERNAL_URL varchar,
     CREATOR_ADDRESS varchar(255),
     CREATOR_NAME varchar,
-    OWNER_ADDRESS char(42),
+    OWNER_ADDRESS varchar(255),
     MULTIPLE_OWNERS boolean,
     CONTRACT json,
     OPENSEA_ID bigint,
@@ -106,7 +106,7 @@ CREATE TABLE nonces (
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     USER_ID varchar(32),
-    ADDRESS char(42),
+    ADDRESS varchar(255),
     VALUE varchar(255)
 );
 
@@ -129,11 +129,11 @@ CREATE TABLE tokens (
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     DESCRIPTION varchar,
-    CONTRACT_ADDRESS varchar(42),
+    CONTRACT_ADDRESS varvarchar(255),
     COLLECTORS_NOTE varchar,
     MEDIA jsonb,
     CHAIN varchar,
-    OWNER_ADDRESS varchar(42),
+    OWNER_ADDRESS varvarchar(255),
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,
@@ -158,7 +158,7 @@ CREATE TABLE contracts (
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     SYMBOL varchar,
-    ADDRESS varchar(42),
+    ADDRESS varvarchar(255),
     LATEST_BLOCK bigint
 );
 
@@ -170,7 +170,7 @@ CREATE TABLE login_attempts (
     VERSION int,
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ADDRESS varchar(42),
+    ADDRESS varvarchar(255),
     REQUEST_HOST_ADDRESS varchar(255),
     USER_EXISTS boolean,
     SIGNATURE varchar(255),

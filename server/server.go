@@ -138,24 +138,6 @@ func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
 		backupRepository:          postgres.NewBackupRepository(db),
 		membershipRepository:      postgres.NewMembershipRepository(db),
 	}
-	// galleryTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
-	// galleryRepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
-	// nftRepo := mongodb.NewNFTRepository(mgoClient, nftsCache, openseaCache, galleryRepo)
-	// return &repositories{
-	// 	nonceRepository:           mongodb.NewNonceMongoRepository(mgoClient),
-	// 	loginRepository:           mongodb.NewLoginRepository(mgoClient),
-	// 	collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, galleryRepo, nftRepo),
-	// 	tokenRepository:           mongodb.NewTokenRepository(mgoClient, galleryTokenRepo),
-	// 	collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedCacheToken, galleryTokenRepo),
-	// 	galleryTokenRepository:    galleryTokenRepo,
-	// 	galleryRepository:         galleryRepo,
-	// 	historyRepository:         mongodb.NewHistoryRepository(mgoClient),
-	// 	nftRepository:             nftRepo,
-	// 	userRepository:            mongodb.NewUserRepository(mgoClient),
-	// 	contractRepository:        mongodb.NewContractRepository(mgoClient),
-	// 	backupRepository:          mongodb.NewBackupRepository(mgoClient),
-	// 	membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
-	// }
 }
 
 func newMongoClient() *mongo.Client {
@@ -210,11 +192,13 @@ func newGCPStorageClient() *storage.Client {
 	defer cancel()
 	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
 
-		_, err := os.Stat(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS"))
+		appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
+		_, err := os.Stat(appCredentials)
 		if err != nil {
-			_, err = os.Stat(filepath.Join("..", viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+			_, err = os.Stat(filepath.Join("..", appCredentials))
 			if err == nil {
-				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join("..", viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+				appCredentials = filepath.Join("..", appCredentials)
+				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join("..", appCredentials))
 			}
 		}
 		if err != nil {
@@ -224,7 +208,7 @@ func newGCPStorageClient() *storage.Client {
 			}
 			return client
 		}
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile(viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")))
+		client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
 		if err != nil {
 			panic(err)
 		}
