@@ -37,7 +37,7 @@ func TestGetTokenByID_Success(t *testing.T) {
 	body := &NftGetByIDResponse{}
 	util.UnmarshallBody(body, resp.Body)
 	assert.Empty(body.Error)
-	assert.Equal(name, body.Nft.Name)
+	assert.Equal(name, body.Nft.Name.String())
 }
 
 func TestGetTokenByID_NoParamError(t *testing.T) {
@@ -92,7 +92,7 @@ func TestUpdateTokenByID_Success(t *testing.T) {
 	// ensure nft was updated
 	body := &getTokenOutput{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal("new nft note", body.Nft.CollectorsNote)
+	assert.Equal("new nft note", body.Nft.CollectorsNote.String())
 }
 
 func TestUpdateTokenByID_UnauthedError(t *testing.T) {

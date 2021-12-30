@@ -57,7 +57,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	body := CollectionGetResponse{}
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collection.Name)
+	assert.Equal(update.Name, body.Collection.Name.String())
 	assert.NotEmpty(body.Collection.ID)
 }
 

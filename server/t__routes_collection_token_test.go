@@ -45,7 +45,7 @@ func TestUpdateCollectionNameByID_Success_Token(t *testing.T) {
 	assert.NotNil(body.Collection)
 	assert.NotEmpty(body.Collection.ID)
 	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collection.Name)
+	assert.Equal(update.Name, body.Collection.Name.String())
 }
 
 func TestCreateCollection_Success_Token(t *testing.T) {

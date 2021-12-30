@@ -70,7 +70,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
-	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,
+	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,
@@ -94,7 +94,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 	for rows.Next() {
 		lastCollID := collection.ID
 
-		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID,
+		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
@@ -145,7 +145,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 
 // GetByID returns the gallery with the given ID
 func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
-	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,
+	sqlStr := `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
@@ -168,7 +168,7 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 	for rows.Next() {
 		lastCollID := collection.ID
 
-		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID,
+		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
