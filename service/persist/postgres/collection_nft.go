@@ -127,7 +127,7 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 	if pShowHidden {
 		stmt = c.getByUserIDAuthStmt
 	} else {
-		stmt = c.getByIDStmt
+		stmt = c.getByUserIDStmt
 	}
 	res, err := stmt.QueryContext(pCtx, pUserID)
 	if err != nil {
