@@ -25,8 +25,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 		if len(allTiers) > 0 {
 			updatedRecently := true
 			for _, tier := range allTiers {
-
-				if time.Since(time.Time(tier.LastUpdated)) > time.Hour {
+				if time.Since(tier.LastUpdated.Time()) > time.Hour {
 					updatedRecently = false
 					break
 				}
@@ -56,8 +55,7 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 		if len(allTiers) > 0 {
 			updatedRecently := true
 			for _, tier := range allTiers {
-
-				if time.Since(time.Time(tier.LastUpdated)) > time.Hour {
+				if time.Since(tier.LastUpdated.Time()) > time.Hour {
 					updatedRecently = false
 					break
 				}

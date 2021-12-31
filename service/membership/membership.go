@@ -11,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -23,21 +24,25 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 			tier := persist.MembershipTier{
 				TokenID: id,
 			}
-
+			logrus.Infof("Fetching membership tier: %s", id)
 			events, err := openseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), persist.TokenID(id), 0)
 			if err != nil || len(events) == 0 {
+				logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 				tierChan <- tier
 				return
 			}
 			asset := events[0].Asset
 			tier.Name = asset.Name
 			tier.AssetURL = asset.ImageURL
+
+			logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 			tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
 
 			ownersChan := make(chan []persist.MembershipOwner)
 			for _, e := range events {
 				go func(event opensea.Event) {
 					owners := make([]persist.MembershipOwner, 0, 2)
+					// does from have the NFT?
 					hasNFT, _ := ethClient.HasNFT(pCtx, id, event.FromAccount.Address)
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
@@ -69,6 +74,7 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 						}
 						owners = append(owners, membershipOwner)
 					}
+					// does to have the NFT?
 					hasNFT, _ = ethClient.HasNFT(pCtx, id, event.ToAccount.Address)
 					if hasNFT {
 						membershipOwner := persist.MembershipOwner{}
@@ -100,6 +106,7 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 						}
 						owners = append(owners, membershipOwner)
 					}
+					logrus.Infof("Fetched membership owners %+v for token %s ", owners, id)
 					ownersChan <- owners
 				}(e)
 			}
@@ -126,9 +133,11 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 			tier := persist.MembershipTier{
 				TokenID: id,
 			}
+			logrus.Infof("Fetching membership tier: %s", id)
 
 			tokens, err := nftRepository.GetByTokenIdentifiers(pCtx, persist.TokenID(id), persist.Address(viper.GetString("CONTRACT_ADDRESS")), -1, 0)
 			if err != nil || len(tokens) == 0 {
+				logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 				tierChan <- tier
 				return
 			}
@@ -136,6 +145,8 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 
 			tier.Name = initialToken.Name
 			tier.AssetURL = initialToken.Media.MediaURL
+			logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
+
 			tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
 
 			ownersChan := make(chan persist.MembershipOwner)
@@ -168,6 +179,7 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 					} else {
 						membershipOwner.Address = token.OwnerAddress
 					}
+					logrus.Infof("Fetched membership owner %+v for token %s ", membershipOwner, id)
 					ownersChan <- membershipOwner
 				}(e)
 			}
