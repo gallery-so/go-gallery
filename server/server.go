@@ -104,6 +104,7 @@ func setDefaults() {
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
+	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 
 	viper.AutomaticEnv()
 
