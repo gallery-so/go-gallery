@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -155,6 +156,24 @@ func listenForSignups(pCtx context.Context, pPubSub pubsub.PubSub, userRepo pers
 		}
 
 		if err := upsertAccessState(ctx, user.ID, userRepo, featureRepo, accessRepo, ethClient); err != nil {
+			logrus.WithError(err).Error("failed to update access state")
+			return err
+		}
+
+		return nil
+	})
+	return nil
+}
+
+func listenForAddressAdd(pCtx context.Context, pPubSub pubsub.PubSub, userRepo persist.UserRepository, featureRepo persist.FeatureFlagRepository, accessRepo persist.AccessRepository, ethClient *ethclient.Client) error {
+	pPubSub.Subscribe(pCtx, viper.GetString("ADD_ADDRESS_TOPIC"), func(ctx context.Context, message []byte) error {
+		user := &user.AddAddressPubSubInput{}
+		if err := json.Unmarshal(message, &user); err != nil {
+			logrus.WithError(err).Error("failed to unmarshal user")
+			return err
+		}
+
+		if err := upsertAccessState(ctx, user.UserID, userRepo, featureRepo, accessRepo, ethClient); err != nil {
 			logrus.WithError(err).Error("failed to update access state")
 			return err
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -21,10 +22,25 @@ import (
 
 var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
 
-type updateMediaInput struct {
+// UpdateMediaInput is the input for the update media endpoint that will find all of the media content
+// for an addresses NFTs and cache it in a storage bucket
+type UpdateMediaInput struct {
 	OwnerAddress    persist.Address `json:"owner_address"`
 	TokenID         persist.TokenID `json:"token_id"`
 	ContractAddress persist.Address `json:"contract_address"`
+}
+
+// ValidateUsersNFTsInput is the input for the validate users NFTs endpoint that will return
+// whether what opensea has on a user is the same as what we have in our database
+type ValidateUsersNFTsInput struct {
+	UserID persist.DBID `json:"user_id"`
+}
+
+// ValidateUsersNFTsOutput is the output of the validate users NFTs endpoint that will return
+// whether what opensea has on a user is the same as what we have in our database
+type ValidateUsersNFTsOutput struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 type tokenUpdateMedia struct {
@@ -58,7 +74,7 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 
 func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client) gin.HandlerFunc {
 	return func(ginContext *gin.Context) {
-		input := updateMediaInput{}
+		input := UpdateMediaInput{}
 		if err := ginContext.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(ginContext, http.StatusBadRequest, err)
 			return
@@ -176,5 +192,76 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 			}
 		}
 		tq.QueueTask(key, task)
+	}
+}
+
+func validateUsersNFTs(tokenRepository persist.TokenRepository, userRepository persist.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input ValidateUsersNFTsInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+		user, err := userRepository.GetByID(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		currentNFTs, err := tokenRepository.GetByUserID(c, input.UserID, -1, -1)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
+		for _, address := range user.Addresses {
+			assets, err := opensea.FetchAssetsForWallet(address, 0, 0)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			openseaAssets = append(openseaAssets, assets...)
+		}
+
+		accountedFor := make(map[persist.DBID]bool)
+		unaccountedFor := make(map[string]bool)
+
+		for _, asset := range openseaAssets {
+			af := false
+			for _, nft := range currentNFTs {
+				if accountedFor[nft.ID] {
+					continue
+				}
+				if asset.Contract.ContractAddress == nft.ContractAddress && asset.TokenID.String() == nft.TokenID.Base10String() {
+					accountedFor[nft.ID] = true
+					af = true
+					break
+				}
+			}
+			if !af {
+				unaccountedFor[asset.Contract.ContractAddress.String()+" -- "+asset.TokenID.String()] = true
+			}
+		}
+
+		var output ValidateUsersNFTsOutput
+
+		if len(unaccountedFor) > 0 {
+			unaccountedForKeys := make([]string, 0, len(unaccountedFor))
+			for k := range unaccountedFor {
+				unaccountedForKeys = append(unaccountedForKeys, k)
+			}
+			accountedForKeys := make([]string, 0, len(accountedFor))
+			for k := range accountedFor {
+				accountedForKeys = append(accountedForKeys, k.String())
+			}
+			output.Success = false
+			output.Message = fmt.Sprintf("user %s has unaccounted for NFTs: %v\naccounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
+			c.JSON(http.StatusOK, output)
+			return
+		}
+
+		output.Success = true
+		c.JSON(http.StatusOK, output)
+
 	}
 }

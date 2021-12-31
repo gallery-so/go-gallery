@@ -1,18 +1,23 @@
 package user
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -71,6 +76,12 @@ type CreateUserOutput struct {
 	UserID         persist.DBID `json:"user_id"`
 	GalleryID      persist.DBID `json:"gallery_id"`
 }
+
+// AddAddressPubSubInput is the input for the user add address pubsub pipeline
+type AddAddressPubSubInput struct {
+	UserID  persist.DBID    `json:"user_id"`
+	Address persist.Address `json:"address"`
+}
 type errUserNotFound struct {
 	userID   persist.DBID
 	address  persist.Address
@@ -84,21 +95,14 @@ type errUserExistsWithAddress struct {
 	address persist.Address
 }
 
+type errCouldNotEnsureMediaForAddress struct {
+	address persist.Address
+}
+
 // CreateUserToken creates a JWT token for the user
 func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (CreateUserOutput, error) {
 
 	output := &CreateUserOutput{}
-
-	defer func() {
-		if viper.GetString("ENV") != "local" {
-			go func() {
-				err := publishUserSignup(pCtx, output.UserID, userRepo, psub)
-				if err != nil {
-					logrus.WithError(err).Error("failed to publish user signup")
-				}
-			}()
-		}
-	}()
 
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
@@ -136,6 +140,35 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 	}
 
 	output.UserID = userID
+
+	defer func() {
+		// user has been created successfully, shoot out a pubsub to notify any service that needs it as well as
+		// validate that the user's NFTs are valid and have cached media content
+		if viper.GetString("ENV") != "local" {
+			go func() {
+				err := publishUserSignup(pCtx, output.UserID, userRepo, psub)
+				if err != nil {
+					logrus.WithError(err).Error("failed to publish user signup")
+				}
+			}()
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := validateNFTsForUser(ctx, userID)
+			if err != nil {
+				logrus.WithError(err).Error("validateNFTsForUser")
+			}
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := ensureMediaContent(ctx, pInput.Address)
+			if err != nil {
+				logrus.WithError(err).Error("ensureMediaForUser")
+			}
+		}()
+	}()
 
 	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
@@ -203,6 +236,26 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 
 	output.UserID = userID
 
+	defer func() {
+		// user has been created successfully, validate that the user's NFTs are valid and have cached media content
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := validateNFTsForUser(ctx, userID)
+			if err != nil {
+				logrus.WithError(err).Error("validateNFTsForUser")
+			}
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := ensureMediaContent(ctx, pInput.Address)
+			if err != nil {
+				logrus.WithError(err).Error("ensureMediaForUser")
+			}
+		}()
+	}()
+
 	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return CreateUserOutput{}, err
@@ -249,7 +302,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
 func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUserAddressesInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (AddUserAddressOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (AddUserAddressOutput, error) {
 
 	output := AddUserAddressOutput{}
 
@@ -279,6 +332,35 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 	if !sigValidBool {
 		return output, nil
 	}
+
+	defer func() {
+		// user has successfully added an address, shoot out a pubsub to notify any service that needs it as well as
+		// validate that the user's NFTs are valid and have cached media content
+		if viper.GetString("ENV") != "local" {
+			go func() {
+				err := publishUserAddAddress(pCtx, pUserID, pInput.Address, psub)
+				if err != nil {
+					logrus.WithError(err).Error("failed to publish user signup")
+				}
+			}()
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := validateNFTsForUser(ctx, pUserID)
+			if err != nil {
+				logrus.WithError(err).Error("validateNFTsForUser")
+			}
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := ensureMediaContent(ctx, pInput.Address)
+			if err != nil {
+				logrus.WithError(err).Error("ensureMediaForUser")
+			}
+		}()
+	}()
 
 	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address}); err != nil {
 		return AddUserAddressOutput{}, err
@@ -389,6 +471,90 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 	return nil
 }
 
+func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID) error {
+	endpoint := viper.GetString("INDEXER_HOST") + "/nfts/validate"
+	input := indexer.ValidateUsersNFTsInput{
+		UserID: pUserID,
+	}
+	client := &http.Client{}
+	deadline, ok := pCtx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(time.Second * 10)
+	}
+	client.Timeout = time.Until(deadline)
+
+	body, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	output := indexer.ValidateUsersNFTsOutput{}
+	err = json.NewDecoder(resp.Body).Decode(&output)
+	if err != nil {
+		return err
+	}
+
+	if !output.Success {
+		return errors.New(output.Message)
+	}
+
+	return nil
+}
+
+func ensureMediaContent(pCtx context.Context, pAddress persist.Address) error {
+	endpoint := viper.GetString("INDEXER_HOST") + "/media/update"
+	input := indexer.UpdateMediaInput{
+		OwnerAddress: pAddress,
+	}
+	client := &http.Client{}
+	deadline, ok := pCtx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(time.Second * 10)
+	}
+	client.Timeout = time.Until(deadline)
+
+	body, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	output := util.SuccessResponse{}
+	err = json.NewDecoder(resp.Body).Decode(&output)
+	if err != nil {
+		return err
+	}
+
+	if !output.Success {
+		return errCouldNotEnsureMediaForAddress{address: pAddress}
+	}
+
+	return nil
+}
+
 func publishUserSignup(pCtx context.Context, pUserID persist.DBID, userRepository persist.UserRepository, psub pubsub.PubSub) error {
 	user, err := userRepository.GetByID(pCtx, pUserID)
 	if err == nil {
@@ -404,10 +570,29 @@ func publishUserSignup(pCtx context.Context, pUserID persist.DBID, userRepositor
 	return nil
 }
 
+func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, psub pubsub.PubSub) error {
+	input := AddAddressPubSubInput{
+		UserID:  pUserID,
+		Address: pAddress,
+	}
+	asJSON, err := json.Marshal(input)
+	if err == nil {
+		psub.Publish(pCtx, viper.GetString("ADD_ADDRESS_TOPIC"), asJSON, true)
+	} else {
+		return fmt.Errorf("error marshalling user: %v", err)
+	}
+
+	return nil
+}
+
 func (e errNonceNotFound) Error() string {
 	return fmt.Sprintf("nonce not found for address: %s", e.address)
 }
 
 func (e errUserExistsWithAddress) Error() string {
 	return fmt.Sprintf("user already exists with address: %s", e.address)
+}
+
+func (e errCouldNotEnsureMediaForAddress) Error() string {
+	return fmt.Sprintf("could not ensure media for address: %s", e.address)
 }
