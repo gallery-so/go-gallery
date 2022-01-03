@@ -17,7 +17,9 @@ import (
 var membershipCardIDs = []persist.TokenID{"3", "4", "5", "6", "8"}
 
 // UpdateMembershipTiers fetches all membership cards for a token ID
-func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(membershipCardIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range membershipCardIDs {
@@ -49,14 +51,14 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					owners := make([]persist.MembershipOwner, 0, 2)
 					// does from have the NFT?
 					if event.FromAccount.Address != "0x0000000000000000000000000000000000000000" {
-						hasNFT, _ := ethClient.HasNFT(pCtx, id, event.FromAccount.Address)
+						hasNFT, _ := ethClient.HasNFT(ctx, id, event.FromAccount.Address)
 						if hasNFT {
 							membershipOwner := persist.MembershipOwner{Address: event.FromAccount.Address}
-							if glryUser, err := userRepository.GetByAddress(pCtx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
+							if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
 								membershipOwner.Username = glryUser.UserName
 								membershipOwner.UserID = glryUser.ID
 
-								nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID)
+								nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
 								if err == nil && len(nfts) > 0 {
 									nftURLs := make([]string, 0, 3)
 									for i, nft := range nfts {
@@ -80,14 +82,14 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 					}
 					if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
 						// does to have the NFT?
-						hasNFT, _ := ethClient.HasNFT(pCtx, id, event.ToAccount.Address)
+						hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 						if hasNFT {
 							membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
-							if glryUser, err := userRepository.GetByAddress(pCtx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
+							if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
 								membershipOwner.Username = glryUser.UserName
 								membershipOwner.UserID = glryUser.ID
 
-								nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID)
+								nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
 								if err == nil && len(nfts) > 0 {
 									nftURLs := make([]string, 0, 3)
 									for i, nft := range nfts {
@@ -116,7 +118,7 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 			for i := 0; i < len(events); i++ {
 				tier.Owners = append(tier.Owners, <-ownersChan...)
 			}
-			go membershipRepository.UpsertByTokenID(pCtx, id, tier)
+			go membershipRepository.UpsertByTokenID(ctx, id, tier)
 			tierChan <- tier
 		}(v, events)
 	}
@@ -128,7 +130,9 @@ func UpdateMembershipTiers(pCtx context.Context, membershipRepository persist.Me
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(membershipCardIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range membershipCardIDs {
@@ -138,7 +142,7 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 			}
 			logrus.Infof("Fetching membership tier: %s", id)
 
-			tokens, err := nftRepository.GetByTokenIdentifiers(pCtx, persist.TokenID(id), persist.Address(viper.GetString("CONTRACT_ADDRESS")), -1, 0)
+			tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address(viper.GetString("CONTRACT_ADDRESS")), -1, 0)
 			if err != nil || len(tokens) == 0 {
 				logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 				tierChan <- tier
@@ -156,11 +160,11 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 			for _, e := range tokens {
 				go func(token persist.Token) {
 					membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
-					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
+					if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
 						membershipOwner.Username = glryUser.UserName
 						membershipOwner.UserID = glryUser.ID
 
-						nfts, err := nftRepository.GetByUserID(pCtx, glryUser.ID, -1, 0)
+						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID, -1, 0)
 						if err == nil && len(nfts) > 0 {
 							nftURLs := make([]string, 0, 3)
 							for i, nft := range nfts {
@@ -186,7 +190,7 @@ func UpdateMembershipTiersToken(pCtx context.Context, membershipRepository persi
 			for i := 0; i < len(tokens); i++ {
 				tier.Owners = append(tier.Owners, <-ownersChan)
 			}
-			go membershipRepository.UpsertByTokenID(pCtx, id, tier)
+			go membershipRepository.UpsertByTokenID(ctx, id, tier)
 			tierChan <- tier
 		}(v)
 	}
