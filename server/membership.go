@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -36,7 +37,9 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
-		membershipTiers, err := membership.UpdateMembershipTiers(c, membershipRepository, userRepository, nftRepository, ethClient)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		defer cancel()
+		membershipTiers, err := membership.UpdateMembershipTiers(ctx, membershipRepository, userRepository, nftRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -66,7 +69,9 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
-		membershipTiers, err := membership.UpdateMembershipTiersToken(c, membershipRepository, userRepository, nftRepository, ethClient)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		defer cancel()
+		membershipTiers, err := membership.UpdateMembershipTiersToken(ctx, membershipRepository, userRepository, nftRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
