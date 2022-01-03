@@ -16,6 +16,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/persist/multi"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -107,10 +108,11 @@ func newIPFSShell() *shell.Shell {
 }
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
-	// mgoClient := newMongoClient()
-	// return mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient), mongodb.NewUserRepository(mgoClient)
+	mgoClient := newMongoClient()
+	mongoToken, mongoContract := mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient)
 	pgClient := postgres.NewClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+	pgToken, pgContract, pgUser := postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+	return multi.NewTokenRepository(pgToken, mongoToken), multi.NewContractRepository(pgContract, mongoContract), pgUser
 }
 
 func newMongoClient() *mongo.Client {
