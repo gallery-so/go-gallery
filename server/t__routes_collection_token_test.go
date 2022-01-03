@@ -148,7 +148,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection_Token(t *testing.T) {
 	verifyCollectionExistsInDbForIDToken(assert, collID)
 
 	resp := sendCollDeleteRequestToken(assert, collectionDeleteInputToken{ID: collID}, tc.user2)
-	assert.Equal(404, resp.StatusCode)
+	assert.Equal(500, resp.StatusCode)
 }
 
 func TestGetHiddenCollections_Success_Token(t *testing.T) {
