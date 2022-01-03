@@ -213,6 +213,7 @@ func openseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
 	resp, err := client.Do(req)
 	if err != nil {

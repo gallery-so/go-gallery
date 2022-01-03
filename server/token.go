@@ -141,7 +141,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
 			if err == mongodb.ErrDocumentNotFound {
-				c.JSON(http.StatusNotFound, util.ErrorResponse{Error: err.Error()})
+				util.ErrResponse(c, http.StatusNotFound, err)
 				return
 			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -194,11 +194,11 @@ func refreshUnassignedTokensForUser(collectionRepository persist.CollectionToken
 
 		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 		if err := collectionRepository.RefreshUnassigned(c, userID); err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

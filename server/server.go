@@ -109,6 +109,7 @@ func setDefaults() {
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
+	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 
 	viper.AutomaticEnv()

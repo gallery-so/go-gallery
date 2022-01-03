@@ -100,9 +100,7 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 			if _, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 				status = http.StatusNotFound
 			}
-			c.JSON(status, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -131,9 +129,7 @@ func createCollection(collectionsRepository persist.CollectionRepository, galler
 
 		id, err := collectionCreateDb(c, input, userID, collectionsRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -203,7 +199,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 
 		// TODO magic number
 		if len(input.Nfts) > 1000 {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errTooManyNFTsInCollection.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errTooManyNFTsInCollection)
 			return
 		}
 
@@ -258,9 +254,7 @@ func deleteCollection(collectionsRepository persist.CollectionRepository) gin.Ha
 
 		err := collectionsRepository.Delete(c, input.ID, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 

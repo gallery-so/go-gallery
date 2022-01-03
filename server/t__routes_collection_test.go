@@ -64,7 +64,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 func TestCreateCollection_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
@@ -111,7 +111,7 @@ func TestCreateCollection_Success(t *testing.T) {
 func TestGetUnassignedCollection_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
@@ -129,8 +129,8 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
-		Nfts  []*persist.NFTDB `json:"nfts"`
-		Error string           `json:"error"`
+		Nfts  []*persist.NFT `json:"nfts"`
+		Error string         `json:"error"`
 	}
 	// ensure nft was updated
 	body := NftsResponse{}
@@ -178,7 +178,7 @@ func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
 func TestGetHiddenCollections_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
@@ -210,7 +210,7 @@ func TestGetHiddenCollections_Success(t *testing.T) {
 func TestGetNoHiddenCollections_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
@@ -248,7 +248,7 @@ func TestGetNoHiddenCollections_Success(t *testing.T) {
 func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
@@ -283,7 +283,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},

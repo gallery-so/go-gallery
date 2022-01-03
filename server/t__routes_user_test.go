@@ -223,7 +223,7 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
-	nft := persist.NFTDB{
+	nft := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Name:         "test",
 	}
