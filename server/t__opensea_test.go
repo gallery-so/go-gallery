@@ -27,24 +27,24 @@ func TestOpenseaSync_Success(t *testing.T) {
 	mikeUserID, err := tc.repos.userRepository.Create(ctx, mike)
 	assert.Nil(err)
 
-	nft1 := persist.NFTDB{
+	nft1 := persist.NFT{
 		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
 		Name:         "malsjdlaksjd",
 		OpenseaID:    46062326,
 	}
-	nft2 := persist.NFTDB{
+	nft2 := persist.NFT{
 		OwnerAddress: "0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15",
 		Name:         "asdjasdasd",
 		OpenseaID:    46062320,
 	}
 
-	nft3 := persist.NFTDB{
+	nft3 := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 		Name:         "asdasdasd",
 		OpenseaID:    46062322,
 	}
 
-	ids, err := tc.repos.nftRepository.CreateBulk(ctx, []persist.NFTDB{nft1, nft2, nft3})
+	ids, err := tc.repos.nftRepository.CreateBulk(ctx, []persist.NFT{nft1, nft2, nft3})
 	assert.Nil(err)
 
 	coll := persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", Nfts: []persist.DBID{ids[1]}}
@@ -72,10 +72,10 @@ func TestOpenseaSync_Success(t *testing.T) {
 	ids1 := make([]int, len(robinOpenseaNFTs))
 	ids2 := make([]int, len(robinNFTs))
 	for i, nft := range robinOpenseaNFTs {
-		ids1[i] = nft.OpenSeaID
+		ids1[i] = nft.OpenseaID
 	}
 	for i, nft := range robinNFTs {
-		ids2[i] = nft.OpenSeaID
+		ids2[i] = nft.OpenseaID
 	}
 
 	// a function that finds the difference between two arrays

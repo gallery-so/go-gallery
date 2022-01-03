@@ -176,7 +176,7 @@ func (c *CollectionMongoRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 		pWalletAddresses[i] = addr
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.NFT{}
 
 	if err := c.nftsStorage.find(pCtx, bson.M{"_id": bson.M{"$nin": pUpdate.Nfts}, "owner_address": bson.M{"$in": pWalletAddresses}}, &nftsToBeRemoved); err != nil {
 		return err
@@ -214,7 +214,7 @@ func (c *CollectionMongoRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 		pAddresses[i] = addr
 	}
 
-	nftsToBeRemoved := []*persist.NFTDB{}
+	nftsToBeRemoved := []*persist.NFT{}
 
 	if err := c.nftsStorage.find(pCtx, bson.M{"owner_address": bson.M{"$in": pAddresses}}, &nftsToBeRemoved); err != nil {
 		return err

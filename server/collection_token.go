@@ -118,9 +118,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			if _, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 				status = http.StatusNotFound
 			}
-			c.JSON(status, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, status, err)
 			return
 		}
 
@@ -152,9 +150,7 @@ func createCollectionToken(collectionsRepository persist.CollectionTokenReposito
 
 		id, err := collectionCreateDbToken(c, input, userID, collectionsRepository, galleryRepository)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -224,7 +220,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 
 		// TODO magic number
 		if len(input.Nfts) > 1000 {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errTooManyTokensInCollection.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errTooManyTokensInCollection)
 			return
 		}
 
@@ -271,9 +267,7 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 
 		err := collectionsRepository.Delete(c, input.ID, userID)
 		if err != nil {
-			c.JSON(http.StatusNotFound, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
