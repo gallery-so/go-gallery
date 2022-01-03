@@ -32,8 +32,8 @@ func NewLoginRepository(mgoClient *mongo.Client) *LoginRepository {
 	}
 }
 
-// NewNonceMongoRepository returns a new instance of a nonce repository
-func NewNonceMongoRepository(mgoClient *mongo.Client) *NonceRepository {
+// NewNonceRepository returns a new instance of a nonce repository
+func NewNonceRepository(mgoClient *mongo.Client) *NonceRepository {
 	return &NonceRepository{
 		mp: newStorage(mgoClient, 0, galleryDBName, noncesCollName),
 	}

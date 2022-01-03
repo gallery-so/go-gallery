@@ -111,6 +111,7 @@ func setDefaults() {
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
+	viper.SetDefault("DATABASE", "mongodb")
 
 	viper.AutomaticEnv()
 
@@ -124,20 +125,46 @@ func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
 	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
 	galleriesCacheToken := redis.NewCache(2)
 	nftsCache := redis.NewCache(3)
-	return &repositories{
-		userRepository:            postgres.NewUserRepository(db),
-		nonceRepository:           postgres.NewNonceRepository(db),
-		loginRepository:           postgres.NewLoginRepository(db),
-		nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
-		tokenRepository:           postgres.NewTokenRepository(db),
-		collectionRepository:      postgres.NewCollectionRepository(db),
-		collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
-		galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
-		galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
-		historyRepository:         mongodb.NewHistoryRepository(mgoClient),
-		contractRepository:        postgres.NewContractRepository(db),
-		backupRepository:          postgres.NewBackupRepository(db),
-		membershipRepository:      postgres.NewMembershipRepository(db),
+	switch viper.GetString("DATABASE") {
+	case "postgres":
+		return &repositories{
+			userRepository:            postgres.NewUserRepository(db),
+			nonceRepository:           postgres.NewNonceRepository(db),
+			loginRepository:           postgres.NewLoginRepository(db),
+			nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+			tokenRepository:           postgres.NewTokenRepository(db),
+			collectionRepository:      postgres.NewCollectionRepository(db),
+			collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
+			galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
+			galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
+			historyRepository:         mongodb.NewHistoryRepository(mgoClient),
+			contractRepository:        postgres.NewContractRepository(db),
+			backupRepository:          postgres.NewBackupRepository(db),
+			membershipRepository:      postgres.NewMembershipRepository(db),
+		}
+	case "mongodb":
+		grepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
+		gTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
+		nftRepo := mongodb.NewNFTRepository(mgoClient, openseaCache, nftsCache, grepo)
+		unassignedCache := redis.NewCache(4)
+		unassignedTokenCache := redis.NewCache(5)
+		return &repositories{
+			userRepository:            mongodb.NewUserRepository(mgoClient),
+			nonceRepository:           mongodb.NewNonceRepository(mgoClient),
+			loginRepository:           mongodb.NewLoginRepository(mgoClient),
+			nftRepository:             nftRepo,
+			tokenRepository:           mongodb.NewTokenRepository(mgoClient, gTokenRepo),
+			collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, grepo, nftRepo),
+			collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedTokenCache, gTokenRepo),
+			galleryRepository:         grepo,
+			galleryTokenRepository:    gTokenRepo,
+			historyRepository:         mongodb.NewHistoryRepository(mgoClient),
+			contractRepository:        mongodb.NewContractRepository(mgoClient),
+			backupRepository:          mongodb.NewBackupRepository(mgoClient),
+			membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
+		}
+	default:
+		panic("DATABASE must be set to either 'postgres' or 'mongodb'")
 	}
 }
 
@@ -199,10 +226,11 @@ func newGCPStorageClient() *storage.Client {
 			_, err = os.Stat(filepath.Join("..", appCredentials))
 			if err == nil {
 				appCredentials = filepath.Join("..", appCredentials)
-				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join("..", appCredentials))
+				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
 			}
 		}
 		if err != nil {
+			logrus.Errorf("err getting app creds: %s", err)
 			client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
 			if err != nil {
 				panic(err)
