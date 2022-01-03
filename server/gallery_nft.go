@@ -75,9 +75,7 @@ func getGalleryByID(galleryRepository persist.GalleryRepository) gin.HandlerFunc
 			if _, ok := err.(persist.ErrGalleryNotFoundByID); ok {
 				status = http.StatusNotFound
 			}
-			c.JSON(status, util.ErrorResponse{
-				Error: err.Error(),
-			})
+			util.ErrResponse(c, status, err)
 			return
 		}
 

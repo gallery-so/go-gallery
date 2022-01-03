@@ -46,7 +46,7 @@ func NewNFTMongoRepository(mgoClient *mongo.Client, nftscache, openseaCache mems
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NFT) ([]persist.DBID, error) {
 
 	nfts := make([]interface{}, len(pNfts))
 
@@ -82,7 +82,7 @@ func (n *NFTMongoRepository) CreateBulk(pCtx context.Context, pNfts []persist.NF
 }
 
 // Create inserts an NFT into the database
-func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT persist.NFTDB) (persist.DBID, error) {
+func (n *NFTMongoRepository) Create(pCtx context.Context, pNFT persist.NFT) (persist.DBID, error) {
 	id, err := n.nftsStorage.insert(pCtx, pNFT)
 	if err != nil {
 		return "", err
@@ -229,13 +229,13 @@ func (n *NFTMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, 
 
 // BulkUpsert will create a bulk operation on the database to upsert many nfts for a given wallet address
 // This function's primary purpose is to be used when syncing a user's NFTs from an external provider
-func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNfts []persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTMongoRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNfts []persist.NFT) ([]persist.DBID, error) {
 
 	ids := make(chan persist.DBID)
 	errs := make(chan error)
 
 	for _, v := range pNfts {
-		go func(nft persist.NFTDB) {
+		go func(nft persist.NFT) {
 			if nft.OwnerAddress == "" {
 				errs <- errOwnerAddressRequired
 				return

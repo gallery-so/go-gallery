@@ -154,11 +154,11 @@ func refreshUnassignedNftsForUser(collectionRepository persist.CollectionReposit
 
 		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 		if err := collectionRepository.RefreshUnassigned(c, userID); err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -201,8 +201,9 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 		}
 
 		nfts, err := opensea.PipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
-		if nfts == nil || err != nil {
-			nfts = []persist.NFT{}
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
 
 		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
@@ -212,13 +213,13 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 	return func(c *gin.Context) {
 		input := &refreshOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		userID := middleware.GetUserIDFromCtx(c)
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserIDNotInCtx.Error()})
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
 		}
 
@@ -233,17 +234,17 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
 			if !ownsWallet {
-				c.JSON(http.StatusBadRequest, util.ErrorResponse{Error: errDoesNotOwnWallets{userID, addresses}.Error()})
+				util.ErrResponse(c, http.StatusBadRequest, errDoesNotOwnWallets{id: userID, addresses: addresses})
 				return
 			}
 		}
 
 		if err := nftRepo.OpenseaCacheDelete(c, addresses); err != nil {
-			c.JSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
