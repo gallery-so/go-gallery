@@ -39,8 +39,8 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 
 			asset := events[0].Asset
 
-      tier.Name = persist.NullString(asset.Name)
-      tier.AssetURL = persist.NullString(asset.ImageURL)
+			tier.Name = persist.NullString(asset.Name)
+			tier.AssetURL = persist.NullString(asset.ImageURL)
 
 			logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 			tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
@@ -161,7 +161,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 			for _, e := range tokens {
 				go func(token persist.Token) {
 					membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
-					if glryUser, err := userRepository.GetByAddress(pCtx, token.OwnerAddress); err == nil && glryUser.Username != "" {
+					if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
 						membershipOwner.Username = persist.NullString(glryUser.Username)
 						membershipOwner.UserID = glryUser.ID
 
