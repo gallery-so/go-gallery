@@ -18,7 +18,7 @@ import (
 func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	nft := persist.NFTDB{
+	nft := persist.NFT{
 		Description:    "asd",
 		OwnerAddress:   tc.user1.address,
 		CollectorsNote: "asd",
@@ -434,7 +434,7 @@ func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpda
 
 func createCollectionInDbForUserID(assert *assert.Assertions, collectionName string, userID persist.DBID) persist.DBID {
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},
 		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},
 		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: persist.NullInt64(rand.Intn(10000000))},

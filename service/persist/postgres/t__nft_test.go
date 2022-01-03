@@ -13,7 +13,7 @@ func TestNFTCreate_Success(t *testing.T) {
 
 	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
 
-	nft := persist.NFTDB{
+	nft := persist.NFT{
 		Deleted:      false,
 		Version:      1,
 		OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
@@ -30,7 +30,7 @@ func TestNFTGetByID_Success(t *testing.T) {
 
 	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
 
-	nft := persist.NFTDB{
+	nft := persist.NFT{
 		Deleted:      false,
 		Version:      1,
 		OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",

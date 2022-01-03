@@ -27,7 +27,7 @@ func TestCollectionGetByUserID_Success(t *testing.T) {
 	id, err := userRepo.Create(context.Background(), user)
 	a.NoError(err)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
@@ -78,7 +78,7 @@ func TestCollectionGetByID_Success(t *testing.T) {
 	a.NoError(err)
 	a.NotEmpty(id)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
 			Name:         "name",
@@ -132,7 +132,7 @@ func TestCollectionUpdate_Success(t *testing.T) {
 	a.NoError(err)
 	a.NotEmpty(userID)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
 			Name:         "name",
@@ -188,7 +188,7 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 	a.NoError(err)
 	a.NotEmpty(userID)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
 			Name:         "name",
@@ -253,7 +253,7 @@ func TestCollectionGetUnassigned_Success(t *testing.T) {
 	a.NoError(err)
 	a.NotEmpty(userID)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
 			Name:         "name",

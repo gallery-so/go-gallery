@@ -28,7 +28,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	userID, err := userRepo.Create(context.Background(), user)
 	a.NoError(err)
 
-	nfts := []persist.NFTDB{
+	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",

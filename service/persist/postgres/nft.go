@@ -74,7 +74,7 @@ func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstor
 }
 
 // CreateBulk creates many new NFTs in the database
-func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFT) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
 	vals := make([]interface{}, 0, len(pNFTs)*21)
 
@@ -113,7 +113,7 @@ func (n *NFTRepository) CreateBulk(pCtx context.Context, pNFTs []persist.NFTDB) 
 }
 
 // Create creates a new NFT in the database
-func (n *NFTRepository) Create(pCtx context.Context, pNFT persist.NFTDB) (persist.DBID, error) {
+func (n *NFTRepository) Create(pCtx context.Context, pNFT persist.NFT) (persist.DBID, error) {
 
 	var id persist.DBID
 	err := n.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pNFT.Deleted, pNFT.Version, pNFT.Name, pNFT.Description, pNFT.ExternalURL, pNFT.CreatorAddress, pNFT.CreatorName, pNFT.OwnerAddress, pNFT.MultipleOwners, pNFT.Contract, pNFT.OpenseaID, pNFT.OpenseaTokenID, pNFT.ImageURL, pNFT.ImageThumbnailURL, pNFT.ImagePreviewURL, pNFT.ImageOriginalURL, pNFT.AnimationURL, pNFT.AnimationOriginalURL, pNFT.TokenCollectionName, pNFT.CollectorsNote).Scan(&id)
@@ -256,7 +256,7 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 }
 
 // BulkUpsert inserts or updates multiple NFTs
-func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFTDB) ([]persist.DBID, error) {
+func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFT) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
 	vals := make([]interface{}, 0, len(pNFTs)*21)
 
