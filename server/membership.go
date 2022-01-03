@@ -31,12 +31,13 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 				}
 			}
 			if !updatedRecently {
-				go membership.UpdateMembershipTiers(c.Copy(), membershipRepository, userRepository, nftRepository, ethClient)
+				go membership.UpdateMembershipTiers(membershipRepository, userRepository, nftRepository, ethClient)
 			}
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
-		membershipTiers, err := membership.UpdateMembershipTiers(c, membershipRepository, userRepository, nftRepository, ethClient)
+
+		membershipTiers, err := membership.UpdateMembershipTiers(membershipRepository, userRepository, nftRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -61,12 +62,12 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 				}
 			}
 			if !updatedRecently {
-				go membership.UpdateMembershipTiersToken(c.Copy(), membershipRepository, userRepository, nftRepository, ethClient)
+				go membership.UpdateMembershipTiersToken(membershipRepository, userRepository, nftRepository, ethClient)
 			}
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
-		membershipTiers, err := membership.UpdateMembershipTiersToken(c, membershipRepository, userRepository, nftRepository, ethClient)
+		membershipTiers, err := membership.UpdateMembershipTiersToken(membershipRepository, userRepository, nftRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
