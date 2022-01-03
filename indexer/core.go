@@ -16,6 +16,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -75,6 +76,11 @@ func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
+	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
+	viper.SetDefault("POSTGRES_PORT", 5432)
+	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_PASSWORD", "")
+	viper.SetDefault("POSTGRES_DB", "postgres")
 
 	viper.AutomaticEnv()
 }
@@ -101,8 +107,10 @@ func newIPFSShell() *shell.Shell {
 }
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
-	mgoClient := newMongoClient()
-	return mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient), mongodb.NewUserRepository(mgoClient)
+	// mgoClient := newMongoClient()
+	// return mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient), mongodb.NewUserRepository(mgoClient)
+	pgClient := postgres.NewClient()
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
 }
 
 func newMongoClient() *mongo.Client {

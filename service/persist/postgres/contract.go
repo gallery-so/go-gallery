@@ -52,14 +52,17 @@ func (c *ContractRepository) UpsertByAddress(pCtx context.Context, pAddress pers
 
 // BulkUpsert bulk upserts the contracts by address
 func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persist.Contract) error {
+	if len(pContracts) == 0 {
+		return nil
+	}
 	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*7)
+	vals := make([]interface{}, 0, len(pContracts)*6)
 	for i, contract := range pContracts {
 		if i > 0 {
 			sqlStr += `,`
 		}
-		sqlStr += `($1,$2,$3,$4,$5,$6)`
-		vals = append(vals, contract.ID, contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock)
+		sqlStr += generateValuesPlaceholders(6, i*6)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock)
 	}
 	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = EXCLUDED.VERSION,SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)

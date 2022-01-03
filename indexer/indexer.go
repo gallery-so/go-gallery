@@ -729,9 +729,9 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 					}
 				}
 			}
-			result[j] = t
-			j++
 		}
+		result[j] = t
+		j++
 	}
 	for k, v := range balances {
 		contractAddress, tokenID, err := parseTokenIdentifiers(k)

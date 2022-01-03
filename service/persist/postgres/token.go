@@ -3,11 +3,13 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // TokenRepository represents a postgres repository for tokens
@@ -97,7 +99,6 @@ func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Tok
 	vals := make([]interface{}, 0, len(pTokens)*17)
 	for i, token := range pTokens {
 		insertSQL += generateValuesPlaceholders(17, i*17) + ","
-
 		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version)
 	}
 	insertSQL = insertSQL[:len(insertSQL)-1]
@@ -272,41 +273,48 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	for _, token := range pTokens {
 		if token.TokenType == persist.TokenTypeERC721 {
 			erc721s = append(erc721s, token)
-		}
-		if token.TokenType == persist.TokenTypeERC1155 {
+		} else if token.TokenType == persist.TokenTypeERC1155 {
 			erc1155s = append(erc1155s, token)
+		} else {
+			return errors.New("unsupported token type")
 		}
 	}
 	erc721SqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	erc721Vals := make([]interface{}, 0, len(erc721s)*17)
+	erc721Vals := make([]interface{}, 0, len(erc721s)*19)
 	for i, token := range erc721s {
-		erc721SqlStr += generateValuesPlaceholders(17, i*17)
-		erc721Vals = append(erc721Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		erc721SqlStr += generateValuesPlaceholders(19, i*19) + ","
+		erc721Vals = append(erc721Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	erc721SqlStr = erc721SqlStr[:len(erc721SqlStr)-1]
 
 	erc1155SqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	erc1155Vals := make([]interface{}, 0, len(erc1155s)*17)
+	erc1155Vals := make([]interface{}, 0, len(erc1155s)*19)
 	for i, token := range erc1155s {
-		erc1155SqlStr += generateValuesPlaceholders(17, i*17)
-		erc1155Vals = append(erc1155Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		erc1155SqlStr += generateValuesPlaceholders(19, i*19) + ","
+		erc1155Vals = append(erc1155Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	erc1155SqlStr = erc1155SqlStr[:len(erc1155SqlStr)-1]
 
-	erc721SqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > BLOCK_NUMBER`
+	erc721SqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
 
 	erc1155SqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > BLOCK_NUMBER`
 
-	_, err := t.db.ExecContext(pCtx, erc721SqlStr, erc721Vals...)
-	if err != nil {
-		return err
+	if len(erc721s) > 0 {
+		_, err := t.db.ExecContext(pCtx, erc721SqlStr, erc721Vals...)
+		if err != nil {
+			logrus.Infof("SQL: %s", erc721SqlStr)
+			return fmt.Errorf("failed to upsert erc721 tokens: %w", err)
+		}
 	}
 
-	_, err = t.db.ExecContext(pCtx, erc1155SqlStr, erc1155Vals...)
-	if err != nil {
-		return err
+	if len(erc1155s) > 0 {
+		_, err := t.db.ExecContext(pCtx, erc1155SqlStr, erc1155Vals...)
+		if err != nil {
+			logrus.Infof("SQL: %s", erc1155SqlStr)
+			return fmt.Errorf("failed to upsert erc1155 tokens: %w", err)
+		}
 	}
 
 	return nil
