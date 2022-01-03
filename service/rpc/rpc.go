@@ -19,7 +19,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -216,15 +215,11 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return "", err
 		}
 
-		i, err := util.HexToBigInt(string(pTokenID))
-		if err != nil {
-			return "", err
-		}
-		logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
+		logrus.Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
 
 		turi, err := instance.Uri(&bind.CallOpts{
 			Context: newCtx,
-		}, i)
+		}, pTokenID.BigInt())
 		if err != nil {
 			return "", err
 		}
@@ -245,16 +240,11 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, p
 		return nil, err
 	}
 
-	i, err := util.HexToBigInt(string(pTokenID))
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	bal, err := instance.BalanceOf(&bind.CallOpts{
 		Context: ctx,
-	}, owner, i)
+	}, owner, pTokenID.BigInt())
 	if err != nil {
 		return nil, err
 	}
