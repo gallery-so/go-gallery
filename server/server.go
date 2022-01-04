@@ -127,6 +127,7 @@ func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
 	nftsCache := redis.NewCache(3)
 	switch viper.GetString("DATABASE") {
 	case "postgres":
+		logrus.Info("using postgres")
 		return &repositories{
 			userRepository:            postgres.NewUserRepository(db),
 			nonceRepository:           postgres.NewNonceRepository(db),
@@ -143,6 +144,7 @@ func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
 			membershipRepository:      postgres.NewMembershipRepository(db),
 		}
 	case "mongodb":
+		logrus.Info("using mongodb")
 		grepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
 		gTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
 		nftRepo := mongodb.NewNFTRepository(mgoClient, openseaCache, nftsCache, grepo)

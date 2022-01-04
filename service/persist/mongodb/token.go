@@ -162,9 +162,11 @@ func (t *TokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID
 	for i := 0; i < len(user.Addresses); i++ {
 		select {
 		case t := <-resultChan:
-			if len(t)+len(tokens) > int(limit) {
-				tokens = append(tokens, t[:int(limit)-len(tokens)]...)
-				break
+			if limit > 0 {
+				if len(t)+len(tokens) > int(limit) {
+					tokens = append(tokens, t[:int(limit)-len(tokens)]...)
+					break
+				}
 			}
 			tokens = append(tokens, t...)
 		case err := <-errChan:

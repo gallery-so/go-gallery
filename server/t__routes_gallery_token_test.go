@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -44,6 +45,8 @@ func TestUpdateGalleryById_ReorderCollections_Success_Token(t *testing.T) {
 	}
 	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
 	updateTestGalleryToken(assert, update)
+
+	time.Sleep(time.Second * 3)
 
 	// Validate the updated order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)

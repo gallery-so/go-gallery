@@ -183,8 +183,10 @@ func (t *TokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID
 		if err != nil {
 			return nil, err
 		}
-		if len(t) == int(limit) {
-			t = t[:limit]
+		if limit > 0 {
+			if len(t)+len(tokens) > int(limit) {
+				t = t[:int(limit)-len(tokens)]
+			}
 		}
 
 		tokens = append(tokens, t...)

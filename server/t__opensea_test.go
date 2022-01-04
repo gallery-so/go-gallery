@@ -59,7 +59,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	logrus.Infof("nft2: %+v", nft2DB)
 	logrus.Infof("nft3: %+v", nft3DB)
 
-	coll := persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", NFTs: []persist.DBID{nft3DB.ID, nft2DB.ID}}
+	coll := persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", NFTs: []persist.DBID{nft3DB.ID, nft1DB.ID}}
 	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
