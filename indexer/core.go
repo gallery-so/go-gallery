@@ -82,6 +82,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("DATABASE", "mongodb")
 
 	viper.AutomaticEnv()
 }
@@ -109,10 +110,20 @@ func newIPFSShell() *shell.Shell {
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
 	mgoClient := newMongoClient()
-	mongoToken, mongoContract := mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient)
 	pgClient := postgres.NewClient()
-	pgToken, pgContract, pgUser := postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-	return multi.NewTokenRepository(pgToken, mongoToken), multi.NewContractRepository(pgContract, mongoContract), pgUser
+
+	switch viper.GetString("DATABASE") {
+	case "mongodb":
+		return mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient), mongodb.NewUserRepository(mgoClient)
+	case "postgres":
+		return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+	case "multi":
+		mongoToken, mongoContract := mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient)
+		pgToken, pgContract, pgUser := postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+		return multi.NewTokenRepository(pgToken, mongoToken), multi.NewContractRepository(pgContract, mongoContract), pgUser
+	default:
+		panic("Unknown database")
+	}
 }
 
 func newMongoClient() *mongo.Client {
