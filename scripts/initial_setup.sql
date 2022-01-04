@@ -66,11 +66,11 @@ CREATE TABLE tokens (
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     DESCRIPTION varchar,
-    CONTRACT_ADDRESS varvarchar(255),
+    CONTRACT_ADDRESS varchar(255),
     COLLECTORS_NOTE varchar,
     MEDIA jsonb,
     CHAIN varchar,
-    OWNER_ADDRESS varvarchar(255),
+    OWNER_ADDRESS varchar(255),
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,
@@ -95,7 +95,7 @@ CREATE TABLE contracts (
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     SYMBOL varchar,
-    ADDRESS varvarchar(255),
+    ADDRESS varchar(255),
     LATEST_BLOCK bigint
 );
 
@@ -107,7 +107,7 @@ CREATE TABLE login_attempts (
     VERSION int,
     CREATED_AT timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ADDRESS varvarchar(255),
+    ADDRESS varchar(255),
     REQUEST_HOST_ADDRESS varchar(255),
     USER_EXISTS boolean,
     SIGNATURE varchar(255),

@@ -98,6 +98,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("INSTANCE_CONNECTION_NAME", "")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
