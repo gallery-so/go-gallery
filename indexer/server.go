@@ -114,17 +114,8 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 					med := token.Media
 					ctx, cancel := context.WithTimeout(c, 10*time.Second)
 					defer cancel()
-					if uri == persist.InvalidTokenURI {
-						errChan <- nil
-						return
-					}
 
-					if _, ok := metadata["error"]; ok {
-						errChan <- nil
-						return
-					}
-
-					if med.MediaType == persist.MediaTypeInvalid {
+					if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || med.MediaType == persist.MediaTypeInvalid {
 						errChan <- nil
 						return
 					}
@@ -207,7 +198,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, userRepository p
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		currentNFTs, err := tokenRepository.GetByUserID(c, input.UserID, -1, -1)
+		currentNFTs, err := tokenRepository.GetByUserID(c, input.UserID, -1, 0)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
