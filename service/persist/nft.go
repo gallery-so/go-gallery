@@ -67,9 +67,10 @@ type CollectionNFT struct {
 	CreatorName         NullString            `bson:"creator_name" json:"creator_name"`
 
 	// IMAGES - OPENSEA
-	ImageURL          NullString `bson:"image_url"           json:"image_url"`
-	ImageThumbnailURL NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
-	ImagePreviewURL   NullString `bson:"image_preview_url"   json:"image_preview_url"`
+	ImageURL             NullString `bson:"image_url"           json:"image_url"`
+	ImageThumbnailURL    NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
+	ImagePreviewURL      NullString `bson:"image_preview_url"   json:"image_preview_url"`
+	AnimationOriginalURL NullString `bson:"animation_original_url" json:"animation_original_url"`
 }
 
 // NFTContract represents a smart contract's information for a given NFT

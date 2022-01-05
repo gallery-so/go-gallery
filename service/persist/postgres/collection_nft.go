@@ -42,7 +42,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	getByUserIDAuthStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
 	LEFT JOIN nfts n ON n.ID = nft
 	WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
@@ -51,7 +51,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM collections c,unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 	LEFT JOIN nfts n ON n.ID = nft 
 	WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
@@ -60,7 +60,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	getByIDAuthStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
 	LEFT JOIN nfts n ON n.ID = nft
 	WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
@@ -69,7 +69,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
 	LEFT JOIN nfts n ON n.ID = nft
 	WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
@@ -139,7 +139,7 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 	for res.Next() {
 		var collection persist.Collection
 		var nft persist.CollectionNFT
-		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.CreationTime)
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	for ; res.Next(); i++ {
 		colID := collection.ID
 		var nft persist.CollectionNFT
-		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.CreationTime)
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
 		if err != nil {
 			return persist.Collection{}, err
 		}
