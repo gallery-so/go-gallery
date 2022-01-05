@@ -23,16 +23,30 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 			return
 		}
 		if len(allTiers) > 0 {
-			updatedRecently := true
+			if len(allTiers) != len(membership.MembershipTierIDs) {
+				tiers := make(map[persist.TokenID]bool)
+				for _, tier := range allTiers {
+					tiers[tier.TokenID] = true
+				}
+				for _, tierID := range membership.MembershipTierIDs {
+					if _, ok := tiers[tierID]; !ok {
+						newTier, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, nftRepository, ethClient)
+						if err != nil {
+							util.ErrResponse(c, http.StatusInternalServerError, err)
+							return
+						}
+						allTiers = append(allTiers, newTier)
+					}
+				}
+
+			}
+
 			for _, tier := range allTiers {
 				if time.Since(tier.LastUpdated.Time()) > time.Hour {
-					updatedRecently = false
-					break
+					go membership.UpdateMembershipTier(tier.TokenID, membershipRepository, userRepository, nftRepository, ethClient)
 				}
 			}
-			if !updatedRecently {
-				go membership.UpdateMembershipTiers(membershipRepository, userRepository, nftRepository, ethClient)
-			}
+
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
@@ -54,16 +68,30 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 			return
 		}
 		if len(allTiers) > 0 {
-			updatedRecently := true
-			for _, tier := range allTiers {
-				if time.Since(tier.LastUpdated.Time()) > time.Hour {
-					updatedRecently = false
-					break
+			if len(allTiers) != len(membership.MembershipTierIDs) {
+				tiers := make(map[persist.TokenID]bool)
+
+				for _, tier := range allTiers {
+					tiers[tier.TokenID] = true
+				}
+				for _, tierID := range membership.MembershipTierIDs {
+					if _, ok := tiers[tierID]; !ok {
+						newTier, err := membership.UpdateMembershipTierToken(tierID, membershipRepository, userRepository, nftRepository, ethClient)
+						if err != nil {
+							util.ErrResponse(c, http.StatusInternalServerError, err)
+							return
+						}
+						allTiers = append(allTiers, newTier)
+					}
 				}
 			}
-			if !updatedRecently {
-				go membership.UpdateMembershipTiersToken(membershipRepository, userRepository, nftRepository, ethClient)
+
+			for _, tier := range allTiers {
+				if time.Since(tier.LastUpdated.Time()) > time.Hour {
+					go membership.UpdateMembershipTierToken(tier.TokenID, membershipRepository, userRepository, nftRepository, ethClient)
+				}
 			}
+
 			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
 			return
 		}
