@@ -93,7 +93,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 
 	}
 }
-func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client, psub pubsub.PubSub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -109,7 +109,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			return
 		}
 
-		output, err := user.AddAddressToUser(c, userID, input, userRepository, nonceRepository, ethClient)
+		output, err := user.AddAddressToUser(c, userID, input, userRepository, nonceRepository, ethClient, psub)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

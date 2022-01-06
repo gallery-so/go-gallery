@@ -36,10 +36,19 @@ func coreInit() *gin.Engine {
 
 	go trackFeatures(context.Background(), userRepo, featuresRepo, accessRepo, ec)
 	if viper.GetString("ENV") != "local" {
+		psub := newGCPPubSub()
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			err := listenForSignups(ctx, newGCPPubSub(), userRepo, featuresRepo, accessRepo, ec)
+			err := listenForSignups(ctx, psub, userRepo, featuresRepo, accessRepo, ec)
+			if err != nil {
+				panic(err)
+			}
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := listenForAddressAdd(ctx, psub, userRepo, featuresRepo, accessRepo, ec)
 			if err != nil {
 				panic(err)
 			}
@@ -57,6 +66,7 @@ func setDefaults() {
 	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("SIGNUP_TOPIC", "user-signup")
+	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.AutomaticEnv()
 }
 
@@ -119,6 +129,13 @@ func newGCPPubSub() pubsub.PubSub {
 		panic(err)
 	}
 
-	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	err = client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	if err != nil {
+		panic(err)
+	}
+	err = client.CreateTopic(ctx, viper.GetString("ADDRESS_ADD_TOPIC"))
+	if err != nil {
+		panic(err)
+	}
 	return client
 }

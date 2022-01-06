@@ -110,9 +110,11 @@ func setDefaults() {
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
+	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("DATABASE", "mongodb")
+	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 
 	viper.AutomaticEnv()
 
@@ -214,7 +216,14 @@ func newGCPPubSub() pubsub.PubSub {
 	if err != nil {
 		panic(err)
 	}
-	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	err = client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	if err != nil {
+		panic(err)
+	}
+	err = client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
+	if err != nil {
+		panic(err)
+	}
 	return client
 }
 

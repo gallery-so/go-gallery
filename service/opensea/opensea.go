@@ -109,7 +109,7 @@ func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWall
 		pOwnerWalletAddresses = user.Addresses
 	}
 
-	asDBNfts, err := openseaFetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
+	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch assets for user %s: %w", pUserID, err)
 	}
@@ -137,7 +137,7 @@ func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWall
 	return result, nil
 }
 
-func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NFT, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) ([]*persist.NFT, error) {
+func syncHistories(pCtx context.Context, pNfts []*persist.NFT, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) ([]*persist.NFT, error) {
 	resultChan := make(chan *persist.NFT)
 	errorChan := make(chan error)
 	updatedNfts := make([]*persist.NFT, len(pNfts))
@@ -146,7 +146,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NFT, userRepo p
 	for _, nft := range pNfts {
 		go func(n *persist.NFT) {
 			if !n.MultipleOwners {
-				history, err := openseaSyncHistory(pCtx, n.OpenseaTokenID, n.Contract.ContractAddress, n.OwnerAddress, userRepo, nftRepo, historyRepo)
+				history, err := syncHistory(pCtx, n.OpenseaTokenID, n.Contract.ContractAddress, n.OwnerAddress, userRepo, nftRepo, historyRepo)
 				if err != nil {
 					errorChan <- err
 					return
@@ -172,7 +172,7 @@ func openseaSyncHistories(pCtx context.Context, pNfts []*persist.NFT, userRepo p
 	return updatedNfts, nil
 }
 
-func openseaSyncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenContractAddress, pWalletAddress persist.Address, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) (persist.OwnershipHistory, error) {
+func syncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenContractAddress, pWalletAddress persist.Address, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) (persist.OwnershipHistory, error) {
 	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
 	events := persist.OwnershipHistory{}
 	resp, err := http.Get(getURL)
@@ -210,20 +210,20 @@ func openseaSyncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenCo
 	return events, nil
 }
 
-func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
+func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
 	result := []persist.NFT{}
 	nftsChan := make(chan []persist.NFT)
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
 		go func(wa persist.Address) {
-			assets, err := openseaFetchAssetsForWallet(wa, 0, 0)
+			assets, err := FetchAssetsForWallet(wa, 0, 0)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 				return
 			}
 			if len(assets) == 0 {
 				time.Sleep(time.Second)
-				assets, err = openseaFetchAssetsForWallet(wa, 0, 0)
+				assets, err = FetchAssetsForWallet(wa, 0, 0)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 					return
@@ -254,8 +254,8 @@ func openseaFetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persi
 	return result, nil
 }
 
-// recursively fetches all assets for a wallet
-func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([]Asset, error) {
+// FetchAssetsForWallet recursively fetches all assets for a wallet
+func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([]Asset, error) {
 
 	result := []Asset{}
 	qsArgsMap := map[string]interface{}{
@@ -286,7 +286,7 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry 
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 2)
-				return openseaFetchAssetsForWallet(pWalletAddress, pOffset, retry+1)
+				return FetchAssetsForWallet(pWalletAddress, pOffset, retry+1)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")
 		}
@@ -299,7 +299,7 @@ func openseaFetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry 
 	}
 	result = append(result, response.Assets...)
 	if len(response.Assets) == 50 {
-		next, err := openseaFetchAssetsForWallet(pWalletAddress, pOffset+50, 0)
+		next, err := FetchAssetsForWallet(pWalletAddress, pOffset+50, 0)
 		if err != nil {
 			return nil, err
 		}
