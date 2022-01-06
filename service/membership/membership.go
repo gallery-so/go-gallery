@@ -161,13 +161,13 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.FromAccount.Address)
 				if hasNFT {
 					membershipOwner := persist.MembershipOwner{Address: event.FromAccount.Address}
-					if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
-						membershipOwner.Username = glryUser.UserName
+					if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.Username != "" {
+						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 
 						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
 						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]string, 0, 3)
+							nftURLs := make([]persist.NullString, 0, 3)
 							for i, nft := range nfts {
 								if i == 3 {
 									break
@@ -192,8 +192,8 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 				if hasNFT {
 					membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
-					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
-						membershipOwner.Username = glryUser.UserName
+					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
+						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 
 						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
@@ -241,8 +241,8 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 		return tier
 	}
 	initialToken := tokens[0]
-  
-  tier.Name = persist.NullString(initialToken.Name)
+
+	tier.Name = persist.NullString(initialToken.Name)
 	tier.AssetURL = persist.NullString(initialToken.Media.MediaURL)
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
@@ -253,8 +253,8 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 	for _, e := range tokens {
 		go func(token persist.Token) {
 			membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
-			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
-				membershipOwner.Username = glryUser.UserName
+			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
+				membershipOwner.Username = glryUser.Username
 				membershipOwner.UserID = glryUser.ID
 
 				nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID, -1, 0)
