@@ -443,8 +443,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 		for _, transfer := range transferAtBlock.transfers {
 			initial := time.Now()
 			func() {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				defer cancel()
 
 				wg := &sync.WaitGroup{}
 				contractAddress := transfer.ContractAddress
@@ -475,6 +473,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 					go func() {
 						defer wg.Done()
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+						defer cancel()
 						ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), i.ethClient)
 						if err != nil {
 							logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
@@ -503,6 +503,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					panic("unknown token type")
 				}
 
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				u, err := rpc.GetTokenURI(ctx, transfer.TokenType, contractAddress, tokenID, i.ethClient)
 				if err != nil {
 					logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
@@ -510,6 +511,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						u = persist.InvalidTokenURI
 					}
 				}
+				cancel()
 
 				id, err := util.HexToBigInt(string(tokenID))
 				if err != nil {
@@ -533,8 +535,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							atomic.AddUint64(&i.badURIs, 1)
 						}
 					} else {
-
-						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
 						if err != nil {
 							switch err.(type) {
 							case rpc.ErrHTTP:
@@ -547,6 +549,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 							atomic.AddUint64(&i.badURIs, 1)
 						}
+						cancel()
 					}
 
 					go func() {

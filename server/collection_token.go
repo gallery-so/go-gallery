@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -90,11 +89,6 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 			colls = []persist.CollectionToken{}
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-		for _, coll := range colls {
-			coll.NFTs = ensureCollectionTokenMedia(aeCtx, coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)
-		}
-
 		c.JSON(http.StatusOK, collectionGetOutputtoken{Collections: colls})
 
 	}
@@ -121,8 +115,6 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			util.ErrResponse(c, status, err)
 			return
 		}
-
-		coll.NFTs = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
 		return

@@ -111,7 +111,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch asURI.Type() {
 	case persist.URITypeBase64SVG:
 		res.MediaType = persist.MediaTypeSVG
-		data, err := rpc.GetDataFromURI(asURI, ipfsClient)
+		data, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient)
 		if err != nil {
 			return persist.Media{}, fmt.Errorf("error getting data from base64 svg uri %s: %s", asURI, err)
 		}
@@ -255,7 +255,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	bs, err := rpc.GetDataFromURI(asURI, ipfsClient)
+	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient)
 	if err != nil {
 		return mediaType, err
 	}

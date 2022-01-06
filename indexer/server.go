@@ -123,7 +123,7 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 					}
 
 					if metadata == nil || len(metadata) == 0 {
-						md, err := rpc.GetMetadataFromURI(token.TokenURI, ipfsClient)
+						md, err := rpc.GetMetadataFromURI(c, token.TokenURI, ipfsClient)
 						if err != nil {
 							errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
 							return

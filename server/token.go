@@ -5,20 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/appengine"
 )
 
 type getTokensInput struct {
@@ -28,7 +23,6 @@ type getTokensInput struct {
 	TokenID         persist.TokenID `form:"token_id"`
 	Page            int64           `form:"page"`
 	Limit           int64           `form:"limit"`
-	SkipMedia       bool            `form:"skip_media"`
 }
 
 type getTokensByUserIDInput struct {
@@ -91,12 +85,8 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-
 		if token.ID != "" {
-			if !input.SkipMedia {
-				token = ensureTokenMedia(aeCtx, []persist.Token{token}, nftRepository, ipfsClient, ethClient, storageClient)[0]
-			}
+
 			c.JSON(http.StatusOK, getTokenOutput{Nft: token})
 			return
 		}
@@ -110,9 +100,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 		if tokens != nil {
-			if !input.SkipMedia {
-				tokens = ensureTokenMedia(aeCtx, tokens, nftRepository, ipfsClient, ethClient, storageClient)
-			}
+
 			c.JSON(http.StatusOK, getTokensOutput{Nfts: tokens})
 			return
 		}
@@ -164,9 +152,7 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			nfts = []persist.Token{}
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-
-		c.JSON(http.StatusOK, getTokensOutput{Nfts: ensureTokenMedia(aeCtx, nfts, nftRepository, ipfsClient, ethClient, storageClient)})
+		c.JSON(http.StatusOK, getTokensOutput{Nfts: nfts})
 	}
 }
 
@@ -183,9 +169,7 @@ func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepo
 			coll.NFTs = []persist.TokenInCollection{}
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-
-		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: ensureCollectionTokenMedia(aeCtx, coll.NFTs, tokenRepository, ipfsClient, ethClient, storageClient)})
+		c.JSON(http.StatusOK, getUnassignedTokensOutput{Nfts: coll.NFTs})
 	}
 }
 
@@ -217,101 +201,6 @@ func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddress
 		}
 	}
 	return true, nil
-}
-
-type tokenIndexTuple struct {
-	token persist.Token
-	i     int
-}
-
-func ensureTokenMedia(aeCtx context.Context, nfts []persist.Token, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) []persist.Token {
-	nftChan := make(chan tokenIndexTuple)
-	for i, nft := range nfts {
-		go func(index int, n persist.Token) {
-			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient, storageClient)
-			n.Media = newMedia
-			n.TokenMetadata = newMetadata
-			n.TokenURI = newURI
-			nftChan <- tokenIndexTuple{n, index}
-			go func(id persist.DBID) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-				err := tokenRepo.UpdateByIDUnsafe(ctx, id, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata, TokenURI: newURI})
-				if err != nil {
-					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
-				}
-			}(n.ID)
-		}(i, nft)
-	}
-	for i := 0; i < len(nfts); i++ {
-		nft := <-nftChan
-		nfts[nft.i] = nft.token
-	}
-	return nfts
-}
-
-type tokenCollectionIndexTuple struct {
-	token persist.TokenInCollection
-	i     int
-}
-
-func ensureCollectionTokenMedia(aeCtx context.Context, nfts []persist.TokenInCollection, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) []persist.TokenInCollection {
-
-	nftChan := make(chan tokenCollectionIndexTuple)
-	for i, nft := range nfts {
-		go func(index int, n persist.TokenInCollection) {
-			newMedia, newMetadata, newURI := ensureMetadataRelatedFields(aeCtx, n.ID, n.TokenType, n.Media, n.TokenMetadata, n.TokenURI, n.TokenID, n.ContractAddress, tokenRepo, ipfsClient, ethClient, storageClient)
-			n.Media = newMedia
-			n.TokenMetadata = newMetadata
-			n.TokenURI = newURI
-			nftChan <- tokenCollectionIndexTuple{n, index}
-			go func(id persist.DBID) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-				defer cancel()
-				err := tokenRepo.UpdateByIDUnsafe(ctx, id, persist.TokenUpdateMediaInput{Media: newMedia, Metadata: newMetadata, TokenURI: newURI})
-				if err != nil {
-					logrus.WithError(err).Error(errCouldNotUpdateMedia{id}.Error())
-				}
-			}(n.ID)
-		}(i, nft)
-	}
-	for i := 0; i < len(nfts); i++ {
-		nft := <-nftChan
-		nfts[nft.i] = nft.token
-	}
-	return nfts
-}
-
-func ensureMetadataRelatedFields(ctx context.Context, id persist.DBID, tokenType persist.TokenType, med persist.Media, metadata persist.TokenMetadata, tokenURI persist.TokenURI, tokenID persist.TokenID, contractAddress persist.Address, tokenRepo persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, storageClient *storage.Client) (persist.Media, persist.TokenMetadata, persist.TokenURI) {
-	if tokenURI == "" {
-		logrus.Infof("Token URI is empty for token %s-%s", contractAddress, id)
-		uri, err := rpc.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not get token URI for token")
-			return med, metadata, tokenURI
-		}
-		tokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", tokenID.BigInt().Text(16)))
-
-	}
-	if metadata == nil || len(metadata) == 0 {
-		logrus.Infof("Token metadata is empty for token %s-%s", contractAddress, id)
-		m, err := rpc.GetMetadataFromURI(tokenURI, ipfsClient)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"uri": tokenURI}).Error("could not get metadata for token")
-			return med, metadata, tokenURI
-		}
-		metadata = m
-	}
-	if med.MediaType == "" || med.MediaURL == "" {
-		logrus.Infof("Token media type is empty for token %s-%s", contractAddress, id)
-		newMedia, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, ipfsClient, storageClient)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"contract": contractAddress, "tokenID": tokenID}).Error("could not make previews for token")
-			return med, metadata, tokenURI
-		}
-		med = newMedia
-	}
-	return med, metadata, tokenURI
 }
 
 func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {
