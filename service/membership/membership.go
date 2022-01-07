@@ -24,7 +24,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
-		events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), persist.TokenID(v), 0)
+		events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), persist.TokenID(v), 0, 0)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", v, err)
 		}
@@ -47,7 +47,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0)
+	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0, 0)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
 	}
@@ -80,7 +80,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0)
+	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0, 0)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
 	}
@@ -92,7 +92,7 @@ func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository pe
 }
 
 // OpenseaFetchMembershipCards recursively fetches all membership cards for a token ID
-func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persist.TokenID, pOffset int) ([]opensea.Event, error) {
+func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persist.TokenID, pOffset int, pRetry int) ([]opensea.Event, error) {
 
 	client := &http.Client{
 		Timeout: time.Minute,
@@ -115,9 +115,13 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 {
+			if pRetry > 3 {
+				return nil, fmt.Errorf("timed out fetching membership cards %d at url: %s", tokenID.Base10Int(), urlStr)
+			}
+
 			logrus.Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
 			time.Sleep(time.Second * 5)
-			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset)
+			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset, pRetry+1)
 		}
 		return nil, fmt.Errorf("unexpected status code: %d - url: %s", resp.StatusCode, urlStr)
 	}
@@ -133,7 +137,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	}
 	result = append(result, response.Events...)
 	if len(response.Events) == 50 {
-		next, err := OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset+50)
+		next, err := OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset+50, pRetry)
 		if err != nil {
 			return nil, err
 		}
