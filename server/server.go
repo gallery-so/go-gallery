@@ -216,14 +216,8 @@ func newGCPPubSub() pubsub.PubSub {
 	if err != nil {
 		panic(err)
 	}
-	err = client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
-	if err != nil {
-		panic(err)
-	}
-	err = client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
-	if err != nil {
-		panic(err)
-	}
+	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
+	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
 	return client
 }
 

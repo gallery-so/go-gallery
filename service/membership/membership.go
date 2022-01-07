@@ -140,7 +140,8 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 
 func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *eth.Client, userRepository persist.UserRepository, nftRepository persist.NFTRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
-		TokenID: id,
+		TokenID:     id,
+		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
@@ -149,49 +150,18 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	tier.AssetURL = persist.NullString(asset.ImageURL)
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
-	tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
+	tier.Owners = make([]persist.MembershipOwner, 0, len(events))
 
-	ownersChan := make(chan []persist.MembershipOwner)
+	ownersChan := make(chan persist.MembershipOwner)
 	for _, e := range events {
 		logrus.Warnf("%s -> %s", e.FromAccount.Address, e.ToAccount.Address)
 		go func(event opensea.Event) {
-			owners := make([]persist.MembershipOwner, 0, 2)
-			// does from have the NFT?
-			if event.FromAccount.Address != "0x0000000000000000000000000000000000000000" {
-				hasNFT, _ := ethClient.HasNFT(ctx, id, event.FromAccount.Address)
-				if hasNFT {
-					membershipOwner := persist.MembershipOwner{Address: event.FromAccount.Address}
-					if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.Username != "" {
-						membershipOwner.Username = glryUser.Username
-						membershipOwner.UserID = glryUser.ID
+			membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 
-						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
-						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]persist.NullString, 0, 3)
-							for i, nft := range nfts {
-								if i == 3 {
-									break
-								}
-								if nft.ImagePreviewURL != "" {
-									nftURLs = append(nftURLs, nft.ImagePreviewURL)
-								} else if nft.ImageURL != "" {
-									nftURLs = append(nftURLs, nft.ImageURL)
-								} else {
-									i--
-									continue
-								}
-							}
-							membershipOwner.PreviewNFTs = nftURLs
-						}
-					}
-					owners = append(owners, membershipOwner)
-				}
-			}
 			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
 				// does to have the NFT?
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 				if hasNFT {
-					membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
 						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
@@ -205,8 +175,6 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 								}
 								if nft.ImagePreviewURL != "" {
 									nftURLs = append(nftURLs, nft.ImagePreviewURL)
-								} else if nft.ImageURL != "" {
-									nftURLs = append(nftURLs, nft.ImageURL)
 								} else {
 									i--
 									continue
@@ -215,15 +183,21 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 							membershipOwner.PreviewNFTs = nftURLs
 						}
 					}
-					owners = append(owners, membershipOwner)
+
 				}
 			}
-			logrus.Infof("Fetched membership owners %+v for token %s ", owners, id)
-			ownersChan <- owners
+			logrus.Infof("Fetched membership owner %+v for token %s ", membershipOwner, id)
+			ownersChan <- membershipOwner
 		}(e)
 	}
+	receivedOwners := map[persist.Address]bool{}
 	for i := 0; i < len(events); i++ {
-		tier.Owners = append(tier.Owners, <-ownersChan...)
+		owner := <-ownersChan
+		if receivedOwners[owner.Address] {
+			continue
+		}
+		tier.Owners = append(tier.Owners, owner)
+		receivedOwners[owner.Address] = true
 	}
 	go membershipRepository.UpsertByTokenID(ctx, id, tier)
 	return tier
@@ -231,7 +205,8 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 
 func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.Client, userRepository persist.UserRepository, nftRepository persist.TokenRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
-		TokenID: id,
+		TokenID:     id,
+		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
