@@ -114,6 +114,11 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	}
 
 	if resp.StatusCode != 200 {
+		if resp.StatusCode == 429 {
+			logrus.Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
+			time.Sleep(time.Second * 5)
+			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset)
+		}
 		return nil, fmt.Errorf("unexpected status code: %d - url: %s", resp.StatusCode, urlStr)
 	}
 
