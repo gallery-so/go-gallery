@@ -523,17 +523,15 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					uris <- tokenURI{key, uriReplaced}
 				}()
 
-				if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
-
-					var metadata persist.TokenMetadata
-					if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-						metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
-						if err != nil {
-							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-							atomic.AddUint64(&i.badURIs, 1)
-						}
-					} else {
-
+				var metadata persist.TokenMetadata
+				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+					metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+					if err != nil {
+						logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+						atomic.AddUint64(&i.badURIs, 1)
+					}
+				} else {
+					if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
 						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
 						if err != nil {
 							switch err.(type) {
@@ -548,7 +546,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							atomic.AddUint64(&i.badURIs, 1)
 						}
 					}
-
+				}
+				if len(metadata) > 0 {
 					go func() {
 						defer wg.Done()
 						metadatas <- tokenMetadata{key, metadata}
@@ -556,6 +555,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				} else {
 					wg.Done()
 				}
+
 				wg.Wait()
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
