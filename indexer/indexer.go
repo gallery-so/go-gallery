@@ -524,19 +524,16 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					defer wg.Done()
 					uris <- tokenURI{key, uriReplaced}
 				}()
-
-				if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
-
-					var metadata persist.TokenMetadata
-					if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-						metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
-						if err != nil {
-							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
-							atomic.AddUint64(&i.badURIs, 1)
-						}
-					} else {
-						ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
+				var metadata persist.TokenMetadata
+				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
+					metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+					if err != nil {
+						logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
+						atomic.AddUint64(&i.badURIs, 1)
+					}
+				} else {
+					if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
+						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
 						if err != nil {
 							switch err.(type) {
 							case rpc.ErrHTTP:
@@ -551,7 +548,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						}
 						cancel()
 					}
-
+				}
+				if len(metadata) > 0 {
 					go func() {
 						defer wg.Done()
 						metadatas <- tokenMetadata{key, metadata}
@@ -559,6 +557,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				} else {
 					wg.Done()
 				}
+
 				wg.Wait()
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
@@ -885,6 +884,7 @@ func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
 		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782"): autoglyphs,
 		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E"): colorglyphs,
+		persist.Address("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"): ens,
 	}
 }
 
