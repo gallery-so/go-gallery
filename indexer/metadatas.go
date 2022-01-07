@@ -333,7 +333,7 @@ func ens(i *Indexer, turi persist.TokenURI, addr persist.Address, tid persist.To
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
 
-	canvas.Text(width/2, height/2, domain.LabelName+".eth", `font-size="15vw"`, `text-anchor="middle"`, `alignment-baseline="middle"`)
+	canvas.Text(width/2, height/2, domain.LabelName+".eth", `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`)
 
 	canvas.End()
 
