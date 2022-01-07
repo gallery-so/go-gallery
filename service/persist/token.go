@@ -2,12 +2,15 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -95,6 +98,12 @@ const (
 // InvalidTokenURI represents an invalid token URI
 const InvalidTokenURI TokenURI = "INVALID"
 
+// Address represents an Ethereum address
+type Address string
+
+// BlockNumber represents an Ethereum block number
+type BlockNumber uint64
+
 // TokenType represents the contract specification of the token
 type TokenType string
 
@@ -130,21 +139,21 @@ type AddressAtBlock struct {
 
 // Token represents an individual Token token
 type Token struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note,omitempty" json:"collectors_note"`
-	Media          Media  `bson:"media,omitempty" json:"media"`
+	CollectorsNote NullString `bson:"collectors_note,omitempty" json:"collectors_note"`
+	Media          Media      `bson:"media,omitempty" json:"media"`
 
 	TokenType TokenType `bson:"token_type,omitempty" json:"token_type"`
 
 	Chain Chain `bson:"chain,omitempty" json:"chain"`
 
-	Name        string `bson:"name,omitempty" json:"name"`
-	Description string `bson:"description,omitempty" json:"description"`
+	Name        NullString `bson:"name,omitempty" json:"name"`
+	Description NullString `bson:"description,omitempty" json:"description"`
 
 	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
 	TokenID          TokenID          `bson:"token_id" json:"token_id"`
@@ -154,17 +163,17 @@ type Token struct {
 	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
 	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
 
-	ExternalURL string `bson:"external_url,omitempty" json:"external_url"`
+	ExternalURL NullString `bson:"external_url,omitempty" json:"external_url"`
 
 	BlockNumber BlockNumber `bson:"block_number,omitempty" json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL string    `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
-	PreviewURL   string    `bson:"preview_url,omitempty" json:"preview_url"`
-	MediaURL     string    `bson:"media_url,omitempty" json:"media_url"`
-	MediaType    MediaType `bson:"media_type,omitempty" json:"media_type"`
+	ThumbnailURL NullString `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
+	PreviewURL   NullString `bson:"preview_url,omitempty" json:"preview_url"`
+	MediaURL     NullString `bson:"media_url,omitempty" json:"media_url"`
+	MediaType    MediaType  `bson:"media_type,omitempty" json:"media_type"`
 }
 
 // TokenInCollection represents a token within a collection
@@ -176,8 +185,8 @@ type TokenInCollection struct {
 
 	Chain Chain `bson:"chain" json:"chain"`
 
-	Name        string `bson:"name" json:"name"`
-	Description string `bson:"description" json:"description"`
+	Name        NullString `bson:"name" json:"name"`
+	Description NullString `bson:"description" json:"description"`
 
 	TokenType TokenType `bson:"token_type" json:"token_type"`
 
@@ -193,7 +202,7 @@ type TokenInCollection struct {
 type TokenUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	CollectorsNote string `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
@@ -225,7 +234,8 @@ type TokenRepository interface {
 
 // ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
 type ErrTokenNotFoundByIdentifiers struct {
-	TokenID, ContractAddress string
+	TokenID         TokenID
+	ContractAddress Address
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -274,6 +284,21 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }
 
+// Value implements the driver.Valuer interface for the Chain type
+func (c Chain) Value() (driver.Value, error) {
+	return string(c), nil
+}
+
+// Scan implements the sql.Scanner interface for the Chain type
+func (c *Chain) Scan(src interface{}) error {
+	if src == nil {
+		*c = Chain("")
+		return nil
+	}
+	*c = Chain(src.(string))
+	return nil
+}
+
 // URL turns a token's URI into a URL
 func (uri TokenURI) URL() (*url.URL, error) {
 	return url.Parse(uri.String())
@@ -281,6 +306,21 @@ func (uri TokenURI) URL() (*url.URL, error) {
 
 func (uri TokenURI) String() string {
 	return string(uri)
+}
+
+// Value implements the driver.Valuer interface for token URIs
+func (uri TokenURI) Value() (driver.Value, error) {
+	return uri.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for token URIs
+func (uri *TokenURI) Scan(src interface{}) error {
+	if src == nil {
+		*uri = TokenURI("")
+		return nil
+	}
+	*uri = TokenURI(src.(string))
+	return nil
 }
 
 // Type returns the type of the token URI
@@ -316,6 +356,21 @@ func (id TokenID) String() string {
 	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
 
+// Value implements the driver.Valuer interface for token IDs
+func (id TokenID) Value() (driver.Value, error) {
+	return id.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for token IDs
+func (id *TokenID) Scan(src interface{}) error {
+	if src == nil {
+		*id = TokenID("")
+		return nil
+	}
+	*id = TokenID(src.(string))
+	return nil
+}
+
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
 	i, ok := new(big.Int).SetString(id.String(), 16)
@@ -342,6 +397,21 @@ func (hex HexString) String() string {
 	return strings.TrimPrefix(strings.ToLower(string(hex)), "0x")
 }
 
+// Value implements the driver.Valuer interface for hex strings
+func (hex HexString) Value() (driver.Value, error) {
+	return hex.String(), nil
+}
+
+// Scan implements the sql.Scanner interface for hex strings
+func (hex *HexString) Scan(src interface{}) error {
+	if src == nil {
+		*hex = HexString("")
+		return nil
+	}
+	*hex = HexString(src.(string))
+	return nil
+}
+
 // BigInt returns the hex string as a big.Int
 func (hex HexString) BigInt() *big.Int {
 	it, ok := big.NewInt(0).SetString(hex.String(), 16)
@@ -349,4 +419,130 @@ func (hex HexString) BigInt() *big.Int {
 		it, _ = big.NewInt(0).SetString(hex.String(), 10)
 	}
 	return it
+}
+
+// Value implements the driver.Valuer interface for media
+func (m Media) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+// Scan implements the sql.Scanner interface for media
+func (m *Media) Scan(src interface{}) error {
+	if src == nil {
+		*m = Media{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), &m)
+}
+
+func (a Address) String() string {
+	return normalizeAddress(strings.ToLower(string(a)))
+}
+
+// Address returns the ethereum address byte array
+func (a Address) Address() common.Address {
+	return common.HexToAddress(a.String())
+}
+
+// Value implements the database/sql/driver Valuer interface for the address type
+func (a Address) Value() (driver.Value, error) {
+	return a.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface
+func (a *Address) Scan(i interface{}) error {
+	if i == nil {
+		*a = Address("")
+		return nil
+	}
+	if it, ok := i.(string); ok {
+		*a = Address(it)
+		return nil
+	}
+	*a = Address(i.([]uint8))
+	return nil
+}
+
+// Uint64 returns the ethereum block number as a uint64
+func (b BlockNumber) Uint64() uint64 {
+	return uint64(b)
+}
+
+// BigInt returns the ethereum block number as a big.Int
+func (b BlockNumber) BigInt() *big.Int {
+	return new(big.Int).SetUint64(b.Uint64())
+}
+
+func (b BlockNumber) String() string {
+	return strings.ToLower(b.BigInt().String())
+}
+
+// Hex returns the ethereum block number as a hex string
+func (b BlockNumber) Hex() string {
+	return strings.ToLower(b.BigInt().Text(16))
+}
+
+// Value implements the database/sql/driver Valuer interface for the block number type
+func (b BlockNumber) Value() (driver.Value, error) {
+	return b.BigInt().Int64(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the block number type
+func (b *BlockNumber) Scan(src interface{}) error {
+	if src == nil {
+		*b = BlockNumber(0)
+		return nil
+	}
+	*b = BlockNumber(src.(int64))
+	return nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenMetadata type
+func (m *TokenMetadata) Scan(src interface{}) error {
+	if src == nil {
+		*m = TokenMetadata{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), m)
+}
+
+// Value implements the database/sql/driver Valuer interface for the TokenMetadata type
+func (m TokenMetadata) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+// Scan implements the database/sql Scanner interface for the AddressAtBlock type
+func (a *AddressAtBlock) Scan(src interface{}) error {
+	if src == nil {
+		*a = AddressAtBlock{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), a)
+}
+
+// Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
+func (a AddressAtBlock) Value() (driver.Value, error) {
+	return json.Marshal(a)
+}
+
+// Value implements the database/sql/driver Valuer interface for the MediaType type
+func (m MediaType) Value() (driver.Value, error) {
+	return string(m), nil
+}
+
+// Scan implements the database/sql Scanner interface for the MediaType type
+func (m *MediaType) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	*m = MediaType(src.(string))
+	return nil
+}
+
+func normalizeAddress(address string) string {
+	withoutPrefix := strings.TrimPrefix(address, "0x")
+	if len(withoutPrefix) < 40 {
+		return ""
+	}
+	return "0x" + withoutPrefix[len(withoutPrefix)-40:]
 }

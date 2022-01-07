@@ -66,7 +66,6 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
 		go func(id persist.TokenID) {
-
 			tierChan <- processEventsToken(ctx, id, ethClient, userRepository, nftRepository, membershipRepository)
 		}(v)
 	}
@@ -146,8 +145,8 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	logrus.Infof("Fetching membership tier: %s", id)
 
 	asset := events[0].Asset
-	tier.Name = asset.Name
-	tier.AssetURL = asset.ImageURL
+	tier.Name = persist.NullString(asset.Name)
+	tier.AssetURL = persist.NullString(asset.ImageURL)
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 	tier.Owners = make([]persist.MembershipOwner, 0, len(events)*2)
@@ -162,13 +161,13 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.FromAccount.Address)
 				if hasNFT {
 					membershipOwner := persist.MembershipOwner{Address: event.FromAccount.Address}
-					if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.UserName != "" {
-						membershipOwner.Username = glryUser.UserName
+					if glryUser, err := userRepository.GetByAddress(ctx, event.FromAccount.Address); err == nil && glryUser.Username != "" {
+						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 
 						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
 						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]string, 0, 3)
+							nftURLs := make([]persist.NullString, 0, 3)
 							for i, nft := range nfts {
 								if i == 3 {
 									break
@@ -193,13 +192,13 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 				if hasNFT {
 					membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
-					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.UserName != "" {
-						membershipOwner.Username = glryUser.UserName
+					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
+						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 
 						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
 						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]string, 0, 3)
+							nftURLs := make([]persist.NullString, 0, 3)
 							for i, nft := range nfts {
 								if i == 3 {
 									break
@@ -243,8 +242,9 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 	}
 	initialToken := tokens[0]
 
-	tier.Name = initialToken.Name
-	tier.AssetURL = initialToken.Media.MediaURL
+	tier.Name = persist.NullString(initialToken.Name)
+	tier.AssetURL = persist.NullString(initialToken.Media.MediaURL)
+
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 
 	tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
@@ -253,13 +253,13 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 	for _, e := range tokens {
 		go func(token persist.Token) {
 			membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
-			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.UserName != "" {
-				membershipOwner.Username = glryUser.UserName
+			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
+				membershipOwner.Username = glryUser.Username
 				membershipOwner.UserID = glryUser.ID
 
 				nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID, -1, 0)
 				if err == nil && len(nfts) > 0 {
-					nftURLs := make([]string, 0, 3)
+					nftURLs := make([]persist.NullString, 0, 3)
 					for i, nft := range nfts {
 						if i == 3 {
 							break

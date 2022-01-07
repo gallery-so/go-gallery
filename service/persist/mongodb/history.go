@@ -10,20 +10,20 @@ import (
 
 var historyColName = "history"
 
-// HistoryMongoRepository is a repository that stores collections in a MongoDB database
-type HistoryMongoRepository struct {
+// HistoryRepository is a repository that stores collections in a MongoDB database
+type HistoryRepository struct {
 	historiesStorage *storage
 }
 
-// NewHistoryMongoRepository creates a new instance of the collection mongo repository
-func NewHistoryMongoRepository(mgoClient *mongo.Client) *HistoryMongoRepository {
-	return &HistoryMongoRepository{
+// NewHistoryRepository creates a new instance of the collection mongo repository
+func NewHistoryRepository(mgoClient *mongo.Client) *HistoryRepository {
+	return &HistoryRepository{
 		historiesStorage: newStorage(mgoClient, 0, galleryDBName, historyColName),
 	}
 }
 
 // Upsert caches a transfer in the memory storage
-func (h *HistoryMongoRepository) Upsert(pCtx context.Context, pNFTID persist.DBID, pHistory persist.OwnershipHistory) error {
+func (h *HistoryRepository) Upsert(pCtx context.Context, pNFTID persist.DBID, pHistory persist.OwnershipHistory) error {
 
 	pHistory.NFTID = pNFTID
 

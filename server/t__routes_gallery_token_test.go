@@ -32,8 +32,6 @@ func TestUpdateGalleryById_ReorderCollections_Success_Token(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	time.Sleep(time.Second * 3)
-
 	// Validate the initial order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
 

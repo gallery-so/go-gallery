@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -90,11 +89,6 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 			colls = []persist.CollectionToken{}
 		}
 
-		aeCtx := appengine.NewContext(c.Request)
-		for _, coll := range colls {
-			coll.Nfts = ensureCollectionTokenMedia(aeCtx, coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
-		}
-
 		c.JSON(http.StatusOK, collectionGetOutputtoken{Collections: colls})
 
 	}
@@ -121,8 +115,6 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			util.ErrResponse(c, status, err)
 			return
 		}
-
-		coll.Nfts = ensureCollectionTokenMedia(appengine.NewContext(c.Request), coll.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
 		return
@@ -172,7 +164,7 @@ func updateCollectionInfoToken(collectionsRepository persist.CollectionTokenRepo
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateInfoInput{Name: validate.SanitizationPolicy.Sanitize(input.Name), CollectorsNote: validate.SanitizationPolicy.Sanitize(input.CollectorsNote)}
+		update := persist.CollectionTokenUpdateInfoInput{Name: persist.NullString(validate.SanitizationPolicy.Sanitize(input.Name)), CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(input.CollectorsNote))}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -198,7 +190,7 @@ func updateCollectionHiddenToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := &persist.CollectionTokenUpdateHiddenInput{Hidden: input.Hidden}
+		update := persist.CollectionTokenUpdateHiddenInput{Hidden: persist.NullBool(input.Hidden)}
 
 		err := collectionsRepository.Update(c, input.ID, userID, update)
 		if err != nil {
@@ -239,7 +231,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		update := persist.CollectionTokenUpdateNftsInput{Nfts: withNoRepeats, Layout: layout}
+		update := persist.CollectionTokenUpdateNftsInput{NFTs: withNoRepeats, Layout: layout}
 
 		err = collectionsRepository.UpdateNFTs(c, input.ID, userID, update)
 		if err != nil {
@@ -284,10 +276,10 @@ func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputT
 	}
 	coll := persist.CollectionTokenDB{
 		OwnerUserID:    pUserID,
-		Nfts:           pInput.Nfts,
-		Name:           validate.SanitizationPolicy.Sanitize(pInput.Name),
+		NFTs:           pInput.Nfts,
+		Name:           persist.NullString(validate.SanitizationPolicy.Sanitize(pInput.Name)),
 		Layout:         layout,
-		CollectorsNote: validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote),
+		CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(pInput.CollectorsNote)),
 	}
 
 	collID, err := collectionsRepo.Create(pCtx, coll)

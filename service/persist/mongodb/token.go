@@ -19,15 +19,15 @@ const (
 
 var errNoTokensFound = errors.New("no tokens found")
 
-// TokenMongoRepository is a repository that stores tokens in a MongoDB database
-type TokenMongoRepository struct {
+// TokenRepository is a repository that stores tokens in a MongoDB database
+type TokenRepository struct {
 	tokensStorage *storage
 	usersStorage  *storage
-	galleryRepo   *GalleryTokenMongoRepository
+	galleryRepo   *GalleryTokenRepository
 }
 
-// NewTokenMongoRepository creates a new instance of the collection mongo repository
-func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenMongoRepository) *TokenMongoRepository {
+// NewTokenRepository creates a new instance of the collection mongo repository
+func NewTokenRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenRepository) *TokenRepository {
 	tokenStorage := newStorage(mgoClient, 0, galleryDBName, tokenColName)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
@@ -74,7 +74,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenM
 	}
 
 	logrus.Infof("created indexes %s and %s and %s and %s", tiName, bnName, waName, allName)
-	return &TokenMongoRepository{
+	return &TokenRepository{
 		tokensStorage: tokenStorage,
 		usersStorage:  newStorage(mgoClient, 0, galleryDBName, usersCollName),
 		galleryRepo:   galleryRepo,
@@ -83,7 +83,7 @@ func NewTokenMongoRepository(mgoClient *mongo.Client, galleryRepo *GalleryTokenM
 
 // CreateBulk is a helper function to create multiple nfts in one call and returns
 // the ids of each nft created
-func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []persist.Token) ([]persist.DBID, error) {
+func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Token) ([]persist.DBID, error) {
 
 	nfts := make([]interface{}, len(pTokens))
 
@@ -100,13 +100,13 @@ func (t *TokenMongoRepository) CreateBulk(pCtx context.Context, pTokens []persis
 }
 
 // Create inserts a token into the database
-func (t *TokenMongoRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
+func (t *TokenRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
 
 	return t.tokensStorage.insert(pCtx, pToken)
 }
 
 // GetByWallet gets tokens for a given wallet address
-func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 
 	if limit > 0 {
@@ -129,7 +129,7 @@ func (t *TokenMongoRepository) GetByWallet(pCtx context.Context, pAddress persis
 }
 
 // GetByUserID gets ERC721 tokens for a given userID
-func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 	if limit > 0 {
 		opts.SetSkip(limit * page)
@@ -162,9 +162,11 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 	for i := 0; i < len(user.Addresses); i++ {
 		select {
 		case t := <-resultChan:
-			if len(t)+len(tokens) > int(limit) {
-				tokens = append(tokens, t[:int(limit)-len(tokens)]...)
-				break
+			if limit > 0 {
+				if len(t)+len(tokens) > int(limit) {
+					tokens = append(tokens, t[:int(limit)-len(tokens)]...)
+					break
+				}
 			}
 			tokens = append(tokens, t...)
 		case err := <-errChan:
@@ -176,7 +178,7 @@ func (t *TokenMongoRepository) GetByUserID(pCtx context.Context, pUserID persist
 }
 
 // GetByContract gets ERC721 tokens for a given contract
-func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByContract(pCtx context.Context, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 	if limit > 0 {
 		opts.SetSkip(limit * page)
@@ -198,7 +200,7 @@ func (t *TokenMongoRepository) GetByContract(pCtx context.Context, pAddress pers
 }
 
 // GetByTokenIdentifiers gets tokens for a given contract address and token ID
-func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pAddress persist.Address, limit, page int64) ([]persist.Token, error) {
 	opts := options.Find()
 
 	if limit > 0 {
@@ -221,7 +223,7 @@ func (t *TokenMongoRepository) GetByTokenIdentifiers(pCtx context.Context, pToke
 }
 
 // GetByID gets tokens for a given DB ID
-func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Token, error) {
+func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Token, error) {
 
 	result := []persist.Token{}
 
@@ -243,7 +245,7 @@ func (t *TokenMongoRepository) GetByID(pCtx context.Context, pID persist.DBID) (
 
 // BulkUpsert will create a bulk operation on the database to upsert many tokens for a given wallet address
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
+func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
 
 	upsertModels := make([]updateModel, 0, len(pTokens))
 	updateModels := make([]updateModel, 0, len(pTokens))
@@ -346,7 +348,7 @@ func (t *TokenMongoRepository) BulkUpsert(pCtx context.Context, pTokens []persis
 
 // Upsert will upsert a token into the database
 // This function's primary purpose is to be used when syncing a user's tokens from an external provider
-func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken persist.Token) error {
+func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) error {
 
 	query := bson.M{"token_id": pToken.TokenID, "contract_address": pToken.ContractAddress}
 	if pToken.TokenType == persist.TokenTypeERC1155 {
@@ -358,7 +360,7 @@ func (t *TokenMongoRepository) Upsert(pCtx context.Context, pToken persist.Token
 }
 
 // UpdateByIDUnsafe will update a given token by its DB ID and owner user ID
-func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
+func (t *TokenRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
 	if err := t.tokensStorage.update(pCtx, bson.M{"_id": pID}, pUpdate); err != nil {
 		return err
@@ -369,7 +371,7 @@ func (t *TokenMongoRepository) UpdateByIDUnsafe(pCtx context.Context, pID persis
 }
 
 // UpdateByID will update a given token by its DB ID and owner user ID
-func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
+func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
 	users := []*persist.User{}
 	err := t.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users, options.Find())
@@ -391,7 +393,7 @@ func (t *TokenMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID
 }
 
 // UpdateByTokenIdentifiersUnsafe will update a given token by its token identifiers without ensuring the token is owned by a given wallet or user
-func (t *TokenMongoRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pUpdate interface{}) error {
+func (t *TokenRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pUpdate interface{}) error {
 	if err := t.tokensStorage.update(pCtx, bson.M{"token_id": pTokenID, "contract_address": pContractAddress}, pUpdate); err != nil {
 		return err
 	}
@@ -400,7 +402,7 @@ func (t *TokenMongoRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Conte
 }
 
 // MostRecentBlock will find the most recent block stored for all tokens
-func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
+func (t *TokenRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNumber, error) {
 
 	opts := options.Find()
 	opts.SetLimit(1)
@@ -421,7 +423,7 @@ func (t *TokenMongoRepository) MostRecentBlock(pCtx context.Context) (persist.Bl
 }
 
 // Count will find the most recent block stored for all tokens
-func (t *TokenMongoRepository) Count(pCtx context.Context, countType persist.TokenCountType) (int64, error) {
+func (t *TokenRepository) Count(pCtx context.Context, countType persist.TokenCountType) (int64, error) {
 
 	filter := bson.M{}
 

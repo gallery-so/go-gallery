@@ -19,7 +19,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -73,9 +72,9 @@ func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
-func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
+func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
 
-	bs, err := GetDataFromURI(turi, ipfsClient)
+	bs, err := GetDataFromURI(ctx, turi, ipfsClient)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -98,12 +97,15 @@ func GetMetadataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) (persist
 }
 
 // GetDataFromURI calls URI and returns the data
-func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
+func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
 
-	timeout := time.Duration(5 * time.Second)
-	client := &http.Client{
-		Timeout: timeout,
+	client := &http.Client{}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(time.Second * 10)
 	}
+	client.Timeout = time.Until(deadline)
+
 	asString := turi.String()
 
 	switch turi.Type() {
@@ -188,8 +190,6 @@ func GetDataFromURI(turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, err
 // GetTokenURI returns metadata URI for a given token address.
 func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
-	newCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
 	contract := common.HexToAddress(string(pContractAddress))
 	switch pTokenType {
 	case persist.TokenTypeERC721:
@@ -202,7 +202,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		logrus.Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
 
 		turi, err := instance.TokenURI(&bind.CallOpts{
-			Context: newCtx,
+			Context: ctx,
 		}, pTokenID.BigInt())
 		if err != nil {
 			return "", err
@@ -216,15 +216,11 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return "", err
 		}
 
-		i, err := util.HexToBigInt(string(pTokenID))
-		if err != nil {
-			return "", err
-		}
-		logrus.Debugf("Token ID: %d\tToken Address: %s", i.Uint64(), contract.Hex())
+		logrus.Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
 
 		turi, err := instance.Uri(&bind.CallOpts{
-			Context: newCtx,
-		}, i)
+			Context: ctx,
+		}, pTokenID.BigInt())
 		if err != nil {
 			return "", err
 		}
@@ -245,16 +241,11 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, p
 		return nil, err
 	}
 
-	i, err := util.HexToBigInt(string(pTokenID))
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	bal, err := instance.BalanceOf(&bind.CallOpts{
 		Context: ctx,
-	}, owner, i)
+	}, owner, pTokenID.BigInt())
 	if err != nil {
 		return nil, err
 	}

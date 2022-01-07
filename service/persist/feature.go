@@ -2,25 +2,26 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"strings"
 )
 
 // FeatureFlag represents a feature flag in the database
 type FeatureFlag struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
 	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
-	RequiredAmount      uint64           `json:"required_amount" bson:"required_amount"`
+	RequiredAmount      NullInt64        `json:"required_amount" bson:"required_amount"`
 	TokenType           TokenType        `json:"token_type" bson:"token_type"`
-	Name                string           `json:"name" bson:"name"`
-	IsEnabled           bool             `json:"is_enabled" bson:"is_enabled"`
-	AdminOnly           bool             `json:"admin_only" bson:"admin_only"`
-	ForceEnabledUserIds []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
+	Name                NullString       `json:"name" bson:"name"`
+	IsEnabled           NullBool         `json:"is_enabled" bson:"is_enabled"`
+	AdminOnly           NullBool         `json:"admin_only" bson:"admin_only"`
+	ForceEnabledUserIDs []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
 }
 
 // TokenIdentifiers represents a unique identifier for a token
@@ -52,7 +53,7 @@ func (t TokenIdentifiers) String() string {
 	if t.Valid() {
 		return string(t)
 	}
-	panic("invalid token identifiers")
+	return ""
 }
 
 // Valid returns true if the token identifiers are valid
@@ -65,6 +66,21 @@ func (t TokenIdentifiers) GetParts() (Address, TokenID) {
 	parts := strings.Split(t.String(), "+")
 
 	return Address(parts[0]), TokenID(parts[1])
+}
+
+// Value implements the driver.Valuer interface
+func (t TokenIdentifiers) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenIdentifiers type
+func (t *TokenIdentifiers) Scan(i interface{}) error {
+	if i == nil {
+		*t = TokenIdentifiers("")
+		return nil
+	}
+	*t = TokenIdentifiers(i.(string))
+	return nil
 }
 
 func (e ErrFeatureNotFoundByTokenIdentifiers) Error() string {

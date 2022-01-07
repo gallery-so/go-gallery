@@ -12,13 +12,13 @@ import (
 
 const accessCollName = "access"
 
-// AccessMongoRepository is a mongoDB repository for storing access states of users
-type AccessMongoRepository struct {
+// AccessRepository is a mongoDB repository for storing access states of users
+type AccessRepository struct {
 	accessStorage *storage
 }
 
-// NewAccessMongoRepository returns a new instance of a feature flag repository
-func NewAccessMongoRepository(mgoClient *mongo.Client) *AccessMongoRepository {
+// NewAccessRepository returns a new instance of a feature flag repository
+func NewAccessRepository(mgoClient *mongo.Client) *AccessRepository {
 	accessStorage := newStorage(mgoClient, 0, galleryDBName, accessCollName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -32,13 +32,13 @@ func NewAccessMongoRepository(mgoClient *mongo.Client) *AccessMongoRepository {
 	if err != nil {
 		panic(err)
 	}
-	return &AccessMongoRepository{
+	return &AccessRepository{
 		accessStorage: accessStorage,
 	}
 }
 
 // GetByUserID returns an feature by a given token identifiers
-func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (persist.Access, error) {
+func (c *AccessRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) (persist.Access, error) {
 
 	opts := options.Find()
 	opts.SetLimit(1)
@@ -58,7 +58,7 @@ func (c *AccessMongoRepository) GetByUserID(pCtx context.Context, pUserID persis
 }
 
 // HasRequiredTokens returns whether a user has the required tokens
-func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID persist.DBID, pTokenIdentifiers []persist.TokenIdentifiers) (bool, error) {
+func (c *AccessRepository) HasRequiredTokens(pCtx context.Context, pUserID persist.DBID, pTokenIdentifiers []persist.TokenIdentifiers) (bool, error) {
 
 	opts := options.Find()
 
@@ -80,7 +80,7 @@ func (c *AccessMongoRepository) HasRequiredTokens(pCtx context.Context, pUserID 
 }
 
 // UpsertRequiredTokensByUserID upserts the required tokens owned by a user
-func (c *AccessMongoRepository) UpsertRequiredTokensByUserID(pCtx context.Context, pUserID persist.DBID, pRequiredTokensOwned map[persist.TokenIdentifiers]uint64, pBlock persist.BlockNumber) error {
+func (c *AccessRepository) UpsertRequiredTokensByUserID(pCtx context.Context, pUserID persist.DBID, pRequiredTokensOwned map[persist.TokenIdentifiers]uint64, pBlock persist.BlockNumber) error {
 
 	if _, err := c.accessStorage.upsert(pCtx, bson.M{"user_id": pUserID}, bson.M{
 		"required_tokens_owned": pRequiredTokensOwned,

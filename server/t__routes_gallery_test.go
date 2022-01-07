@@ -11,6 +11,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,8 +33,6 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	time.Sleep(time.Second * 5)
-
 	// Validate the initial order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
 
@@ -48,7 +47,7 @@ func TestUpdateGalleryById_ReorderCollections_Success(t *testing.T) {
 	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
 	updateTestGallery(assert, update)
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 3)
 
 	// Validate the updated order of the gallery's collections
 	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
@@ -69,6 +68,7 @@ func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []
 	for index, element := range collections {
 		assert.Equal(element, retreivedCollections[index].ID)
 	}
+	logrus.Infof("Collections in gallery: %v", retreivedCollections)
 }
 
 func updateTestGallery(assert *assert.Assertions, update interface{}) {

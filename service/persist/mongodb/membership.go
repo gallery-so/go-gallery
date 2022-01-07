@@ -16,8 +16,8 @@ type MembershipRepository struct {
 	membershipsStorage *storage
 }
 
-// NewMembershipMongoRepository returns a new instance of a membership repository
-func NewMembershipMongoRepository(mgoClient *mongo.Client) *MembershipRepository {
+// NewMembershipRepository returns a new instance of a membership repository
+func NewMembershipRepository(mgoClient *mongo.Client) *MembershipRepository {
 	return &MembershipRepository{
 		membershipsStorage: newStorage(mgoClient, 0, galleryDBName, membershipColName),
 	}

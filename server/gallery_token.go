@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"google.golang.org/appengine"
 
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -56,14 +55,6 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 		if len(galleries) == 0 || err != nil {
 			galleries = []persist.GalleryToken{}
 		}
-		aeCtx := appengine.NewContext(c.Request)
-		for i, gallery := range galleries {
-			for i, collection := range gallery.Collections {
-				collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
-				gallery.Collections[i] = collection
-			}
-			galleries[i] = gallery
-		}
 
 		c.JSON(http.StatusOK, galleryTokenGetOutput{Galleries: galleries})
 
@@ -89,12 +80,6 @@ func getGalleryByIDToken(galleryRepository persist.GalleryTokenRepository, token
 			}
 			util.ErrResponse(c, status, err)
 			return
-		}
-
-		aeCtx := appengine.NewContext(c.Request)
-		for i, collection := range gallery.Collections {
-			collection.Nfts = ensureCollectionTokenMedia(aeCtx, collection.Nfts, tokenRepository, ipfsClient, ethClient, storageClient)
-			gallery.Collections[i] = collection
 		}
 
 		c.JSON(http.StatusOK, galleryTokenGetByIDOutput{Gallery: gallery})

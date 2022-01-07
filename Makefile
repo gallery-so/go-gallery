@@ -21,3 +21,13 @@ abi-gen:
 	abigen --abi=./contracts/abi/IENS.abi --pkg=contracts --type=IENS > ./contracts/IENS.go
 	abigen --abi=./contracts/abi/IERC1155Metadata_URI.abi --pkg=contracts --type=IERC1155Metadata_URI > ./contracts/IERC1155Metadata_URI.go
 	abigen --abi=./contracts/abi/ISignatureValidator.abi --pkg=contracts --type=ISignatureValidator > ./contracts/ISignatureValidator.go
+
+g-docker:
+	docker-compose down
+	docker-compose build
+	docker build -t bcgallery/gallery-postgres -f docker/postgres/DOCKERFILE .
+	docker build -t bcgallery/gallery-postgres:circle -f docker/postgres/circle/DOCKERFILE .
+	docker push bcgallery/gallery-postgres
+	docker push bcgallery/gallery-postgres:circle
+	docker-compose up -d
+

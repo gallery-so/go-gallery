@@ -7,15 +7,15 @@ import (
 
 // Contract represents an ethereum contract in the database
 type Contract struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
+	Deleted      NullBool        `bson:"deleted" json:"-"`
 	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
 
-	Address Address `bson:"address" json:"address"`
-	Symbol  string  `bson:"symbol" json:"symbol"`
-	Name    string  `bson:"name" json:"name"`
+	Address Address    `bson:"address" json:"address"`
+	Symbol  NullString `bson:"symbol" json:"symbol"`
+	Name    NullString `bson:"name" json:"name"`
 
 	LatestBlock BlockNumber `bson:"latest_block" json:"latest_block"`
 }

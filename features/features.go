@@ -87,7 +87,7 @@ func newEthClient() *ethclient.Client {
 
 func newRepos() (persist.UserRepository, persist.FeatureFlagRepository, persist.AccessRepository) {
 	mgoClient := newMongoClient()
-	return mongodb.NewUserMongoRepository(mgoClient), mongodb.NewFeaturesMongoRepository(mgoClient), mongodb.NewAccessMongoRepository(mgoClient)
+	return mongodb.NewUserRepository(mgoClient), mongodb.NewFeaturesRepository(mgoClient), mongodb.NewAccessRepository(mgoClient)
 }
 
 func newMongoClient() *mongo.Client {

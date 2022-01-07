@@ -14,13 +14,13 @@ import (
 
 const usersCollName = "users"
 
-// UserMongoRepository is a repository that stores collections in a MongoDB database
-type UserMongoRepository struct {
+// UserRepository is a repository that stores collections in a MongoDB database
+type UserRepository struct {
 	usersStorage *storage
 }
 
-// NewUserMongoRepository creates a new instance of the collection mongo repository
-func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
+// NewUserRepository creates a new instance of the collection mongo repository
+func NewUserRepository(mgoClient *mongo.Client) *UserRepository {
 	b := true
 	mgoClient.Database(galleryDBName).Collection(usersCollName).Indexes().CreateOne(context.Background(), mongo.IndexModel{
 		Keys: bson.M{"username_idempotent": 1},
@@ -29,14 +29,14 @@ func NewUserMongoRepository(mgoClient *mongo.Client) *UserMongoRepository {
 			Sparse: &b,
 		},
 	})
-	return &UserMongoRepository{
+	return &UserRepository{
 		usersStorage: newStorage(mgoClient, 0, galleryDBName, usersCollName),
 	}
 }
 
 // UpdateByID updates a user by ID
 // pUpdate represents a struct with bson tags to specify which fields to update
-func (u *UserMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
+func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
 
 	err := u.usersStorage.update(pCtx, bson.M{"_id": pID}, pUpdate)
 	if err != nil {
@@ -50,7 +50,7 @@ func (u *UserMongoRepository) UpdateByID(pCtx context.Context, pID persist.DBID,
 }
 
 // ExistsByAddress returns true if a user exists with the given address
-func (u *UserMongoRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address) (bool, error) {
+func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address) (bool, error) {
 
 	countInt, err := u.usersStorage.count(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}})
 
@@ -62,18 +62,18 @@ func (u *UserMongoRepository) ExistsByAddress(pCtx context.Context, pAddress per
 }
 
 // Create inserts a user into the database
-func (u *UserMongoRepository) Create(pCtx context.Context, pUser persist.User) (persist.DBID, error) {
+func (u *UserRepository) Create(pCtx context.Context, pUser persist.User) (persist.DBID, error) {
 	return u.usersStorage.insert(pCtx, pUser)
 }
 
 // Delete marks a user as deleted in the database
-func (u *UserMongoRepository) Delete(pCtx context.Context, pUserID persist.DBID,
+func (u *UserRepository) Delete(pCtx context.Context, pUserID persist.DBID,
 ) error {
 	return u.usersStorage.update(pCtx, bson.M{"_id": pUserID}, bson.M{"$set": bson.M{"deleted": true}})
 }
 
 // GetByID returns a user by a given ID
-func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID) (persist.User, error) {
+func (u *UserRepository) GetByID(pCtx context.Context, userID persist.DBID) (persist.User, error) {
 
 	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"_id": userID}, &result)
@@ -90,7 +90,7 @@ func (u *UserMongoRepository) GetByID(pCtx context.Context, userID persist.DBID)
 }
 
 // GetByAddress returns a user by a given wallet address
-func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
+func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
 
 	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"addresses": bson.M{"$in": []persist.Address{pAddress}}}, &result)
@@ -111,7 +111,7 @@ func (u *UserMongoRepository) GetByAddress(pCtx context.Context, pAddress persis
 }
 
 // GetByUsername returns a user by a given username (case insensitive)
-func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
+func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
 	result := []persist.User{}
 	err := u.usersStorage.find(pCtx, bson.M{"username_idempotent": strings.ToLower(pUsername)}, &result)
@@ -132,11 +132,11 @@ func (u *UserMongoRepository) GetByUsername(pCtx context.Context, pUsername stri
 }
 
 // AddAddresses pushes addresses into a user's address list
-func (u *UserMongoRepository) AddAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
+func (u *UserRepository) AddAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
 	return u.usersStorage.push(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }
 
 // RemoveAddresses removes addresses from a user's address list
-func (u *UserMongoRepository) RemoveAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
+func (u *UserRepository) RemoveAddresses(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address) error {
 	return u.usersStorage.pullAll(pCtx, bson.M{"_id": pUserID}, "addresses", pAddresses)
 }

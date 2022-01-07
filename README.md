@@ -26,9 +26,9 @@ This will generate a binary within `./bin/main`. To run the binary, simply:
 $ ./bin/main
 ```
 
-### Mongo and Redis
+### Mongo and Redis and Postgres
 
-The app will connect to a local mongo instance and local redis instance by default. To spin it up, you can use the official docker containers:
+The app will connect to a local mongo instance, local redis, and local postgres instance by default. To spin it up, you can use the official docker containers:
 
 ```bash
 $ docker-compose up -d

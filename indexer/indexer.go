@@ -443,8 +443,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 		for _, transfer := range transferAtBlock.transfers {
 			initial := time.Now()
 			func() {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				defer cancel()
 
 				wg := &sync.WaitGroup{}
 				contractAddress := transfer.ContractAddress
@@ -475,6 +473,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 					go func() {
 						defer wg.Done()
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+						defer cancel()
 						ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), i.ethClient)
 						if err != nil {
 							logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
@@ -503,6 +503,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					panic("unknown token type")
 				}
 
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				u, err := rpc.GetTokenURI(ctx, transfer.TokenType, contractAddress, tokenID, i.ethClient)
 				if err != nil {
 					logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
@@ -510,6 +511,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						u = persist.InvalidTokenURI
 					}
 				}
+				cancel()
 
 				id, err := util.HexToBigInt(string(tokenID))
 				if err != nil {
@@ -522,7 +524,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					defer wg.Done()
 					uris <- tokenURI{key, uriReplaced}
 				}()
-
 				var metadata persist.TokenMetadata
 				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
 					metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
@@ -532,7 +533,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					}
 				} else {
 					if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
-						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
 						if err != nil {
 							switch err.(type) {
 							case rpc.ErrHTTP:
@@ -545,6 +547,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 							atomic.AddUint64(&i.badURIs, 1)
 						}
+						cancel()
 					}
 				}
 				if len(metadata) > 0 {
@@ -701,8 +704,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
 			Quantity:         persist.HexString("1"),
-			Name:             name,
-			Description:      description,
+			Name:             persist.NullString(name),
+			Description:      persist.NullString(description),
 			OwnershipHistory: previousOwnerAddresses,
 			TokenType:        persist.TokenTypeERC721,
 			TokenMetadata:    metadata.md,
@@ -729,9 +732,9 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 					}
 				}
 			}
-			result[j] = t
-			j++
 		}
+		result[j] = t
+		j++
 	}
 	for k, v := range balances {
 		contractAddress, tokenID, err := parseTokenIdentifiers(k)
@@ -788,8 +791,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
-				Name:            name,
-				Description:     description,
+				Name:            persist.NullString(name),
+				Description:     persist.NullString(description),
 				Chain:           i.chain,
 				BlockNumber:     balance.block,
 				Media:           m,
@@ -848,8 +851,8 @@ func handleContract(ethClient *ethclient.Client, contractAddress persist.Address
 		// TODO figure out what type of error this is
 		logrus.WithError(err).WithField("address", contractAddress).Error("error getting contract metadata")
 	} else {
-		c.Name = cMetadata.Name
-		c.Symbol = cMetadata.Symbol
+		c.Name = persist.NullString(cMetadata.Name)
+		c.Symbol = persist.NullString(cMetadata.Symbol)
 	}
 	return c
 }

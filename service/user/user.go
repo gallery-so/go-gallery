@@ -41,11 +41,11 @@ type GetUserInput struct {
 
 // GetUserOutput is the output of the user get pipeline
 type GetUserOutput struct {
-	UserID      persist.DBID         `json:"id"`
-	UserNameStr string               `json:"username"`
-	BioStr      string               `json:"bio"`
-	Addresses   []persist.Address    `json:"addresses"`
-	CreatedAt   persist.CreationTime `json:"created_at"`
+	UserID    persist.DBID         `json:"id"`
+	Username  string               `json:"username"`
+	BioStr    string               `json:"bio"`
+	Addresses []persist.Address    `json:"addresses"`
+	CreatedAt persist.CreationTime `json:"created_at"`
 }
 
 // AddUserAddressesInput is the input for the user add addresses pipeline and also user creation pipeline given that they have the same requirements
@@ -113,7 +113,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return CreateUserOutput{}, auth.ErrNonceMismatch
 		}
 	}
@@ -208,7 +208,7 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return CreateUserOutput{}, auth.ErrNonceMismatch
 		}
 	}
@@ -289,7 +289,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return err
 	}
 
-	if len(user.Addresses) < len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pInput.Addresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 
@@ -297,7 +297,11 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 	if err != nil {
 		return err
 	}
-	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	err = collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
@@ -315,7 +319,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce || auth.NoncePrepend+nonce != pInput.Nonce {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return AddUserAddressOutput{}, auth.ErrNonceMismatch
 		}
 	}
@@ -383,7 +387,7 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 		return err
 	}
 
-	if len(user.Addresses) < len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pInput.Addresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 
@@ -427,11 +431,11 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	output := GetUserOutput{
-		UserID:      user.ID,
-		UserNameStr: user.UserName,
-		BioStr:      user.Bio,
-		CreatedAt:   user.CreationTime,
-		Addresses:   user.Addresses,
+		UserID:    user.ID,
+		Username:  user.Username.String(),
+		BioStr:    user.Bio.String(),
+		CreatedAt: user.CreationTime,
+		Addresses: user.Addresses,
 	}
 
 	return output, nil
@@ -460,9 +464,9 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		pCtx,
 		userID,
 		persist.UserUpdateInfoInput{
-			UserNameIdempotent: strings.ToLower(input.UserName),
-			UserName:           input.UserName,
-			Bio:                validate.SanitizationPolicy.Sanitize(input.BioStr),
+			UsernameIdempotent: persist.NullString(strings.ToLower(input.UserName)),
+			Username:           persist.NullString(input.UserName),
+			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(input.BioStr)),
 		},
 	)
 	if err != nil {

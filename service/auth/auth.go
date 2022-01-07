@@ -111,11 +111,11 @@ func LoginAndMemorizeAttempt(pCtx context.Context, pInput LoginInput,
 	loginAttempt := persist.UserLoginAttempt{
 
 		Address:        pInput.Address,
-		Signature:      pInput.Signature,
-		SignatureValid: output.SignatureValid,
+		Signature:      persist.NullString(pInput.Signature),
+		SignatureValid: persist.NullBool(output.SignatureValid),
 
-		ReqHostAddr: pReq.RemoteAddr,
-		ReqHeaders:  map[string][]string(pReq.Header),
+		ReqHostAddr: persist.NullString(pReq.RemoteAddr),
+		ReqHeaders:  persist.ReqHeaders(pReq.Header),
 	}
 
 	_, err = loginRepo.Create(pCtx, loginAttempt)
@@ -138,7 +138,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 	}
 
 	if pInput.WalletType != WalletTypeEOA {
-		if NewNoncePrepend+nonce != pInput.Nonce || NoncePrepend+nonce != pInput.Nonce {
+		if NewNoncePrepend+nonce != pInput.Nonce && NoncePrepend+nonce != pInput.Nonce {
 			return LoginOutput{}, ErrNonceMismatch
 		}
 	}
@@ -321,7 +321,7 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 		if err != nil || nonce.ID == "" {
 			nonce = persist.UserNonce{
 				Address: pInput.Address,
-				Value:   generateNonce(),
+				Value:   persist.NullString(generateNonce()),
 			}
 
 			err = nonceRepo.Create(pCtx, nonce)
@@ -330,14 +330,14 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 			}
 		}
 
-		output.Nonce = NewNoncePrepend + nonce.Value
+		output.Nonce = NewNoncePrepend + nonce.Value.String()
 
 	} else {
 		nonce, err := nonceRepo.Get(pCtx, pInput.Address)
 		if err != nil {
 			return nil, err
 		}
-		output.Nonce = NewNoncePrepend + nonce.Value
+		output.Nonce = NewNoncePrepend + nonce.Value.String()
 	}
 
 	return output, nil
@@ -347,7 +347,7 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 func NonceRotate(pCtx context.Context, pAddress persist.Address, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := persist.UserNonce{
-		Value:   generateNonce(),
+		Value:   persist.NullString(generateNonce()),
 		Address: pAddress,
 	}
 
@@ -368,7 +368,7 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 		return nonceValue, userID, err
 	}
 
-	nonceValue = nonce.Value
+	nonceValue = nonce.Value.String()
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {

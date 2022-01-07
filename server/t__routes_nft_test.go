@@ -20,7 +20,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	// seed DB with nft
 	name := "very cool nft"
 	nftID, err := tc.repos.nftRepository.Create(context.Background(), persist.NFT{
-		Name:         name,
+		Name:         persist.NullString(name),
 		OwnerAddress: tc.user1.address,
 	})
 	assert.Nil(err)
@@ -36,7 +36,7 @@ func TestGetNftByID_Success(t *testing.T) {
 	body := &NftGetByIDResponse{}
 	util.UnmarshallBody(body, resp.Body)
 	assert.Empty(body.Error)
-	assert.Equal(name, body.Nft.Name)
+	assert.Equal(name, body.Nft.Name.String())
 }
 
 func TestGetNftByID_NoParamError(t *testing.T) {
@@ -79,6 +79,9 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
 	resp := updateNFTRequest(assert, update, tc.user1.jwt)
 	assertValidResponse(assert, resp)
+	errResp := util.ErrorResponse{}
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Empty(errResp.Error)
 
 	// retrieve updated nft
 	resp, err = http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
@@ -94,7 +97,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	util.UnmarshallBody(body, resp.Body)
 	assert.Empty(body.Error)
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(update.CollectorsNote, body.Nft.CollectorsNote)
+	assert.Equal(update.CollectorsNote, body.Nft.CollectorsNote.String())
 }
 
 func TestUpdateNftByID_UnauthedError(t *testing.T) {
@@ -139,7 +142,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal("document not found", body.Error)
+	assert.NotEmpty(body.Error)
 }
 
 func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {

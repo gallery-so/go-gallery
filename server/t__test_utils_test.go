@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,17 +15,20 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+var db *sql.DB
+var mgoClient *mongo.Client
+
 type TestConfig struct {
 	server              *httptest.Server
 	serverURL           string
 	repos               *repositories
-	mgoClient           *mongo.Client
 	user1               *TestUser
 	user2               *TestUser
 	openseaCache        memstore.Cache
@@ -42,13 +46,15 @@ type TestUser struct {
 	username string
 }
 
-func generateTestUser(repos *repositories, username string) *TestUser {
+func generateTestUser(repos *repositories) *TestUser {
 	ctx := context.Background()
+
+	username := util.RandStringBytes(40)
 
 	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40))))
 	user := persist.User{
-		UserName:           username,
-		UserNameIdempotent: strings.ToLower(username),
+		Username:           persist.NullString(username),
+		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
 		Addresses:          []persist.Address{address},
 	}
 	id, err := repos.userRepository.Create(ctx, user)
@@ -67,20 +73,27 @@ func generateTestUser(repos *repositories, username string) *TestUser {
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
 func initializeTestEnv(v int) *TestConfig {
-	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
-	ts := httptest.NewServer(CoreInit())
+	setDefaults()
 
-	mclient := newMongoClient()
-	repos := newRepos()
+	if db == nil {
+		db = postgres.NewClient()
+	}
+	if mgoClient == nil {
+		mgoClient = newMongoClient()
+	}
+
+	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
+	ts := httptest.NewServer(CoreInit(mgoClient, db))
+
+	repos := newRepos(mgoClient, db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
 	log.Info("test server connected! ✅")
 	return &TestConfig{
 		server:              ts,
 		serverURL:           fmt.Sprintf("%s/glry/v%d", ts.URL, v),
 		repos:               repos,
-		mgoClient:           mclient,
-		user1:               generateTestUser(repos, "bob"),
-		user2:               generateTestUser(repos, "john"),
+		user1:               generateTestUser(repos),
+		user2:               generateTestUser(repos),
 		openseaCache:        opensea,
 		unassignedCache:     unassigned,
 		galleriesCache:      galleries,
@@ -96,7 +109,12 @@ func teardown() {
 }
 
 func clearDB() {
-	tc.mgoClient.Database("gallery").Drop(context.Background())
+	mgoClient.Database("gallery").Drop(context.Background())
+	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
+	_, err := db.Exec(dropSQL)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {
