@@ -40,6 +40,15 @@ func (o MembershipOwner) Value() (driver.Value, error) {
 	return json.Marshal(o)
 }
 
+// Scan implements the database/sql Scanner interface for the membership owner type
+func (o *MembershipOwner) Scan(src interface{}) error {
+	if src == nil {
+		*o = MembershipOwner{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), o)
+}
+
 // ErrMembershipNotFoundByTokenID represents an error when a membership is not found by token id
 type ErrMembershipNotFoundByTokenID struct {
 	TokenID TokenID
