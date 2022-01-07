@@ -2,17 +2,20 @@ package indexer
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"image/color"
 	"math"
+	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	svg "github.com/ajstarks/svgo"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 /**
@@ -61,12 +64,8 @@ func autoglyphs(i *Indexer, turi persist.TokenURI, addr persist.Address, tid per
 		}
 	}
 	canvas.End()
-	it, err := util.HexToBigInt(string(tid))
-	if err != nil {
-		return nil, err
-	}
 	return persist.TokenMetadata{
-		"name":        fmt.Sprintf("Autoglyph #%d", it.Uint64()),
+		"name":        fmt.Sprintf("Autoglyph #%s", tid.Base10String()),
 		"description": "Autoglyphs are the first “on-chain” generative art on the Ethereum blockchain. A completely self-contained mechanism for the creation and ownership of an artwork.",
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
 	}, nil
@@ -247,12 +246,8 @@ func colorglyphs(i *Indexer, turi persist.TokenURI, addr persist.Address, tid pe
 		}
 	}
 	canvas.End()
-	it, err := util.HexToBigInt(string(tid))
-	if err != nil {
-		return nil, err
-	}
 	return persist.TokenMetadata{
-		"name":        fmt.Sprintf("Colorglyph #%d", it.Uint64()),
+		"name":        fmt.Sprintf("Colorglyph #%s", tid.Base10String()),
 		"description": fmt.Sprintf("A Colorglyph with color scheme %s. Created by %s.", spl[1], spl[2]),
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
 	}, nil
@@ -272,4 +267,80 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 	c.B = asBytes[2]
 
 	return
+}
+
+const ensGraph = "https://api.thegraph.com/subgraphs/name/ensdomains/ens"
+
+type ensDomain struct {
+	LabelName string `json:"labelName"`
+}
+type ensDomains struct {
+	Domains []ensDomain `json:"domains"`
+}
+
+type graphResponse struct {
+	Data ensDomains `json:"data"`
+}
+
+func ens(i *Indexer, turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenMetadata, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	gql := fmt.Sprintf(`
+	{
+	  domains(first:1, where:{labelhash:"%s"}){
+		labelName
+	  }
+	}`, tid)
+
+	jsonData := map[string]interface{}{
+		"query": gql,
+	}
+
+	marshaled, err := json.Marshal(jsonData)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", ensGraph, bytes.NewBuffer(marshaled))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var gr graphResponse
+	err = json.NewDecoder(resp.Body).Decode(&gr)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(gr.Data.Domains) == 0 {
+		return nil, fmt.Errorf("no ENS domain found for %s", tid)
+	}
+	if len(gr.Data.Domains) > 1 {
+		return nil, fmt.Errorf("multiple ENS domains found for %s", tid)
+	}
+
+	domain := gr.Data.Domains[0]
+
+	width := 240
+	height := 240
+	buf := &bytes.Buffer{}
+	canvas := svg.New(buf)
+	canvas.Start(width, height)
+	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
+
+	canvas.Text(width/2, height/2, domain.LabelName+".eth", `font-size="15vw"`, `text-anchor="middle"`, `alignment-baseline="middle"`)
+
+	canvas.End()
+
+	return persist.TokenMetadata{
+		"name":        fmt.Sprintf("ENS: %s", domain.LabelName+".eth"),
+		"description": "ENS names are used to resolve domain names to Ethereum addresses.",
+		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
+	}, nil
+
 }

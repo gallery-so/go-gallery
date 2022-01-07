@@ -882,6 +882,7 @@ func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
 		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782"): autoglyphs,
 		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E"): colorglyphs,
+		persist.Address("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"): ens,
 	}
 }
 
