@@ -533,7 +533,8 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 					}
 				} else {
 					if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
-						metadata, err = rpc.GetMetadataFromURI(uriReplaced, i.ipfsClient)
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
 						if err != nil {
 							switch err.(type) {
 							case rpc.ErrHTTP:
