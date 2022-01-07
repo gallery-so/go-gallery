@@ -15,9 +15,9 @@ import (
 type CollectionRepository struct {
 	db                           *sql.DB
 	createStmt                   *sql.Stmt
-	getByUserIDAuthStmt          *sql.Stmt
+	getByUserIDOwnerStmt         *sql.Stmt
 	getByUserIDStmt              *sql.Stmt
-	getByIDAuthStmt              *sql.Stmt
+	getByIDOwnerStmt             *sql.Stmt
 	getByIDStmt                  *sql.Stmt
 	updateInfoStmt               *sql.Stmt
 	updateHiddenStmt             *sql.Stmt
@@ -108,7 +108,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDAuthStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDAuthStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt}
+	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt}
 }
 
 // Create creates a new collection in the database
@@ -125,7 +125,7 @@ func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.Collec
 func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
 	var stmt *sql.Stmt
 	if pShowHidden {
-		stmt = c.getByUserIDAuthStmt
+		stmt = c.getByUserIDOwnerStmt
 	} else {
 		stmt = c.getByUserIDStmt
 	}
@@ -170,7 +170,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	var stmt *sql.Stmt
 	// TODO if c.NFTS is empty no rows get returned :(
 	if pShowHidden {
-		stmt = c.getByIDAuthStmt
+		stmt = c.getByIDOwnerStmt
 	} else {
 		stmt = c.getByIDStmt
 	}
