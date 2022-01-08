@@ -485,12 +485,13 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
 							if err != nil {
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
-								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s", from, key)).NewWriter(ctx)
+								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s-%s", from, key, transfer.BlockNumber)).NewWriter(ctx)
 								defer storageWriter.Close()
 								errData := map[string]interface{}{
-									"from": from,
-									"key":  key,
-									"err":  err.Error(),
+									"from":  from,
+									"key":   key,
+									"block": transfer.BlockNumber,
+									"err":   err.Error(),
 								}
 								logrus.Error(errData)
 								err = json.NewEncoder(storageWriter).Encode(errData)
@@ -504,12 +505,13 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
 							if err != nil {
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
-								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s", to, key)).NewWriter(ctx)
+								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s-%s", to, key, transfer.BlockNumber)).NewWriter(ctx)
 								defer storageWriter.Close()
 								errData := map[string]interface{}{
-									"to":  to,
-									"key": key,
-									"err": err.Error(),
+									"to":    to,
+									"key":   key,
+									"block": transfer.BlockNumber,
+									"err":   err.Error(),
 								}
 								logrus.Error(errData)
 								err = json.NewEncoder(storageWriter).Encode(errData)
