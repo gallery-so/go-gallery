@@ -485,14 +485,38 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
 							if err != nil {
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
-								panic(err)
+								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s", from, key)).NewWriter(ctx)
+								defer storageWriter.Close()
+								errData := map[string]interface{}{
+									"from": from,
+									"key":  key,
+									"err":  err.Error(),
+								}
+								logrus.Error(errData)
+								err = json.NewEncoder(storageWriter).Encode(errData)
+								if err != nil {
+									panic(err)
+								}
+								return
 							}
 						}
 						if to.String() != "0x0000000000000000000000000000000000000000" {
 							toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
 							if err != nil {
 								logrus.WithError(err).Errorf("error getting balance of %s for %s", to, key)
-								panic(err)
+								storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-BALANCE-%s-%s", to, key)).NewWriter(ctx)
+								defer storageWriter.Close()
+								errData := map[string]interface{}{
+									"to":  to,
+									"key": key,
+									"err": err.Error(),
+								}
+								logrus.Error(errData)
+								err = json.NewEncoder(storageWriter).Encode(errData)
+								if err != nil {
+									panic(err)
+								}
+								return
 							}
 						}
 
