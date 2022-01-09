@@ -37,7 +37,7 @@ func NewNonceRepository(db *sql.DB) *NonceRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VALUE,ADDRESS,VERSION,DELETED,CREATED_AT,LAST_UPDATED FROM nonces WHERE ADDRESS = $1`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VALUE,ADDRESS,VERSION,DELETED,CREATED_AT,LAST_UPDATED FROM nonces WHERE ADDRESS = $1 ORDER BY LAST_UPDATED DESC LIMIT 1`)
 	checkNoErr(err)
 
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,VALUE,ADDRESS,VERSION,DELETED) VALUES ($1,$2,$3,$4,$5)`)
