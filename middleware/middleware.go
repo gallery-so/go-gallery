@@ -154,7 +154,7 @@ func HandleCORS() gin.HandlerFunc {
 		requestOrigin := c.Request.Header.Get("Origin")
 		allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
 
-		if util.Contains(allowedOrigins, requestOrigin) || (strings.ToLower(viper.GetString("ENV")) == "development" && strings.HasPrefix(requestOrigin, "https://gallery-git-") && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+		if util.Contains(allowedOrigins, requestOrigin) || (strings.ToLower(viper.GetString("ENV")) == "development" && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 
