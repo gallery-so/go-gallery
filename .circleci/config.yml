@@ -110,6 +110,6 @@ jobs:
       - run:
           name: "Deploy Backend"
           command: gcloud beta app deploy --quiet --appyaml app-backend.yaml
-      - run:
-          name: "Deploy Indexer"
-          command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
+      # - run:
+      #     name: "Deploy Indexer"
+      #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
