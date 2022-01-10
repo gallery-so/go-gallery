@@ -66,13 +66,13 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	countAllColledtionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
+	countAllCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
 	checkNoErr(err)
 
 	countCollsStmt, err := db.PrepareContext(ctx, `SELECT cardinality(COLLECTIONS) FROM galleries WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt}
+	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt}
 }
 
 // Create creates a new gallery
