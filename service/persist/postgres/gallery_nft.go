@@ -20,6 +20,8 @@ type GalleryRepository struct {
 	getByUserIDStmt         *sql.Stmt
 	getByIDStmt             *sql.Stmt
 	checkOwnCollectionsStmt *sql.Stmt
+	countAllCollectionsStmt *sql.Stmt
+	countCollsStmt          *sql.Stmt
 
 	galleriesCache memstore.Cache
 }
@@ -64,13 +66,23 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt}
+	countAllColledtionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
+	checkNoErr(err)
+
+	countCollsStmt, err := db.PrepareContext(ctx, `SELECT cardinality(COLLECTIONS) FROM galleries WHERE ID = $1;`)
+	checkNoErr(err)
+
+	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt}
 }
 
 // Create creates a new gallery
 func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
 
 	err := ensureCollsOwnedByUser(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+	err = ensureAllCollsAccountedFor(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
 		return "", err
 	}
@@ -86,6 +98,10 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
 func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.GalleryUpdateInput) error {
 	err := ensureCollsOwnedByUser(pCtx, g, pUpdate.Collections, pUserID)
+	if err != nil {
+		return err
+	}
+	err = ensureAllCollsAccountedFor(pCtx, g, pUpdate.Collections, pUserID)
 	if err != nil {
 		return err
 	}
@@ -109,6 +125,23 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	if err != nil {
 		return err
 	}
+
+	var ct int64
+	err = g.countCollsStmt.QueryRowContext(pCtx, pID).Scan(&ct)
+	if err != nil {
+		return err
+	}
+
+	var allCollsCt int64
+	err = g.countAllCollectionsStmt.QueryRowContext(pCtx, pUserID).Scan(&allCollsCt)
+	if err != nil {
+		return err
+	}
+
+	if ct+int64(len(pCollections)) != allCollsCt {
+		return errNotAllCollectionsAccountedFor
+	}
+
 	res, err := g.addCollectionsStmt.ExecContext(pCtx, pq.Array(pCollections), pID, pUserID)
 	if err != nil {
 		return err
@@ -253,6 +286,18 @@ func (g *GalleryRepository) RefreshCache(pCtx context.Context, pUserID persist.D
 func ensureCollsOwnedByUser(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pUserID persist.DBID) error {
 	var ct int64
 	err := g.checkOwnCollectionsStmt.QueryRowContext(pCtx, pq.Array(pColls), pUserID).Scan(&ct)
+	if err != nil {
+		return err
+	}
+	if ct != int64(len(pColls)) {
+		return errCollsNotOwnedByUser
+	}
+	return nil
+}
+
+func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pUserID persist.DBID) error {
+	var ct int64
+	err := g.countAllCollectionsStmt.QueryRowContext(pCtx, pUserID).Scan(&ct)
 	if err != nil {
 		return err
 	}

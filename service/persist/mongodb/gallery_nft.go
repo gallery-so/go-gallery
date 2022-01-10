@@ -44,6 +44,11 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 		return "", err
 	}
 
+	err = ensureAllCollsAccountedFor(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	id, err := g.galleriesStorage.insert(pCtx, pGallery)
 	if err != nil {
 		return "", err
@@ -63,6 +68,11 @@ func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 ) error {
 
 	err := ensureCollsOwnedByUser(pCtx, g, pUpdate.Collections, pOwnerUserID)
+	if err != nil {
+		return err
+	}
+
+	err = ensureAllCollsAccountedFor(pCtx, g, pUpdate.Collections, pOwnerUserID)
 	if err != nil {
 		return err
 	}
@@ -199,6 +209,18 @@ func ensureCollsOwnedByUser(pCtx context.Context, g *GalleryRepository, pColls [
 
 	if int(ct) != len(pColls) {
 		return errUserDoesNotOwnCollections{pOwnerUserID}
+	}
+	return nil
+}
+
+func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pOwnerUserID persist.DBID) error {
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pOwnerUserID})
+	if err != nil {
+		return err
+	}
+
+	if int(ct) != len(pColls) {
+		return errAllCollectionsNotAccountedFor
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 )
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
+var errNotAllCollectionsAccountedFor = errors.New("not all collections accounted for")
 
 // GalleryTokenRepository is the repository for interacting with galleries in a postgres database
 type GalleryTokenRepository struct {
@@ -23,6 +24,8 @@ type GalleryTokenRepository struct {
 	getByUserIDStmt         *sql.Stmt
 	getByIDStmt             *sql.Stmt
 	checkOwnCollectionsStmt *sql.Stmt
+	countAllCollectionsStmt *sql.Stmt
+	countCollsStmt          *sql.Stmt
 
 	galleriesCache memstore.Cache
 }
@@ -65,13 +68,24 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt}
+	countAllColledtionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
+	checkNoErr(err)
+
+	countCollsStmt, err := db.PrepareContext(ctx, `SELECT cardinality(COLLECTIONS) FROM galleries WHERE ID = $1;`)
+	checkNoErr(err)
+
+	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt}
 }
 
 // Create creates a new gallery
 func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.GalleryTokenDB) (persist.DBID, error) {
 
 	err := ensureCollsOwnedByUserToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
+	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
 		return "", err
 	}
@@ -87,6 +101,10 @@ func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.G
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
 func (g *GalleryTokenRepository) Update(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.GalleryTokenUpdateInput) error {
 	err := ensureCollsOwnedByUserToken(pCtx, g, pUpdate.Collections, pUserID)
+	if err != nil {
+		return err
+	}
+	err = ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pUserID)
 	if err != nil {
 		return err
 	}
@@ -126,6 +144,22 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 	err := ensureCollsOwnedByUserToken(pCtx, g, pCollections, pUserID)
 	if err != nil {
 		return err
+	}
+
+	var ct int64
+	err = g.countCollsStmt.QueryRowContext(pCtx, pID).Scan(&ct)
+	if err != nil {
+		return err
+	}
+
+	var allCollsCt int64
+	err = g.countAllCollectionsStmt.QueryRowContext(pCtx, pUserID).Scan(&allCollsCt)
+	if err != nil {
+		return err
+	}
+
+	if ct+int64(len(pCollections)) != allCollsCt {
+		return errNotAllCollectionsAccountedFor
 	}
 
 	res, err := g.addCollectionsStmt.ExecContext(pCtx, pq.Array(pCollections), pID, pUserID)
@@ -269,6 +303,18 @@ func (g *GalleryTokenRepository) RefreshCache(pCtx context.Context, pUserID pers
 func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pUserID persist.DBID) error {
 	var ct int64
 	err := g.checkOwnCollectionsStmt.QueryRowContext(pCtx, pq.Array(pColls), pUserID).Scan(&ct)
+	if err != nil {
+		return err
+	}
+	if ct != int64(len(pColls)) {
+		return errCollsNotOwnedByUser
+	}
+	return nil
+}
+
+func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pUserID persist.DBID) error {
+	var ct int64
+	err := g.countAllCollectionsStmt.QueryRowContext(pCtx, pUserID).Scan(&ct)
 	if err != nil {
 		return err
 	}
