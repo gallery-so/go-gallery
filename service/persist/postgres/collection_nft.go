@@ -29,6 +29,7 @@ type CollectionRepository struct {
 	deleteCollectionStmt         *sql.Stmt
 	getUserAddressesStmt         *sql.Stmt
 	getUnassignedNFTsStmt        *sql.Stmt
+	checkOwnNFTsStmt             *sql.Stmt
 }
 
 // NewCollectionRepository creates a new CollectionRepository
@@ -108,13 +109,21 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt}
+	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
+	checkNoErr(err)
+
+	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt}
 }
 
 // Create creates a new collection in the database
 func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.CollectionDB) (persist.DBID, error) {
+	err := ensureNFTsOwnedByUser(pCtx, c, pColl.OwnerUserID, pColl.NFTs)
+	if err != nil {
+		return "", err
+	}
+
 	var id persist.DBID
-	err := c.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
+	err = c.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -238,6 +247,12 @@ func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pU
 
 // UpdateNFTs updates the nfts of a collection in the database
 func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
+
+	err := ensureNFTsOwnedByUser(pCtx, c, pUserID, pUpdate.NFTs)
+	if err != nil {
+		return err
+	}
+
 	res, err := c.updateNFTsStmt.ExecContext(pCtx, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID, pUserID)
 	if err != nil {
 		return err
@@ -382,5 +397,23 @@ func (c *CollectionRepository) GetUnassigned(pCtx context.Context, pUserID persi
 
 // RefreshUnassigned refreshes the unassigned nfts
 func (c *CollectionRepository) RefreshUnassigned(context.Context, persist.DBID) error {
+	return nil
+}
+
+func ensureNFTsOwnedByUser(pCtx context.Context, c *CollectionRepository, pUserID persist.DBID, nfts []persist.DBID) error {
+	var addresses []persist.Address
+	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
+	if err != nil {
+		return err
+	}
+
+	var ct int64
+	err = c.checkOwnNFTsStmt.QueryRowContext(pCtx, pq.Array(addresses), pq.Array(nfts)).Scan(&ct)
+	if err != nil {
+		return err
+	}
+	if ct != int64(len(nfts)) {
+		return errNotOwnedByUser
+	}
 	return nil
 }

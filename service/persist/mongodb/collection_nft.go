@@ -59,6 +59,11 @@ func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.Collec
 		}
 	}*/
 
+	err := ensureNFTsOwnedByUser(pCtx, c, pColl.NFTs, pColl.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	id, err := c.collectionsStorage.insert(pCtx, pColl)
 	if err != nil {
 		return "", err
@@ -132,21 +137,9 @@ func (c *CollectionRepository) Update(pCtx context.Context, pID persist.DBID, pU
 // being shared between collections.
 func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateNftsInput) error {
 
-	users := []*persist.User{}
-	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err := ensureNFTsOwnedByUser(pCtx, c, pUpdate.NFTs, pUserID)
 	if err != nil {
 		return err
-	}
-	if len(users) != 1 {
-		return fmt.Errorf("user not found")
-	}
-
-	ct, err := c.nftsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.NFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
-	if err != nil {
-		return err
-	}
-	if int(ct) != len(pUpdate.NFTs) {
-		return errors.New("not all nfts are owned by the user")
 	}
 
 	// TODO this is to ensure that the NFTs are not being shared between collections
@@ -408,4 +401,23 @@ func nftToCollectionNft(nft persist.NFT) persist.CollectionNFT {
 		OwnerAddress:      nft.OwnerAddress,
 		MultipleOwners:    nft.MultipleOwners,
 	}
+}
+
+func ensureNFTsOwnedByUser(pCtx context.Context, c *CollectionRepository, pNFTs []persist.DBID, pUserID persist.DBID) error {
+	users := []persist.User{}
+	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
+	if err != nil {
+		return err
+	}
+	if len(users) != 1 {
+		return fmt.Errorf("user not found")
+	}
+	ct, err := c.nftsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pNFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
+	if err != nil {
+		return err
+	}
+	if int(ct) != len(pNFTs) {
+		return errNotAllNFTsOwnedByUser{userID: pUserID}
+	}
+	return nil
 }

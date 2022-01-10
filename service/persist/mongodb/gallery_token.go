@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -13,6 +14,8 @@ import (
 )
 
 const galleryColName = "galleries"
+
+var errAllCollectionsNotAccountedFor = errors.New("all collections not accounted for")
 
 // GalleryTokenRepository is a repository that stores collections in a MongoDB database
 type GalleryTokenRepository struct {
@@ -43,6 +46,16 @@ func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.G
 		pGallery.Collections = []persist.DBID{}
 	}
 
+	err := ensureCollsOwnedByUserToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
+	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	id, err := g.galleriesStorage.insert(pCtx, pGallery)
 	if err != nil {
 		return "", err
@@ -58,13 +71,14 @@ func (g *GalleryTokenRepository) Update(pCtx context.Context, pIDstr persist.DBI
 	pOwnerUserID persist.DBID,
 	pUpdate persist.GalleryTokenUpdateInput,
 ) error {
-	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.Collections}, "owner_user_id": pOwnerUserID})
+	err := ensureCollsOwnedByUserToken(pCtx, g, pUpdate.Collections, pOwnerUserID)
 	if err != nil {
 		return err
 	}
 
-	if int(ct) != len(pUpdate.Collections) {
-		return errUserDoesNotOwnCollections{pOwnerUserID}
+	err = ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pOwnerUserID)
+	if err != nil {
+		return err
 	}
 
 	if err := g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
@@ -197,4 +211,28 @@ func newGalleryTokenPipeline(matchFilter bson.M) mongo.Pipeline {
 
 func (e errUserDoesNotOwnCollections) Error() string {
 	return fmt.Sprintf("user with ID %v does not own all collections to be inserted", e.userID)
+}
+
+func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pOwnerUserID persist.DBID) error {
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pColls}, "owner_user_id": pOwnerUserID})
+	if err != nil {
+		return err
+	}
+
+	if int(ct) != len(pColls) {
+		return errUserDoesNotOwnCollections{pOwnerUserID}
+	}
+	return nil
+}
+
+func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pOwnerUserID persist.DBID) error {
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pOwnerUserID})
+	if err != nil {
+		return err
+	}
+
+	if int(ct) != len(pColls) {
+		return errAllCollectionsNotAccountedFor
+	}
+	return nil
 }

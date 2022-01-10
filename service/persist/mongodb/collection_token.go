@@ -64,6 +64,11 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 		}
 	}*/
 
+	err := ensureTokensOwnedByUser(pCtx, c, pColl.NFTs, pColl.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	id, err := c.collectionsStorage.insert(pCtx, pColl)
 	if err != nil {
 		return "", err
@@ -134,21 +139,9 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pIDstr persist.
 // being shared between collections.
 func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionTokenUpdateNftsInput) error {
 
-	users := []*persist.User{}
-	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
+	err := ensureTokensOwnedByUser(pCtx, c, pUpdate.NFTs, pUserID)
 	if err != nil {
 		return err
-	}
-	if len(users) != 1 {
-		return persist.ErrUserNotFoundByID{ID: pUserID}
-	}
-
-	ct, err := c.tokensStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pUpdate.NFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
-	if err != nil {
-		return err
-	}
-	if int(ct) != len(pUpdate.NFTs) {
-		return errNotAllNFTsOwnedByUser{pUserID}
 	}
 
 	// TODO this is to ensure that the NFTs are not being shared between collections
@@ -435,4 +428,23 @@ func tokenToCollectionToken(nft persist.Token) persist.TokenInCollection {
 
 func (e errNotAllNFTsOwnedByUser) Error() string {
 	return fmt.Sprintf("not all nfts owned by user: %s", e.userID)
+}
+
+func ensureTokensOwnedByUser(pCtx context.Context, c *CollectionTokenRepository, pNFTs []persist.DBID, pUserID persist.DBID) error {
+	users := []persist.User{}
+	err := c.usersStorage.find(pCtx, bson.M{"_id": pUserID}, &users)
+	if err != nil {
+		return err
+	}
+	if len(users) != 1 {
+		return fmt.Errorf("user not found")
+	}
+	ct, err := c.tokensStorage.count(pCtx, bson.M{"_id": bson.M{"$in": pNFTs}, "owner_address": bson.M{"$in": users[0].Addresses}})
+	if err != nil {
+		return err
+	}
+	if int(ct) != len(pNFTs) {
+		return errNotAllNFTsOwnedByUser{userID: pUserID}
+	}
+	return nil
 }
