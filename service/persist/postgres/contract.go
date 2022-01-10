@@ -55,6 +55,7 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 	if len(pContracts) == 0 {
 		return nil
 	}
+	pContracts = removeDuplicates(pContracts)
 	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK) VALUES `
 	vals := make([]interface{}, 0, len(pContracts)*6)
 	for i, contract := range pContracts {
@@ -64,11 +65,27 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 		sqlStr += generateValuesPlaceholders(6, i*6)
 		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock)
 	}
-	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = EXCLUDED.VERSION,SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK`
+	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = EXCLUDED.VERSION,SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK;`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func removeDuplicates(pContracts []persist.Contract) []persist.Contract {
+	if len(pContracts) == 0 {
+		return pContracts
+	}
+	unique := map[persist.Address]bool{}
+	result := make([]persist.Contract, 0, len(pContracts))
+	for _, v := range pContracts {
+		if unique[v.Address] {
+			continue
+		}
+		result = append(result, v)
+		unique[v.Address] = true
+	}
+	return result
 }
