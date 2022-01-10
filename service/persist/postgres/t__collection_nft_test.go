@@ -82,12 +82,14 @@ func TestCollectionGetByID_Success(t *testing.T) {
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
+			OpenseaID:    1,
 		},
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "blah blah",
+			OpenseaID:    10,
 		},
 	}
 
@@ -136,12 +138,14 @@ func TestCollectionUpdate_Success(t *testing.T) {
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
+			OpenseaID:    1,
 		},
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "blah blah",
+			OpenseaID:    10,
 		},
 	}
 
@@ -192,12 +196,14 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
+			OpenseaID:    1,
 		},
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "blah blah",
+			OpenseaID:    10,
 		},
 	}
 
@@ -257,12 +263,14 @@ func TestCollectionGetUnassigned_Success(t *testing.T) {
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d1",
+			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "name",
+			OpenseaID:    1,
 		},
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 			Name:         "blah blah",
+			OpenseaID:    10,
 		},
 	}
 
