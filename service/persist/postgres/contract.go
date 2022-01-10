@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -59,16 +60,15 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK) VALUES `
 	vals := make([]interface{}, 0, len(pContracts)*6)
 	for i, contract := range pContracts {
-		if i > 0 {
-			sqlStr += `,`
-		}
 		sqlStr += generateValuesPlaceholders(6, i*6)
 		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock)
+		sqlStr += ","
 	}
-	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = EXCLUDED.VERSION,SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK;`
+	sqlStr = sqlStr[:len(sqlStr)-1]
+	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK;`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
-		return err
+		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)
 	}
 
 	return nil

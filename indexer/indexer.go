@@ -102,6 +102,8 @@ type Indexer struct {
 	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
 	userRepo      persist.UserRepository
+	contractDBMu  *sync.Mutex
+	tokenDBMu     *sync.Mutex
 
 	chain persist.Chain
 
@@ -129,6 +131,8 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, storageCli
 		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
 		userRepo:      userRepo,
+		contractDBMu:  &sync.Mutex{},
+		tokenDBMu:     &sync.Mutex{},
 
 		chain: pChain,
 
@@ -629,7 +633,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	logrus.Info("Upserting tokens and contracts with a timeout of ", timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.tokenDBMu, i.contractDBMu)
 	if err != nil {
 		logrus.WithError(err).Error("error upserting tokens and contracts")
 		panic(err)
@@ -835,14 +839,22 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, tokenMu *sync.Mutex, contractMu *sync.Mutex) error {
 
-	now := time.Now()
-	logrus.Infof("Upserting %d tokens", len(t))
-	if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
-		return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
+	err := func() error {
+		tokenMu.Lock()
+		defer tokenMu.Unlock()
+		now := time.Now()
+		logrus.Infof("Upserting %d tokens", len(t))
+		if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
+			return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
+		}
+		logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
+		return nil
+	}()
+	if err != nil {
+		return err
 	}
-	logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
 
 	contracts := make(map[persist.Address]bool)
 
@@ -863,12 +875,16 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 	logrus.Infof("Processed %d contracts in %v time", len(toUpsert), time.Since(nextNow))
 
 	finalNow := time.Now()
-	err := contractRepo.BulkUpsert(ctx, toUpsert)
-	if err != nil {
-		return fmt.Errorf("err upserting contracts: %s", err.Error())
-	}
-	logrus.Infof("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
-	return nil
+	return func() error {
+		contractMu.Lock()
+		defer contractMu.Unlock()
+		err = contractRepo.BulkUpsert(ctx, toUpsert)
+		if err != nil {
+			return fmt.Errorf("err upserting contracts: %s", err.Error())
+		}
+		logrus.Infof("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
+		return nil
+	}()
 }
 
 func handleContract(ethClient *ethclient.Client, contractAddress persist.Address, lastSyncedBlock persist.BlockNumber) persist.Contract {
