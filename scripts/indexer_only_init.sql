@@ -34,9 +34,13 @@ CREATE TABLE tokens (
     BLOCK_NUMBER bigint
 );
 
-CREATE UNIQUE INDEX token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
+CREATE UNIQUE INDEX token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS)
+WHERE
+    TOKEN_TYPE = 'ERC-721';
 
-CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
+CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS)
+WHERE
+    TOKEN_TYPE = 'ERC-1155';
 
 CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
 
