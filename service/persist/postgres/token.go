@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -32,6 +31,9 @@ type TokenRepository struct {
 	updateMediaByTokenIdentifiersUnsafeStmt *sql.Stmt
 	mostRecentBlockStmt                     *sql.Stmt
 	countTokensStmt                         *sql.Stmt
+	upsertStmt                              *sql.Stmt
+	deleteBalanceZeroStmt                   *sql.Stmt
+	deleteStmt                              *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
@@ -90,7 +92,15 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	countTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens;`)
 	checkNoErr(err)
 
-	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt}
+	upsertStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = $2,MEDIA = $3,TOKEN_TYPE = $4,CHAIN = $5,NAME = $6,DESCRIPTION = $7,TOKEN_URI = $9,QUANTITY = $10,OWNER_ADDRESS = $11,OWNERSHIP_HISTORY = $12,TOKEN_METADATA = $13,EXTERNAL_URL = $15,BLOCK_NUMBER = $16,VERSION = $17,CREATED_AT = $18,LAST_UPDATED = $19;`)
+	checkNoErr(err)
+
+	deleteBalanceZeroStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE QUANTITY = '0';`)
+	checkNoErr(err)
+
+	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1, CONTRACT_ADDRESS = $2, OWNER_ADDRESS = $3;`)
+
+	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt, upsertStmt: upsertStmt, deleteBalanceZeroStmt: deleteBalanceZeroStmt, deleteStmt: deleteStmt}
 }
 
 // CreateBulk creates many tokens in the database
@@ -270,54 +280,55 @@ func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persi
 
 // BulkUpsert upserts multiple tokens
 func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
-	erc721s := make([]persist.Token, 0, len(pTokens))
-	erc1155s := make([]persist.Token, 0, len(pTokens))
+	allTokens := make([]persist.Token, 0, len(pTokens)*3)
+
+	owners := map[string]bool{}
 	for _, token := range pTokens {
+		allTokens = append(allTokens, token)
+		owners[token.OwnerAddress.String()] = true
 		if token.TokenType == persist.TokenTypeERC721 {
-			erc721s = append(erc721s, token)
-		} else if token.TokenType == persist.TokenTypeERC1155 {
-			erc1155s = append(erc1155s, token)
-		} else {
-			return errors.New("unsupported token type")
+			for _, ownership := range token.OwnershipHistory {
+				if !owners[ownership.Address.String()] {
+					oldToken := persist.Token{
+						TokenID:         token.TokenID,
+						ContractAddress: token.ContractAddress,
+						OwnerAddress:    ownership.Address,
+						Quantity:        "0",
+					}
+					allTokens = append(allTokens, oldToken)
+					owners[ownership.Address.String()] = true
+				}
+			}
 		}
 	}
-	erc721SqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	erc721Vals := make([]interface{}, 0, len(erc721s)*19)
-	for i, token := range erc721s {
-		erc721SqlStr += generateValuesPlaceholders(19, i*19) + ","
-		erc721Vals = append(erc721Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
+	vals := make([]interface{}, 0, len(allTokens)*19)
+	for i, token := range allTokens {
+		sqlStr += generateValuesPlaceholders(19, i*19) + ","
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
-	erc721SqlStr = erc721SqlStr[:len(erc721SqlStr)-1]
+	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	erc1155SqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	erc1155Vals := make([]interface{}, 0, len(erc1155s)*19)
-	for i, token := range erc1155s {
-		erc1155SqlStr += generateValuesPlaceholders(19, i*19) + ","
-		erc1155Vals = append(erc1155Vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
-	}
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
 
-	erc1155SqlStr = erc1155SqlStr[:len(erc1155SqlStr)-1]
-
-	erc721SqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
-
-	erc1155SqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
-
-	if len(erc721s) > 0 {
-		_, err := t.db.ExecContext(pCtx, erc721SqlStr, erc721Vals...)
+	if len(allTokens) > 0 {
+		_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 		if err != nil {
-			logrus.Debugf("SQL: %s", erc721SqlStr)
-			return fmt.Errorf("failed to upsert erc721 tokens: %w", err)
+			logrus.Debugf("SQL: %s", sqlStr)
+			return fmt.Errorf("failed to upsert tokens: %w", err)
 		}
 	}
 
-	if len(erc1155s) > 0 {
-		_, err := t.db.ExecContext(pCtx, erc1155SqlStr, erc1155Vals...)
-		if err != nil {
-			logrus.Debugf("SQL: %s", erc1155SqlStr)
-			return fmt.Errorf("failed to upsert erc1155 tokens: %w", err)
-		}
+	res, err := t.deleteBalanceZeroStmt.ExecContext(pCtx)
+	if err != nil {
+		return fmt.Errorf("failed to delete old tokens: %w", err)
 	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	logrus.Debugf("deleted %d empty tokens", rowsAffected)
 
 	return nil
 
@@ -325,13 +336,12 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 // Upsert upserts a token by its token ID and contract address and if its token type is ERC-1155 it also upserts using the owner address
 func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) error {
-	conflict := "(TOKEN_ID,CONTRACT_ADDRESS"
-	if pToken.TokenType == persist.TokenTypeERC1155 {
-		conflict += ",OWNER_ADDRESS"
+	var err error
+	if pToken.Quantity == "0" {
+		_, err = t.deleteStmt.ExecContext(pCtx, pToken.TokenID, pToken.ContractAddress, pToken.OwnerAddress)
+	} else {
+		_, err = t.upsertStmt.ExecContext(pCtx, persist.GenerateID(), pToken.CollectorsNote, pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
 	}
-	conflict += ")"
-	sqlStr := fmt.Sprintf(`INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ON CONFLICT %s DO UPDATE SET COLLECTORS_NOTE = $2,MEDIA = $3,TOKEN_TYPE = $4,CHAIN = $5,NAME = $6,DESCRIPTION = $7,TOKEN_URI = $9,QUANTITY = $10,OWNER_ADDRESS = $11,OWNERSHIP_HISTORY = $12,TOKEN_METADATA = $13,EXTERNAL_URL = $15,BLOCK_NUMBER = $16,VERSION = $17,CREATED_AT = $18,LAST_UPDATED = $19`, conflict)
-	_, err := t.db.ExecContext(pCtx, sqlStr, persist.GenerateID(), pToken.CollectorsNote, pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
 	return err
 }
 
