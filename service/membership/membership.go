@@ -158,6 +158,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	logrus.Infof("Fetching membership tier: %s", id)
 
 	asset := events[0].Asset
+	// TODO correct name
 	tier.Name = persist.NullString(asset.Name)
 	tier.AssetURL = persist.NullString(asset.ImageURL)
 
