@@ -113,7 +113,7 @@ func setDefaults() {
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
-	viper.SetDefault("DATABASE", "postgres")
+	viper.SetDefault("DATABASE", "mongodb")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 
 	viper.AutomaticEnv()
