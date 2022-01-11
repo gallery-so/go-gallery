@@ -23,6 +23,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+		logrus.Debugf("Found %d membership tiers in the DB", len(allTiers))
 		if len(allTiers) > 0 {
 			if len(allTiers) != len(membership.MembershipTierIDs) {
 				tiers := make(map[persist.TokenID]bool)
@@ -53,6 +54,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 			return
 		}
 
+		logrus.Infof("No tiers found - updating membership tiers")
 		membershipTiers, err := membership.UpdateMembershipTiers(membershipRepository, userRepository, nftRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)

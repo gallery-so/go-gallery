@@ -212,7 +212,14 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		receivedOwners[owner.Address] = true
 	}
 	wp.StopWait()
-	go membershipRepository.UpsertByTokenID(ctx, id, tier)
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
+		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
+		if err != nil {
+			logrus.Errorf("Error upserting membership tier: %s", err)
+		}
+	}()
 	return tier
 }
 
@@ -273,6 +280,13 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 		tier.Owners = append(tier.Owners, <-ownersChan)
 	}
 	wp.StopWait()
-	go membershipRepository.UpsertByTokenID(ctx, id, tier)
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
+		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
+		if err != nil {
+			logrus.Errorf("Error upserting membership tier: %s", err)
+		}
+	}()
 	return tier
 }
