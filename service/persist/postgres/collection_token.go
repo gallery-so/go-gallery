@@ -199,7 +199,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	defer res.Close()
 
 	var collection persist.CollectionToken
-	var nfts []persist.TokenInCollection
+	nfts := make([]persist.TokenInCollection, 0, 10)
 
 	i := 0
 	for ; res.Next(); i++ {
@@ -219,7 +219,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		return persist.CollectionToken{}, err
 	}
 
-	if i == 0 {
+	if collection.ID == "" {
 		return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 

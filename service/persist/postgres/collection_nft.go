@@ -191,7 +191,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	defer res.Close()
 
 	var collection persist.Collection
-	var nfts []persist.CollectionNFT
+	nfts := make([]persist.CollectionNFT, 0, 10)
 	i := 0
 	for ; res.Next(); i++ {
 		colID := collection.ID
@@ -209,7 +209,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	if err := res.Err(); err != nil {
 		return persist.Collection{}, err
 	}
-	if i == 0 {
+	if collection.ID == "" {
 		return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 
