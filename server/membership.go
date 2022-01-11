@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 type getMembershipTiersResponse struct {
@@ -29,7 +30,8 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 					tiers[tier.TokenID] = true
 				}
 				for _, tierID := range membership.MembershipTierIDs {
-					if _, ok := tiers[tierID]; !ok {
+					if ok := tiers[tierID]; !ok {
+						logrus.Infof("Tier not found - updating membership tier %s", tierID)
 						newTier, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, nftRepository, ethClient)
 						if err != nil {
 							util.ErrResponse(c, http.StatusInternalServerError, err)
