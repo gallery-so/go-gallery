@@ -71,7 +71,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	countAllCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
 	checkNoErr(err)
 
-	countCollsStmt, err := db.PrepareContext(ctx, `SELECT cardinality(COLLECTIONS) FROM galleries WHERE ID = $1;`)
+	countCollsStmt, err := db.PrepareContext(ctx, `SELECT array_length(COLLECTIONS, 1) FROM galleries WHERE ID = $1;`)
 	checkNoErr(err)
 
 	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM collections WHERE OWNER_USER_ID = $1;`)
@@ -136,7 +136,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	var ct int64
+	var ct persist.NullInt64
 	err = g.countCollsStmt.QueryRowContext(pCtx, pID).Scan(&ct)
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	if ct+int64(len(pCollections)) != allCollsCt {
+	if ct.Int64()+int64(len(pCollections)) != allCollsCt {
 		var galleryCollIDs []persist.DBID
 		err = g.getGalleryCollectionsStmt.QueryRowContext(pCtx, pID).Scan(pq.Array(&galleryCollIDs))
 		if err != nil {

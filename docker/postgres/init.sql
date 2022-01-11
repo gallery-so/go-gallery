@@ -171,6 +171,8 @@ CREATE TABLE membership (
     OWNERS jsonb []
 );
 
+CREATE UNIQUE INDEX token_id_idx ON membership (TOKEN_ID);
+
 CREATE TABLE access (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
