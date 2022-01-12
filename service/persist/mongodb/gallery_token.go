@@ -112,13 +112,9 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 		return err
 	}
 
-	ids := make([]persist.DBID, len(gallery.Collections))
-	for i, c := range gallery.Collections {
-		ids[i] = c
-	}
-	pCollectionIDs = appendDifference(ids, pCollectionIDs)
+	total := append(gallery.Collections, pCollectionIDs...)
 
-	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pCollectionIDs, pUserID)
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, total, pUserID)
 	if err != nil {
 		return err
 	}

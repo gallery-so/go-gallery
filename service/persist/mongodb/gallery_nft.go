@@ -100,13 +100,9 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	ids := make([]persist.DBID, len(gallery.Collections))
-	for i, c := range gallery.Collections {
-		ids[i] = c
-	}
-	pCollectionIDs = appendDifference(ids, pCollectionIDs)
+	total := append(gallery.Collections, pCollectionIDs...)
 
-	colls, err := ensureAllCollsAccountedFor(pCtx, g, pCollectionIDs, pUserID)
+	colls, err := ensureAllCollsAccountedFor(pCtx, g, total, pUserID)
 	if err != nil {
 		return err
 	}
