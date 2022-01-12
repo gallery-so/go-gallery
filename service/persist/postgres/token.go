@@ -301,6 +301,16 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			}
 		}
 	}
+
+	// Postgres can't upsert more than 3400 tokens at a time
+	if len(allTokens) > 3400 {
+		next := allTokens[3400:]
+		current := allTokens[:3400]
+		if err := t.BulkUpsert(pCtx, current); err != nil {
+			return err
+		}
+		allTokens = next
+	}
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
 	vals := make([]interface{}, 0, len(allTokens)*19)
 	for i, token := range allTokens {
