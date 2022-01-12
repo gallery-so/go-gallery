@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -120,7 +121,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 			}
 
 			logrus.Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 2)
 			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset, pRetry+1)
 		}
 		return nil, fmt.Errorf("unexpected status code: %d - url: %s", resp.StatusCode, urlStr)
@@ -155,6 +156,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	logrus.Infof("Fetching membership tier: %s", id)
 
 	asset := events[0].Asset
+	// TODO correct name
 	tier.Name = persist.NullString(asset.Name)
 	tier.AssetURL = persist.NullString(asset.ImageURL)
 
@@ -162,9 +164,9 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	tier.Owners = make([]persist.MembershipOwner, 0, len(events))
 
 	ownersChan := make(chan persist.MembershipOwner)
-	for _, e := range events {
-		logrus.Warnf("%s -> %s", e.FromAccount.Address, e.ToAccount.Address)
-		go func(event opensea.Event) {
+	wp := workerpool.New(10)
+	for _, event := range events {
+		f := func() {
 			membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 
 			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
@@ -195,9 +197,9 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 
 				}
 			}
-			logrus.Infof("Fetched membership owner %+v for token %s ", membershipOwner, id)
 			ownersChan <- membershipOwner
-		}(e)
+		}
+		wp.Submit(f)
 	}
 	receivedOwners := map[persist.Address]bool{}
 	for i := 0; i < len(events); i++ {
@@ -208,7 +210,15 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		tier.Owners = append(tier.Owners, owner)
 		receivedOwners[owner.Address] = true
 	}
-	go membershipRepository.UpsertByTokenID(ctx, id, tier)
+	wp.StopWait()
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
+		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
+		if err != nil {
+			logrus.Errorf("Error upserting membership tier: %s", err)
+		}
+	}()
 	return tier
 }
 
@@ -234,8 +244,9 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 	tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
 
 	ownersChan := make(chan persist.MembershipOwner)
-	for _, e := range tokens {
-		go func(token persist.Token) {
+	wp := workerpool.New(10)
+	for _, token := range tokens {
+		f := func() {
 			membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
 			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
 				membershipOwner.Username = glryUser.Username
@@ -260,13 +271,21 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 					membershipOwner.PreviewNFTs = nftURLs
 				}
 			}
-			logrus.Infof("Fetched membership owner %+v for token %s ", membershipOwner, id)
 			ownersChan <- membershipOwner
-		}(e)
+		}
+		wp.Submit(f)
 	}
 	for i := 0; i < len(tokens); i++ {
 		tier.Owners = append(tier.Owners, <-ownersChan)
 	}
-	go membershipRepository.UpsertByTokenID(ctx, id, tier)
+	wp.StopWait()
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
+		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
+		if err != nil {
+			logrus.Errorf("Error upserting membership tier: %s", err)
+		}
+	}()
 	return tier
 }

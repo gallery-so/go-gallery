@@ -23,6 +23,8 @@ type GalleryTokenRepository struct {
 	addCollectionsStmt        *sql.Stmt
 	getByUserIDStmt           *sql.Stmt
 	getByIDStmt               *sql.Stmt
+	getByUserIDRawStmt        *sql.Stmt
+	getByIDRawStmt            *sql.Stmt
 	checkOwnCollectionsStmt   *sql.Stmt
 	countAllCollectionsStmt   *sql.Stmt
 	countCollsStmt            *sql.Stmt
@@ -67,13 +69,19 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
 	checkNoErr(err)
 
+	getByUserIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false;`)
+	checkNoErr(err)
+
+	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.ID = $1 AND g.DELETED = false;`)
+	checkNoErr(err)
+
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
 	countAllColledtionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1;`)
 	checkNoErr(err)
 
-	countCollsStmt, err := db.PrepareContext(ctx, `SELECT cardinality(COLLECTIONS) FROM galleries WHERE ID = $1;`)
+	countCollsStmt, err := db.PrepareContext(ctx, `SELECT array_length(COLLECTIONS, 1) FROM galleries WHERE ID = $1;`)
 	checkNoErr(err)
 
 	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM collections WHERE OWNER_USER_ID = $1;`)
@@ -82,7 +90,7 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COLLECTIONS FROM galleries WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt}
+	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
 }
 
 // Create creates a new gallery
@@ -156,7 +164,7 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 		return err
 	}
 
-	var ct int64
+	var ct persist.NullInt64
 	err = g.countCollsStmt.QueryRowContext(pCtx, pID).Scan(&ct)
 	if err != nil {
 		return err
@@ -168,7 +176,7 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 		return err
 	}
 
-	if ct+int64(len(pCollections)) != allCollsCt {
+	if ct.Int64()+int64(len(pCollections)) != allCollsCt {
 
 		var galleryCollIDs []persist.DBID
 		err = g.getGalleryCollectionsStmt.QueryRowContext(pCtx, pID).Scan(pq.Array(&galleryCollIDs))
@@ -255,6 +263,28 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 	}
 
 	result := make([]persist.GalleryToken, 0, len(galleries))
+
+	if len(galleries) == 0 {
+		galleriesRaw, err := g.getByUserIDRawStmt.QueryContext(pCtx, pUserID)
+		if err != nil {
+			return nil, err
+		}
+		defer galleriesRaw.Close()
+		for galleriesRaw.Next() {
+			var rawGallery persist.GalleryToken
+			err := galleriesRaw.Scan(&rawGallery.ID, &rawGallery.Version, &rawGallery.OwnerUserID, &rawGallery.CreationTime, &rawGallery.LastUpdated)
+			if err != nil {
+				return nil, err
+			}
+			rawGallery.Collections = []persist.CollectionToken{}
+			result = append(result, rawGallery)
+		}
+		if err := galleriesRaw.Err(); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.CollectionToken, 0, len(collections))
@@ -315,6 +345,18 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 
 	if len(galleries) > 1 {
 		return persist.GalleryToken{}, errors.New("too many galleries")
+	}
+
+	if len(galleries) == 0 {
+		res := persist.GalleryToken{Collections: []persist.CollectionToken{}}
+		err := g.getByUserIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
+		if err != nil {
+			return persist.GalleryToken{}, err
+		}
+		if res.ID != pID {
+			return persist.GalleryToken{}, persist.ErrGalleryNotFoundByID{ID: pID}
+		}
+		return res, nil
 	}
 
 	for _, gallery := range galleries {

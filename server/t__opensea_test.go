@@ -46,7 +46,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	nft4 := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 		Name:         "baby",
-		OpenseaID:    46062325,
+		OpenseaID:    61355517,
 	}
 
 	ids, err := tc.repos.nftRepository.CreateBulk(ctx, []persist.NFT{nft1, nft2, nft3, nft4})
@@ -89,7 +89,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	mikeColl, err := tc.repos.collectionRepository.GetByID(ctx, collID, true)
 	assert.Nil(err)
-	assert.Len(mikeColl.NFTs, 0)
+	assert.Len(mikeColl.NFTs, 1)
 
 	robinNFTs, err := tc.repos.nftRepository.GetByUserID(ctx, robinUserID)
 	assert.Nil(err)

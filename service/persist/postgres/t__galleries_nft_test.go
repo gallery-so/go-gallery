@@ -44,6 +44,14 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	ids, err := nftRepo.CreateBulk(context.Background(), nfts)
 	a.NoError(err)
 
+	gallery := persist.GalleryDB{
+		OwnerUserID: userID,
+		Collections: []persist.DBID{},
+	}
+
+	id, err := galleryRepo.Create(context.Background(), gallery)
+	a.NoError(err)
+
 	collection := persist.CollectionDB{
 		Name:        "name",
 		OwnerUserID: userID,
@@ -53,12 +61,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	collID, err := collectionRepo.Create(context.Background(), collection)
 	a.NoError(err)
 
-	gallery := persist.GalleryDB{
-		OwnerUserID: userID,
-		Collections: []persist.DBID{collID},
-	}
-
-	_, err = galleryRepo.Create(context.Background(), gallery)
+	err = galleryRepo.AddCollections(context.Background(), id, userID, []persist.DBID{collID})
 	a.NoError(err)
 
 	galleries, err := galleryRepo.GetByUserID(context.Background(), userID)

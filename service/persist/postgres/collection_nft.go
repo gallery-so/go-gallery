@@ -16,9 +16,13 @@ type CollectionRepository struct {
 	db                           *sql.DB
 	createStmt                   *sql.Stmt
 	getByUserIDOwnerStmt         *sql.Stmt
+	getByUserIDOwnerRawStmt      *sql.Stmt
 	getByUserIDStmt              *sql.Stmt
+	getByUserIDRawStmt           *sql.Stmt
 	getByIDOwnerStmt             *sql.Stmt
+	getByIDOwnerRawStmt          *sql.Stmt
 	getByIDStmt                  *sql.Stmt
+	getByIDRawStmt               *sql.Stmt
 	updateInfoStmt               *sql.Stmt
 	updateHiddenStmt             *sql.Stmt
 	updateNFTsStmt               *sql.Stmt
@@ -49,6 +53,9 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
+	getByUserIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false;`)
+	checkNoErr(err)
+
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
@@ -56,6 +63,8 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	FROM collections c,unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 	LEFT JOIN nfts n ON n.ID = nft 
 	WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
+	checkNoErr(err)
+	getByUserIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
 	checkNoErr(err)
 
 	getByIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
@@ -67,6 +76,9 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
+	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false;`)
+	checkNoErr(err)
+
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
@@ -74,6 +86,9 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
 	LEFT JOIN nfts n ON n.ID = nft
 	WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
+	checkNoErr(err)
+
+	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
 	checkNoErr(err)
 
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE collections SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5`)
@@ -112,7 +127,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt}
+	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt}
 }
 
 // Create creates a new collection in the database
@@ -133,10 +148,13 @@ func (c *CollectionRepository) Create(pCtx context.Context, pColl persist.Collec
 // GetByUserID returns all collections owned by a user
 func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
 	var stmt *sql.Stmt
+	var rawStmt *sql.Stmt
 	if pShowHidden {
 		stmt = c.getByUserIDOwnerStmt
+		rawStmt = c.getByUserIDOwnerRawStmt
 	} else {
 		stmt = c.getByUserIDStmt
+		rawStmt = c.getByUserIDRawStmt
 	}
 	res, err := stmt.QueryContext(pCtx, pUserID)
 	if err != nil {
@@ -167,6 +185,28 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 	}
 
 	result := make([]persist.Collection, 0, len(collections))
+
+	if len(collections) == 0 {
+		colls, err := rawStmt.QueryContext(pCtx, pUserID)
+		if err != nil {
+			return nil, err
+		}
+		defer colls.Close()
+		for colls.Next() {
+			var rawColl persist.Collection
+			err = colls.Scan(&rawColl.ID, &rawColl.OwnerUserID, &rawColl.Name, &rawColl.Version, &rawColl.Deleted, &rawColl.CollectorsNote, &rawColl.Layout, &rawColl.CreationTime, &rawColl.LastUpdated)
+			if err != nil {
+				return nil, err
+			}
+			rawColl.NFTs = []persist.CollectionNFT{}
+			result = append(result, rawColl)
+		}
+		if err := colls.Err(); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
 	for _, collection := range collections {
 		result = append(result, collection)
 	}
@@ -177,11 +217,13 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 // GetByID returns a collection by its ID
 func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
 	var stmt *sql.Stmt
-	// TODO if c.NFTS is empty no rows get returned :(
+	var rawStmt *sql.Stmt
 	if pShowHidden {
 		stmt = c.getByIDOwnerStmt
+		rawStmt = c.getByIDOwnerRawStmt
 	} else {
 		stmt = c.getByIDStmt
+		rawStmt = c.getByIDRawStmt
 	}
 
 	res, err := stmt.QueryContext(pCtx, pID)
@@ -191,7 +233,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	defer res.Close()
 
 	var collection persist.Collection
-	var nfts []persist.CollectionNFT
+	nfts := make([]persist.CollectionNFT, 0, 10)
 	i := 0
 	for ; res.Next(); i++ {
 		colID := collection.ID
@@ -209,8 +251,16 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	if err := res.Err(); err != nil {
 		return persist.Collection{}, err
 	}
-	if i == 0 {
-		return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+	if collection.ID == "" {
+		collection.NFTs = []persist.CollectionNFT{}
+		err := rawStmt.QueryRow(pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated)
+		if err != nil {
+			return persist.Collection{}, err
+		}
+		if collection.ID != pID {
+			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+		}
+		return collection, nil
 	}
 
 	collection.NFTs = nfts

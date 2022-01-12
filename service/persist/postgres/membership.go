@@ -22,13 +22,13 @@ func NewMembershipRepository(db *sql.DB) *MembershipRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	upsertByTokenIDStmt, err := db.PrepareContext(ctx, `INSERT INTO membership (ID,TOKEN_ID,NAME,ASSET_URL,OWNERS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (TOKEN_ID) DO UPDATE SET NAME = $3, ASSET_URL = $4, OWNERS = $5;`)
+	upsertByTokenIDStmt, err := db.PrepareContext(ctx, `INSERT INTO membership (ID,TOKEN_ID,NAME,ASSET_URL,OWNERS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (TOKEN_ID) DO UPDATE SET NAME = EXCLUDED.NAME, ASSET_URL = EXCLUDED.ASSET_URL, OWNERS = EXCLUDED.OWNERS;`)
 	checkNoErr(err)
 
 	getByTokenIDStmt, err := db.PrepareContext(ctx, `SELECT ID,CREATED_AT,LAST_UPDATED,VERSION,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getAllStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_ID,NAME,ASSET_URL,OWNERS FROM membership WHERE DELETED = false;`)
+	getAllStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_ID,NAME,ASSET_URL,OWNERS,CREATED_AT,LAST_UPDATED FROM membership WHERE DELETED = false;`)
 	checkNoErr(err)
 
 	return &MembershipRepository{db: db, upsertByTokenIDStmt: upsertByTokenIDStmt, getByTokenIDStmt: getByTokenIDStmt, getAllStmt: getAllStmt}
@@ -65,7 +65,7 @@ func (m *MembershipRepository) GetAll(pCtx context.Context) ([]persist.Membershi
 	tiers := make([]persist.MembershipTier, 0, 10)
 	for rows.Next() {
 		tier := persist.MembershipTier{}
-		err := rows.Scan(&tier.ID, &tier.TokenID, &tier.Name, &tier.AssetURL, pq.Array(&tier.Owners))
+		err := rows.Scan(&tier.ID, &tier.TokenID, &tier.Name, &tier.AssetURL, pq.Array(&tier.Owners), &tier.CreationTime, &tier.LastUpdated)
 		if err != nil {
 			return nil, err
 		}
