@@ -243,6 +243,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 			if err != nil {
 				return nil, err
 			}
+			rawGallery.Collections = []persist.CollectionToken{}
 			result = append(result, rawGallery)
 		}
 		if err := galleriesRaw.Err(); err != nil {
@@ -314,7 +315,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 	}
 
 	if len(galleries) == 0 {
-		res := persist.GalleryToken{}
+		res := persist.GalleryToken{Collections: []persist.CollectionToken{}}
 		err := g.getByUserIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
 		if err != nil {
 			return persist.GalleryToken{}, err

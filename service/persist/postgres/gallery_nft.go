@@ -225,6 +225,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			if err != nil {
 				return nil, err
 			}
+			rawGallery.Collections = []persist.Collection{}
 			result = append(result, rawGallery)
 		}
 		if err := galleriesRaw.Err(); err != nil {
@@ -296,7 +297,7 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 	}
 
 	if len(galleries) == 0 {
-		res := persist.Gallery{}
+		res := persist.Gallery{Collections: []persist.Collection{}}
 		err := g.getByUserIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
 		if err != nil {
 			return persist.Gallery{}, err

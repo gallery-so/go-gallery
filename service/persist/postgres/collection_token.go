@@ -206,6 +206,8 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 			if err != nil {
 				return nil, err
 			}
+			rawColl.NFTs = []persist.TokenInCollection{}
+			result = append(result, rawColl)
 		}
 		if err := colls.Err(); err != nil {
 			return nil, err
@@ -260,8 +262,8 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	}
 
 	if collection.ID == "" {
-		res := persist.Collection{}
-		err := rawStmt.QueryRow(pID).Scan(&res.ID, &res.OwnerUserID, &res.Name, &res.Version, &res.Deleted, &res.CollectorsNote, &res.Layout, &res.CreationTime, &res.LastUpdated)
+		collection.NFTs = []persist.TokenInCollection{}
+		err := rawStmt.QueryRow(pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.CreationTime, &collection.LastUpdated)
 		if err != nil {
 			return persist.CollectionToken{}, err
 		}
