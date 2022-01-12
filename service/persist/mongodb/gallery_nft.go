@@ -89,9 +89,26 @@ func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 
 // AddCollections adds collections to the specified gallery
 func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
-	if err := g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs); err != nil {
+
+	colls := []persist.CollectionDB{}
+
+	if err := g.collectionsStorage.find(pCtx, bson.M{"owner_user_id": pUserID}, &colls); err != nil {
 		return err
 	}
+
+	ids := make([]persist.DBID, len(colls))
+	for i, c := range colls {
+		ids[i] = c.ID
+	}
+
+	up := persist.GalleryUpdateInput{
+		Collections: ids,
+	}
+
+	if err := g.Update(pCtx, pID, pUserID, up); err != nil {
+		return err
+	}
+
 	go g.resetCache(pCtx, pUserID)
 	return nil
 }
