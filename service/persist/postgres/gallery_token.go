@@ -12,22 +12,23 @@ import (
 )
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
-var errNotAllCollectionsAccountedFor = errors.New("not all collections accounted for")
 
 // GalleryTokenRepository is the repository for interacting with galleries in a postgres database
 type GalleryTokenRepository struct {
-	db                      *sql.DB
-	createStmt              *sql.Stmt
-	updateStmt              *sql.Stmt
-	updateUnsafeStmt        *sql.Stmt
-	addCollectionsStmt      *sql.Stmt
-	getByUserIDStmt         *sql.Stmt
-	getByIDStmt             *sql.Stmt
-	getByUserIDRawStmt      *sql.Stmt
-	getByIDRawStmt          *sql.Stmt
-	checkOwnCollectionsStmt *sql.Stmt
-	countAllCollectionsStmt *sql.Stmt
-	countCollsStmt          *sql.Stmt
+	db                        *sql.DB
+	createStmt                *sql.Stmt
+	updateStmt                *sql.Stmt
+	updateUnsafeStmt          *sql.Stmt
+	addCollectionsStmt        *sql.Stmt
+	getByUserIDStmt           *sql.Stmt
+	getByIDStmt               *sql.Stmt
+	getByUserIDRawStmt        *sql.Stmt
+	getByIDRawStmt            *sql.Stmt
+	checkOwnCollectionsStmt   *sql.Stmt
+	countAllCollectionsStmt   *sql.Stmt
+	countCollsStmt            *sql.Stmt
+	getCollectionsStmt        *sql.Stmt
+	getGalleryCollectionsStmt *sql.Stmt
 
 	galleriesCache memstore.Cache
 }
@@ -82,7 +83,13 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	countCollsStmt, err := db.PrepareContext(ctx, `SELECT array_length(COLLECTIONS, 1) FROM galleries WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt}
+	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM collections WHERE OWNER_USER_ID = $1;`)
+	checkNoErr(err)
+
+	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COLLECTIONS FROM galleries WHERE ID = $1;`)
+	checkNoErr(err)
+
+	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllColledtionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
 }
 
 // Create creates a new gallery
@@ -93,10 +100,11 @@ func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.G
 		return "", err
 	}
 
-	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
 		return "", err
 	}
+	pGallery.Collections = colls
 
 	var id persist.DBID
 	err = g.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pGallery.Version, pq.Array(pGallery.Collections), pGallery.OwnerUserID).Scan(&id)
@@ -112,10 +120,11 @@ func (g *GalleryTokenRepository) Update(pCtx context.Context, pID persist.DBID, 
 	if err != nil {
 		return err
 	}
-	err = ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pUserID)
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pUserID)
 	if err != nil {
 		return err
 	}
+	pUpdate.Collections = colls
 	res, err := g.updateStmt.ExecContext(pCtx, pUpdate.LastUpdated, pq.Array(pUpdate.Collections), pID, pUserID)
 	if err != nil {
 		return err
@@ -167,7 +176,30 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 	}
 
 	if ct.Int64()+int64(len(pCollections)) != allCollsCt {
-		return errNotAllCollectionsAccountedFor
+
+		var galleryCollIDs []persist.DBID
+		err = g.getGalleryCollectionsStmt.QueryRowContext(pCtx, pID).Scan(pq.Array(&galleryCollIDs))
+		if err != nil {
+			return err
+		}
+		galleryCollIDs = append(galleryCollIDs, pCollections...)
+
+		allColls, err := addUnaccountedForCollectionsToken(pCtx, g, pUserID, galleryCollIDs)
+		if err != nil {
+			return err
+		}
+		res, err := g.updateStmt.ExecContext(pCtx, time.Now(), pq.Array(allColls), pID, pUserID)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return persist.ErrGalleryNotFoundByID{ID: pID}
+		}
+		return nil
 	}
 
 	res, err := g.addCollectionsStmt.ExecContext(pCtx, pq.Array(pCollections), pID, pUserID)
@@ -354,14 +386,55 @@ func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryTokenRepository
 	return nil
 }
 
-func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pUserID persist.DBID) error {
+func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pUserID persist.DBID) ([]persist.DBID, error) {
 	var ct int64
 	err := g.countAllCollectionsStmt.QueryRowContext(pCtx, pUserID).Scan(&ct)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if ct != int64(len(pColls)) {
-		return errNotAllCollectionsAccountedFor
+		if int64(len(pColls)) < ct {
+			return addUnaccountedForCollectionsToken(pCtx, g, pUserID, pColls)
+		}
+		return nil, errCollsNotOwnedByUser
 	}
-	return nil
+	return pColls, nil
+}
+
+func appendDifference(pDest []persist.DBID, pSrc []persist.DBID) []persist.DBID {
+	for _, v := range pSrc {
+		if !containsDBID(pDest, v) {
+			pDest = append(pDest, v)
+		}
+	}
+	return pDest
+}
+
+func containsDBID(pSrc []persist.DBID, pID persist.DBID) bool {
+	for _, v := range pSrc {
+		if v == pID {
+			return true
+		}
+	}
+	return false
+}
+
+func addUnaccountedForCollectionsToken(pCtx context.Context, g *GalleryTokenRepository, pUserID persist.DBID, pColls []persist.DBID) ([]persist.DBID, error) {
+	rows, err := g.getCollectionsStmt.QueryContext(pCtx, pUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	colls := make([]persist.DBID, 0, len(pColls)*2)
+	for rows.Next() {
+		var coll persist.DBID
+		if err := rows.Scan(&coll); err != nil {
+			return nil, err
+		}
+		colls = append(colls, coll)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return appendDifference(pColls, colls), nil
 }

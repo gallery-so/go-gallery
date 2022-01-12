@@ -3,7 +3,6 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -14,8 +13,6 @@ import (
 )
 
 const galleryColName = "galleries"
-
-var errAllCollectionsNotAccountedFor = errors.New("all collections not accounted for")
 
 // GalleryTokenRepository is a repository that stores collections in a MongoDB database
 type GalleryTokenRepository struct {
@@ -51,10 +48,11 @@ func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.G
 		return "", err
 	}
 
-	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
 		return "", err
 	}
+	pGallery.Collections = colls
 
 	id, err := g.galleriesStorage.insert(pCtx, pGallery)
 	if err != nil {
@@ -76,10 +74,11 @@ func (g *GalleryTokenRepository) Update(pCtx context.Context, pIDstr persist.DBI
 		return err
 	}
 
-	err = ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pOwnerUserID)
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pOwnerUserID)
 	if err != nil {
 		return err
 	}
+	pUpdate.Collections = colls
 
 	if err := g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
 		return err
@@ -103,9 +102,30 @@ func (g *GalleryTokenRepository) UpdateUnsafe(pCtx context.Context, pIDstr persi
 
 // AddCollections adds collections to the specified gallery
 func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
-	if err := g.galleriesStorage.push(pCtx, bson.M{"_id": pID, "owner_user_id": pUserID}, "collections", pCollectionIDs); err != nil {
+	err := ensureCollsOwnedByUserToken(pCtx, g, pCollectionIDs, pUserID)
+	if err != nil {
 		return err
 	}
+
+	gallery := persist.GalleryTokenDB{}
+	if err := g.galleriesStorage.find(pCtx, bson.M{"_id": pID}, &gallery); err != nil {
+		return err
+	}
+
+	total := append(gallery.Collections, pCollectionIDs...)
+
+	colls, err := ensureAllCollsAccountedForToken(pCtx, g, total, pUserID)
+	if err != nil {
+		return err
+	}
+	up := persist.GalleryTokenUpdateInput{
+		Collections: colls,
+	}
+
+	if err := g.Update(pCtx, pID, pUserID, up); err != nil {
+		return err
+	}
+
 	go g.resetCache(pCtx, pUserID)
 	return nil
 }
@@ -225,14 +245,50 @@ func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryTokenRepository
 	return nil
 }
 
-func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pOwnerUserID persist.DBID) error {
-	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pOwnerUserID})
+func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenRepository, pColls []persist.DBID, pUserID persist.DBID) ([]persist.DBID, error) {
+
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pUserID})
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if ct != int64(len(pColls)) {
+		if int64(len(pColls)) < ct {
+			return addUnaccountedForCollectionsToken(pCtx, g, pUserID, pColls)
+		}
+		return nil, errUserDoesNotOwnCollections{pUserID}
+	}
+	return pColls, nil
+}
+
+func appendDifference(pDest []persist.DBID, pSrc []persist.DBID) []persist.DBID {
+	for _, v := range pSrc {
+		if !containsDBID(pDest, v) {
+			pDest = append(pDest, v)
+		}
+	}
+	return pDest
+}
+
+func containsDBID(pSrc []persist.DBID, pID persist.DBID) bool {
+	for _, v := range pSrc {
+		if v == pID {
+			return true
+		}
+	}
+	return false
+}
+
+func addUnaccountedForCollectionsToken(pCtx context.Context, g *GalleryTokenRepository, pUserID persist.DBID, pColls []persist.DBID) ([]persist.DBID, error) {
+	colls := make([]persist.CollectionTokenDB, 0, len(pColls)*2)
+	err := g.collectionsStorage.find(pCtx, bson.M{"owner_user_id": pUserID}, &colls)
+	if err != nil {
+		return nil, err
 	}
 
-	if int(ct) != len(pColls) {
-		return errAllCollectionsNotAccountedFor
+	ids := make([]persist.DBID, 0, len(pColls))
+	for _, v := range colls {
+		ids = append(ids, v.ID)
 	}
-	return nil
+
+	return appendDifference(pColls, ids), nil
 }
