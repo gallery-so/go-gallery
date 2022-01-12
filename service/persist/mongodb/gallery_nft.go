@@ -90,19 +90,28 @@ func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 // AddCollections adds collections to the specified gallery
 func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
 
-	colls := []persist.CollectionDB{}
-
-	if err := g.collectionsStorage.find(pCtx, bson.M{"owner_user_id": pUserID}, &colls); err != nil {
+	err := ensureCollsOwnedByUser(pCtx, g, pCollectionIDs, pUserID)
+	if err != nil {
 		return err
 	}
 
-	ids := make([]persist.DBID, len(colls))
-	for i, c := range colls {
-		ids[i] = c.ID
+	gallery := persist.GalleryTokenDB{}
+	if err := g.galleriesStorage.find(pCtx, bson.M{"_id": pID}, &gallery); err != nil {
+		return err
 	}
 
+	ids := make([]persist.DBID, len(gallery.Collections))
+	for i, c := range gallery.Collections {
+		ids[i] = c
+	}
+	pCollectionIDs = appendDifference(ids, pCollectionIDs)
+
+	colls, err := ensureAllCollsAccountedFor(pCtx, g, pCollectionIDs, pUserID)
+	if err != nil {
+		return err
+	}
 	up := persist.GalleryUpdateInput{
-		Collections: ids,
+		Collections: colls,
 	}
 
 	if err := g.Update(pCtx, pID, pUserID, up); err != nil {
