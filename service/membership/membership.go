@@ -3,11 +3,9 @@ package membership
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/opensea"
@@ -171,7 +169,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		f := func() {
 			membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 
-			if event.ToAccount.Address.Address() != common.BigToAddress(big.NewInt(0)) {
+			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
 				// does to have the NFT?
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 				if hasNFT {

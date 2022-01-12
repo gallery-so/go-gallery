@@ -7,6 +7,8 @@ CREATE TABLE users (
     ADDRESSES varchar(255) []
 );
 
+CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
+
 CREATE TABLE galleries (
     ID varchar(32) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -36,6 +38,8 @@ CREATE TABLE nfts (
     ANIMATION_URL varchar,
     ANIMATION_ORIGINAL_URL varchar
 );
+
+CREATE UNIQUE INDEX opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
 CREATE TABLE collections (
     ID varchar(32) PRIMARY KEY,
