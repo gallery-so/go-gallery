@@ -44,10 +44,11 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 		return "", err
 	}
 
-	err = ensureAllCollsAccountedFor(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	colls, err := ensureAllCollsAccountedFor(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
 		return "", err
 	}
+	pGallery.Collections = colls
 
 	id, err := g.galleriesStorage.insert(pCtx, pGallery)
 	if err != nil {
@@ -72,10 +73,12 @@ func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 		return err
 	}
 
-	err = ensureAllCollsAccountedFor(pCtx, g, pUpdate.Collections, pOwnerUserID)
+	colls, err := ensureAllCollsAccountedFor(pCtx, g, pUpdate.Collections, pOwnerUserID)
 	if err != nil {
 		return err
 	}
+
+	pUpdate.Collections = colls
 
 	if err = g.galleriesStorage.update(pCtx, bson.M{"_id": pIDstr}, pUpdate); err != nil {
 		return err
@@ -213,14 +216,32 @@ func ensureCollsOwnedByUser(pCtx context.Context, g *GalleryRepository, pColls [
 	return nil
 }
 
-func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pOwnerUserID persist.DBID) error {
-	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pOwnerUserID})
+func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pUserID persist.DBID) ([]persist.DBID, error) {
+	ct, err := g.collectionsStorage.count(pCtx, bson.M{"owner_user_id": pUserID})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if int(ct) != len(pColls) {
-		return errAllCollectionsNotAccountedFor
+		if int64(len(pColls)) < ct {
+			return addUnaccountedForCollections(pCtx, g, pUserID, pColls)
+		}
+		return nil, errUserDoesNotOwnCollections{pUserID}
 	}
-	return nil
+	return pColls, nil
+}
+
+func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pUserID persist.DBID, pColls []persist.DBID) ([]persist.DBID, error) {
+	colls := make([]persist.CollectionTokenDB, 0, len(pColls)*2)
+	err := g.collectionsStorage.find(pCtx, bson.M{"owner_user_id": pUserID}, &colls)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]persist.DBID, 0, len(pColls))
+	for _, v := range colls {
+		ids = append(ids, v.ID)
+	}
+
+	return appendDifference(pColls, ids), nil
 }

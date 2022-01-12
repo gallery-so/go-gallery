@@ -378,7 +378,7 @@ func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pCol
 		if int64(len(pColls)) < ct {
 			return addUnaccountedForCollections(pCtx, g, pUserID, pColls)
 		}
-		return nil, errNotAllCollectionsAccountedFor
+		return nil, errCollsNotOwnedByUser
 	}
 	return pColls, nil
 }

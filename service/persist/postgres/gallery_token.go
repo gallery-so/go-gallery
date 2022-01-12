@@ -12,7 +12,6 @@ import (
 )
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
-var errNotAllCollectionsAccountedFor = errors.New("not all collections accounted for")
 
 // GalleryTokenRepository is the repository for interacting with galleries in a postgres database
 type GalleryTokenRepository struct {
@@ -397,7 +396,7 @@ func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenReposi
 		if int64(len(pColls)) < ct {
 			return addUnaccountedForCollectionsToken(pCtx, g, pUserID, pColls)
 		}
-		return nil, errNotAllCollectionsAccountedFor
+		return nil, errCollsNotOwnedByUser
 	}
 	return pColls, nil
 }
