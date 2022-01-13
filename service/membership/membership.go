@@ -156,7 +156,6 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	logrus.Infof("Fetching membership tier: %s", id)
 
 	asset := events[0].Asset
-	// TODO correct name
 	tier.Name = persist.NullString(asset.Name)
 	tier.AssetURL = persist.NullString(asset.ImageURL)
 
@@ -165,11 +164,13 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 
 	ownersChan := make(chan persist.MembershipOwner)
 	wp := workerpool.New(10)
-	for _, event := range events {
+	for i, e := range events {
+		event := e
 		f := func() {
-			membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
-
+			logrus.Debugf("Processing event for ID %s %+v %d", id, event.ToAccount.Address, i)
 			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
+				logrus.Debug("Event is to real address")
+				membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 				// does to have the NFT?
 				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
 				if hasNFT {
@@ -194,29 +195,34 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 							membershipOwner.PreviewNFTs = nftURLs
 						}
 					}
-
 				}
+				logrus.Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
+				ownersChan <- membershipOwner
+				return
 			}
-			ownersChan <- membershipOwner
+			logrus.Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
+			ownersChan <- persist.MembershipOwner{}
 		}
 		wp.Submit(f)
 	}
 	receivedOwners := map[persist.Address]bool{}
 	for i := 0; i < len(events); i++ {
 		owner := <-ownersChan
-		if receivedOwners[owner.Address] {
+		if receivedOwners[owner.Address] || owner.Address == "" {
+			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
 			continue
 		}
 		tier.Owners = append(tier.Owners, owner)
 		receivedOwners[owner.Address] = true
 	}
 	wp.StopWait()
+	logrus.Debugf("Done receiving owners for token %s", id)
 	go func() {
-		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 		defer cancel()
 		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
 		if err != nil {
-			logrus.Errorf("Error upserting membership tier: %s", err)
+			logrus.Errorf("Error upserting membership tier %s: %s", id, err)
 		}
 	}()
 	return tier
@@ -245,7 +251,8 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 
 	ownersChan := make(chan persist.MembershipOwner)
 	wp := workerpool.New(10)
-	for _, token := range tokens {
+	for _, t := range tokens {
+		token := t
 		f := func() {
 			membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
 			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
@@ -280,7 +287,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.
 	}
 	wp.StopWait()
 	go func() {
-		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 		defer cancel()
 		err := membershipRepository.UpsertByTokenID(ctx, id, tier)
 		if err != nil {
