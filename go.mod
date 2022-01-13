@@ -19,6 +19,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/ipfs/go-ipfs-api v0.3.0
+	github.com/jackc/pgx/v4 v4.14.1
 	github.com/lib/pq v1.10.4
 	github.com/microcosm-cc/bluemonday v1.0.17
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646

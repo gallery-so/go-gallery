@@ -6,7 +6,8 @@ import (
 	"time"
 
 	// register postgres driver
-	_ "github.com/lib/pq"
+	// _ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -27,14 +28,13 @@ func NewClient() *sql.DB {
 		psqlInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", dbHost, dbPort, dbUser, dbPwd, dbName)
 	}
 
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sql.Open("pgx", psqlInfo)
 	if err != nil {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
 	db.SetConnMaxLifetime(time.Minute * 5)
-	db.SetConnMaxIdleTime(time.Minute * 5)
 
 	err = db.Ping()
 	if err != nil {
