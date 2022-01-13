@@ -95,10 +95,16 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return err
 	}
 
-	gallery := persist.GalleryTokenDB{}
-	if err := g.galleriesStorage.find(pCtx, bson.M{"_id": pID}, &gallery); err != nil {
+	galleries := []persist.GalleryTokenDB{}
+	if err := g.galleriesStorage.find(pCtx, bson.M{"_id": pID}, &galleries); err != nil {
 		return err
 	}
+
+	if len(galleries) != 1 {
+		return persist.ErrGalleryNotFoundByID{ID: pID}
+	}
+
+	gallery := galleries[0]
 
 	total := append(gallery.Collections, pCollectionIDs...)
 
