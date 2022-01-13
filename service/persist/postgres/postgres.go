@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	// register postgres driver
 	_ "github.com/lib/pq"
@@ -31,6 +32,9 @@ func NewClient() *sql.DB {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
+
+	db.SetConnMaxLifetime(time.Minute * 5)
+	db.SetConnMaxIdleTime(time.Minute * 5)
 
 	err = db.Ping()
 	if err != nil {

@@ -271,7 +271,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 	offset := pOffset
 	if pOffset > 10000 {
 		dir = "asc"
-		offset = pOffset - 10000
+		offset = pOffset - 10050
 	}
 
 	logrus.Debugf("Fetching assets for wallet %s with offset %d, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, offset, retry, dir, len(alreadyReceived))
