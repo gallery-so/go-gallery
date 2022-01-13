@@ -8,11 +8,11 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Assets is a list of NFTs from OpenSea
@@ -216,14 +216,14 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
 		go func(wa persist.Address) {
-			assets, err := FetchAssetsForWallet(wa, 0, 0)
+			assets, err := FetchAssetsForWallet(wa, 0, 0, nil)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 				return
 			}
 			if len(assets) == 0 {
 				time.Sleep(time.Second)
-				assets, err = FetchAssetsForWallet(wa, 0, 0)
+				assets, err = FetchAssetsForWallet(wa, 0, 0, nil)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 					return
@@ -255,22 +255,28 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 }
 
 // FetchAssetsForWallet recursively fetches all assets for a wallet
-func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([]Asset, error) {
+func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+
+	if alreadyReceived == nil {
+		alreadyReceived = make(map[int]string)
+	}
 
 	result := []Asset{}
-	qsArgsMap := map[string]interface{}{
-		"owner":           pWalletAddress,
-		"order_direction": "desc",
-		"offset":          fmt.Sprint(pOffset),
-		"limit":           fmt.Sprint(50),
+
+	if pOffset > 20000 {
+		return result, fmt.Errorf("failed to fetch assets for wallet %s: too many results", pWalletAddress)
 	}
 
-	qsLst := []string{}
-	for k, v := range qsArgsMap {
-		qsLst = append(qsLst, fmt.Sprintf("%s=%s", k, v))
+	dir := "desc"
+	offset := pOffset
+	if pOffset > 10000 {
+		dir = "asc"
+		offset = pOffset - 10000
 	}
-	qsStr := strings.Join(qsLst, "&")
-	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?%s", qsStr)
+
+	logrus.Debugf("Fetching assets for wallet %s with offset %d, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, offset, retry, dir, len(alreadyReceived))
+
+	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&offset=%d&limit=%d", pWalletAddress, dir, offset, 50)
 
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
@@ -286,7 +292,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 2)
-				return FetchAssetsForWallet(pWalletAddress, pOffset, retry+1)
+				return FetchAssetsForWallet(pWalletAddress, pOffset, retry+1, alreadyReceived)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")
 		}
@@ -297,9 +303,22 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset, retry int) ([
 	if err != nil {
 		return nil, err
 	}
-	result = append(result, response.Assets...)
+
+	doneReceiving := false
+	for _, asset := range response.Assets {
+		if it, ok := alreadyReceived[asset.ID]; ok {
+			logrus.Debugf("response already received asset: %s", it)
+			doneReceiving = true
+			continue
+		}
+		result = append(result, asset)
+		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%d|len-%d|dir-%s", asset.ID, pOffset, len(result), dir)
+	}
+	if doneReceiving {
+		return result, nil
+	}
 	if len(response.Assets) == 50 {
-		next, err := FetchAssetsForWallet(pWalletAddress, pOffset+50, 0)
+		next, err := FetchAssetsForWallet(pWalletAddress, pOffset+50, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}
