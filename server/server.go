@@ -65,6 +65,11 @@ func CoreInit(mgoClient *mongo.Client, pqClient *sql.DB) *gin.Engine {
 
 	log.SetReportCaller(true)
 
+	if viper.GetString("ENV") != "production" {
+		log.SetLevel(log.DebugLevel)
+		gin.SetMode(gin.DebugMode)
+	}
+
 	router := gin.Default()
 	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
 

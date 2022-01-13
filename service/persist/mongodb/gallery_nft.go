@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -90,30 +91,23 @@ func (g *GalleryRepository) Update(pCtx context.Context, pIDstr persist.DBID,
 // AddCollections adds collections to the specified gallery
 func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pCollectionIDs []persist.DBID) error {
 
-	err := ensureCollsOwnedByUser(pCtx, g, pCollectionIDs, pUserID)
+	gallery, err := g.GetByID(pCtx, pID)
 	if err != nil {
 		return err
 	}
 
-	galleries := []persist.GalleryTokenDB{}
-	if err := g.galleriesStorage.find(pCtx, bson.M{"_id": pID}, &galleries); err != nil {
-		return err
+	collIDs := []persist.DBID{}
+	for _, coll := range gallery.Collections {
+		if coll.Deleted {
+			continue
+		}
+		collIDs = append(collIDs, coll.ID)
 	}
 
-	if len(galleries) != 1 {
-		return persist.ErrGalleryNotFoundByID{ID: pID}
-	}
+	total := append(collIDs, pCollectionIDs...)
 
-	gallery := galleries[0]
-
-	total := append(gallery.Collections, pCollectionIDs...)
-
-	colls, err := ensureAllCollsAccountedFor(pCtx, g, total, pUserID)
-	if err != nil {
-		return err
-	}
 	up := persist.GalleryUpdateInput{
-		Collections: colls,
+		Collections: total,
 	}
 
 	if err := g.Update(pCtx, pID, pUserID, up); err != nil {
@@ -238,6 +232,8 @@ func ensureCollsOwnedByUser(pCtx context.Context, g *GalleryRepository, pColls [
 		return err
 	}
 
+	logrus.Debugf("ensureCollsOwnedByUser: %d of %d collections owned by user %s - %+v", ct, len(pColls), pOwnerUserID, pColls)
+
 	if int(ct) != len(pColls) {
 		return errUserDoesNotOwnCollections{pOwnerUserID}
 	}
@@ -254,7 +250,7 @@ func ensureAllCollsAccountedFor(pCtx context.Context, g *GalleryRepository, pCol
 		if int64(len(pColls)) < ct {
 			return addUnaccountedForCollections(pCtx, g, pUserID, pColls)
 		}
-		return nil, errUserDoesNotOwnCollections{pUserID}
+		return nil, fmt.Errorf("accounting for all collections: %s - %d/%d", errUserDoesNotOwnCollections{pUserID}.Error(), len(pColls), int(ct))
 	}
 	return pColls, nil
 }
