@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -720,6 +721,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		for i, w := range previousOwners[k] {
 			previousOwnerAddresses[i] = persist.AddressAtBlock{Address: w.owner, Block: w.block}
 		}
+		delete(previousOwners, k)
 		metadata := metadatas[k]
 		delete(metadatas, k)
 		var name, description string
@@ -769,6 +771,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		}
 		result[j] = t
 		j++
+		delete(owners, k)
 	}
 	for k, v := range balances {
 		contractAddress, tokenID, err := parseTokenIdentifiers(k)
@@ -833,6 +836,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			}
 			result[j] = t
 			j++
+			delete(balances, k)
 		}
 	}
 
@@ -846,8 +850,11 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		defer tokenMu.Unlock()
 		now := time.Now()
 		logrus.Infof("Upserting %d tokens", len(t))
-		if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
-			return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
+		for i := 0; i < len(t); i += len(t) / 4 {
+			upsert := t[i:int(math.Min(float64(i)+float64(len(t))/4.0, float64(len(t))))]
+			if err := tokenRepo.BulkUpsert(ctx, upsert); err != nil {
+				return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
+			}
 		}
 		logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
 		return nil

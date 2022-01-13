@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     USERNAME varchar(255),
@@ -12,7 +12,7 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
 
 CREATE TABLE tokens (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -39,7 +39,7 @@ CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN
 CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
 
 CREATE TABLE contracts (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,

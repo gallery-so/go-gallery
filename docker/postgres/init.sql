@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -12,17 +12,17 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
 
 CREATE TABLE galleries (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     VERSION int,
-    OWNER_USER_ID varchar(32),
-    COLLECTIONS varchar(32) []
+    OWNER_USER_ID varchar(255),
+    COLLECTIONS varchar(255) []
 );
 
 CREATE TABLE nfts (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -44,16 +44,20 @@ CREATE TABLE nfts (
     IMAGE_PREVIEW_URL varchar,
     IMAGE_ORIGINAL_URL varchar,
     ANIMATION_URL varchar,
-    ANIMATION_ORIGINAL_URL varchar
+    ANIMATION_ORIGINAL_URL varchar,
+    ACQUISITION_DATE varchar,
+    COLLECTORS_NOTE varchar,
+    TOKEN_COLLECTION_NAME varchar,
+    TOKEN_METADATA_URL varchar
 );
 
 CREATE UNIQUE INDEX opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
 CREATE TABLE collections (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
-    OWNER_USER_ID varchar(32),
-    NFTS varchar(32) [],
+    OWNER_USER_ID varchar(255),
+    NFTS varchar(255) [],
     VERSION int,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,18 +68,18 @@ CREATE TABLE collections (
 );
 
 CREATE TABLE nonces (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    USER_ID varchar(32),
+    USER_ID varchar(255),
     ADDRESS varchar(255),
     VALUE varchar(255)
 );
 
 CREATE TABLE tokens (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -102,7 +106,7 @@ CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN
 CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
 
 CREATE TABLE contracts (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -116,7 +120,7 @@ CREATE TABLE contracts (
 CREATE UNIQUE INDEX address_idx ON contracts (ADDRESS);
 
 CREATE TABLE login_attempts (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -131,7 +135,7 @@ CREATE TABLE login_attempts (
 );
 
 CREATE TABLE features (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +146,7 @@ CREATE TABLE features (
     NAME varchar,
     IS_ENABLED boolean,
     ADMIN_ONLY boolean,
-    FORCE_ENABLED_USER_IDS varchar(32) []
+    FORCE_ENABLED_USER_IDS varchar(255) []
 );
 
 CREATE UNIQUE INDEX feature_name_idx ON features (NAME);
@@ -150,17 +154,17 @@ CREATE UNIQUE INDEX feature_name_idx ON features (NAME);
 CREATE UNIQUE INDEX feature_required_token_idx ON features (REQUIRED_TOKEN);
 
 CREATE TABLE backups (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    GALLERY_ID varchar(32),
+    GALLERY_ID varchar(255),
     GALLERY jsonb
 );
 
 CREATE TABLE membership (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -174,12 +178,12 @@ CREATE TABLE membership (
 CREATE UNIQUE INDEX token_id_idx ON membership (TOKEN_ID);
 
 CREATE TABLE access (
-    ID varchar(32) PRIMARY KEY,
+    ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    USER_ID varchar(32),
+    USER_ID varchar(255),
     MOST_RECENT_BLOCK bigint,
     REQUIRED_TOKENS_OWNED jsonb,
     IS_ADMIN boolean

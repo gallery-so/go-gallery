@@ -4,6 +4,7 @@
 # Misc
 .DS_Store
 *.csv
+scripts/csv_export/
 .env
 
 stats.json
