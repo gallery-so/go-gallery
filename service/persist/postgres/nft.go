@@ -258,6 +258,21 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 // BulkUpsert inserts or updates multiple NFTs
 func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFT) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
+
+	resultIDs := make([]persist.DBID, len(pNFTs))
+
+	// Postgres can't upsert more than 3400 tokens at a time
+	if len(pNFTs) > (65535/21 - 1000) {
+		next := pNFTs[(65535/21 - 1000):]
+		current := pNFTs[:(65535/21 - 1000)]
+		ids, err := n.BulkUpsert(pCtx, pUserID, next)
+		if err != nil {
+			return nil, err
+		}
+		resultIDs = append(resultIDs, ids...)
+		pNFTs = current
+	}
+
 	vals := make([]interface{}, 0, len(pNFTs)*21)
 
 	for i, nft := range pNFTs {
@@ -274,8 +289,6 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 		return nil, err
 	}
 	defer res.Close()
-
-	resultIDs := make([]persist.DBID, len(pNFTs))
 
 	for i := 0; res.Next(); i++ {
 		var id string
