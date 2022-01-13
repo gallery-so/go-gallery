@@ -379,7 +379,7 @@ func fillNFTIDs(pCtx context.Context, pNfts []persist.NFT, pUser persist.User, n
 			if n.ID == "" {
 				dbNFT, err := nftRepo.GetByOpenseaID(pCtx, n.OpenseaID, n.OwnerAddress)
 				if err != nil {
-					errChan <- err
+					errChan <- fmt.Errorf("failed to get nft by opensea id %s: %s", n.OpenseaID, err)
 					return
 				}
 				if len(dbNFT) == 0 {
