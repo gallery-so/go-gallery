@@ -374,11 +374,11 @@ func (id *TokenID) Scan(src interface{}) error {
 
 // DetectBase returns the base of the token URI
 func (id TokenID) DetectBase() int {
-	if len(id) > 64 {
-		return 10
-	}
 	if strings.HasPrefix(string(id), "0x") {
 		return 16
+	}
+	if len(id) > 64 {
+		return 10
 	}
 	for i := 0; i < len(id); i++ {
 		if unicode.IsLetter(rune(id[i])) {
