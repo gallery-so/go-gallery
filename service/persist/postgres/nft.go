@@ -261,10 +261,15 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 
 	resultIDs := make([]persist.DBID, len(pNFTs))
 
-	// Postgres can't upsert more than 3400 tokens at a time
-	if len(pNFTs) > (65535/21 - 1000) {
-		next := pNFTs[(65535/21 - 1000):]
-		current := pNFTs[:(65535/21 - 1000)]
+	// Postgres only allows 65535 parameters at a time.
+	// TODO: Consider trying this implementation at some point instead of chunking:
+	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
+	paramsPerRow := 21
+	rowsPerQuery := 65535 / paramsPerRow
+
+	if len(pNFTs) > rowsPerQuery {
+		next := pNFTs[rowsPerQuery:]
+		current := pNFTs[:rowsPerQuery]
 		ids, err := n.BulkUpsert(pCtx, pUserID, next)
 		if err != nil {
 			return nil, err
@@ -273,10 +278,10 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 		pNFTs = current
 	}
 
-	vals := make([]interface{}, 0, len(pNFTs)*21)
+	vals := make([]interface{}, 0, len(pNFTs)*paramsPerRow)
 
 	for i, nft := range pNFTs {
-		sqlStr += generateValuesPlaceholders(21, i*21) + ","
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
 		vals = append(vals, nft.ID, nft.Deleted, nft.Version, nft.Name, nft.Description, nft.ExternalURL, nft.CreatorAddress, nft.CreatorName, nft.OwnerAddress, nft.MultipleOwners, nft.Contract, nft.OpenseaID, nft.OpenseaTokenID, nft.ImageURL, nft.ImageThumbnailURL, nft.ImagePreviewURL, nft.ImageOriginalURL, nft.AnimationURL, nft.AnimationOriginalURL, nft.TokenCollectionName, nft.CollectorsNote)
 	}
 
