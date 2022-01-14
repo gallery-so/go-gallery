@@ -391,6 +391,9 @@ func (id TokenID) DetectBase() int {
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
 	normalized := util.RemoveLeftPaddedZeros(string(id))
+	if normalized == "" {
+		return big.NewInt(0)
+	}
 	base := id.DetectBase()
 	i, ok := new(big.Int).SetString(normalized, base)
 	if !ok {
@@ -401,7 +404,7 @@ func (id TokenID) BigInt() *big.Int {
 		}
 		i, ok = new(big.Int).SetString(normalized, base)
 		if !ok {
-			panic("failed to convert token ID to big.Int")
+			panic(fmt.Sprintf("failed to parse token ID %s as base %d", normalized, base))
 		}
 	}
 	return i
