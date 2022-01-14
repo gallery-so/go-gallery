@@ -168,7 +168,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		event := e
 		f := func() {
 			logrus.Debugf("Processing event for ID %s %+v %d", id, event.ToAccount.Address, i)
-			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
+			if event.ToAccount.Address != persist.ZeroAddress {
 				logrus.Debug("Event is to real address")
 				membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 				// does to have the NFT?

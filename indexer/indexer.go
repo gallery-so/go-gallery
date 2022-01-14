@@ -486,7 +486,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 							return
 						}
 						var fromBalance, toBalance *big.Int
-						if from.String() != "0x0000000000000000000000000000000000000000" {
+						if from.String() != persist.ZeroAddress.String() {
 							fromBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, from.Address(), tokenID.BigInt())
 							if err != nil {
 								ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
@@ -508,7 +508,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 								return
 							}
 						}
-						if to.String() != "0x0000000000000000000000000000000000000000" {
+						if to.String() != persist.ZeroAddress.String() {
 							toBalance, err = ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, to.Address(), tokenID.BigInt())
 							if err != nil {
 								ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)

@@ -98,6 +98,9 @@ const (
 // InvalidTokenURI represents an invalid token URI
 const InvalidTokenURI TokenURI = "INVALID"
 
+// ZeroAddress is the all-zero Ethereum address
+const ZeroAddress Address = "0x0000000000000000000000000000000000000000"
+
 // Address represents an Ethereum address
 type Address string
 
