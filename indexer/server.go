@@ -206,7 +206,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, userRepository p
 
 		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 		for _, address := range user.Addresses {
-			assets, err := opensea.FetchAssetsForWallet(address, 0, 0)
+			assets, err := opensea.FetchAssetsForWallet(address, 0, 0, nil)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return

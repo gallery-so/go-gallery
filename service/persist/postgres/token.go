@@ -286,18 +286,19 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	for _, token := range pTokens {
 		allTokens = append(allTokens, token)
 		owners[token.OwnerAddress.String()] = true
-		if token.TokenType == persist.TokenTypeERC721 {
-			for _, ownership := range token.OwnershipHistory {
-				if !owners[ownership.Address.String()] {
-					oldToken := persist.Token{
-						TokenID:         token.TokenID,
-						ContractAddress: token.ContractAddress,
-						OwnerAddress:    ownership.Address,
-						Quantity:        "0",
-					}
-					allTokens = append(allTokens, oldToken)
-					owners[ownership.Address.String()] = true
+		if token.TokenType != persist.TokenTypeERC721 {
+			continue
+		}
+		for _, ownership := range token.OwnershipHistory {
+			if !owners[ownership.Address.String()] {
+				oldToken := persist.Token{
+					TokenID:         token.TokenID,
+					ContractAddress: token.ContractAddress,
+					OwnerAddress:    ownership.Address,
+					Quantity:        "0",
 				}
+				allTokens = append(allTokens, oldToken)
+				owners[ownership.Address.String()] = true
 			}
 		}
 	}
