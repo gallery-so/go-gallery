@@ -1,13 +1,9 @@
 package opensea
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -97,13 +93,13 @@ type errNoSingleNFTForOpenseaID struct {
 	openseaID int
 }
 
-// PipelineAssetsForAcc is a pipeline for getting assets for an account
-func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
-	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) ([]persist.NFT, error) {
+// UpdateAssetsForAcc is a pipeline for getting assets for an account
+func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
+	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
+		return fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
 	}
 	if len(pOwnerWalletAddresses) == 0 {
 		pOwnerWalletAddresses = user.Addresses
@@ -111,103 +107,21 @@ func PipelineAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWall
 
 	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch assets for user %s: %w", pUserID, err)
+		return fmt.Errorf("failed to fetch assets for user %s: %w", pUserID, err)
 	}
 
 	ids, err := nftRepo.BulkUpsert(pCtx, pUserID, asDBNfts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to bulk upsert NFTs: %w", err)
+		return fmt.Errorf("failed to bulk upsert NFTs: %w", err)
 	}
 
 	// update other user's collections and this user's collection so that they and ONLY they can display these
 	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
 	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
-		return nil, fmt.Errorf("failed to claim NFTs: %w", err)
+		return fmt.Errorf("failed to claim NFTs: %w", err)
 	}
 
-	result, err := fillNFTIDs(pCtx, asDBNfts, user, nftRepo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert NFTs to Gallery NFTs: %w", err)
-	}
-
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no NFTs found for user %s", pUserID)
-	}
-
-	return result, nil
-}
-
-func syncHistories(pCtx context.Context, pNfts []*persist.NFT, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) ([]*persist.NFT, error) {
-	resultChan := make(chan *persist.NFT)
-	errorChan := make(chan error)
-	updatedNfts := make([]*persist.NFT, len(pNfts))
-
-	// create a goroutine for each nft and sync history
-	for _, nft := range pNfts {
-		go func(n *persist.NFT) {
-			if !n.MultipleOwners {
-				history, err := syncHistory(pCtx, n.OpenseaTokenID, n.Contract.ContractAddress, n.OwnerAddress, userRepo, nftRepo, historyRepo)
-				if err != nil {
-					errorChan <- err
-					return
-				}
-
-				n.OwnershipHistory = history
-			}
-			resultChan <- n
-		}(nft)
-
-	}
-
-	// wait for all goroutines to finish and collect results from chan
-	for i := 0; i < len(pNfts); i++ {
-		select {
-		case nft := <-resultChan:
-			updatedNfts[i] = nft
-		case err := <-errorChan:
-			return nil, err
-
-		}
-	}
-	return updatedNfts, nil
-}
-
-func syncHistory(pCtx context.Context, pTokenID persist.TokenID, pTokenContractAddress, pWalletAddress persist.Address, userRepo persist.UserRepository, nftRepo persist.NFTRepository, historyRepo persist.OwnershipHistoryRepository) (persist.OwnershipHistory, error) {
-	getURL := fmt.Sprintf("https://api.opensea.io/api/v1/events?token_id=%s&asset_contract_address=%s&event_type=transfer&only_opensea=false&limit=50&offset=0", pTokenID, pTokenContractAddress)
-	events := persist.OwnershipHistory{}
-	resp, err := http.Get(getURL)
-	if err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-	defer resp.Body.Close()
-	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, resp.Body); err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-	openseaEvents := &Events{}
-	if err := json.Unmarshal(buf.Bytes(), openseaEvents); err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-
-	events, err = openseaToGalleryEvents(pCtx, openseaEvents, userRepo)
-	if err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-
-	nfts, err := nftRepo.GetByContractData(pCtx, pTokenID, pTokenContractAddress)
-	if err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-	if len(nfts) < 1 {
-		return persist.OwnershipHistory{}, fmt.Errorf("no nfts found for token id: %s, contract address: %s", pTokenID, pTokenContractAddress)
-	}
-
-	err = historyRepo.Upsert(pCtx, nfts[0].ID, events)
-	if err != nil {
-		return persist.OwnershipHistory{}, err
-	}
-
-	return events, nil
+	return nil
 }
 
 func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
@@ -342,67 +256,6 @@ func assetsToNFTs(pCtx context.Context, pWalletAddress persist.Address, openseaN
 	return nfts, nil
 }
 
-func fillNFTIDs(pCtx context.Context, pNfts []persist.NFT, pUser persist.User, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
-
-	nfts := make([]persist.NFT, len(pNfts))
-	nftChan := make(chan persist.NFT)
-	errChan := make(chan error)
-	for _, nft := range pNfts {
-		go func(n persist.NFT) {
-			result := persist.NFT{
-				ID:                   n.ID,
-				Name:                 n.Name,
-				MultipleOwners:       n.MultipleOwners,
-				Description:          n.Description,
-				Version:              n.Version,
-				CreationTime:         n.CreationTime,
-				Deleted:              n.Deleted,
-				CollectorsNote:       n.CollectorsNote,
-				TokenCollectionName:  n.TokenCollectionName,
-				ExternalURL:          n.ExternalURL,
-				TokenMetadataURL:     n.TokenMetadataURL,
-				ImageURL:             n.ImageURL,
-				CreatorAddress:       n.CreatorAddress,
-				OwnershipHistory:     n.OwnershipHistory,
-				CreatorName:          n.CreatorName,
-				OwnerAddress:         n.OwnerAddress,
-				Contract:             n.Contract,
-				OpenseaID:            n.OpenseaID,
-				OpenseaTokenID:       n.OpenseaTokenID,
-				ImageThumbnailURL:    n.ImageThumbnailURL,
-				ImagePreviewURL:      n.ImagePreviewURL,
-				ImageOriginalURL:     n.ImageOriginalURL,
-				AnimationURL:         n.AnimationURL,
-				AnimationOriginalURL: n.AnimationOriginalURL,
-				AcquisitionDateStr:   n.AcquisitionDateStr,
-			}
-			if n.ID == "" {
-				dbNFT, err := nftRepo.GetByOpenseaID(pCtx, n.OpenseaID, n.OwnerAddress)
-				if err != nil {
-					errChan <- fmt.Errorf("failed to get nft by opensea id %s: %s", n.OpenseaID, err)
-					return
-				}
-				if len(dbNFT) == 0 {
-					errChan <- errNoSingleNFTForOpenseaID{int(n.OpenseaID.Int64())}
-					return
-				}
-				result.ID = dbNFT[0].ID
-			}
-			nftChan <- result
-		}(nft)
-	}
-	for i := 0; i < len(pNfts); i++ {
-		select {
-		case nft := <-nftChan:
-			nfts[i] = nft
-		case err := <-errChan:
-			return nil, err
-		}
-	}
-
-	return nfts, nil
-}
-
 func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft Asset, nftRepo persist.NFTRepository) persist.NFT {
 
 	result := persist.NFT{
@@ -434,30 +287,6 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 
 	return result
 
-}
-
-func openseaToGalleryEvents(pCtx context.Context, pEvents *Events, userRepo persist.UserRepository) (persist.OwnershipHistory, error) {
-	timeLayout := "2006-01-02T15:04:05"
-	ownershipHistory := persist.OwnershipHistory{Owners: []persist.Owner{}}
-	for _, event := range pEvents.Events {
-		owner := persist.Owner{}
-		time, err := time.Parse(timeLayout, event.CreatedDate)
-		if err != nil {
-			return persist.OwnershipHistory{}, err
-		}
-		owner.TimeObtained = time
-		owner.Address = event.ToAccount.Address
-		user, err := userRepo.GetByAddress(pCtx, event.ToAccount.Address)
-		if err == nil {
-			owner.UserID = user.ID
-			owner.Username = persist.NullString(user.Username)
-		}
-		ownershipHistory.Owners = append(ownershipHistory.Owners, owner)
-	}
-	sort.Slice(ownershipHistory.Owners, func(i, j int) bool {
-		return ownershipHistory.Owners[i].TimeObtained.After(ownershipHistory.Owners[j].TimeObtained)
-	})
-	return ownershipHistory, nil
 }
 
 func (e errNoNFTForTokenIdentifiers) Error() string {

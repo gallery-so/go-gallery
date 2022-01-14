@@ -200,13 +200,13 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 		}
 
-		nfts, err := opensea.PipelineAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
+		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, getNftsOutput{Nfts: nfts})
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
 func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {

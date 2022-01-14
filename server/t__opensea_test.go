@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"testing"
@@ -19,10 +18,6 @@ func TestOpenseaSync_Success(t *testing.T) {
 	ctx := context.Background()
 
 	mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
-	robin := persist.User{Username: "robin", UsernameIdempotent: "robin", Addresses: []persist.Address{persist.Address(strings.ToLower("0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"))}}
-
-	robinUserID, err := tc.repos.userRepository.Create(ctx, robin)
-	assert.Nil(err)
 
 	mikeUserID, err := tc.repos.userRepository.Create(ctx, mike)
 	assert.Nil(err)
@@ -79,10 +74,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
-	robinOpenseaNFTs, err := opensea.PipelineAssetsForAcc(ctx, robinUserID, []persist.Address{"0x70d04384b5c3a466ec4d8cfb8213efc31c6a9d15"}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
-	assert.Nil(err)
-
-	mikeOpenseaNFTs, err := opensea.PipelineAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
 	assert.Nil(err)
 
 	time.Sleep(time.Second * 3)
@@ -91,41 +83,8 @@ func TestOpenseaSync_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Len(mikeColl.NFTs, 1)
 
-	robinNFTs, err := tc.repos.nftRepository.GetByUserID(ctx, robinUserID)
-	assert.Nil(err)
-
 	mikeNFTs, err := tc.repos.nftRepository.GetByUserID(ctx, mikeUserID)
 	assert.Nil(err)
-
-	ids1 := make([]int, len(robinOpenseaNFTs))
-	ids2 := make([]int, len(robinNFTs))
-	for i, nft := range robinOpenseaNFTs {
-		ids1[i] = int(nft.OpenseaID.Int64())
-	}
-	for i, nft := range robinNFTs {
-		ids2[i] = int(nft.OpenseaID.Int64())
-	}
-
-	// a function that finds the difference between two arrays
-	arrayDiff := func(a, b []int) []int {
-		mb := map[int]bool{}
-		for _, x := range b {
-			mb[x] = true
-		}
-		ab := []int{}
-		for _, x := range a {
-			if _, ok := mb[x]; !ok {
-				ab = append(ab, x)
-			}
-		}
-		return ab
-	}
-
-	log.Println("DIF", arrayDiff(ids1, ids2))
-
-	assert.Len(robinOpenseaNFTs, len(robinNFTs))
-
-	assert.Len(mikeOpenseaNFTs, len(mikeNFTs))
 
 	assert.Greater(len(mikeNFTs), 0)
 
