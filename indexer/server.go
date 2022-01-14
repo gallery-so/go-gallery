@@ -107,7 +107,7 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 		ginContext.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
 		tq.QueueTask(key, func() {
-			c, cancel := context.WithTimeout(ginContext, 30*time.Second)
+			c, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, storageClient)
 			for i := 0; i < len(tokens); i++ {
