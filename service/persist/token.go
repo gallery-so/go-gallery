@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mikeydub/go-gallery/util"
@@ -353,7 +354,7 @@ func (uri TokenURI) Type() URIType {
 }
 
 func (id TokenID) String() string {
-	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
+	return strings.ToLower(id.BigInt().Text(16))
 }
 
 // Value implements the driver.Valuer interface for token IDs
@@ -371,11 +372,34 @@ func (id *TokenID) Scan(src interface{}) error {
 	return nil
 }
 
+// DetectBase returns the base of the token URI
+func (id TokenID) DetectBase() int {
+	if len(id) > 64 {
+		return 10
+	}
+	if strings.HasPrefix(string(id), "0x") {
+		return 16
+	}
+	for i := 0; i < len(id); i++ {
+		if unicode.IsLetter(rune(id[i])) {
+			return 16
+		}
+	}
+	return 10
+}
+
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
-	i, ok := new(big.Int).SetString(id.String(), 16)
+	normalized := util.RemoveLeftPaddedZeros(string(id))
+	base := id.DetectBase()
+	i, ok := new(big.Int).SetString(normalized, base)
 	if !ok {
-		i, ok = new(big.Int).SetString(id.String(), 10)
+		if base == 16 {
+			base = 10
+		} else {
+			base = 16
+		}
+		i, ok = new(big.Int).SetString(normalized, base)
 		if !ok {
 			panic("failed to convert token ID to big.Int")
 		}
