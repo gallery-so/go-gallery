@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // Assets is a list of NFTs from OpenSea
@@ -196,6 +197,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
