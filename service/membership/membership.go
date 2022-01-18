@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gammazero/workerpool"
@@ -206,14 +207,22 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		wp.Submit(f)
 	}
 	receivedOwners := map[persist.Address]bool{}
+	receivedUsers := map[string]bool{}
 	for i := 0; i < len(events); i++ {
 		owner := <-ownersChan
 		if receivedOwners[owner.Address] || owner.Address == "" {
 			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
 			continue
 		}
+		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
+			logrus.Debugf("Skipping duplicate username for ID %s: %s", id, owner.Username)
+			continue
+		}
 		tier.Owners = append(tier.Owners, owner)
 		receivedOwners[owner.Address] = true
+		if owner.Username != "" {
+			receivedUsers[strings.ToLower(owner.Username.String())] = true
+		}
 	}
 	wp.StopWait()
 	logrus.Debugf("Done receiving owners for token %s", id)
