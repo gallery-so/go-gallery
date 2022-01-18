@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -110,9 +109,7 @@ func TestUpdateTokenByID_UnauthedError(t *testing.T) {
 	resp := updateTokenUnauthedRequest(assert, update)
 	assertErrorResponse(assert, resp)
 
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(auth.ErrInvalidAuthHeader.Error(), body.Error)
+	assert.Equal(resp.StatusCode, http.StatusUnauthorized)
 }
 
 func TestUpdateTokenByID_NoIDFieldError(t *testing.T) {
