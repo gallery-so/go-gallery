@@ -223,9 +223,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 		}
 
 		accountedFor := make(map[persist.DBID]bool)
-		unaccountedFor := make(map[string]bool)
-
-		allUnaccountedForAssets := make([]opensea.Asset, 0, len(openseaAssets))
+		unaccountedFor := make(map[string]opensea.Asset)
 
 		for _, asset := range openseaAssets {
 			af := false
@@ -240,8 +238,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 				}
 			}
 			if !af {
-				unaccountedFor[asset.Contract.ContractAddress.String()+" -- "+asset.TokenID.String()] = true
-				allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
+				unaccountedFor[asset.Contract.ContractAddress.String()+" -- "+asset.TokenID.String()] = asset
 			}
 		}
 
@@ -261,6 +258,10 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			c.JSON(http.StatusOK, output)
 
 			go func() {
+				allUnaccountedForAssets := make([]opensea.Asset, 0, len(unaccountedFor))
+				for _, asset := range unaccountedFor {
+					allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
+				}
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				defer cancel()
 				if err := processUnaccountedForNFTs(ctx, allUnaccountedForAssets, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
@@ -280,7 +281,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
 	store := map[persist.TokenIdentifiers]*persist.Token{}
 	allTokens := make([]persist.Token, 0, len(assets))
-	ctrcts := make([]persist.Contract, 0, len(assets))
+	cntracts := make([]persist.Contract, 0, len(assets))
 	for _, a := range assets {
 
 		block, err := ethcl.BlockNumber(ctx)
@@ -292,7 +293,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			Name:            persist.NullString(a.Name),
 			Description:     persist.NullString(a.Description),
 			Chain:           persist.ChainETH,
-			TokenID:         a.TokenID,
+			TokenID:         persist.TokenID(a.TokenID.ToBase16()),
 			ContractAddress: a.Contract.ContractAddress,
 			OwnerAddress:    a.Owner.Address,
 			TokenURI:        persist.TokenURI(a.TokenMetadataURL),
@@ -330,7 +331,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			Name:        a.Contract.ContractName,
 			LatestBlock: persist.BlockNumber(block),
 		}
-		ctrcts = append(ctrcts, c)
+		cntracts = append(cntracts, c)
 	}
 
 	updates, errs := updateMediaForTokens(ctx, allTokens, ethcl, ipfsClient, stg)
@@ -354,7 +355,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 		}
 	}
 
-	if err := contractRepository.BulkUpsert(ctx, ctrcts); err != nil {
+	if err := contractRepository.BulkUpsert(ctx, cntracts); err != nil {
 		return err
 	}
 

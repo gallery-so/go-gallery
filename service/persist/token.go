@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"unicode"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mikeydub/go-gallery/util"
@@ -354,7 +353,7 @@ func (uri TokenURI) Type() URIType {
 }
 
 func (id TokenID) String() string {
-	return strings.ToLower(id.BigInt().Text(16))
+	return strings.ToLower(util.RemoveLeftPaddedZeros(string(id)))
 }
 
 // Value implements the driver.Valuer interface for token IDs
@@ -372,41 +371,18 @@ func (id *TokenID) Scan(src interface{}) error {
 	return nil
 }
 
-// DetectBase returns the base of the token URI
-func (id TokenID) DetectBase() int {
-	if strings.HasPrefix(string(id), "0x") {
-		return 16
-	}
-	if len(id) > 64 {
-		return 10
-	}
-	for i := 0; i < len(id); i++ {
-		if unicode.IsLetter(rune(id[i])) {
-			return 16
-		}
-	}
-	return 10
-}
-
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
 	normalized := util.RemoveLeftPaddedZeros(string(id))
 	if normalized == "" {
 		return big.NewInt(0)
 	}
-	base := id.DetectBase()
-	i, ok := new(big.Int).SetString(normalized, base)
+	i, ok := new(big.Int).SetString(normalized, 16)
+
 	if !ok {
-		if base == 16 {
-			base = 10
-		} else {
-			base = 16
-		}
-		i, ok = new(big.Int).SetString(normalized, base)
-		if !ok {
-			panic(fmt.Sprintf("failed to parse token ID %s as base %d", normalized, base))
-		}
+		panic(fmt.Sprintf("failed to parse token ID %s as base 16", normalized))
 	}
+
 	return i
 }
 

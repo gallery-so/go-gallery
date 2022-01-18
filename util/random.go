@@ -5,6 +5,8 @@ import (
 )
 
 const alphanumeric = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+// use uppercase and lowercase because there will be cases where we are receiving hex strings from inputs that are mixed case (such as Ethereum addresses)
 const hex = "0123456789abcdefABCDEF"
 
 // RandStringBytes returns a random alphanumeric string of given length
