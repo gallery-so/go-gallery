@@ -262,7 +262,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 
 	result := persist.NFT{
 		OwnerAddress:         pWalletAddress,
-		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
+		MultipleOwners:       nft.Owner.Address == persist.ZeroAddress,
 		Name:                 persist.NullString(nft.Name),
 		Description:          persist.NullString(nft.Description),
 		ExternalURL:          persist.NullString(nft.ExternalURL),
