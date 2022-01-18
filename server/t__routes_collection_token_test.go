@@ -407,9 +407,9 @@ func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionNam
 
 func seedTokens(assert *assert.Assertions) []persist.DBID {
 	nfts := []persist.Token{
-		{CollectorsNote: "asd", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandStringBytes(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandStringBytes(40)))},
-		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandStringBytes(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandStringBytes(40)))},
-		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandStringBytes(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandStringBytes(40)))},
+		{CollectorsNote: "asd", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
+		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
+		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
 	}
 	nftIDs, err := tc.repos.tokenRepository.CreateBulk(context.Background(), nfts)
 	assert.Nil(err)

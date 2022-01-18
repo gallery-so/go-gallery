@@ -66,7 +66,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, userRepo, tq, ethClient, ipfsClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, s), i
 }
 
 func setDefaults() {
