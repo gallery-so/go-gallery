@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -17,26 +18,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-// RequiredNFTs is a list of NFTs that are required for the user to be able to use the service as an authenticated user
-var RequiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
-
-const (
-	// UserIDContextKey is the key for the user id in the context
-	UserIDContextKey = "user_id"
-	// AuthContextKey is the key for the auth status in the context
-	AuthContextKey = "authenticated"
-)
-
 var rateLimiter = newIPRateLimiter(1, 5)
-
-// ErrInvalidJWT is returned when the JWT is invalid
-var ErrInvalidJWT = errors.New("invalid JWT")
 
 // ErrRateLimited is returned when the IP address has exceeded the rate limit
 var ErrRateLimited = errors.New("rate limited")
-
-// ErrInvalidAuthHeader is returned when the auth header is invalid
-var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 
 var mixpanelDistinctIDs = map[string]string{}
 
@@ -48,60 +33,58 @@ type errUserDoesNotHaveRequiredNFT struct {
 func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
-		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
-			return
-		}
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				c.Set(UserIDContextKey, persist.DBID(authHeaders[1]))
+				c.Set(auth.UserIDContextKey, persist.DBID(authHeaders[1]))
 				c.Next()
 				return
 			}
-			if authHeaders[0] != "Bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
+		}
+		jwt, err := c.Cookie(auth.JWTCookieKey)
+		if err != nil {
+			if err == http.ErrNoCookie {
+				c.AbortWithError(http.StatusUnauthorized, auth.ErrNoJWT)
 				return
 			}
-			// get string after "Bearer"
-			jwt := authHeaders[1]
-			// use an env variable as jwt secret as upposed to using a stateful secret stored in
-			// database that is unique to every user and session
-			valid, userID, err := AuthJWTParse(jwt, viper.GetString("JWT_SECRET"))
-			if err != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
-				return
-			}
-
-			if !valid {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: ErrInvalidJWT.Error()})
-				return
-			}
-
-			if viper.GetBool("REQUIRE_NFTS") {
-				user, err := userRepository.GetByID(c, userID)
-				if err != nil {
-					c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-					return
-				}
-				has := false
-				for _, addr := range user.Addresses {
-					if res, _ := ethClient.HasNFTs(c, RequiredNFTs, addr); res {
-						has = true
-						break
-					}
-				}
-				if !has {
-					c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Addresses}.Error()})
-					return
-				}
-			}
-
-			c.Set(UserIDContextKey, userID)
-		} else {
-			c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: ErrInvalidAuthHeader.Error()})
+			c.AbortWithError(http.StatusUnauthorized, auth.ErrInvalidJWT)
 			return
 		}
+
+		// use an env variable as jwt secret as upposed to using a stateful secret stored in
+		// database that is unique to every user and session
+		valid, userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
+			return
+		}
+
+		if !valid {
+			c.AbortWithError(http.StatusUnauthorized, auth.ErrInvalidJWT)
+			return
+		}
+
+		if viper.GetBool("REQUIRE_NFTS") {
+			user, err := userRepository.GetByID(c, userID)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
+				return
+			}
+			has := false
+			for _, addr := range user.Addresses {
+				if res, _ := ethClient.HasNFTs(c, auth.RequiredNFTs, addr); res {
+					has = true
+					break
+				}
+			}
+			if !has {
+				c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Addresses}.Error()})
+				return
+			}
+		}
+
+		c.Set(auth.UserIDContextKey, userID)
+
 		c.Next()
 	}
 }
@@ -111,27 +94,28 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 func JWTOptional() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
-		if header != "" {
-			authHeaders := strings.Split(header, " ")
-			if len(authHeaders) == 2 {
-				if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-					c.Set(UserIDContextKey, persist.DBID(authHeaders[1]))
-					c.Next()
-					return
-				}
-				// get string after "Bearer"
-				jwt := authHeaders[1]
-				valid, userID, _ := AuthJWTParse(jwt, viper.GetString("JWT_SECRET"))
-				c.Set(AuthContextKey, valid)
-				c.Set(UserIDContextKey, userID)
-			} else {
-				c.Set(AuthContextKey, false)
-				c.Set(UserIDContextKey, persist.DBID(""))
+		authHeaders := strings.Split(header, " ")
+		if len(authHeaders) == 2 {
+			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
+				c.Set(auth.UserIDContextKey, persist.DBID(authHeaders[1]))
+				c.Next()
+				return
 			}
-		} else {
-			c.Set(AuthContextKey, false)
-			c.Set(UserIDContextKey, persist.DBID(""))
 		}
+		jwt, err := c.Cookie(auth.JWTCookieKey)
+		if err != nil {
+			if err == http.ErrNoCookie {
+				c.Set(auth.AuthContextKey, false)
+				c.Set(auth.UserIDContextKey, persist.DBID(""))
+				c.Next()
+				return
+			}
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
+		valid, userID, _ := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		c.Set(auth.AuthContextKey, valid)
+		c.Set(auth.UserIDContextKey, userID)
 		c.Next()
 	}
 }
@@ -176,7 +160,7 @@ func MixpanelTrack(eventName string, keys []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		var distinctID string
-		userID, ok := c.Get(UserIDContextKey)
+		userID, ok := c.Get(auth.UserIDContextKey)
 		if ok {
 			distinctID = string(userID.(persist.DBID))
 		} else {
@@ -244,11 +228,6 @@ func ErrLogger() gin.HandlerFunc {
 			logrus.Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
 		}
 	}
-}
-
-// GetUserIDFromCtx returns the user ID from the context
-func GetUserIDFromCtx(c *gin.Context) persist.DBID {
-	return c.MustGet(UserIDContextKey).(persist.DBID)
 }
 
 func (e errUserDoesNotHaveRequiredNFT) Error() string {

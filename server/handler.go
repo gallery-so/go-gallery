@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 )
@@ -28,8 +29,8 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 
 	// AUTH
 	authGroup.GET("/get_preflight", middleware.JWTOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
-	authGroup.GET("/jwt_valid", middleware.JWTOptional(), middleware.ValidateJWT())
-	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, middleware.RequiredNFTs))
+	authGroup.GET("/jwt_valid", middleware.JWTOptional(), auth.ValidateJWT())
+	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, auth.RequiredNFTs))
 
 	// USER
 
@@ -51,8 +52,8 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 
 	// AUTH
 	authGroup.GET("/get_preflight", middleware.JWTOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
-	authGroup.GET("/jwt_valid", middleware.JWTOptional(), middleware.ValidateJWT())
-	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, middleware.RequiredNFTs))
+	authGroup.GET("/jwt_valid", middleware.JWTOptional(), auth.ValidateJWT())
+	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, auth.RequiredNFTs))
 
 	// USER
 

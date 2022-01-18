@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
@@ -31,16 +31,38 @@ const (
 	WalletTypeGnosis
 )
 
+const (
+	// UserIDContextKey is the key for the user id in the context
+	UserIDContextKey = "user_id"
+	// AuthContextKey is the key for the auth status in the context
+	AuthContextKey = "authenticated"
+)
+
 // NoncePrepend is what is prepended to every nonce
 const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
 // NewNoncePrepend is what will now be prepended to every nonce
 const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a password: "
 
+// JWTCookieKey is the key used to store the JWT token in the cookie
+const JWTCookieKey = "GLRY_JWT"
+
+// RequiredNFTs is a list of NFTs that are required for the user to be able to use the service as an authenticated user
+var RequiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
+
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
 // ErrNonceMismatch is returned when the nonce does not match the expected nonce
 var ErrNonceMismatch = errors.New("incorrect nonce input")
+
+// ErrInvalidJWT is returned when the JWT is invalid
+var ErrInvalidJWT = errors.New("invalid JWT")
+
+// ErrNoJWT is returned when there is no JWT in the request
+var ErrNoJWT = errors.New("no jwt passed as cookie")
+
+// ErrInvalidAuthHeader is returned when the auth header is invalid
+var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
@@ -157,7 +179,7 @@ func LoginPipeline(pCtx context.Context, pInput LoginInput, userRepo persist.Use
 
 	output.UserID = userID
 
-	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -307,7 +329,7 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 
 		if !pPreAuthed {
 
-			hasNFT, err := ethClient.HasNFTs(pCtx, middleware.RequiredNFTs, pInput.Address)
+			hasNFT, err := ethClient.HasNFTs(pCtx, RequiredNFTs, pInput.Address)
 			if err != nil {
 				return nil, err
 			}
@@ -381,4 +403,9 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 	}
 
 	return nonceValue, userID, nil
+}
+
+// GetUserIDFromCtx returns the user ID from the context
+func GetUserIDFromCtx(c *gin.Context) persist.DBID {
+	return c.MustGet(UserIDContextKey).(persist.DBID)
 }

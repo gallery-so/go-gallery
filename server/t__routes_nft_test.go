@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -77,7 +77,7 @@ func TestUpdateNftByID_Success(t *testing.T) {
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+	resp := updateNFTRequest(assert, update, tc.user1)
 	assertValidResponse(assert, resp)
 	errResp := util.ErrorResponse{}
 	json.NewDecoder(resp.Body).Decode(&errResp)
@@ -117,14 +117,14 @@ func TestUpdateNftByID_UnauthedError(t *testing.T) {
 
 	body := util.ErrorResponse{}
 	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(middleware.ErrInvalidAuthHeader.Error(), body.Error)
+	assert.Equal(auth.ErrInvalidAuthHeader.Error(), body.Error)
 }
 
 func TestUpdateNftByID_NoIDFieldError(t *testing.T) {
 	assert := setupTest(t, 1)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft note"}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+	resp := updateNFTRequest(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -137,7 +137,7 @@ func TestUpdateNftByID_NotFoundError(t *testing.T) {
 
 	nftID := persist.DBID("no exist :(")
 	update := updateNftByIDInput{CollectorsNote: "new nft note", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user1.jwt)
+	resp := updateNFTRequest(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -155,7 +155,7 @@ func TestUpdateNftByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	assert.Nil(err)
 
 	update := updateNftByIDInput{CollectorsNote: "new nft name", ID: nftID}
-	resp := updateNFTRequest(assert, update, tc.user2.jwt)
+	resp := updateNFTRequest(assert, update, tc.user2)
 	assertErrorResponse(assert, resp)
 
 }
@@ -171,7 +171,7 @@ func updateNFTUnauthedRequest(assert *assert.Assertions, update updateNftByIDInp
 	return resp
 }
 
-func updateNFTRequest(assert *assert.Assertions, update updateNftByIDInput, jwt string) *http.Response {
+func updateNFTRequest(assert *assert.Assertions, update updateNftByIDInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(update)
 	assert.Nil(err)
 
@@ -180,9 +180,8 @@ func updateNFTRequest(assert *assert.Assertions, update updateNftByIDInput, jwt 
 		fmt.Sprintf("%s/nfts/update", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }

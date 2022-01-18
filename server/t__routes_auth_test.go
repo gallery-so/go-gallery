@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -20,7 +20,7 @@ import (
 func TestAuthPreflightUserExists_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	resp := getPreflightRequest(assert, tc.user1.address, tc.user1.jwt)
+	resp := getPreflightRequest(assert, tc.user1)
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
@@ -37,7 +37,7 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	resp := getPreflightRequest(assert, "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", "")
+	resp := getPreflightRequest(assert, &TestUser{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", client: &http.Client{}})
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
@@ -54,7 +54,12 @@ func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	resp := getPreflightRequest(assert, "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", tc.user1.jwt)
+	j, err := cookiejar.New(nil)
+	assert.Nil(err)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", client: client, jwt: tc.user1.jwt}
+	getFakeCookie(assert, tu.jwt, tu.client)
+	resp := getPreflightRequest(assert, tu)
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
@@ -62,7 +67,7 @@ func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 		Error string `json:"error"`
 	}
 	output := &PreflightResp{}
-	err := util.UnmarshallBody(output, resp.Body)
+	err = util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.Empty(output.Error)
 	assert.False(output.UserExists)
@@ -371,10 +376,10 @@ func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
 
 func TestJwtValid_Success(t *testing.T) {
 	assert := setupTest(t, 1)
-	resp := jwtValidRequest(assert, tc.user1.jwt)
+	resp := jwtValidRequest(assert, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
-	output := &middleware.JWTValidateResponse{}
+	output := &auth.JWTValidateResponse{}
 	err := util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.True(output.IsValid)
@@ -383,37 +388,32 @@ func TestJwtValid_Success(t *testing.T) {
 
 func TestJwtValid_WrongSignatureAndClaims_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
-	resp := jwtValidRequest(assert, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUZXN0IiwiaWF0IjoxNjMzMDE1MTM1LCJleHAiOjE2NjQ1NTExMzUsImF1ZCI6InRlc3QiLCJzdWIiOiJ0ZXN0IiwiVGVzdCI6IlRlc3QifQ.ewGO4x1xEN01CCZTp5vg0d_rxzdzH_rY0zBXVT1OVJY")
+	resp := jwtValidRequest(assert, generateTestUser(assert, tc.repos, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUZXN0IiwiaWF0IjoxNjMzMDE1MTM1LCJleHAiOjE2NjQ1NTExMzUsImF1ZCI6InRlc3QiLCJzdWIiOiJ0ZXN0IiwiVGVzdCI6IlRlc3QifQ.ewGO4x1xEN01CCZTp5vg0d_rxzdzH_rY0zBXVT1OVJY"))
 	assertValidJSONResponse(assert, resp)
 
-	output := &middleware.JWTValidateResponse{}
+	output := &auth.JWTValidateResponse{}
 	err := util.UnmarshallBody(output, resp.Body)
 	assert.Nil(err)
 	assert.False(output.IsValid)
 }
 
-func jwtValidRequest(assert *assert.Assertions, jwt string) *http.Response {
+func jwtValidRequest(assert *assert.Assertions, t *TestUser) *http.Response {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/auth/jwt_valid", tc.serverURL),
 		nil)
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := t.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
 
-func getPreflightRequest(assert *assert.Assertions, address persist.Address, jwt string) *http.Response {
+func getPreflightRequest(assert *assert.Assertions, t *TestUser) *http.Response {
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/auth/get_preflight?address=%s", tc.serverURL, address),
+		fmt.Sprintf("%s/auth/get_preflight?address=%s", tc.serverURL, t.address),
 		nil)
 	assert.Nil(err)
-	if jwt != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := t.client.Do(req)
 	assert.Nil(err)
 	return resp
 }

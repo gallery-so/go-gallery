@@ -46,23 +46,23 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
-	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll 
+	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
 	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
-	c.LAYOUT,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll 
+	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
 	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
 	checkNoErr(err)
@@ -214,7 +214,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
-			&collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
+			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
 			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
 		if err != nil {
@@ -226,12 +226,16 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.Collection, 0, 10)
-			collection.NFTs = []persist.CollectionNFT{nft}
+			if nft.ID != "" {
+				collection.NFTs = []persist.CollectionNFT{nft}
+			}
 			colls = append(colls, collection)
 			collections[gallery.ID] = colls
 		} else {
 			if lastCollID != collection.ID {
-				collection.NFTs = []persist.CollectionNFT{nft}
+				if nft.ID != "" {
+					collection.NFTs = []persist.CollectionNFT{nft}
+				}
 				colls = append(colls, collection)
 			} else {
 				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
@@ -295,7 +299,7 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
-			&collection.Layout, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
+			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
 			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
 		if err != nil {
@@ -307,12 +311,16 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.Collection, 0, 10)
-			collection.NFTs = []persist.CollectionNFT{nft}
+			if nft.ID != "" {
+				collection.NFTs = []persist.CollectionNFT{nft}
+			}
 			colls = append(colls, collection)
 			collections[gallery.ID] = colls
 		} else {
 			if lastCollID != collection.ID {
-				collection.NFTs = []persist.CollectionNFT{nft}
+				if nft.ID != "" {
+					collection.NFTs = []persist.CollectionNFT{nft}
+				}
 				colls = append(colls, collection)
 			} else {
 				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)

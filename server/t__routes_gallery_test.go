@@ -80,9 +80,7 @@ func updateTestGallery(assert *assert.Assertions, update interface{}) {
 		bytes.NewBuffer(data))
 	assert.Nil(err)
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := tc.user1.client.Do(req)
 	assert.Nil(err)
 	assertValidResponse(assert, resp)
 }

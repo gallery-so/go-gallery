@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 
-	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -96,7 +96,7 @@ func updateGalleryToken(galleryRepository persist.GalleryTokenRepository) gin.Ha
 			return
 		}
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
