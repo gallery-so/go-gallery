@@ -221,6 +221,13 @@ func MixpanelTrack(eventName string, keys []string) gin.HandlerFunc {
 	}
 }
 
+// BlockRequest is a middleware that blocks posts from being created
+func BlockRequest() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: "gallery in maintenance, please try again later"})
+	}
+}
+
 // ErrLogger is a middleware that logs errors
 func ErrLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
