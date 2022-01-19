@@ -55,7 +55,7 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 
 	username := util.RandStringBytes(40)
 
-	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandStringBytes(40))))
+	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandHexString(40))))
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),

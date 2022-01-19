@@ -3,6 +3,7 @@ package opensea
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -11,6 +12,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+// TokenID represents a token ID from Opensea. It is separate from persist.TokenID becuase opensea returns token IDs in base 10 format instead of what we want, base 16
+type TokenID string
 
 // Assets is a list of NFTs from OpenSea
 type Assets struct {
@@ -35,7 +39,7 @@ type Asset struct {
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	TokenID persist.TokenID `json:"token_id"`
+	TokenID TokenID `json:"token_id"`
 
 	// IMAGES - OPENSEA
 	ImageURL             string `json:"image_url"`
@@ -83,11 +87,6 @@ type Collection struct {
 type Order struct {
 	Maker Account `json:"maker"`
 	Taker Account `json:"taker"`
-}
-
-type errNoNFTForTokenIdentifiers struct {
-	tokenID         persist.TokenID
-	contractAddress persist.Address
 }
 
 type errNoSingleNFTForOpenseaID struct {
@@ -262,14 +261,14 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 
 	result := persist.NFT{
 		OwnerAddress:         pWalletAddress,
-		MultipleOwners:       nft.Owner.Address == "0x0000000000000000000000000000000000000000",
+		MultipleOwners:       nft.Owner.Address == persist.ZeroAddress,
 		Name:                 persist.NullString(nft.Name),
 		Description:          persist.NullString(nft.Description),
 		ExternalURL:          persist.NullString(nft.ExternalURL),
 		ImageURL:             persist.NullString(nft.ImageURL),
 		CreatorAddress:       nft.Creator.Address,
 		AnimationURL:         persist.NullString(nft.AnimationURL),
-		OpenseaTokenID:       nft.TokenID,
+		OpenseaTokenID:       persist.TokenID(nft.TokenID.ToBase16()),
 		OpenseaID:            persist.NullInt64(nft.ID),
 		TokenCollectionName:  persist.NullString(nft.Collection.Name),
 		ImageThumbnailURL:    persist.NullString(nft.ImageThumbnailURL),
@@ -291,10 +290,19 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 
 }
 
-func (e errNoNFTForTokenIdentifiers) Error() string {
-	return fmt.Sprintf("no NFT found for token id %s and contract address %s", e.tokenID, e.contractAddress)
-}
-
 func (e errNoSingleNFTForOpenseaID) Error() string {
 	return fmt.Sprintf("no single NFT found for opensea id %d", e.openseaID)
+}
+
+func (t TokenID) String() string {
+	return string(t)
+}
+
+// ToBase16 coverts a base 10 tokenID to base 16
+func (t TokenID) ToBase16() string {
+	asBig, ok := new(big.Int).SetString(string(t), 10)
+	if !ok {
+		panic("failed to convert opensea token id to big int")
+	}
+	return asBig.Text(16)
 }

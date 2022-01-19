@@ -291,7 +291,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				if err := t.deleteOldtoken(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
+				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
 				owners[ownership.Address.String()] = true
@@ -299,28 +299,33 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 	}
 
-	for i, token := range allTokens {
+
+   for i, token := range allTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			if err := t.deleteOldtoken(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}
 			allTokens = append(allTokens[:i], allTokens[i+1:]...)
 		}
 	}
+	// Postgres only allows 65535 parameters at a time.
+	// TODO: Consider trying this implementation at some point instead of chunking:
+	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
+	paramsPerRow := 19
+	rowsPerQuery := 65535 / paramsPerRow
 
-	// Postgres can't upsert more than 3400 tokens at a time
-	if len(allTokens) > (65535/19 - 1000) {
-		next := allTokens[(65535/19 - 1000):]
-		current := allTokens[:(65535/19 - 1000)]
+	if len(allTokens) > rowsPerQuery {
+		next := allTokens[rowsPerQuery:]
+		current := allTokens[:rowsPerQuery]
 		if err := t.BulkUpsert(pCtx, next); err != nil {
 			return err
 		}
 		allTokens = current
 	}
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	vals := make([]interface{}, 0, len(allTokens)*19)
+	vals := make([]interface{}, 0, len(allTokens)*paramsPerRow)
 	for i, token := range allTokens {
-		sqlStr += generateValuesPlaceholders(19, i*19) + ","
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
 		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
@@ -458,7 +463,7 @@ func (t *TokenRepository) Count(pCtx context.Context, pTokenType persist.TokenCo
 	return count, nil
 }
 
-func (t *TokenRepository) deleteOldtoken(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.Address) error {
+func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.Address) error {
 	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
 	return err
 }

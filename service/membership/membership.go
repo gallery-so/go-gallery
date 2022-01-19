@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gammazero/workerpool"
@@ -168,7 +169,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		event := e
 		f := func() {
 			logrus.Debugf("Processing event for ID %s %+v %d", id, event.ToAccount.Address, i)
-			if event.ToAccount.Address != "0x0000000000000000000000000000000000000000" {
+			if event.ToAccount.Address != persist.ZeroAddress {
 				logrus.Debug("Event is to real address")
 				membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 				// does to have the NFT?
@@ -206,14 +207,22 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 		wp.Submit(f)
 	}
 	receivedOwners := map[persist.Address]bool{}
+	receivedUsers := map[string]bool{}
 	for i := 0; i < len(events); i++ {
 		owner := <-ownersChan
 		if receivedOwners[owner.Address] || owner.Address == "" {
 			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
 			continue
 		}
+		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
+			logrus.Debugf("Skipping duplicate username for ID %s: %s", id, owner.Username)
+			continue
+		}
 		tier.Owners = append(tier.Owners, owner)
 		receivedOwners[owner.Address] = true
+		if owner.Username != "" {
+			receivedUsers[strings.ToLower(owner.Username.String())] = true
+		}
 	}
 	wp.StopWait()
 	logrus.Debugf("Done receiving owners for token %s", id)

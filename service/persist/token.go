@@ -98,6 +98,9 @@ const (
 // InvalidTokenURI represents an invalid token URI
 const InvalidTokenURI TokenURI = "INVALID"
 
+// ZeroAddress is the all-zero Ethereum address
+const ZeroAddress Address = "0x0000000000000000000000000000000000000000"
+
 // Address represents an Ethereum address
 type Address string
 
@@ -373,13 +376,16 @@ func (id *TokenID) Scan(src interface{}) error {
 
 // BigInt returns the token ID as a big.Int
 func (id TokenID) BigInt() *big.Int {
-	i, ok := new(big.Int).SetString(id.String(), 16)
-	if !ok {
-		i, ok = new(big.Int).SetString(id.String(), 10)
-		if !ok {
-			panic("failed to convert token ID to big.Int")
-		}
+	normalized := util.RemoveLeftPaddedZeros(string(id))
+	if normalized == "" {
+		return big.NewInt(0)
 	}
+	i, ok := new(big.Int).SetString(normalized, 16)
+
+	if !ok {
+		panic(fmt.Sprintf("failed to parse token ID %s as base 16", normalized))
+	}
+
 	return i
 }
 
