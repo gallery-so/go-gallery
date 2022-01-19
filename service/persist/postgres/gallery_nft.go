@@ -223,6 +223,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
 		}
+
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.Collection, 0, 10)
@@ -273,6 +274,9 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
 		for _, coll := range collections {
+			if coll.ID == "" {
+				continue
+			}
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
@@ -352,6 +356,9 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
 		for _, coll := range collections {
+			if coll.ID == "" {
+				continue
+			}
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		return gallery, nil

@@ -98,5 +98,17 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, token
 }
 
 func setJWTCookie(c *gin.Context, token string) {
-	c.SetCookie(auth.JWTCookieKey, token, viper.GetInt("JWT_TTL"), "/", "", viper.GetString("ENV") != "local", true)
+	mode := http.SameSiteStrictMode
+	if viper.GetString("ENV") != "production" {
+		mode = http.SameSiteNoneMode
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     auth.JWTCookieKey,
+		Value:    token,
+		MaxAge:   viper.GetInt("JWT_TTL"),
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: mode,
+	})
 }

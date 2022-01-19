@@ -44,10 +44,10 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				c.AbortWithError(http.StatusUnauthorized, auth.ErrNoJWT)
+				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrNoJWT.Error()})
 				return
 			}
-			c.AbortWithError(http.StatusUnauthorized, auth.ErrInvalidJWT)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
 			return
 		}
 
@@ -60,7 +60,7 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 		}
 
 		if !valid {
-			c.AbortWithError(http.StatusUnauthorized, auth.ErrInvalidJWT)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
 			return
 		}
 
@@ -143,8 +143,9 @@ func HandleCORS() gin.HandlerFunc {
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Set-Cookie")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type, Set-Cookie")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
