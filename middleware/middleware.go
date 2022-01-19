@@ -44,10 +44,10 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrNoJWT.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrNoJWT.Error()})
 				return
 			}
-			c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
 			return
 		}
 
@@ -60,7 +60,7 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 		}
 
 		if !valid {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
 			return
 		}
 
