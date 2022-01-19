@@ -99,8 +99,10 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, token
 
 func setJWTCookie(c *gin.Context, token string) {
 	mode := http.SameSiteStrictMode
+	domain := ".gallery.so"
 	if viper.GetString("ENV") != "production" {
 		mode = http.SameSiteNoneMode
+		domain = ""
 	}
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     auth.JWTCookieKey,
@@ -110,5 +112,6 @@ func setJWTCookie(c *gin.Context, token string) {
 		Secure:   true,
 		HttpOnly: true,
 		SameSite: mode,
+		Domain:   domain,
 	})
 }

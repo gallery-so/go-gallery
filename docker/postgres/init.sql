@@ -7,7 +7,7 @@ CREATE TABLE users (
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
     ADDRESSES varchar(255) [],
-    BIO varchar,
+    BIO varchar
 );
 
 CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
