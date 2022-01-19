@@ -5,6 +5,7 @@ CREATE TABLE users (
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
     ADDRESSES varchar(255) [],
+    BIO varchar,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

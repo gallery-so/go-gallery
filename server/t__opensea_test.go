@@ -2,15 +2,12 @@ package server
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestOpenseaSync_Success(t *testing.T) {
@@ -88,16 +85,4 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	assert.Greater(len(mikeNFTs), 0)
 
-}
-
-func openseaSyncRequest(assert *assert.Assertions, address persist.Address, jwt string) *http.Response {
-	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/nfts/opensea/refresh?addresses=%s", tc.serverURL, address),
-		nil)
-	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	assert.Nil(err)
-	return resp
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
@@ -94,7 +94,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 			return
 		}
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -135,7 +135,7 @@ func getNftsForUser(nftRepository persist.NFTRepository) gin.HandlerFunc {
 func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -152,7 +152,7 @@ func getUnassignedNftsForUser(collectionRepository persist.CollectionRepository)
 func refreshUnassignedNftsForUser(collectionRepository persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -174,7 +174,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return
@@ -217,7 +217,7 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		userID := middleware.GetUserIDFromCtx(c)
+		userID := auth.GetUserIDFromCtx(c)
 		if userID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
 			return

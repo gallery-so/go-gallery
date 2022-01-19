@@ -1,4 +1,4 @@
-package middleware
+package auth
 
 import (
 	"context"
@@ -35,8 +35,8 @@ func ValidateJWT() gin.HandlerFunc {
 	}
 }
 
-// AuthJWTParse parses the JWT token from the request and returns whether the token is valid and the user ID associated with it
-func AuthJWTParse(pJWTtokenStr string,
+// JWTParse parses the JWT token from the request and returns whether the token is valid and the user ID associated with it
+func JWTParse(pJWTtokenStr string,
 	pJWTsecretKeyStr string) (bool, persist.DBID, error) {
 
 	claims := jwtClaims{}

@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/indexer"
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -170,7 +169,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		}()
 	}()
 
-	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
@@ -256,7 +255,7 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 		}()
 	}()
 
-	jwtTokenStr, err := middleware.JWTGeneratePipeline(pCtx, userID)
+	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}

@@ -5,11 +5,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 type authHasNFTInput struct {
@@ -30,7 +30,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 			return
 		}
 
-		authed := c.GetBool(middleware.AuthContextKey)
+		authed := c.GetBool(auth.AuthContextKey)
 
 		output, err := auth.GetPreflight(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
@@ -68,6 +68,8 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			return
 		}
 
+		setJWTCookie(c, output.JWTtoken)
+
 		c.JSON(http.StatusOK, output)
 	}
 }
@@ -93,4 +95,20 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, token
 		}
 		c.JSON(http.StatusOK, authHasNFTOutput{HasNFT: has})
 	}
+}
+
+func setJWTCookie(c *gin.Context, token string) {
+	mode := http.SameSiteStrictMode
+	if viper.GetString("ENV") != "production" {
+		mode = http.SameSiteNoneMode
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     auth.JWTCookieKey,
+		Value:    token,
+		MaxAge:   viper.GetInt("JWT_TTL"),
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: mode,
+	})
 }

@@ -1,16 +1,18 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -38,15 +40,17 @@ type TestConfig struct {
 }
 
 var tc *TestConfig
+var ts *httptest.Server
 
 type TestUser struct {
 	id       persist.DBID
 	address  persist.Address
 	jwt      string
 	username string
+	client   *http.Client
 }
 
-func generateTestUser(repos *repositories) *TestUser {
+func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *TestUser {
 	ctx := context.Background()
 
 	username := util.RandStringBytes(40)
@@ -58,21 +62,25 @@ func generateTestUser(repos *repositories) *TestUser {
 		Addresses:          []persist.Address{address},
 	}
 	id, err := repos.userRepository.Create(ctx, user)
-	if err != nil {
-		log.Fatal(err)
+	a.NoError(err)
+	j, err := cookiejar.New(nil)
+	a.NoError(err)
+	c := &http.Client{Jar: j}
+
+	if jwt == "" {
+		jwt, err = auth.JWTGeneratePipeline(ctx, id)
+		a.NoError(err)
 	}
-	jwt, err := middleware.JWTGeneratePipeline(ctx, id)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	getFakeCookie(a, jwt, c)
 	auth.NonceRotate(ctx, address, id, repos.nonceRepository)
 	log.Info(id, username)
-	return &TestUser{id, address, jwt, username}
+	return &TestUser{id, address, jwt, username, c}
 }
 
 // Should be called at the beginning of every integration test
 // Initializes the runtime, connects to mongodb, and starts a test server
-func initializeTestEnv(v int) *TestConfig {
+func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 	setDefaults()
 
 	if db == nil {
@@ -83,17 +91,20 @@ func initializeTestEnv(v int) *TestConfig {
 	}
 
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
-	ts := httptest.NewServer(CoreInit(mgoClient, db))
+	router := CoreInit(mgoClient, db)
+	router.POST("/fake-cookie", fakeCookie)
+	ts = httptest.NewServer(router)
 
 	repos := newRepos(mgoClient, db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
-	log.Info("test server connected! ✅")
+	log.Infof("test server connected at %s ✅", ts.URL)
+
 	return &TestConfig{
 		server:              ts,
 		serverURL:           fmt.Sprintf("%s/glry/v%d", ts.URL, v),
 		repos:               repos,
-		user1:               generateTestUser(repos),
-		user2:               generateTestUser(repos),
+		user1:               generateTestUser(a, repos, ""),
+		user2:               generateTestUser(a, repos, ""),
 		openseaCache:        opensea,
 		unassignedCache:     unassigned,
 		galleriesCache:      galleries,
@@ -130,13 +141,39 @@ func assertValidJSONResponse(assert *assert.Assertions, resp *http.Response) {
 
 func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.NotEqual(http.StatusOK, resp.StatusCode, "Status should not be 200")
-	val, ok := resp.Header["Content-Type"]
-	assert.True(ok, "Content-Type header should be set")
-	assert.Equal("application/json; charset=utf-8", val[0], "Response should be in JSON")
 }
 
 func setupTest(t *testing.T, v int) *assert.Assertions {
-	tc = initializeTestEnv(v)
+	a := assert.New(t)
+	tc = initializeTestEnv(a, v)
 	t.Cleanup(teardown)
 	return assert.New(t)
+}
+
+type fakeCookieInput struct {
+	JWT string `json:"jwt"`
+}
+
+func fakeCookie(ctx *gin.Context) {
+	var input fakeCookieInput
+	err := ctx.ShouldBindJSON(&input)
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+
+	ctx.SetCookie(auth.JWTCookieKey, input.JWT, 3600, "/", "", false, true)
+	ctx.Status(http.StatusOK)
+}
+
+func getFakeCookie(a *assert.Assertions, pJWT string, c *http.Client) {
+	var input fakeCookieInput
+	input.JWT = pJWT
+	buf := new(bytes.Buffer)
+	err := json.NewEncoder(buf).Encode(input)
+	a.NoError(err)
+	resp, err := c.Post(fmt.Sprintf("%s/fake-cookie", ts.URL), "application/json", buf)
+	a.NoError(err)
+	assertValidResponse(a, resp)
+
 }

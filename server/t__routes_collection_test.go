@@ -8,10 +8,13 @@ import (
 	"math/rand"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +38,7 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 
 	// build update request body
 	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
-	resp := updateCollectionInfoRequest(assert, update, tc.user1.jwt)
+	resp := updateCollectionInfoRequest(assert, update, tc.user1)
 
 	errResp := &util.ErrorResponse{}
 	err = util.UnmarshallBody(errResp, resp.Body)
@@ -75,7 +78,7 @@ func TestCreateCollection_Success(t *testing.T) {
 	assert.Nil(err)
 
 	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs}
-	resp := createCollectionRequest(assert, input, tc.user1.jwt)
+	resp := createCollectionRequest(assert, input, tc.user1)
 	assertValidResponse(assert, resp)
 
 	type CreateResp struct {
@@ -125,7 +128,7 @@ func TestGetUnassignedCollection_Success(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1.jwt)
+	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1)
 	assertValidResponse(assert, resp)
 
 	type NftsResponse struct {
@@ -260,7 +263,7 @@ func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
 	gid, err := tc.repos.galleryRepository.Create(context.Background(), persist.GalleryDB{Collections: []persist.DBID{preCollID}, OwnerUserID: tc.user1.id})
 
 	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs[0:2]}
-	resp := createCollectionRequest(assert, input, tc.user1.jwt)
+	resp := createCollectionRequest(assert, input, tc.user1)
 	assertValidResponse(assert, resp)
 
 	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, preCollID))
@@ -303,7 +306,7 @@ func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
 	nftIDs[2] = temp
 
 	update := collectionUpdateNftsByIDInput{ID: collID, Nfts: nftIDs}
-	resp := updateCollectionNftsRequest(assert, update, tc.user1.jwt)
+	resp := updateCollectionNftsRequest(assert, update, tc.user1)
 	assertValidResponse(assert, resp)
 
 	errResp := util.ErrorResponse{}
@@ -344,7 +347,7 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	assert.Nil(err)
 
 	if authenticatedUser != nil {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authenticatedUser.jwt))
+		req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: authenticatedUser.jwt, Expires: time.Now().Add(time.Duration(viper.GetInt("JWT_TTL")) * time.Second), Secure: false, Path: "/", HttpOnly: true})
 	}
 
 	client := &http.Client{}
@@ -354,38 +357,32 @@ func sendDeleteRequest(assert *assert.Assertions, requestBody interface{}, authe
 	return resp
 }
 
-func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID, jwt string) *http.Response {
+func getUnassignedNFTsRequest(assert *assert.Assertions, userID persist.DBID, tu *TestUser) *http.Response {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/nfts/unassigned/get", tc.serverURL),
 		nil)
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
 
-func sendCollUserGetRequest(assert *assert.Assertions, forUserID string, authenticatedUser *TestUser) *http.Response {
+func sendCollUserGetRequest(assert *assert.Assertions, forUserID string, tu *TestUser) *http.Response {
 
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/collections/user_get?user_id=%s", tc.serverURL, forUserID),
 		nil)
 	assert.Nil(err)
 
-	if authenticatedUser != nil {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authenticatedUser.jwt))
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	assertValidResponse(assert, resp)
 
 	return resp
 }
 
-func createCollectionRequest(assert *assert.Assertions, input collectionCreateInput, jwt string) *http.Response {
+func createCollectionRequest(assert *assert.Assertions, input collectionCreateInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -394,14 +391,12 @@ func createCollectionRequest(assert *assert.Assertions, input collectionCreateIn
 		fmt.Sprintf("%s/collections/create", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
 
-func updateCollectionInfoRequest(assert *assert.Assertions, input collectionUpdateInfoByIDInput, jwt string) *http.Response {
+func updateCollectionInfoRequest(assert *assert.Assertions, input collectionUpdateInfoByIDInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -410,13 +405,12 @@ func updateCollectionInfoRequest(assert *assert.Assertions, input collectionUpda
 		fmt.Sprintf("%s/collections/update/info", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
-func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpdateNftsByIDInput, jwt string) *http.Response {
+func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpdateNftsByIDInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
@@ -425,9 +419,7 @@ func updateCollectionNftsRequest(assert *assert.Assertions, input collectionUpda
 		fmt.Sprintf("%s/collections/update/nfts", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }

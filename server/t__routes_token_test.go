@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
@@ -77,7 +76,7 @@ func TestUpdateTokenByID_Success(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1.jwt)
+	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
 	assertValidResponse(assert, resp)
 
 	errResp := util.ErrorResponse{}
@@ -110,15 +109,13 @@ func TestUpdateTokenByID_UnauthedError(t *testing.T) {
 	resp := updateTokenUnauthedRequest(assert, update)
 	assertErrorResponse(assert, resp)
 
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal(middleware.ErrInvalidAuthHeader.Error(), body.Error)
+	assert.Equal(resp.StatusCode, http.StatusUnauthorized)
 }
 
 func TestUpdateTokenByID_NoIDFieldError(t *testing.T) {
 	assert := setupTest(t, 2)
 
-	resp := updateTokenRequest(assert, "", "new nft note", tc.user1.jwt)
+	resp := updateTokenRequest(assert, "", "new nft note", tc.user1)
 	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -131,7 +128,7 @@ func TestUpdateTokenByID_NotFoundError(t *testing.T) {
 
 	nftID := persist.DBID("no exist :(")
 
-	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1.jwt)
+	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
 	assertErrorResponse(assert, resp)
 
 	body := util.ErrorResponse{}
@@ -148,7 +145,7 @@ func TestUpdateTokenByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
 	})
 	assert.Nil(err)
 
-	resp := updateTokenRequest(assert, nftID, "new nft name", tc.user2.jwt)
+	resp := updateTokenRequest(assert, nftID, "new nft name", tc.user2)
 	assertErrorResponse(assert, resp)
 
 }
@@ -164,7 +161,7 @@ func updateTokenUnauthedRequest(assert *assert.Assertions, update updateTokenByI
 	return resp
 }
 
-func updateTokenRequest(assert *assert.Assertions, id persist.DBID, collectorsNote string, jwt string) *http.Response {
+func updateTokenRequest(assert *assert.Assertions, id persist.DBID, collectorsNote string, tu *TestUser) *http.Response {
 	update := map[string]interface{}{
 		"id":              id,
 		"collectors_note": collectorsNote,
@@ -177,9 +174,8 @@ func updateTokenRequest(assert *assert.Assertions, id persist.DBID, collectorsNo
 		fmt.Sprintf("%s/nfts/update", tc.serverURL),
 		bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }

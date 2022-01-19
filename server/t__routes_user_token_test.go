@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
@@ -61,9 +62,7 @@ func TestGetUserAuthenticated_ShouldIncludeAddress_Token(t *testing.T) {
 	userID := tc.user1.id
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get?user_id=%s", tc.serverURL, userID), nil)
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.user1.jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := tc.user1.client.Do(req)
 	assert.Nil(err)
 	assertValidJSONResponse(assert, resp)
 
@@ -79,7 +78,7 @@ func TestUpdateUserAuthenticated_Success_Token(t *testing.T) {
 	update := user.UpdateUserInput{
 		UserName: "kaito",
 	}
-	resp := updateUserInfoRequestToken(assert, update, tc.user1.jwt)
+	resp := updateUserInfoRequestToken(assert, update, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
@@ -95,7 +94,7 @@ func TestUpdateUserAuthenticated_NoChange_Success_Token(t *testing.T) {
 	update := user.UpdateUserInput{
 		UserName: "bob",
 	}
-	resp := updateUserInfoRequestToken(assert, update, tc.user1.jwt)
+	resp := updateUserInfoRequestToken(assert, update, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
@@ -123,7 +122,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure_Token(t *testing.T) {
 	update := user.UpdateUserInput{
 		UserName: tc.user2.username,
 	}
-	resp := updateUserInfoRequestToken(assert, update, tc.user1.jwt)
+	resp := updateUserInfoRequestToken(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
@@ -136,7 +135,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure_Token(t *testing.T) {
 	update := user.UpdateUserInput{
 		UserName: "92ks&$m__",
 	}
-	resp := updateUserInfoRequestToken(assert, update, tc.user1.jwt)
+	resp := updateUserInfoRequestToken(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
@@ -158,7 +157,7 @@ func TestUserAddAddresses_Success_Token(t *testing.T) {
 		Address:   persist.Address(strings.ToLower("0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5")),
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
-	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
+	resp := userAddAddressesRequestToken(assert, update, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
 	errResp := &util.ErrorResponse{}
@@ -185,7 +184,7 @@ func TestUserAddAddresses_WrongNonce_Failure_Token(t *testing.T) {
 		Address:   "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5",
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
-	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
+	resp := userAddAddressesRequestToken(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 }
 
@@ -208,7 +207,7 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure_Token(t *testing.T) {
 		Address:   "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5",
 		Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 	}
-	resp := userAddAddressesRequestToken(assert, update, tc.user1.jwt)
+	resp := userAddAddressesRequestToken(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 }
 
@@ -248,13 +247,22 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	}
 	collID, err := tc.repos.collectionTokenRepository.Create(context.Background(), coll)
 
-	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := user.RemoveUserAddressesInput{
 		Addresses: []persist.Address{"0xcb1b78568d0ef81585f074b0dfd6b743959070d9"},
 	}
-	resp := userRemoveAddressesRequestToken(assert, update, jwt)
+	j, err := cookiejar.New(nil)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{
+		id:     userID,
+		jwt:    jwt,
+		client: client,
+	}
+	getFakeCookie(assert, jwt, client)
+
+	resp := userRemoveAddressesRequestToken(assert, update, tu)
 	assertValidJSONResponse(assert, resp)
 
 	errResp := &util.ErrorResponse{}
@@ -284,14 +292,23 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure_Token(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
-	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := user.RemoveUserAddressesInput{
 		Addresses: []persist.Address{tc.user1.address},
 	}
 
-	resp := userRemoveAddressesRequestToken(assert, update, jwt)
+	j, err := cookiejar.New(nil)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{
+		id:     userID,
+		jwt:    jwt,
+		client: client,
+	}
+	getFakeCookie(assert, jwt, client)
+
+	resp := userRemoveAddressesRequestToken(assert, update, tu)
 	assertErrorResponse(assert, resp)
 
 }
@@ -305,52 +322,57 @@ func TestUserRemoveAddresses_AllAddresses_Failure_Token(t *testing.T) {
 	userID, err := tc.repos.userRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
-	jwt, err := middleware.JWTGeneratePipeline(context.Background(), userID)
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
 
 	update := user.RemoveUserAddressesInput{
 		Addresses: u.Addresses,
 	}
+	j, err := cookiejar.New(nil)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{
+		id:     userID,
+		jwt:    jwt,
+		client: client,
+	}
+	getFakeCookie(assert, jwt, client)
 
-	resp := userRemoveAddressesRequestToken(assert, update, jwt)
+	resp := userRemoveAddressesRequestToken(assert, update, tu)
 	assertErrorResponse(assert, resp)
 
 }
 
-func updateUserInfoRequestToken(assert *assert.Assertions, input user.UpdateUserInput, jwt string) *http.Response {
+func updateUserInfoRequestToken(assert *assert.Assertions, input user.UpdateUserInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/info", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
-func userAddAddressesRequestToken(assert *assert.Assertions, input user.AddUserAddressesInput, jwt string) *http.Response {
+func userAddAddressesRequestToken(assert *assert.Assertions, input user.AddUserAddressesInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/addresses/add", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
 
-func userRemoveAddressesRequestToken(assert *assert.Assertions, input user.RemoveUserAddressesInput, jwt string) *http.Response {
+func userRemoveAddressesRequestToken(assert *assert.Assertions, input user.RemoveUserAddressesInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/update/addresses/remove", tc.serverURL), bytes.NewBuffer(data))
 	assert.Nil(err)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }

@@ -291,18 +291,23 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				oldToken := persist.Token{
-					TokenID:         token.TokenID,
-					ContractAddress: token.ContractAddress,
-					OwnerAddress:    ownership.Address,
-					Quantity:        "0",
+				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
+					return err
 				}
-				allTokens = append(allTokens, oldToken)
 				owners[ownership.Address.String()] = true
 			}
 		}
 	}
 
+
+   for i, token := range allTokens {
+		if token.Quantity == "" || token.Quantity == "0" {
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
+				return err
+			}
+			allTokens = append(allTokens[:i], allTokens[i+1:]...)
+		}
+	}
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
@@ -335,16 +340,6 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			return fmt.Errorf("failed to upsert tokens: %w", err)
 		}
 	}
-
-	res, err := t.deleteBalanceZeroStmt.ExecContext(pCtx)
-	if err != nil {
-		return fmt.Errorf("failed to delete old tokens: %w", err)
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-	logrus.Debugf("deleted %d empty tokens", rowsAffected)
 
 	return nil
 
@@ -466,4 +461,9 @@ func (t *TokenRepository) Count(pCtx context.Context, pTokenType persist.TokenCo
 		return 0, err
 	}
 	return count, nil
+}
+
+func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.Address) error {
+	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
+	return err
 }
