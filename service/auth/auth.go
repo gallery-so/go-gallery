@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // WalletType is the type of wallet used to sign a message
@@ -46,9 +47,6 @@ const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a
 
 // JWTCookieKey is the key used to store the JWT token in the cookie
 const JWTCookieKey = "GLRY_JWT"
-
-// RequiredNFTs is a list of NFTs that are required for the user to be able to use the service as an authenticated user
-var RequiredNFTs = []persist.TokenID{"0", "1", "2", "3", "4", "5", "6", "7", "8"}
 
 var errAddressSignatureMismatch = errors.New("address does not match signature")
 
@@ -314,7 +312,7 @@ func VerifySignature(pSignatureStr string,
 
 // GetPreflight will establish if a user is permitted to preflight a login and generate a nonce to be signed
 func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *eth.Client) (*GetPreflightOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pInput.Address)
 
@@ -329,11 +327,20 @@ func GetPreflight(pCtx context.Context, pInput GetPreflightInput, pPreAuthed boo
 
 		if !pPreAuthed {
 
-			hasNFT, err := ethClient.HasNFTs(pCtx, RequiredNFTs, pInput.Address)
-			if err != nil {
-				return nil, err
+			req := GetAllowlistContracts()
+			has := false
+			for k, v := range req {
+
+				hasNFT, err := eth.HasNFTs(pCtx, k, v, pInput.Address, ethClient)
+				if err != nil {
+					return nil, err
+				}
+				if hasNFT {
+					has = true
+					break
+				}
 			}
-			if !hasNFT {
+			if !has {
 				return nil, errAddressDoesNotOwnRequiredNFT{pInput.Address}
 			}
 
@@ -408,4 +415,30 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 // GetUserIDFromCtx returns the user ID from the context
 func GetUserIDFromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(UserIDContextKey).(persist.DBID)
+}
+
+// GetAllowlistContracts returns the list of addresses we allowlist against
+func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
+	addrs := viper.GetString("CONTRACT_ADDRESSES")
+	spl := strings.Split(addrs, "|")
+	logrus.Info("contract addresses:", spl)
+	res := make(map[persist.Address][]persist.TokenID)
+	for _, addr := range spl {
+		nextSpl := strings.Split(addr, "=")
+		if len(nextSpl) != 2 {
+			panic("invalid contract address")
+		}
+		addr := nextSpl[0]
+		tokens := nextSpl[1]
+		tokens = strings.TrimLeft(tokens, "[")
+		tokens = strings.TrimRight(tokens, "]")
+		logrus.Info("token_ids:", tokens)
+		tokenIDs := strings.Split(tokens, ",")
+		logrus.Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
+		res[persist.Address(addr)] = make([]persist.TokenID, len(tokenIDs))
+		for i, tokenID := range tokenIDs {
+			res[persist.Address(addr)][i] = persist.TokenID(tokenID)
+		}
+	}
+	return res
 }

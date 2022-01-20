@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/opensea"
@@ -19,14 +20,17 @@ import (
 // MembershipTierIDs is a list of all membership tiers
 var MembershipTierIDs = []persist.TokenID{"3", "4", "5", "6", "8"}
 
+// PremiumCards is the contract address for the premium membership cards
+const PremiumCards persist.Address = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"
+
 // UpdateMembershipTiers fetches all membership cards for all token IDs
-func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
-		events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), persist.TokenID(v), 0, 0)
+		events, err := OpenseaFetchMembershipCards(PremiumCards, persist.TokenID(v), 0, 0)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", v, err)
 		}
@@ -46,10 +50,10 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 }
 
 // UpdateMembershipTier fetches all membership cards for a token ID
-func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0, 0)
+	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
 	}
@@ -61,7 +65,7 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
@@ -79,10 +83,10 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 }
 
 // UpdateMembershipTierToken fetches all membership cards for a token ID
-func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	events, err := OpenseaFetchMembershipCards(persist.Address(viper.GetString("CONTRACT_ADDRESS")), pTokenID, 0, 0)
+	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
 	}
@@ -149,7 +153,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	return result, nil
 }
 
-func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *eth.Client, userRepository persist.UserRepository, nftRepository persist.NFTRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
+func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.NFTRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
@@ -173,7 +177,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 				logrus.Debug("Event is to real address")
 				membershipOwner := persist.MembershipOwner{Address: event.ToAccount.Address}
 				// does to have the NFT?
-				hasNFT, _ := ethClient.HasNFT(ctx, id, event.ToAccount.Address)
+				hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, event.ToAccount.Address, ethClient)
 				if hasNFT {
 					if glryUser, err := userRepository.GetByAddress(ctx, event.ToAccount.Address); err == nil && glryUser.Username != "" {
 						membershipOwner.Username = glryUser.Username
@@ -237,14 +241,14 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	return tier
 }
 
-func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *eth.Client, userRepository persist.UserRepository, nftRepository persist.TokenRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
+func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
-	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address(viper.GetString("CONTRACT_ADDRESS")), -1, 0)
+	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), PremiumCards, -1, 0)
 	if err != nil || len(tokens) == 0 {
 		logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 		return tier

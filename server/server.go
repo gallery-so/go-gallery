@@ -15,7 +15,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/mongodb"
@@ -108,7 +107,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "decrypted/service-key.json")
-	viper.SetDefault("CONTRACT_ADDRESS", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46")
+	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("REQUIRE_NFTS", false)
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
@@ -200,12 +199,12 @@ func newMongoClient() *mongo.Client {
 	return mongodb.NewMongoClient(ctx, mOpts)
 }
 
-func newEthClient() *eth.Client {
+func newEthClient() *ethclient.Client {
 	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 	if err != nil {
 		panic(err)
 	}
-	return eth.NewEthClient(client, viper.GetString("CONTRACT_ADDRESS"))
+	return client
 }
 
 func newIPFSShell() *shell.Shell {

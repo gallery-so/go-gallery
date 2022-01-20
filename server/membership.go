@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -16,7 +16,7 @@ type getMembershipTiersResponse struct {
 	Tiers []persist.MembershipTier `json:"tiers"`
 }
 
-func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *eth.Client) gin.HandlerFunc {
+func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
@@ -64,7 +64,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 	}
 }
 
-func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *eth.Client) gin.HandlerFunc {
+func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {

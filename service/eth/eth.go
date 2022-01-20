@@ -13,26 +13,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// Client represents an abstraction over the geth ethereum client
-type Client struct {
-	EthClient       *ethclient.Client
-	contractAddress common.Address
-}
-
-// NewEthClient initializes a new eth client
-func NewEthClient(ethClient *ethclient.Client, contractAddress string) *Client {
-	return &Client{
-		EthClient:       ethClient,
-		contractAddress: common.HexToAddress(contractAddress),
-	}
-}
-
 const ensContractAddress = "0xFaC7BEA255a6990f749363002136aF6556b31e04"
 
 // HasNFT checks if a wallet address has a given NFT
-func (c *Client) HasNFT(pCtx context.Context, id persist.TokenID, userAddr persist.Address) (bool, error) {
+func HasNFT(pCtx context.Context, contractAddress persist.Address, id persist.TokenID, userAddr persist.Address, ethcl *ethclient.Client) (bool, error) {
 
-	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.EthClient)
+	instance, err := contracts.NewIERC1155Caller(contractAddress.Address(), ethcl)
 	if err != nil {
 		return false, err
 	}
@@ -47,9 +33,9 @@ func (c *Client) HasNFT(pCtx context.Context, id persist.TokenID, userAddr persi
 }
 
 // HasNFTs checks if a wallet address has a given set of NFTs
-func (c *Client) HasNFTs(pCtx context.Context, ids []persist.TokenID, userAddr persist.Address) (bool, error) {
+func HasNFTs(pCtx context.Context, contractAddress persist.Address, ids []persist.TokenID, userAddr persist.Address, ethcl *ethclient.Client) (bool, error) {
 
-	instance, err := contracts.NewIERC1155Caller(c.contractAddress, c.EthClient)
+	instance, err := contracts.NewIERC1155Caller(contractAddress.Address(), ethcl)
 	if err != nil {
 		return false, err
 	}
@@ -77,9 +63,9 @@ func (c *Client) HasNFTs(pCtx context.Context, ids []persist.TokenID, userAddr p
 }
 
 // ResolvesENS checks if an ENS resolves to a given address
-func (c *Client) ResolvesENS(pCtx context.Context, ens string, userAddr persist.Address) (bool, error) {
+func ResolvesENS(pCtx context.Context, ens string, userAddr persist.Address, ethcl *ethclient.Client) (bool, error) {
 
-	instance, err := contracts.NewIENSCaller(c.contractAddress, c.EthClient)
+	instance, err := contracts.NewIENSCaller(common.HexToAddress(ens), ethcl)
 	if err != nil {
 		return false, err
 	}

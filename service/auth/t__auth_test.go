@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,4 +57,13 @@ func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 	success, err := VerifySignatureAllMethods(sig, testNonce, addr, WalletTypeEOA, client)
 	assert.NotNil(err)
 	assert.False(success)
+}
+
+func Test_AllowListParse(t *testing.T) {
+	a := assert.New(t)
+	allowlist := "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698=[0,1,2,3,4,5,6,7,8]|0xE3d0fe9B7E0B951663267a3Ed1e6577f6f79757e=[0]"
+	viper.Set("CONTRACT_ADDRESSES", allowlist)
+	parsed := GetAllowlistContracts()
+	a.Len(parsed["0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"], 9)
+	a.Len(parsed["0xE3d0fe9B7E0B951663267a3Ed1e6577f6f79757e"], 1)
 }
