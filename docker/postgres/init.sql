@@ -10,8 +10,6 @@ CREATE TABLE users (
     BIO varchar
 );
 
-CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
-
 CREATE TABLE galleries (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
