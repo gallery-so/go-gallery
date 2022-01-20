@@ -98,7 +98,8 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	deleteBalanceZeroStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE QUANTITY = '0';`)
 	checkNoErr(err)
 
-	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1, CONTRACT_ADDRESS = $2, OWNER_ADDRESS = $3;`)
+	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
+	checkNoErr(err)
 
 	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt, upsertStmt: upsertStmt, deleteBalanceZeroStmt: deleteBalanceZeroStmt, deleteStmt: deleteStmt}
 }
@@ -280,17 +281,20 @@ func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persi
 
 // BulkUpsert upserts multiple tokens
 func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
-	allTokens := make([]persist.Token, 0, len(pTokens)*3)
+	if len(pTokens) == 0 {
+		return nil
+	}
 
 	owners := map[string]bool{}
 	for _, token := range pTokens {
-		allTokens = append(allTokens, token)
 		owners[token.OwnerAddress.String()] = true
 		if token.TokenType != persist.TokenTypeERC721 {
 			continue
 		}
+		logrus.Infof("Token %s is ERC721", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
+				logrus.Infof("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
@@ -299,32 +303,45 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 	}
 
-
-   for i, token := range allTokens {
+	logrus.Infof("Checking 0 quantities for tokens...")
+	// TODO ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time
+	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
+			logrus.Infof("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}
-			allTokens = append(allTokens[:i], allTokens[i+1:]...)
+			if len(pTokens) < i+1 {
+				pTokens = pTokens[:i]
+			} else {
+				pTokens = append(pTokens[:i], pTokens[i+1:]...)
+			}
 		}
 	}
+
+	if len(pTokens) == 0 {
+		return nil
+	}
+
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
 	paramsPerRow := 19
 	rowsPerQuery := 65535 / paramsPerRow
 
-	if len(allTokens) > rowsPerQuery {
-		next := allTokens[rowsPerQuery:]
-		current := allTokens[:rowsPerQuery]
+	if len(pTokens) > rowsPerQuery {
+		logrus.Infof("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
+		next := pTokens[rowsPerQuery:]
+		current := pTokens[:rowsPerQuery]
 		if err := t.BulkUpsert(pCtx, next); err != nil {
 			return err
 		}
-		allTokens = current
+		pTokens = current
+		logrus.Infof("Currently %d tokens", len(pTokens))
 	}
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
-	vals := make([]interface{}, 0, len(allTokens)*paramsPerRow)
-	for i, token := range allTokens {
+	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
+	for i, token := range pTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
 		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
@@ -333,13 +350,14 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
 
-	if len(allTokens) > 0 {
-		_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
-		if err != nil {
-			logrus.Debugf("SQL: %s", sqlStr)
-			return fmt.Errorf("failed to upsert tokens: %w", err)
-		}
+	logrus.Infof("Inserting %d tokens", len(pTokens))
+	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
+	if err != nil {
+		logrus.Debugf("SQL: %s", sqlStr)
+		return fmt.Errorf("failed to upsert tokens: %w", err)
 	}
+
+	logrus.Infof("Successfully upserted %d tokens", len(pTokens))
 
 	return nil
 

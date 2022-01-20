@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -850,11 +849,8 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		defer tokenMu.Unlock()
 		now := time.Now()
 		logrus.Infof("Upserting %d tokens", len(t))
-		for i := 0; i < len(t); i += len(t) / 4 {
-			upsert := t[i:int(math.Min(float64(i)+float64(len(t))/4.0, float64(len(t))))]
-			if err := tokenRepo.BulkUpsert(ctx, upsert); err != nil {
-				return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
-			}
+		if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
+			return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
 		}
 		logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
 		return nil
