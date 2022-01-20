@@ -1,6 +1,7 @@
 package opensea
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -211,7 +212,12 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")
 		}
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		bs := new(bytes.Buffer)
+		_, err := bs.ReadFrom(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code: %d - %s", resp.StatusCode, bs.String())
 	}
 	response := Assets{}
 	err = util.UnmarshallBody(&response, resp.Body)
