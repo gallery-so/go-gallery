@@ -291,10 +291,9 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		if token.TokenType != persist.TokenTypeERC721 {
 			continue
 		}
-		logrus.Infof("Token %s is ERC721", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				logrus.Infof("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
+				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
@@ -304,10 +303,9 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	}
 
 	logrus.Infof("Checking 0 quantities for tokens...")
-	// TODO ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			logrus.Infof("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}
@@ -330,15 +328,17 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {
-		logrus.Infof("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
+		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
 		next := pTokens[rowsPerQuery:]
 		current := pTokens[:rowsPerQuery]
 		if err := t.BulkUpsert(pCtx, next); err != nil {
 			return err
 		}
 		pTokens = current
-		logrus.Infof("Currently %d tokens", len(pTokens))
 	}
+
+	pTokens = t.dedupTokens(pTokens)
+
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
 	for i, token := range pTokens {
@@ -350,14 +350,11 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET COLLECTORS_NOTE = EXCLUDED.COLLECTORS_NOTE,MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
 
-	logrus.Infof("Inserting %d tokens", len(pTokens))
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logrus.Debugf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert tokens: %w", err)
 	}
-
-	logrus.Infof("Successfully upserted %d tokens", len(pTokens))
 
 	return nil
 
@@ -484,4 +481,28 @@ func (t *TokenRepository) Count(pCtx context.Context, pTokenType persist.TokenCo
 func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.Address) error {
 	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
 	return err
+}
+
+type blockWithIndex struct {
+	block persist.BlockNumber
+	index int
+}
+
+func (t *TokenRepository) dedupTokens(pTokens []persist.Token) []persist.Token {
+	seen := map[string]persist.Token{}
+	for _, token := range pTokens {
+		key := token.ContractAddress.String() + "-" + token.TokenID.String() + "-" + token.OwnerAddress.String()
+		if seenToken, ok := seen[key]; ok {
+			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
+				continue
+			}
+			seen[key] = token
+		}
+		seen[key] = token
+	}
+	result := make([]persist.Token, 0, len(seen))
+	for _, v := range seen {
+		result = append(result, v)
+	}
+	return result
 }
