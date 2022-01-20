@@ -62,9 +62,14 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // UpdateByID updates the user with the given ID
 func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
+
 	switch pUpdate.(type) {
 	case persist.UserUpdateInfoInput:
 		update := pUpdate.(persist.UserUpdateInfoInput)
+		aUser, _ := u.GetByUsername(pCtx, update.Username.String())
+		if aUser.ID != "" {
+			return fmt.Errorf("username %s already exists", update.Username.String())
+		}
 		res, err := u.updateInfoStmt.ExecContext(pCtx, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated, update.Bio)
 		if err != nil {
 			return err

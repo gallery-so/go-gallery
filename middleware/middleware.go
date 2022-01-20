@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -30,7 +31,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 }
 
 // JWTRequired is a middleware that checks if the user is authenticated
-func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) gin.HandlerFunc {
+func JWTRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		authHeaders := strings.Split(header, " ")
@@ -72,9 +73,12 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *eth.Client) g
 			}
 			has := false
 			for _, addr := range user.Addresses {
-				if res, _ := ethClient.HasNFTs(c, auth.RequiredNFTs, addr); res {
-					has = true
-					break
+				allowlist := auth.GetAllowlistContracts()
+				for k, v := range allowlist {
+					if res, _ := eth.HasNFTs(c, k, v, addr, ethClient); res {
+						has = true
+						break
+					}
 				}
 			}
 			if !has {

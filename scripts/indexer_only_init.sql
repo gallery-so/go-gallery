@@ -10,8 +10,6 @@ CREATE TABLE users (
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
-
 CREATE TABLE tokens (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,

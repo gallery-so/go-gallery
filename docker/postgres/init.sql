@@ -10,8 +10,6 @@ CREATE TABLE users (
     BIO varchar
 );
 
-CREATE UNIQUE INDEX users_username_idempotent ON users (USERNAME_IDEMPOTENT);
-
 CREATE TABLE galleries (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -47,8 +45,6 @@ CREATE TABLE nfts (
     ANIMATION_URL varchar,
     ANIMATION_ORIGINAL_URL varchar,
     ACQUISITION_DATE varchar,
-    COLLECTORS_NOTE varchar,
-    TOKEN_COLLECTION_NAME varchar,
     TOKEN_METADATA_URL varchar
 );
 

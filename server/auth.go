@@ -20,7 +20,7 @@ type authHasNFTOutput struct {
 	HasNFT bool `json:"has_nft"`
 }
 
-func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *eth.Client) gin.HandlerFunc {
+func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := auth.GetPreflightInput{}
@@ -74,7 +74,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	}
 }
 
-func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, tokenIDs []persist.TokenID) gin.HandlerFunc {
+func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client, contractAddress persist.Address, tokenIDs []persist.TokenID) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authHasNFTInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -88,7 +88,7 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *eth.Client, token
 		}
 		has := false
 		for _, addr := range user.Addresses {
-			if res, _ := ethClient.HasNFTs(c, tokenIDs, addr); res {
+			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, addr, ethClient); res {
 				has = true
 				break
 			}

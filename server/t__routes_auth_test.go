@@ -97,6 +97,36 @@ func TestUserCreate_Success(t *testing.T) {
 	assert.True(output.SignatureValid)
 	assert.NotEmpty(output.UserID)
 }
+
+func TestUserCreate_UserWithEmptyUsernameExists_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	otherUser := persist.User{
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F0AC5"))},
+	}
+	_, err := tc.repos.userRepository.Create(context.Background(), otherUser)
+
+	nonce := persist.UserNonce{
+		Value:   "TestNonce",
+		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+	}
+	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	assert.Nil(err)
+
+	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address)
+	assertValidResponse(assert, resp)
+
+	type UserCreateOutput struct {
+		user.CreateUserOutput
+		Error string `json:"error"`
+	}
+	output := &UserCreateOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	assert.Nil(err)
+	assert.Empty(output.Error)
+	assert.True(output.SignatureValid)
+	assert.NotEmpty(output.UserID)
+}
 func TestUserCreate_WrongNonce_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 

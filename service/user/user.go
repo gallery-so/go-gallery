@@ -441,7 +441,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 }
 
 // UpdateUser updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput, userRepository persist.UserRepository, ethClient *eth.Client) error {
+func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
 	if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {
@@ -449,7 +449,7 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		}
 		can := false
 		for _, addr := range user.Addresses {
-			if resolves, _ := ethClient.ResolvesENS(pCtx, input.UserName, addr); resolves {
+			if resolves, _ := eth.ResolvesENS(pCtx, input.UserName, addr, ethClient); resolves {
 				can = true
 				break
 			}
