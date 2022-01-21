@@ -16,7 +16,7 @@ type getMembershipTiersResponse struct {
 	Tiers []persist.MembershipTier `json:"tiers"`
 }
 
-func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
@@ -33,7 +33,7 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 				for _, tierID := range membership.MembershipTierIDs {
 					if ok := tiers[tierID]; !ok {
 						logrus.Infof("Tier not found - updating membership tier %s", tierID)
-						newTier, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, nftRepository, ethClient)
+						newTier, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
 						if err != nil {
 							util.ErrResponse(c, http.StatusInternalServerError, err)
 							return
@@ -46,25 +46,25 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 
 			for _, tier := range allTiers {
 				if time.Since(tier.LastUpdated.Time()) > time.Hour {
-					go membership.UpdateMembershipTier(tier.TokenID, membershipRepository, userRepository, nftRepository, ethClient)
+					go membership.UpdateMembershipTier(tier.TokenID, membershipRepository, userRepository, galleryRepository, ethClient)
 				}
 			}
 
-			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
+			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(allTiers)})
 			return
 		}
 
 		logrus.Infof("No tiers found - updating membership tiers")
-		membershipTiers, err := membership.UpdateMembershipTiers(membershipRepository, userRepository, nftRepository, ethClient)
+		membershipTiers, err := membership.UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membershipTiers})
+		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(membershipTiers)})
 	}
 }
 
-func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
@@ -80,7 +80,7 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 				}
 				for _, tierID := range membership.MembershipTierIDs {
 					if _, ok := tiers[tierID]; !ok {
-						newTier, err := membership.UpdateMembershipTierToken(tierID, membershipRepository, userRepository, nftRepository, ethClient)
+						newTier, err := membership.UpdateMembershipTierToken(tierID, membershipRepository, userRepository, nftRepository, galleryRepository, ethClient)
 						if err != nil {
 							util.ErrResponse(c, http.StatusInternalServerError, err)
 							return
@@ -92,18 +92,18 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 
 			for _, tier := range allTiers {
 				if time.Since(tier.LastUpdated.Time()) > time.Hour {
-					go membership.UpdateMembershipTierToken(tier.TokenID, membershipRepository, userRepository, nftRepository, ethClient)
+					go membership.UpdateMembershipTierToken(tier.TokenID, membershipRepository, userRepository, nftRepository, galleryRepository, ethClient)
 				}
 			}
 
-			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: allTiers})
+			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(allTiers)})
 			return
 		}
-		membershipTiers, err := membership.UpdateMembershipTiersToken(membershipRepository, userRepository, nftRepository, ethClient)
+		membershipTiers, err := membership.UpdateMembershipTiersToken(membershipRepository, userRepository, nftRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membershipTiers})
+		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(membershipTiers)})
 	}
 }
