@@ -67,7 +67,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 	case persist.UserUpdateInfoInput:
 		update := pUpdate.(persist.UserUpdateInfoInput)
 		aUser, _ := u.GetByUsername(pCtx, update.Username.String())
-		if aUser.ID != "" {
+		if aUser.ID != "" && aUser.ID != pID {
 			return fmt.Errorf("username %s already exists", update.Username.String())
 		}
 		res, err := u.updateInfoStmt.ExecContext(pCtx, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated, update.Bio)
