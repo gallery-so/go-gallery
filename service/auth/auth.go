@@ -449,12 +449,16 @@ func SetJWTCookie(c *gin.Context, token string) {
 	domain := ".gallery.so"
 	httpOnly := true
 	secure := true
-	if viper.GetString("ENV") != "production" {
+
+	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
+
+	if clientIsLocalhost || viper.GetString("ENV") != "production" {
 		mode = http.SameSiteNoneMode
 		domain = ""
 		httpOnly = false
 		secure = false
 	}
+
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     JWTCookieKey,
 		Value:    token,
