@@ -9,7 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 type authHasNFTInput struct {
@@ -68,7 +67,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			return
 		}
 
-		setJWTCookie(c, output.JWTtoken)
+		auth.SetJWTCookie(c, output.JWTtoken)
 
 		c.JSON(http.StatusOK, output)
 	}
@@ -95,23 +94,4 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client,
 		}
 		c.JSON(http.StatusOK, authHasNFTOutput{HasNFT: has})
 	}
-}
-
-func setJWTCookie(c *gin.Context, token string) {
-	mode := http.SameSiteStrictMode
-	domain := ".gallery.so"
-	if viper.GetString("ENV") != "production" {
-		mode = http.SameSiteNoneMode
-		domain = ""
-	}
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     auth.JWTCookieKey,
-		Value:    token,
-		MaxAge:   viper.GetInt("JWT_TTL"),
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: mode,
-		Domain:   domain,
-	})
 }
