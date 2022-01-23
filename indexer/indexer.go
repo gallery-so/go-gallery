@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/appengine"
@@ -739,8 +740,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
 			Quantity:         persist.HexString("1"),
-			Name:             persist.NullString(name),
-			Description:      persist.NullString(description),
+			Name:             persist.NullString(strings.ToValidUTF8(validate.SanitizationPolicy.Sanitize(name), "")),
+			Description:      persist.NullString(strings.ToValidUTF8(validate.SanitizationPolicy.Sanitize(description), "")),
 			OwnershipHistory: previousOwnerAddresses,
 			TokenType:        persist.TokenTypeERC721,
 			TokenMetadata:    metadata.md,
@@ -819,6 +820,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 					}
 				}
 			}
+
 			t := persist.Token{
 				TokenID:         tokenID,
 				ContractAddress: contractAddress,
@@ -827,8 +829,8 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				TokenType:       persist.TokenTypeERC1155,
 				TokenMetadata:   metadata.md,
 				TokenURI:        uri.uri,
-				Name:            persist.NullString(name),
-				Description:     persist.NullString(description),
+				Name:            persist.NullString(strings.ToValidUTF8(validate.SanitizationPolicy.Sanitize(name), "")),
+				Description:     persist.NullString(strings.ToValidUTF8(validate.SanitizationPolicy.Sanitize(description), "")),
 				Chain:           i.chain,
 				BlockNumber:     balance.block,
 				Media:           m,
