@@ -442,3 +442,31 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 	}
 	return res
 }
+
+// SetJWTCookie sets the cookie for auth on the response
+func SetJWTCookie(c *gin.Context, token string) {
+	mode := http.SameSiteStrictMode
+	domain := ".gallery.so"
+	httpOnly := true
+	secure := true
+
+	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
+
+	if clientIsLocalhost || viper.GetString("ENV") != "production" {
+		mode = http.SameSiteNoneMode
+		domain = ""
+		httpOnly = false
+		secure = false
+	}
+
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     JWTCookieKey,
+		Value:    token,
+		MaxAge:   viper.GetInt("JWT_TTL"),
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: httpOnly,
+		SameSite: mode,
+		Domain:   domain,
+	})
+}

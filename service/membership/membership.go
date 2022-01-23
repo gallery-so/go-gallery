@@ -18,13 +18,13 @@ import (
 )
 
 // MembershipTierIDs is a list of all membership tiers
-var MembershipTierIDs = []persist.TokenID{"3", "4", "5", "6", "8"}
+var MembershipTierIDs = []persist.TokenID{"4", "3", "5", "6", "8"}
 
 // PremiumCards is the contract address for the premium membership cards
 const PremiumCards persist.Address = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"
 
 // UpdateMembershipTiers fetches all membership cards for all token IDs
-func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
@@ -39,7 +39,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 		}
 		time.Sleep(time.Second)
 		go func(id persist.TokenID, events []opensea.Event) {
-			tierChan <- processEvents(ctx, id, events, ethClient, userRepository, nftRepository, membershipRepository)
+			tierChan <- processEvents(ctx, id, events, ethClient, userRepository, galleryRepository, membershipRepository)
 		}(v, events)
 	}
 
@@ -50,7 +50,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 }
 
 // UpdateMembershipTier fetches all membership cards for a token ID
-func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
@@ -61,18 +61,18 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
 	}
 
-	return processEvents(ctx, pTokenID, events, ethClient, userRepository, nftRepository, membershipRepository), nil
+	return processEvents(ctx, pTokenID, events, ethClient, userRepository, galleryRepository, membershipRepository), nil
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
 		go func(id persist.TokenID) {
-			tierChan <- processEventsToken(ctx, id, ethClient, userRepository, nftRepository, membershipRepository)
+			tierChan <- processEventsToken(ctx, id, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository)
 		}(v)
 	}
 
@@ -83,7 +83,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 }
 
 // UpdateMembershipTierToken fetches all membership cards for a token ID
-func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
@@ -94,7 +94,7 @@ func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository pe
 		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
 	}
 
-	return processEventsToken(ctx, pTokenID, ethClient, userRepository, nftRepository, membershipRepository), nil
+	return processEventsToken(ctx, pTokenID, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository), nil
 }
 
 // OpenseaFetchMembershipCards recursively fetches all membership cards for a token ID
@@ -153,7 +153,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	return result, nil
 }
 
-func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.NFTRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
+func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
@@ -183,21 +183,12 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 						membershipOwner.Username = glryUser.Username
 						membershipOwner.UserID = glryUser.ID
 
-						nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID)
-						if err == nil && len(nfts) > 0 {
-							nftURLs := make([]persist.NullString, 0, 3)
-							for i, nft := range nfts {
-								if i == 3 {
-									break
-								}
-								if nft.ImagePreviewURL != "" {
-									nftURLs = append(nftURLs, nft.ImagePreviewURL)
-								} else {
-									i--
-									continue
-								}
+						galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+						if err == nil && len(galleries) > 0 {
+							gallery := galleries[0]
+							if gallery.Collections != nil || len(gallery.Collections) > 0 {
+								membershipOwner.PreviewNFTs = getPreviewsFromCollections(gallery.Collections)
 							}
-							membershipOwner.PreviewNFTs = nftURLs
 						}
 					}
 				}
@@ -241,7 +232,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	return tier
 }
 
-func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
+func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository) persist.MembershipTier {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
@@ -272,23 +263,13 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 				membershipOwner.Username = glryUser.Username
 				membershipOwner.UserID = glryUser.ID
 
-				nfts, err := nftRepository.GetByUserID(ctx, glryUser.ID, -1, 0)
-				if err == nil && len(nfts) > 0 {
-					nftURLs := make([]persist.NullString, 0, 3)
-					for i, nft := range nfts {
-						if i == 3 {
-							break
-						}
-						if nft.Media.PreviewURL != "" {
-							nftURLs = append(nftURLs, nft.Media.PreviewURL)
-						} else if nft.Media.MediaURL != "" {
-							nftURLs = append(nftURLs, nft.Media.MediaURL)
-						} else {
-							i--
-							continue
-						}
+				galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+				if err == nil && len(galleries) > 0 {
+					gallery := galleries[0]
+					if gallery.Collections != nil && len(gallery.Collections) > 0 {
+
+						membershipOwner.PreviewNFTs = getPreviewsFromCollectionsToken(gallery.Collections)
 					}
-					membershipOwner.PreviewNFTs = nftURLs
 				}
 			}
 			ownersChan <- membershipOwner
@@ -308,4 +289,59 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 		}
 	}()
 	return tier
+}
+
+func getPreviewsFromCollections(pColls []persist.Collection) []persist.NullString {
+	result := make([]persist.NullString, 0, 3)
+
+outer:
+	for _, c := range pColls {
+		for _, n := range c.NFTs {
+			if n.ImageThumbnailURL != "" {
+				result = append(result, n.ImageThumbnailURL)
+			}
+			if len(result) > 2 {
+				break outer
+			}
+		}
+		if len(result) > 2 {
+			break outer
+		}
+	}
+	return result
+
+}
+
+func getPreviewsFromCollectionsToken(pColls []persist.CollectionToken) []persist.NullString {
+	result := make([]persist.NullString, 0, 3)
+
+outer:
+	for _, c := range pColls {
+		for _, n := range c.NFTs {
+			if n.Media.ThumbnailURL != "" {
+				result = append(result, n.Media.ThumbnailURL)
+			}
+			if len(result) > 2 {
+				break outer
+			}
+		}
+		if len(result) > 2 {
+			break outer
+		}
+	}
+	return result
+
+}
+
+// OrderMembershipTiers orders the membership tiers in the desired order determined for the membership page
+func OrderMembershipTiers(pTiers []persist.MembershipTier) []persist.MembershipTier {
+	result := make([]persist.MembershipTier, 0, len(pTiers))
+	for _, v := range MembershipTierIDs {
+		for _, t := range pTiers {
+			if t.TokenID == v {
+				result = append(result, t)
+			}
+		}
+	}
+	return result
 }
