@@ -1,16 +1,13 @@
 package middleware
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -30,8 +27,8 @@ type errUserDoesNotHaveRequiredNFT struct {
 	addresses []persist.Address
 }
 
-// JWTRequired is a middleware that checks if the user is authenticated
-func JWTRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+// AuthRequired is a middleware that checks if the user is authenticated
+func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		authHeaders := strings.Split(header, " ")
@@ -93,9 +90,9 @@ func JWTRequired(userRepository persist.UserRepository, ethClient *ethclient.Cli
 	}
 }
 
-// JWTOptional is a middleware that checks if the user is authenticated and if so stores
+// AuthOptional is a middleware that checks if the user is authenticated and if so stores
 // auth data in the context
-func JWTOptional() gin.HandlerFunc {
+func AuthOptional() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		authHeaders := strings.Split(header, " ")
@@ -157,71 +154,6 @@ func HandleCORS() gin.HandlerFunc {
 		}
 
 		c.Next()
-	}
-}
-
-// MixpanelTrack is a middleware that tracks events in MixPanel
-func MixpanelTrack(eventName string, keys []string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Next()
-		var distinctID string
-		userID, ok := c.Get(auth.UserIDContextKey)
-		if ok {
-			distinctID = string(userID.(persist.DBID))
-		} else {
-			uniqueID, ok := mixpanelDistinctIDs[c.ClientIP()]
-			if !ok {
-				distinctID = uuid.New().String()
-				mixpanelDistinctIDs[c.ClientIP()] = distinctID
-			} else {
-				distinctID = uniqueID
-			}
-		}
-
-		vals := url.Values{}
-		data := map[string]interface{}{
-			"event": eventName,
-			"properties": map[string]interface{}{
-				"distinct_id": distinctID,
-				"ip":          c.ClientIP(),
-				"params":      c.Params,
-			},
-		}
-		if keys != nil {
-			for _, key := range keys {
-				val := c.Value(key)
-				if val != nil {
-					data["properties"].(map[string]interface{})[key] = val
-				}
-			}
-		}
-		marshalled, err := json.Marshal(data)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
-			return
-		}
-		vals.Set("data", string(marshalled))
-		payload := strings.NewReader(vals.Encode())
-		req, err := http.NewRequest(http.MethodPost, viper.GetString("MIXPANEL_API_URL"), payload)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
-			return
-		}
-
-		req.Header.Add("Accept", "text/plain")
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName}).Error("error tracking mixpanel event")
-			return
-		}
-		defer res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			logrus.WithFields(logrus.Fields{"Data": vals, "DistinctID": distinctID, "EventName": eventName, "Status": res.Status}).Error("error tracking mixpanel event")
-			return
-		}
-
 	}
 }
 
