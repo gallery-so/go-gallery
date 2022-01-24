@@ -22,7 +22,7 @@ func NewMembershipRepository(db *sql.DB) *MembershipRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	upsertByTokenIDStmt, err := db.PrepareContext(ctx, `INSERT INTO membership (ID,TOKEN_ID,NAME,ASSET_URL,OWNERS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (TOKEN_ID) DO UPDATE SET NAME = EXCLUDED.NAME, ASSET_URL = EXCLUDED.ASSET_URL, OWNERS = EXCLUDED.OWNERS;`)
+	upsertByTokenIDStmt, err := db.PrepareContext(ctx, `INSERT INTO membership (ID,TOKEN_ID,NAME,ASSET_URL,OWNERS,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (TOKEN_ID) DO UPDATE SET NAME = EXCLUDED.NAME, ASSET_URL = EXCLUDED.ASSET_URL, OWNERS = EXCLUDED.OWNERS, LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
 	getByTokenIDStmt, err := db.PrepareContext(ctx, `SELECT ID,CREATED_AT,LAST_UPDATED,VERSION,NAME,ASSET_URL,OWNERS FROM membership WHERE TOKEN_ID = $1 AND DELETED = false;`)
@@ -36,7 +36,7 @@ func NewMembershipRepository(db *sql.DB) *MembershipRepository {
 
 // UpsertByTokenID upserts the given tier
 func (m *MembershipRepository) UpsertByTokenID(pCtx context.Context, pTokenID persist.TokenID, pTier persist.MembershipTier) error {
-	_, err := m.upsertByTokenIDStmt.ExecContext(pCtx, persist.GenerateID(), pTier.TokenID, pTier.Name, pTier.AssetURL, pq.Array(pTier.Owners))
+	_, err := m.upsertByTokenIDStmt.ExecContext(pCtx, persist.GenerateID(), pTier.TokenID, pTier.Name, pTier.AssetURL, pq.Array(pTier.Owners), pTier.LastUpdated)
 	return err
 }
 
