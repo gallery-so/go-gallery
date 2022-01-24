@@ -27,6 +27,9 @@ func getMembershipTiers(membershipRepository persist.MembershipRepository, userR
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
+		if input.ForceRefresh {
+			logrus.Infof("Force refresh - updating membership tiers")
+		}
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -92,6 +95,9 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
+		if input.ForceRefresh {
+			logrus.Infof("Force refresh - updating membership tiers")
+		}
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -113,12 +119,6 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 						}
 						allTiers = append(allTiers, newTier)
 					}
-				}
-			}
-
-			for _, tier := range allTiers {
-				if time.Since(tier.LastUpdated.Time()) > time.Hour || input.ForceRefresh {
-
 				}
 			}
 
