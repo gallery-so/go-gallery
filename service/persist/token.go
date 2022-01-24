@@ -308,12 +308,17 @@ func (uri TokenURI) URL() (*url.URL, error) {
 }
 
 func (uri TokenURI) String() string {
-	return string(uri)
+	result := string(uri)
+	if strings.Contains(result, "://") {
+		result = url.QueryEscape(result)
+	}
+
+	return result
 }
 
 // Value implements the driver.Valuer interface for token URIs
 func (uri TokenURI) Value() (driver.Value, error) {
-	return uri.String(), nil
+	return strings.ToValidUTF8(uri.String(), ""), nil
 }
 
 // Scan implements the sql.Scanner interface for token URIs

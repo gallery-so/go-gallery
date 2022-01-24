@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/segmentio/ksuid"
@@ -159,7 +160,7 @@ func (n NullString) Value() (driver.Value, error) {
 	if n.String() == "" {
 		return "", nil
 	}
-	return n.String(), nil
+	return strings.ToValidUTF8(n.String(), ""), nil
 }
 
 // Scan implements the database/sql Scanner interface for the NullString type
