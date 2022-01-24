@@ -401,20 +401,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			membershipOwner := persist.MembershipOwner{Address: token.OwnerAddress}
-			if glryUser, err := userRepository.GetByAddress(ctx, token.OwnerAddress); err == nil && glryUser.Username != "" {
-				membershipOwner.Username = glryUser.Username
-				membershipOwner.UserID = glryUser.ID
-
-				galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-				if err == nil && len(galleries) > 0 {
-					gallery := galleries[0]
-					if gallery.Collections != nil && len(gallery.Collections) > 0 {
-
-						membershipOwner.PreviewNFTs = getPreviewsFromCollectionsToken(gallery.Collections)
-					}
-				}
-			}
+			membershipOwner := fillMembershipOwnerToken(ctx, token.OwnerAddress, id, ethClient, userRepository, galleryRepository)
 			ownersChan <- membershipOwner
 		})
 
