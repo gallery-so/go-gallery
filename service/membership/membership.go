@@ -179,8 +179,9 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 	wp := workerpool.New(10)
 	ownersChan := make(chan persist.MembershipOwner)
 	for _, v := range tier.Owners {
+		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwner(ctx, v.Address, pTokenID, ethClient, userRepository, galleryRepository)
+			owner := fillMembershipOwner(ctx, owner.Address, pTokenID, ethClient, userRepository, galleryRepository)
 			ownersChan <- owner
 		})
 	}
@@ -226,8 +227,9 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 	wp := workerpool.New(10)
 	ownersChan := make(chan persist.MembershipOwner)
 	for _, v := range tier.Owners {
+		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwnerToken(ctx, v.Address, pTokenID, ethClient, userRepository, galleryRepository)
+			owner := fillMembershipOwnerToken(ctx, owner.Address, pTokenID, ethClient, userRepository, galleryRepository)
 			ownersChan <- owner
 		})
 	}
