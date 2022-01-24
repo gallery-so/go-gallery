@@ -32,7 +32,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 	for _, v := range MembershipTierIDs {
 		events, err := OpenseaFetchMembershipCards(PremiumCards, persist.TokenID(v), 0, 0)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", v, err)
+			return nil, fmt.Errorf("Failed to fetch membership cards for token: %s, %v", v, err)
 		}
 		if len(events) == 0 {
 			continue
@@ -41,7 +41,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 		go func(id persist.TokenID, events []opensea.Event) {
 			tier, err := processEvents(ctx, id, events, ethClient, userRepository, galleryRepository, membershipRepository)
 			if err != nil {
-				logrus.Errorf("Failed to process membership events for token: %s, %w", id, err)
+				logrus.Errorf("Failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
 		}(v, events)
@@ -59,11 +59,11 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 	defer cancel()
 	_, err := processCurrentTier(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %w", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %v", pTokenID, err)
 	}
 	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %v", pTokenID, err)
 	}
 	if len(events) == 0 {
 		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
@@ -82,7 +82,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 		go func(id persist.TokenID) {
 			tier, err := processEventsToken(ctx, id, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository)
 			if err != nil {
-				logrus.Errorf("Failed to process membership events for token: %s, %w", id, err)
+				logrus.Errorf("Failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
 		}(v)
@@ -100,11 +100,11 @@ func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository pe
 	defer cancel()
 	_, err := processCurrentTierToken(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %w", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %v", pTokenID, err)
 	}
 	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %w", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %v", pTokenID, err)
 	}
 	if len(events) == 0 {
 		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
