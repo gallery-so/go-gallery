@@ -29,17 +29,18 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.JWTOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
-	authGroup.GET("/jwt_valid", middleware.JWTOptional(), auth.ValidateJWT())
-	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
+	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
+	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
+	authGroup.GET("/logout", logout())
 
 	// USER
 
 	usersGroup.POST("/login", login(repos.userRepository, repos.nonceRepository, repos.loginRepository, ethClient))
-	usersGroup.POST("/update/info", middleware.JWTRequired(repos.userRepository, ethClient), updateUserInfo(repos.userRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", middleware.JWTRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
-	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
-	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
+	usersGroup.POST("/update/info", middleware.AuthRequired(repos.userRepository, ethClient), updateUserInfo(repos.userRepository, ethClient))
+	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
+	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.userRepository, ethClient), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
+	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.membershipRepository, repos.userRepository, repos.tokenRepository, repos.galleryTokenRepository, ethClient))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub, ethClient))
 
@@ -52,17 +53,18 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.JWTOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
-	authGroup.GET("/jwt_valid", middleware.JWTOptional(), auth.ValidateJWT())
-	authGroup.GET("/is_member", middleware.JWTOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
+	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
+	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
+	authGroup.GET("/logout", logout())
 
 	// USER
 
 	usersGroup.POST("/login", login(repos.userRepository, repos.nonceRepository, repos.loginRepository, ethClient))
-	usersGroup.POST("/update/info", middleware.JWTRequired(repos.userRepository, ethClient), updateUserInfo(repos.userRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", middleware.JWTRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
-	usersGroup.POST("/update/addresses/remove", middleware.JWTRequired(repos.userRepository, ethClient), removeAddresses(repos.userRepository, repos.collectionRepository))
-	usersGroup.GET("/get", middleware.JWTOptional(), getUser(repos.userRepository))
+	usersGroup.POST("/update/info", middleware.AuthRequired(repos.userRepository, ethClient), updateUserInfo(repos.userRepository, ethClient))
+	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
+	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.userRepository, ethClient), removeAddresses(repos.userRepository, repos.collectionRepository))
+	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, repos.galleryRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub, ethClient))
 
@@ -78,30 +80,30 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 
 	galleriesGroup := parent.Group("/galleries")
 
-	galleriesGroup.GET("/get", middleware.JWTOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	galleriesGroup.GET("/user_get", middleware.JWTOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	galleriesGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateGalleryToken(repos.galleryTokenRepository))
+	galleriesGroup.GET("/get", middleware.AuthOptional(), getGalleryByIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	galleriesGroup.GET("/user_get", middleware.AuthOptional(), getGalleriesByUserIDToken(repos.galleryTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	galleriesGroup.POST("/update", middleware.AuthRequired(repos.userRepository, ethClient), updateGalleryToken(repos.galleryTokenRepository))
 	// COLLECTIONS
 
 	collectionsGroup := parent.Group("/collections")
 
-	collectionsGroup.GET("/get", middleware.JWTOptional(), getCollectionByIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	collectionsGroup.GET("/user_get", middleware.JWTOptional(), getCollectionsByUserIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	collectionsGroup.POST("/create", middleware.JWTRequired(repos.userRepository, ethClient), createCollectionToken(repos.collectionTokenRepository, repos.galleryTokenRepository))
-	collectionsGroup.POST("/delete", middleware.JWTRequired(repos.userRepository, ethClient), deleteCollectionToken(repos.collectionTokenRepository))
-	collectionsGroup.POST("/update/info", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionInfoToken(repos.collectionTokenRepository))
-	collectionsGroup.POST("/update/hidden", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionHiddenToken(repos.collectionTokenRepository))
-	collectionsGroup.POST("/update/nfts", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionTokensToken(repos.collectionTokenRepository))
+	collectionsGroup.GET("/get", middleware.AuthOptional(), getCollectionByIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	collectionsGroup.GET("/user_get", middleware.AuthOptional(), getCollectionsByUserIDToken(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	collectionsGroup.POST("/create", middleware.AuthRequired(repos.userRepository, ethClient), createCollectionToken(repos.collectionTokenRepository, repos.galleryTokenRepository))
+	collectionsGroup.POST("/delete", middleware.AuthRequired(repos.userRepository, ethClient), deleteCollectionToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/info", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionInfoToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/hidden", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionHiddenToken(repos.collectionTokenRepository))
+	collectionsGroup.POST("/update/nfts", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionTokensToken(repos.collectionTokenRepository))
 
 	// NFTS
 
 	nftsGroup := parent.Group("/nfts")
 
-	nftsGroup.GET("/get", middleware.JWTOptional(), getTokens(repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	nftsGroup.GET("/user_get", middleware.JWTOptional(), getTokensForUser(repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	nftsGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateTokenByID(repos.tokenRepository))
-	nftsGroup.GET("/unassigned/get", middleware.JWTRequired(repos.userRepository, ethClient), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
-	nftsGroup.POST("/unassigned/refresh", middleware.JWTRequired(repos.userRepository, ethClient), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
+	nftsGroup.GET("/get", middleware.AuthOptional(), getTokens(repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	nftsGroup.GET("/user_get", middleware.AuthOptional(), getTokensForUser(repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	nftsGroup.POST("/update", middleware.AuthRequired(repos.userRepository, ethClient), updateTokenByID(repos.tokenRepository))
+	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.userRepository, ethClient), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient, storageClient))
+	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	parent.GET("/health", healthcheck())
 
@@ -117,34 +119,34 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 
 	galleriesGroup := parent.Group("/galleries")
 
-	galleriesGroup.GET("/get", middleware.JWTOptional(), getGalleryByID(repos.galleryRepository))
-	galleriesGroup.GET("/user_get", middleware.JWTOptional(), getGalleriesByUserID(repos.galleryRepository))
-	galleriesGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateGallery(repos.galleryRepository, repos.backupRepository))
+	galleriesGroup.GET("/get", middleware.AuthOptional(), getGalleryByID(repos.galleryRepository))
+	galleriesGroup.GET("/user_get", middleware.AuthOptional(), getGalleriesByUserID(repos.galleryRepository))
+	galleriesGroup.POST("/update", middleware.AuthRequired(repos.userRepository, ethClient), updateGallery(repos.galleryRepository, repos.backupRepository))
 	galleriesGroup.POST("/refresh", middleware.RateLimited(), refreshGallery(repos.galleryRepository))
 
 	// COLLECTIONS
 
 	collectionsGroup := parent.Group("/collections")
 
-	collectionsGroup.GET("/get", middleware.JWTOptional(), getCollectionByID(repos.collectionRepository))
-	collectionsGroup.GET("/user_get", middleware.JWTOptional(), getCollectionsByUserID(repos.collectionRepository))
-	collectionsGroup.POST("/create", middleware.JWTRequired(repos.userRepository, ethClient), createCollection(repos.collectionRepository, repos.galleryRepository))
-	collectionsGroup.POST("/delete", middleware.JWTRequired(repos.userRepository, ethClient), deleteCollection(repos.collectionRepository))
-	collectionsGroup.POST("/update/info", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionInfo(repos.collectionRepository))
-	collectionsGroup.POST("/update/hidden", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionHidden(repos.collectionRepository))
-	collectionsGroup.POST("/update/nfts", middleware.JWTRequired(repos.userRepository, ethClient), updateCollectionNfts(repos.collectionRepository, repos.galleryRepository, repos.backupRepository))
+	collectionsGroup.GET("/get", middleware.AuthOptional(), getCollectionByID(repos.collectionRepository))
+	collectionsGroup.GET("/user_get", middleware.AuthOptional(), getCollectionsByUserID(repos.collectionRepository))
+	collectionsGroup.POST("/create", middleware.AuthRequired(repos.userRepository, ethClient), createCollection(repos.collectionRepository, repos.galleryRepository))
+	collectionsGroup.POST("/delete", middleware.AuthRequired(repos.userRepository, ethClient), deleteCollection(repos.collectionRepository))
+	collectionsGroup.POST("/update/info", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionInfo(repos.collectionRepository))
+	collectionsGroup.POST("/update/hidden", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionHidden(repos.collectionRepository))
+	collectionsGroup.POST("/update/nfts", middleware.AuthRequired(repos.userRepository, ethClient), updateCollectionNfts(repos.collectionRepository, repos.galleryRepository, repos.backupRepository))
 
 	// NFTS
 
 	nftsGroup := parent.Group("/nfts")
 
-	nftsGroup.GET("/get", middleware.JWTOptional(), getNftByID(repos.nftRepository))
-	nftsGroup.GET("/user_get", middleware.JWTOptional(), getNftsForUser(repos.nftRepository))
-	nftsGroup.GET("/opensea/get", middleware.JWTRequired(repos.userRepository, ethClient), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
-	nftsGroup.POST("/opensea/refresh", middleware.JWTRequired(repos.userRepository, ethClient), refreshOpenseaNFTs(repos.nftRepository, repos.userRepository))
-	nftsGroup.POST("/update", middleware.JWTRequired(repos.userRepository, ethClient), updateNftByID(repos.nftRepository))
-	nftsGroup.GET("/unassigned/get", middleware.JWTRequired(repos.userRepository, ethClient), getUnassignedNftsForUser(repos.collectionRepository))
-	nftsGroup.POST("/unassigned/refresh", middleware.JWTRequired(repos.userRepository, ethClient), refreshUnassignedNftsForUser(repos.collectionRepository))
+	nftsGroup.GET("/get", middleware.AuthOptional(), getNftByID(repos.nftRepository))
+	nftsGroup.GET("/user_get", middleware.AuthOptional(), getNftsForUser(repos.nftRepository))
+	nftsGroup.GET("/opensea/get", middleware.AuthRequired(repos.userRepository, ethClient), getNftsFromOpensea(repos.nftRepository, repos.userRepository, repos.collectionRepository, repos.historyRepository))
+	nftsGroup.POST("/opensea/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshOpenseaNFTs(repos.nftRepository, repos.userRepository))
+	nftsGroup.POST("/update", middleware.AuthRequired(repos.userRepository, ethClient), updateNftByID(repos.nftRepository))
+	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.userRepository, ethClient), getUnassignedNftsForUser(repos.collectionRepository))
+	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedNftsForUser(repos.collectionRepository))
 
 	parent.GET("/health", healthcheck())
 

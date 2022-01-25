@@ -73,6 +73,13 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 	}
 }
 
+func logout() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		auth.SetJWTCookie(c, "")
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
 func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client, contractAddress persist.Address, tokenIDs []persist.TokenID) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authHasNFTInput{}
