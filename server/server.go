@@ -170,35 +170,30 @@ func newGCPPubSub() pubsub.PubSub {
 func newGCPStorageClient() *storage.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
-	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
-
-		appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
-		_, err := os.Stat(appCredentials)
-		if err != nil {
-			_, err = os.Stat(filepath.Join("..", appCredentials))
-			if err == nil {
-				appCredentials = filepath.Join("..", appCredentials)
-				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
-			}
+	appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
+	_, err := os.Stat(appCredentials)
+	if err != nil {
+		_, err = os.Stat(filepath.Join("..", appCredentials))
+		if err == nil {
+			appCredentials = filepath.Join("..", appCredentials)
+			viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
 		}
+	}
+	if err != nil {
+		logrus.Errorf("err getting app creds: %s", err)
+		client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
 		if err != nil {
-			logrus.Errorf("err getting app creds: %s", err)
-			client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
-			if err != nil {
-				panic(err)
+			if viper.GetString("ENV") != "production" && viper.GetString("ENV") != "development" {
+				logrus.Info("not using gcp storage client in local environment")
+				return nil
 			}
-			return client
-		}
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
-		if err != nil {
 			panic(err)
 		}
 		return client
 	}
-	client, err := storage.NewClient(ctx)
+	client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
 	if err != nil {
 		panic(err)
 	}
 	return client
-
 }

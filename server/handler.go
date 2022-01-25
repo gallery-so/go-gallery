@@ -17,7 +17,9 @@ func handlersInit(router *gin.Engine, repos *repositories, ethClient *ethclient.
 	apiGroupV2 := router.Group("/glry/v2")
 
 	nftHandlersInit(apiGroupV1, repos, ethClient, psub)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, psub, storageClient)
+	if storageClient != nil {
+		tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, psub, storageClient)
+	}
 
 	return router
 }
