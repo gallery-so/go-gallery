@@ -21,11 +21,9 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var db *sql.DB
-var mgoClient *mongo.Client
 
 type TestConfig struct {
 	server              *httptest.Server
@@ -86,16 +84,13 @@ func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 	if db == nil {
 		db = postgres.NewClient()
 	}
-	if mgoClient == nil {
-		mgoClient = newMongoClient()
-	}
 
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
-	router := CoreInit(mgoClient, db)
+	router := CoreInit(db)
 	router.POST("/fake-cookie", fakeCookie)
 	ts = httptest.NewServer(router)
 
-	repos := newRepos(mgoClient, db)
+	repos := newRepos(db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
 	log.Infof("test server connected at %s ✅", ts.URL)
 
@@ -120,7 +115,6 @@ func teardown() {
 }
 
 func clearDB() {
-	mgoClient.Database("gallery").Drop(context.Background())
 	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
 	_, err := db.Exec(dropSQL)
 	if err != nil {

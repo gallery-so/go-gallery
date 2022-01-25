@@ -10,15 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/mongodb"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 // Init starts the background process for keeping the access state up to date and handles requests
@@ -63,7 +59,7 @@ func coreInit() *gin.Engine {
 
 func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
-	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
+
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("SIGNUP_TOPIC", "user-signup")
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
@@ -86,39 +82,9 @@ func newEthClient() *ethclient.Client {
 }
 
 func newRepos() (persist.UserRepository, persist.FeatureFlagRepository, persist.AccessRepository) {
-	mgoClient := newMongoClient()
-	return mongodb.NewUserRepository(mgoClient), mongodb.NewFeaturesRepository(mgoClient), mongodb.NewAccessRepository(mgoClient)
-}
+	pgClient := postgres.NewClient()
 
-func newMongoClient() *mongo.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
-	defer cancel()
-	mgoURL := viper.GetString("MONGO_URL")
-	if viper.GetString("ENV") != "local" {
-		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
-		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
-		if err != nil {
-			panic(err)
-		}
-		mgoURL = string(secret)
-	}
-
-	logrus.Infof("Connecting to mongo at %s", mgoURL)
-
-	mOpts := options.Client().ApplyURI(mgoURL)
-	mOpts.SetRegistry(mongodb.CustomRegistry)
-
-	mClient, err := mongo.Connect(ctx, mOpts)
-	if err != nil {
-		panic(err)
-	}
-
-	err = mClient.Ping(ctx, readpref.Primary())
-	if err != nil {
-		panic(err)
-	}
-
-	return mClient
+	return postgres.NewUserRepository(pgClient), postgres.NewFeatureFlagRepository(pgClient), postgres.NewAccessRepository(pgClient)
 }
 
 func newGCPPubSub() pubsub.PubSub {

@@ -12,7 +12,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -128,10 +127,6 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
-			if err == mongodb.ErrDocumentNotFound {
-				util.ErrResponse(c, http.StatusNotFound, err)
-				return
-			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
