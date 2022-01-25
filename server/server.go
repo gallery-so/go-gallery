@@ -172,7 +172,7 @@ func newGCPStorageClient() *storage.Client {
 	defer cancel()
 
 	if viper.GetString("ENV") != "local" {
-		client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
+		client, err := storage.NewClient(ctx)
 		if err != nil {
 			panic(err)
 		}
