@@ -15,16 +15,10 @@ import (
 	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/mongodb"
-	"github.com/mikeydub/go-gallery/service/persist/multi"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"google.golang.org/api/option"
 )
 
@@ -73,7 +67,6 @@ func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("CHAIN", "ETH")
-	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
@@ -82,8 +75,6 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("INSTANCE_CONNECTION_NAME", "")
-	viper.SetDefault("DATABASE", "mongodb")
 
 	viper.AutomaticEnv()
 }
@@ -110,45 +101,9 @@ func newIPFSShell() *shell.Shell {
 }
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
-	mgoClient := newMongoClient()
 	pgClient := postgres.NewClient()
 
-	switch viper.GetString("DATABASE") {
-	case "mongodb":
-		return mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient), mongodb.NewUserRepository(mgoClient)
-	case "postgres":
-		return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-	case "multi":
-		mongoToken, mongoContract := mongodb.NewTokenRepository(mgoClient, nil), mongodb.NewContractRepository(mgoClient)
-		pgToken, pgContract, pgUser := postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-		return multi.NewTokenRepository(pgToken, mongoToken), multi.NewContractRepository(pgContract, mongoContract), pgUser
-	default:
-		panic("Unknown database")
-	}
-}
-
-func newMongoClient() *mongo.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-	defer cancel()
-	mgoURL := viper.GetString("MONGO_URL")
-	if viper.GetString("ENV") != "local" {
-		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
-		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
-		if err != nil {
-			panic(err)
-		}
-		mgoURL = string(secret)
-	}
-
-	logrus.Infof("Connecting to mongo at %s", mgoURL)
-
-	mOpts := options.Client().ApplyURI(mgoURL)
-	mOpts.SetRegistry(mongodb.CustomRegistry)
-	mOpts.SetWriteConcern(writeconcern.New(writeconcern.J(true), writeconcern.W(1)))
-	mOpts.SetRetryWrites(true)
-	mOpts.SetRetryReads(true)
-
-	return mongodb.NewMongoClient(ctx, mOpts)
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
 }
 
 func redirectStderr(f *os.File) {

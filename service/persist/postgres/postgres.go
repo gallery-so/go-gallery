@@ -15,14 +15,13 @@ import (
 func NewClient() *sql.DB {
 	dbUser := viper.GetString("POSTGRES_USER")
 	dbPwd := viper.GetString("POSTGRES_PASSWORD")
-	instanceConnectionName := viper.GetString("INSTANCE_CONNECTION_NAME")
 	dbName := viper.GetString("POSTGRES_DB")
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
 	var psqlInfo string
 	if viper.GetString("ENV") != "local" {
-		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=/cloudsql/%s", dbUser, dbPwd, dbName, instanceConnectionName)
+		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=/cloudsql/%s", dbUser, dbPwd, dbName, dbHost)
 	} else {
 		psqlInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", dbHost, dbPort, dbUser, dbPwd, dbName)
 	}

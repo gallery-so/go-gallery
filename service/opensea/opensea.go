@@ -96,7 +96,7 @@ type errNoSingleNFTForOpenseaID struct {
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
 func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
-	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) error {
+	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {

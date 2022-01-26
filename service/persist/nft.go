@@ -22,8 +22,6 @@ type NFT struct {
 
 	MultipleOwners NullBool `bson:"multiple_owners" json:"multiple_owners"`
 
-	OwnershipHistory OwnershipHistory `bson:"ownership_history" json:"ownership_history"`
-
 	Name                NullString  `bson:"name"                 json:"name"`
 	Description         NullString  `bson:"description"          json:"description"`
 	ExternalURL         NullString  `bson:"external_url"         json:"external_url"`

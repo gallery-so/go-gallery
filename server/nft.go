@@ -9,7 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/mongodb"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -46,15 +45,6 @@ type getUnassignedNftsOutput struct {
 type updateNftByIDInput struct {
 	ID             persist.DBID `form:"id" binding:"required"`
 	CollectorsNote string       `form:"collectors_note"`
-}
-
-type getOwnershipHistoryInput struct {
-	NftID     persist.DBID `json:"id" form:"id" binding:"required"`
-	SkipCache bool         `json:"skip_cache" form:"skip_cache"`
-}
-
-type getOwnershipHistoryOutput struct {
-	OwnershipHistory persist.OwnershipHistory `json:"ownership_history"`
 }
 
 type errDoesNotOwnWallets struct {
@@ -104,11 +94,7 @@ func updateNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
 
 		err := nftRepository.UpdateByID(c, input.ID, userID, update)
 		if err != nil {
-			status := http.StatusInternalServerError
-			if err == mongodb.ErrDocumentNotFound {
-				status = http.StatusNotFound
-			}
-			util.ErrResponse(c, status, err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -166,7 +152,7 @@ func refreshUnassignedNftsForUser(collectionRepository persist.CollectionReposit
 	}
 }
 
-func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, historyRepo persist.OwnershipHistoryRepository) gin.HandlerFunc {
+func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -200,7 +186,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 		}
 
-		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, historyRepo)
+		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

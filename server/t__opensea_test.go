@@ -71,7 +71,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
-	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository, tc.repos.historyRepository)
+	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository)
 	assert.Nil(err)
 
 	time.Sleep(time.Second * 3)

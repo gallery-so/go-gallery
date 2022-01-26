@@ -17,18 +17,13 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/mongodb"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"google.golang.org/api/option"
 )
 
@@ -42,7 +37,6 @@ type repositories struct {
 	collectionTokenRepository persist.CollectionTokenRepository
 	galleryRepository         persist.GalleryRepository
 	galleryTokenRepository    persist.GalleryTokenRepository
-	historyRepository         persist.OwnershipHistoryRepository
 	contractRepository        persist.ContractRepository
 	backupRepository          persist.BackupRepository
 	membershipRepository      persist.MembershipRepository
@@ -52,14 +46,14 @@ type repositories struct {
 func init() {
 	setDefaults()
 
-	router := CoreInit(newMongoClient(), postgres.NewClient())
+	router := CoreInit(postgres.NewClient())
 
 	http.Handle("/", router)
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(mgoClient *mongo.Client, pqClient *sql.DB) *gin.Engine {
+func CoreInit(pqClient *sql.DB) *gin.Engine {
 	log.Info("initializing server...")
 
 	log.SetReportCaller(true)
@@ -87,7 +81,7 @@ func CoreInit(mgoClient *mongo.Client, pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(mgoClient, pqClient), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
 }
 
 func setDefaults() {
@@ -96,13 +90,11 @@ func setDefaults() {
 	viper.SetDefault("JWT_SECRET", "Test-Secret")
 	viper.SetDefault("JWT_TTL", 60*60*24*7)
 	viper.SetDefault("PORT", 4000)
-	viper.SetDefault("MONGO_URL", "mongodb://localhost:27017/")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("INSTANCE_CONNECTION_NAME", "")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
@@ -117,7 +109,6 @@ func setDefaults() {
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
-	viper.SetDefault("DATABASE", "mongodb")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 
 	viper.AutomaticEnv()
@@ -127,76 +118,27 @@ func setDefaults() {
 	}
 }
 
-func newRepos(mgoClient *mongo.Client, db *sql.DB) *repositories {
+func newRepos(db *sql.DB) *repositories {
 
 	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
 	galleriesCacheToken := redis.NewCache(2)
 	nftsCache := redis.NewCache(3)
-	switch viper.GetString("DATABASE") {
-	case "postgres":
-		logrus.Info("using postgres")
-		return &repositories{
-			userRepository:            postgres.NewUserRepository(db),
-			nonceRepository:           postgres.NewNonceRepository(db),
-			loginRepository:           postgres.NewLoginRepository(db),
-			nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
-			tokenRepository:           postgres.NewTokenRepository(db),
-			collectionRepository:      postgres.NewCollectionRepository(db),
-			collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
-			galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
-			galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
-			historyRepository:         mongodb.NewHistoryRepository(mgoClient),
-			contractRepository:        postgres.NewContractRepository(db),
-			backupRepository:          postgres.NewBackupRepository(db),
-			membershipRepository:      postgres.NewMembershipRepository(db),
-		}
-	case "mongodb":
-		logrus.Info("using mongodb")
-		grepo := mongodb.NewGalleryRepository(mgoClient, galleriesCache)
-		gTokenRepo := mongodb.NewGalleryTokenRepository(mgoClient, galleriesCacheToken)
-		nftRepo := mongodb.NewNFTRepository(mgoClient, openseaCache, nftsCache, grepo)
-		unassignedCache := redis.NewCache(4)
-		unassignedTokenCache := redis.NewCache(5)
-		return &repositories{
-			userRepository:            mongodb.NewUserRepository(mgoClient),
-			nonceRepository:           mongodb.NewNonceRepository(mgoClient),
-			loginRepository:           mongodb.NewLoginRepository(mgoClient),
-			nftRepository:             nftRepo,
-			tokenRepository:           mongodb.NewTokenRepository(mgoClient, gTokenRepo),
-			collectionRepository:      mongodb.NewCollectionRepository(mgoClient, unassignedCache, grepo, nftRepo),
-			collectionTokenRepository: mongodb.NewCollectionTokenRepository(mgoClient, unassignedTokenCache, gTokenRepo),
-			galleryRepository:         grepo,
-			galleryTokenRepository:    gTokenRepo,
-			historyRepository:         mongodb.NewHistoryRepository(mgoClient),
-			contractRepository:        mongodb.NewContractRepository(mgoClient),
-			backupRepository:          mongodb.NewBackupRepository(mgoClient),
-			membershipRepository:      mongodb.NewMembershipRepository(mgoClient),
-		}
-	default:
-		panic("DATABASE must be set to either 'postgres' or 'mongodb'")
+
+	return &repositories{
+		userRepository:            postgres.NewUserRepository(db),
+		nonceRepository:           postgres.NewNonceRepository(db),
+		loginRepository:           postgres.NewLoginRepository(db),
+		nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+		tokenRepository:           postgres.NewTokenRepository(db),
+		collectionRepository:      postgres.NewCollectionRepository(db),
+		collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
+		galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
+		galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
+		contractRepository:        postgres.NewContractRepository(db),
+		backupRepository:          postgres.NewBackupRepository(db),
+		membershipRepository:      postgres.NewMembershipRepository(db),
 	}
-}
 
-func newMongoClient() *mongo.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
-	defer cancel()
-	mgoURL := viper.GetString("MONGO_URL")
-	if viper.GetString("ENV") != "local" {
-		mongoSecretName := viper.GetString("MONGO_SECRET_NAME")
-		secret, err := util.AccessSecret(context.Background(), mongoSecretName)
-		if err != nil {
-			panic(err)
-		}
-		mgoURL = string(secret)
-	}
-	logrus.Infof("Connecting to mongo at %s\n", mgoURL)
-
-	mOpts := options.Client().ApplyURI(string(mgoURL))
-	mOpts.SetRegistry(mongodb.CustomRegistry)
-	mOpts.SetRetryWrites(true)
-	mOpts.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
-
-	return mongodb.NewMongoClient(ctx, mOpts)
 }
 
 func newEthClient() *ethclient.Client {
