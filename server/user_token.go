@@ -72,6 +72,34 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
+func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authed := c.GetBool(auth.AuthContextKey)
+		if !authed {
+			util.ErrResponse(c, http.StatusUnauthorized, errors.New("not authorized"))
+			return
+		}
+		userID := auth.GetUserIDFromCtx(c)
+
+		output, err := user.GetUser(
+			c,
+			user.GetUserInput{UserID: userID},
+			userRepository,
+		)
+		if err != nil {
+			status := http.StatusInternalServerError
+			switch err.(type) {
+			case persist.ErrUserNotFoundByAddress, persist.ErrUserNotFoundByID, persist.ErrUserNotFoundByUsername:
+				status = http.StatusNotFound
+			}
+			util.ErrResponse(c, status, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, output)
+	}
+}
+
 func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

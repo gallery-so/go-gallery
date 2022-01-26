@@ -32,7 +32,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
-	authGroup.GET("/logout", logout())
+	authGroup.POST("/logout", logout())
 
 	// USER
 
@@ -41,6 +41,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
 	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.userRepository, ethClient), removeAddressesToken(repos.userRepository, repos.collectionTokenRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.userRepository))
+	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.membershipRepository, repos.userRepository, repos.tokenRepository, repos.galleryTokenRepository, ethClient))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub, ethClient))
 
@@ -56,7 +57,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.userRepository, repos.nonceRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.userRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
-	authGroup.GET("/logout", logout())
+	authGroup.POST("/logout", logout())
 
 	// USER
 
@@ -65,6 +66,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.userRepository, ethClient), addUserAddress(repos.userRepository, repos.nonceRepository, ethClient, psub))
 	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.userRepository, ethClient), removeAddresses(repos.userRepository, repos.collectionRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.userRepository))
+	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, repos.galleryRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub, ethClient))
 
