@@ -18,6 +18,9 @@ type statements struct {
 	deleteCollectionStmt  *sql.Stmt
 	updateUserStmt        *sql.Stmt
 	updateGalleryStmt     *sql.Stmt
+	createUserStmt        *sql.Stmt
+	createGalleryStmt     *sql.Stmt
+	createNonceStmt       *sql.Stmt
 }
 
 func newStatements(db *sql.DB) *statements {
@@ -48,6 +51,15 @@ func newStatements(db *sql.DB) *statements {
 	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
 	checkNoErr(err)
 
+	createUserStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES, USERNAME, USERNAME_IDEMPOTENT, BIO) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
+	checkNoErr(err)
+
+	createGalleryStmt, err := db.PrepareContext(ctx, `INSERT INTO galleries (ID,OWNER_USER_ID, COLLECTIONS) VALUES ($1, $2, $3) RETURNING ID;`)
+	checkNoErr(err)
+
+	createNonceStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,USER_ID, ADDRESS, VALUE) VALUES ($1, $2, $3, $4);`)
+	checkNoErr(err)
+
 	return &statements{
 		getUserByIDStmt:       getUserByIDStmt,
 		getUserByUsernameStmt: getUserByUsernameStmt,
@@ -57,6 +69,9 @@ func newStatements(db *sql.DB) *statements {
 		deleteCollectionStmt:  deleteCollectionStmt,
 		updateUserStmt:        updateUserStmt,
 		updateGalleryStmt:     updateGalleryStmt,
+		createUserStmt:        createUserStmt,
+		createGalleryStmt:     createGalleryStmt,
+		createNonceStmt:       createNonceStmt,
 	}
 
 }

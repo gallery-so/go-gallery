@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 )
 
 var errMustProvideUserIdentifier = fmt.Errorf("must provide either ID or username")
@@ -35,6 +35,17 @@ type updateUserInput struct {
 type mergeUserInput struct {
 	FirstUserID  persist.DBID `json:"first_user" binding:"required"`
 	SecondUserID persist.DBID `json:"second_user" binding:"required"`
+}
+
+type createUserInput struct {
+	Addresses []persist.Address `json:"addresses" binding:"required"`
+	Username  string            `json:"username" binding:"required"`
+	Bio       string            `json:"bio"`
+}
+
+type createUserOutput struct {
+	UserID    persist.DBID `json:"user_id"`
+	GalleryID persist.DBID `json:"gallery_id"`
 }
 
 func getUser(getUserByIDStmt, getUserByUsername *sql.Stmt) gin.HandlerFunc {
@@ -62,9 +73,51 @@ func getUser(getUserByIDStmt, getUserByUsername *sql.Stmt) gin.HandlerFunc {
 			return
 		}
 
-		logrus.Info(user.Deleted)
-
 		c.JSON(http.StatusOK, user)
+	}
+}
+
+func createUser(db *sql.DB, createUserStmt, createGalleryStmt, createNonceStmt *sql.Stmt) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input createUserInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		tx, err := db.BeginTx(c, nil)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		var userID, galleryID persist.DBID
+		if err := tx.StmtContext(c, createUserStmt).QueryRowContext(c, persist.GenerateID(), pq.Array(input.Addresses), input.Username, strings.ToLower(input.Username), input.Bio).Scan(&userID); err != nil {
+			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := tx.StmtContext(c, createGalleryStmt).QueryRowContext(c, persist.GenerateID(), userID, pq.Array([]persist.DBID{})).Scan(&galleryID); err != nil {
+			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
+			return
+		}
+
+		for _, address := range input.Addresses {
+			if _, err := tx.StmtContext(c, createNonceStmt).ExecContext(c, persist.GenerateID(), userID, address, auth.GenerateNonce()); err != nil {
+				rollbackWithErr(c, tx, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, createUserOutput{
+			UserID:    userID,
+			GalleryID: galleryID,
+		})
 	}
 }
 

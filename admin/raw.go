@@ -13,7 +13,7 @@ type queryRawInput struct {
 }
 
 type queryRawOutput struct {
-	Raw [][]byte `json:"raw"`
+	Raw []map[string]interface{} `json:"raw"`
 }
 
 func queryRaw(db *sql.DB) gin.HandlerFunc {
@@ -33,19 +33,32 @@ func queryRaw(db *sql.DB) gin.HandlerFunc {
 		}
 		res, err := tx.QueryContext(c, input.Query)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
 		defer res.Close()
 
-		output := queryRawOutput{Raw: make([][]byte, 0, 10)}
+		colls, err := res.Columns()
+		if err != nil {
+			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
+			return
+		}
+
+		output := queryRawOutput{Raw: make([]map[string]interface{}, 0, 10)}
 		for res.Next() {
-			var raw []byte
-			if err := res.Scan(&raw); err != nil {
+			raw := make([]interface{}, len(colls))
+			for i := 0; i < len(colls); i++ {
+				raw[i] = new(interface{})
+			}
+			if err := res.Scan(raw...); err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
-			output.Raw = append(output.Raw, raw)
+			row := make(map[string]interface{}, len(colls))
+			for i := 0; i < len(colls); i++ {
+				row[colls[i]] = raw[i]
+			}
+			output.Raw = append(output.Raw, row)
 		}
 
 		if err := tx.Commit(); err != nil {
