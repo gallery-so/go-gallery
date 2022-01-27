@@ -452,15 +452,10 @@ func SetJWTCookie(c *gin.Context, token string) {
 
 	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
 
-	if viper.GetString("ENV") != "production" {
+	if viper.GetString("ENV") != "production" || clientIsLocalhost {
 		mode = http.SameSiteNoneMode
 		domain = ""
 		httpOnly = false
-	}
-
-	if clientIsLocalhost {
-		mode = http.SameSiteDefaultMode
-		secure = false
 	}
 
 	http.SetCookie(c.Writer, &http.Cookie{
