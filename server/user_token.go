@@ -17,7 +17,6 @@ var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
 
 func updateUserInfo(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		input := user.UpdateUserInput{}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -76,7 +75,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authed := c.GetBool(auth.AuthContextKey)
 		if !authed {
-			util.ErrResponse(c, http.StatusUnauthorized, errors.New("not authorized"))
+			c.JSON(http.StatusNoContent, util.SuccessResponse{Success: false})
 			return
 		}
 		userID := auth.GetUserIDFromCtx(c)

@@ -54,7 +54,7 @@ var errAddressSignatureMismatch = errors.New("address does not match signature")
 var ErrNonceMismatch = errors.New("incorrect nonce input")
 
 // ErrInvalidJWT is returned when the JWT is invalid
-var ErrInvalidJWT = errors.New("invalid JWT")
+var ErrInvalidJWT = errors.New("invalid or expired auth token")
 
 // ErrNoJWT is returned when there is no JWT in the request
 var ErrNoJWT = errors.New("no jwt passed as cookie")
