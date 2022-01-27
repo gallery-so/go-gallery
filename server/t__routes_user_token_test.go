@@ -72,6 +72,60 @@ func TestGetUserAuthenticated_ShouldIncludeAddress_Token(t *testing.T) {
 	assert.NotEmpty(body.Addresses)
 }
 
+func TestGetCurrentUser_ValidCookieReturnsUser_Token(t *testing.T) {
+	assert := setupTest(t, 2)
+
+	// Create user
+	u := persist.User{}
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	assert.Nil(err)
+
+	// Set up cookie to make an authenticated request
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	assert.Nil(err)
+	tu := createCookieAndSetOnUser(assert, userID, jwt)
+
+	// Make request
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get/current", tc.serverURL), nil)
+	assert.Nil(err)
+
+	resp, err := tu.client.Do(req)
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	body := persist.User{}
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Equal(tu.id.String(), body.ID.String())
+}
+
+func TestGetCurrentUser_NoCookieReturnsNoContent_Token(t *testing.T) {
+	assert := setupTest(t, 2)
+
+	resp, err := http.Get(fmt.Sprintf("%s/users/get/current", tc.serverURL))
+	assert.Nil(err)
+	assert.Equal(http.StatusNoContent, resp.StatusCode)
+}
+
+func TestGetCurrentUser_InvalidCookieReturnsNoContent_Token(t *testing.T) {
+	assert := setupTest(t, 2)
+
+	// Create user
+	u := persist.User{}
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	assert.Nil(err)
+
+	// Set up invalid cookie
+	tu := createCookieAndSetOnUser(assert, userID, "invalid token")
+
+	// Make request
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get/current", tc.serverURL), nil)
+	assert.Nil(err)
+
+	resp, err := tu.client.Do(req)
+	assert.Nil(err)
+	assert.Equal(http.StatusNoContent, resp.StatusCode)
+}
+
 func TestUpdateUserAuthenticated_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
@@ -340,6 +394,19 @@ func TestUserRemoveAddresses_AllAddresses_Failure_Token(t *testing.T) {
 	resp := userRemoveAddressesRequestToken(assert, update, tu)
 	assertErrorResponse(assert, resp)
 
+}
+
+func createCookieAndSetOnUser(assert *assert.Assertions, userID persist.DBID, jwt string) *TestUser {
+	j, err := cookiejar.New(nil)
+	assert.Nil(err)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{
+		id:     userID,
+		jwt:    jwt,
+		client: client,
+	}
+	getFakeCookie(assert, jwt, client)
+	return tu
 }
 
 func updateUserInfoRequestToken(assert *assert.Assertions, input user.UpdateUserInput, tu *TestUser) *http.Response {
