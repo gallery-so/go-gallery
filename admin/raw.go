@@ -9,11 +9,7 @@ import (
 )
 
 type queryRawInput struct {
-	Query    string `json:"query" binding:"required"`
-	CanWrite bool   `json:"can_write"`
-}
-type execRawInput struct {
-	Stmt string `json:"stmt" binding:"required"`
+	Query string `json:"query" binding:"required"`
 }
 
 type queryRawOutput struct {
@@ -30,7 +26,7 @@ func queryRaw(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		tx, err := db.BeginTx(c, &sql.TxOptions{ReadOnly: !input.CanWrite})
+		tx, err := db.BeginTx(c, &sql.TxOptions{ReadOnly: true})
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -58,26 +54,6 @@ func queryRaw(db *sql.DB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, output)
-	}
-
-}
-
-func execRaw(db *sql.DB) gin.HandlerFunc {
-
-	return func(c *gin.Context) {
-
-		var input execRawInput
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
-			return
-		}
-
-		if _, err := db.ExecContext(c, input.Stmt); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 
 }

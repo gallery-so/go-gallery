@@ -12,11 +12,12 @@ func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethc
 
 	users := api.Group("/users")
 	users.GET("/get", getUser(stmts.getUserByIDStmt, stmts.getUserByUsernameStmt))
+	users.POST("/merge", mergeUser(db, stmts.getUserByIDStmt, stmts.updateUserStmt, stmts.deleteUserStmt, stmts.getGalleriesStmt, stmts.deleteGalleryStmt, stmts.updateGalleryStmt))
+	users.POST("/update", updateUser(stmts.updateUserStmt))
 	users.POST("/delete", deleteUser(db, stmts.deleteUserStmt, stmts.getGalleriesStmt, stmts.deleteGalleryStmt, stmts.deleteCollectionStmt))
 
 	raw := api.Group("/raw")
 	raw.GET("/query", queryRaw(db))
-	raw.POST("/exec", execRaw(db))
 
 	return router
 }

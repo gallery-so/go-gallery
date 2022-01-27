@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -35,6 +36,9 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	router := gin.Default()
 	router.Use(middleware.ErrLogger())
+
+	pqClient.Exec(`DELETE FROM users WHERE USERNAME = 'admin';`)
+	pqClient.Exec(`INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT) VALUES ($1, $2, $3);`, persist.GenerateID(), "admin", "admin")
 
 	return handlersInit(router, pqClient, newStatements(pqClient), newEthClient())
 }
