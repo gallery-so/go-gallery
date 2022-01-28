@@ -9,7 +9,6 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // UserRepository represents a user repository in the postgres database
@@ -308,7 +307,6 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	defer res.Close()
 
 	for res.Next() {
-		logrus.Infof("Merging gallery from user %d into user %d", secondUser.ID, user.ID)
 		var gallery persist.GalleryDB
 		if err := res.Scan(&gallery.ID, pq.Array(&gallery.Collections)); err != nil {
 			return err
@@ -325,8 +323,6 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 		return err
 	}
 
-	logrus.Infof("Merged %d collections", len(mergedCollections))
-
 	nextRes, err := u.getGalleriesStmt.QueryContext(pCtx, pInitialUser)
 	if err != nil {
 		return err
@@ -334,7 +330,6 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	defer nextRes.Close()
 
 	if nextRes.Next() {
-		logrus.Infof("User %d has a gallery", pInitialUser)
 		var gallery persist.GalleryDB
 		if err := nextRes.Scan(&gallery.ID, pq.Array(&gallery.Collections)); err != nil {
 			return err
