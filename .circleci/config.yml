@@ -106,7 +106,7 @@ jobs:
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy Backend"
-          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $CIRCLE_SHA1
+          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
