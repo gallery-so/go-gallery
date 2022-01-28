@@ -39,6 +39,7 @@ type UserRepository interface {
 	Delete(context.Context, DBID) error
 	AddAddresses(context.Context, DBID, []Address) error
 	RemoveAddresses(context.Context, DBID, []Address) error
+	MergeUsers(context.Context, DBID, DBID) error
 }
 
 // ErrUserNotFoundByID is returned when a user is not found by ID
