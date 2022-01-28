@@ -44,6 +44,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.membershipRepository, repos.userRepository, repos.tokenRepository, repos.galleryTokenRepository, ethClient))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub, ethClient))
+	usersGroup.GET("/previews", getNFTPReviewsToken(repos.galleryTokenRepository))
 
 }
 
@@ -69,6 +70,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, repos.galleryRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub, ethClient))
+	usersGroup.GET("/previews", getNFTPReviews(repos.galleryRepository))
 
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -14,6 +15,14 @@ import (
 )
 
 var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
+
+type getPreviewsForUserInput struct {
+	UserID persist.DBID `form:"user_id"`
+}
+
+type getPreviewsForUserOutput struct {
+	Previews []persist.NullString `json:"previews"`
+}
 
 func updateUserInfo(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -169,6 +178,27 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+
+	}
+}
+
+func getNFTPReviewsToken(galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := getPreviewsForUserInput{}
+
+		if err := c.ShouldBindQuery(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		output, err := nft.GetPreviewsForUserToken(c, galleryRepository, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, getPreviewsForUserOutput{Previews: output})
 
 	}
 }

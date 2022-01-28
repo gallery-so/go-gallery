@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -345,7 +346,7 @@ func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persi
 		if err == nil && len(galleries) > 0 {
 			gallery := galleries[0]
 			if gallery.Collections != nil || len(gallery.Collections) > 0 {
-				membershipOwner.PreviewNFTs = getPreviewsFromCollections(gallery.Collections)
+				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
 			}
 		}
 
@@ -370,7 +371,7 @@ func fillMembershipOwnerToken(ctx context.Context, pAddress persist.Address, id 
 		if err == nil && len(galleries) > 0 {
 			gallery := galleries[0]
 			if gallery.Collections != nil || len(gallery.Collections) > 0 {
-				membershipOwner.PreviewNFTs = getPreviewsFromCollectionsToken(gallery.Collections)
+				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
 			}
 		}
 	}
@@ -420,48 +421,6 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	}
 
 	return tier, nil
-}
-
-func getPreviewsFromCollections(pColls []persist.Collection) []persist.NullString {
-	result := make([]persist.NullString, 0, 3)
-
-outer:
-	for _, c := range pColls {
-		for _, n := range c.NFTs {
-			if n.ImageThumbnailURL != "" {
-				result = append(result, n.ImageThumbnailURL)
-			}
-			if len(result) > 2 {
-				break outer
-			}
-		}
-		if len(result) > 2 {
-			break outer
-		}
-	}
-	return result
-
-}
-
-func getPreviewsFromCollectionsToken(pColls []persist.CollectionToken) []persist.NullString {
-	result := make([]persist.NullString, 0, 3)
-
-outer:
-	for _, c := range pColls {
-		for _, n := range c.NFTs {
-			if n.Media.ThumbnailURL != "" {
-				result = append(result, n.Media.ThumbnailURL)
-			}
-			if len(result) > 2 {
-				break outer
-			}
-		}
-		if len(result) > 2 {
-			break outer
-		}
-	}
-	return result
-
 }
 
 // OrderMembershipTiers orders the membership tiers in the desired order determined for the membership page
