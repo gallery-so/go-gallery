@@ -7,7 +7,7 @@ workflows:
           filters:
             branches:
               only:
-                - "main"
+                - "robin/deploy-updates"
 jobs:
   build:
     working_directory: ~/go-gallery
