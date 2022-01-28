@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -13,7 +15,7 @@ type statements struct {
 	getUserByIDStmt       *sql.Stmt
 	getUserByUsernameStmt *sql.Stmt
 	deleteUserStmt        *sql.Stmt
-	getGalleriesStmt      *sql.Stmt
+	getGalleriesRawStmt   *sql.Stmt
 	deleteGalleryStmt     *sql.Stmt
 	deleteCollectionStmt  *sql.Stmt
 	updateUserStmt        *sql.Stmt
@@ -21,6 +23,9 @@ type statements struct {
 	createUserStmt        *sql.Stmt
 	createGalleryStmt     *sql.Stmt
 	createNonceStmt       *sql.Stmt
+
+	galleryRepo persist.GalleryRepository
+	nftRepo     persist.NFTRepository
 }
 
 func newStatements(db *sql.DB) *statements {
@@ -36,7 +41,7 @@ func newStatements(db *sql.DB) *statements {
 	deleteUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getGalleriesStmt, err := db.PrepareContext(ctx, `SELECT ID, COLLECTIONS FROM galleries WHERE OWNER_USER_ID = $1;`)
+	getGalleriesRawStmt, err := db.PrepareContext(ctx, `SELECT ID, COLLECTIONS FROM galleries WHERE OWNER_USER_ID = $1;`)
 	checkNoErr(err)
 
 	deleteGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET DELETED = true WHERE ID = $1;`)
@@ -64,7 +69,7 @@ func newStatements(db *sql.DB) *statements {
 		getUserByIDStmt:       getUserByIDStmt,
 		getUserByUsernameStmt: getUserByUsernameStmt,
 		deleteUserStmt:        deleteUserStmt,
-		getGalleriesStmt:      getGalleriesStmt,
+		getGalleriesRawStmt:   getGalleriesRawStmt,
 		deleteGalleryStmt:     deleteGalleryStmt,
 		deleteCollectionStmt:  deleteCollectionStmt,
 		updateUserStmt:        updateUserStmt,
@@ -72,6 +77,9 @@ func newStatements(db *sql.DB) *statements {
 		createUserStmt:        createUserStmt,
 		createGalleryStmt:     createGalleryStmt,
 		createNonceStmt:       createNonceStmt,
+
+		galleryRepo: postgres.NewGalleryRepository(db, nil),
+		nftRepo:     postgres.NewNFTRepository(db, nil, nil),
 	}
 
 }
