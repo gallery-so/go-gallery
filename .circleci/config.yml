@@ -46,7 +46,7 @@ jobs:
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: keybase decrypt -i secrits -o decrypted.zip
+          command: keybase decrypt -i secrits -o deploy.zip
       - run:
           name: "Update apt"
           command: apt-get update
@@ -55,61 +55,58 @@ jobs:
           command: apt-get -y install unzip curl sudo python3
       - run:
           name: "Unzip secrets file"
-          command: unzip decrypted.zip
+          command: echo "A" | unzip deploy.zip
       - run:
           name: "Copy Backend app.yaml"
-          command: cp -R decrypted/app-dev-backend.yaml ./app-backend.yaml
+          command: cp -R dev/app-dev-backend.yaml ./app-backend.yaml
       - run:
           name: "Copy Indexer app.yaml"
-          command: cp -R decrypted/app-dev-indexer.yaml ./app-indexer.yaml 
-      - run:
-          name: "Copy GCP service key"
-          command: cp -R decrypted/service-key.json ./service-key.json
+          command: cp -R dev/app-dev-indexer.yaml ./app-indexer.yaml
       - run:
           command: |
-              install () {
-                # Set sudo to work whether logged in as root user or non-root user
-                if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
-                cd ~/
-                curl -Ss --retry 5 https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz | tar xz
-                echo 'source ~/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
-              }
+            install () {
+              # Set sudo to work whether logged in as root user or non-root user
+              if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+              cd ~/
+              curl -Ss --retry 5 https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz | tar xz
+              echo 'source ~/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
+            }
 
-              if grep 'docker\|lxc' /proc/1/cgroup > /dev/null 2>&1; then
-                if [[ $(command -v gcloud) == "" ]]; then
-                  install
-                else
-                  echo "gcloud CLI is already installed."
-                fi
-              else
-                echo "----------------------------------------------------------------------------------------------------"
-                echo "this is a machine executor job, replacing default installation of gcloud CLI"
-                echo "----------------------------------------------------------------------------------------------------"
-                sudo rm -rf /opt/google-cloud-sdk
+            if grep 'docker\|lxc' /proc/1/cgroup > /dev/null 2>&1; then
+              if [[ $(command -v gcloud) == "" ]]; then
                 install
+              else
+                echo "gcloud CLI is already installed."
               fi
+            else
+              echo "----------------------------------------------------------------------------------------------------"
+              echo "this is a machine executor job, replacing default installation of gcloud CLI"
+              echo "----------------------------------------------------------------------------------------------------"
+              sudo rm -rf /opt/google-cloud-sdk
+              install
+            fi
           name: Install latest gcloud CLI version, if not available
       - run:
           command: |
-              # Store service account
-              echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+            # Store service account
+            echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
 
-              # Initialize gcloud CLI
-              gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-              gcloud --quiet config set project $GOOGLE_PROJECT_ID
+            # Initialize gcloud CLI
+            gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+            gcloud --quiet config set project $GOOGLE_PROJECT_ID
 
-              if [[ -n $GOOGLE_COMPUTE_ZONE ]]; then
-                gcloud --quiet config set compute/zone $GOOGLE_COMPUTE_ZONE
-              elif [[ -n $GOOGLE_COMPUTE_REGION ]]; then
-                gcloud --quiet config set compute/region $GOOGLE_COMPUTE_REGION
-              else
-                echo "ERROR: Set GOOGLE_COMPUTE_ZONE or GOOGLE_COMPUTE_REGION env variable" >&2
-                exit 1
-              fi
+            if [[ -n $GOOGLE_COMPUTE_ZONE ]]; then
+              gcloud --quiet config set compute/zone $GOOGLE_COMPUTE_ZONE
+            elif [[ -n $GOOGLE_COMPUTE_REGION ]]; then
+              gcloud --quiet config set compute/region $GOOGLE_COMPUTE_REGION
+            else
+              echo "ERROR: Set GOOGLE_COMPUTE_ZONE or GOOGLE_COMPUTE_REGION env variable" >&2
+              exit 1
+            fi
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy Backend"
-          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml
+          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $CIRCLE_SHA1
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
