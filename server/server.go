@@ -27,21 +27,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-type repositories struct {
-	userRepository            persist.UserRepository
-	nonceRepository           persist.NonceRepository
-	loginRepository           persist.LoginAttemptRepository
-	nftRepository             persist.NFTRepository
-	tokenRepository           persist.TokenRepository
-	collectionRepository      persist.CollectionRepository
-	collectionTokenRepository persist.CollectionTokenRepository
-	galleryRepository         persist.GalleryRepository
-	galleryTokenRepository    persist.GalleryTokenRepository
-	contractRepository        persist.ContractRepository
-	backupRepository          persist.BackupRepository
-	membershipRepository      persist.MembershipRepository
-}
-
 // Init initializes the server
 func init() {
 	setDefaults()
@@ -118,27 +103,25 @@ func setDefaults() {
 	}
 }
 
-func newRepos(db *sql.DB) *repositories {
-
+func newRepos(db *sql.DB) *persist.Repositories {
 	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
 	galleriesCacheToken := redis.NewCache(2)
 	nftsCache := redis.NewCache(3)
 
-	return &repositories{
-		userRepository:            postgres.NewUserRepository(db),
-		nonceRepository:           postgres.NewNonceRepository(db),
-		loginRepository:           postgres.NewLoginRepository(db),
-		nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
-		tokenRepository:           postgres.NewTokenRepository(db),
-		collectionRepository:      postgres.NewCollectionRepository(db),
-		collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
-		galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
-		galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
-		contractRepository:        postgres.NewContractRepository(db),
-		backupRepository:          postgres.NewBackupRepository(db),
-		membershipRepository:      postgres.NewMembershipRepository(db),
+	return &persist.Repositories{
+		UserRepository:            postgres.NewUserRepository(db),
+		NonceRepository:           postgres.NewNonceRepository(db),
+		LoginRepository:           postgres.NewLoginRepository(db),
+		NftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+		TokenRepository:           postgres.NewTokenRepository(db),
+		CollectionRepository:      postgres.NewCollectionRepository(db),
+		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db),
+		GalleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
+		GalleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
+		ContractRepository:        postgres.NewContractRepository(db),
+		BackupRepository:          postgres.NewBackupRepository(db),
+		MembershipRepository:      postgres.NewMembershipRepository(db),
 	}
-
 }
 
 func newEthClient() *ethclient.Client {

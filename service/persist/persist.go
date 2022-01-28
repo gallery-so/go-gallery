@@ -28,6 +28,22 @@ type NullInt64 int64
 // NullBool represents a bool that may be null in the DB
 type NullBool bool
 
+// Repositories is the set of all available persistence repositories
+type Repositories struct {
+	UserRepository            UserRepository
+	NonceRepository           NonceRepository
+	LoginRepository           LoginAttemptRepository
+	NftRepository             NFTRepository
+	TokenRepository           TokenRepository
+	CollectionRepository      CollectionRepository
+	CollectionTokenRepository CollectionTokenRepository
+	GalleryRepository         GalleryRepository
+	GalleryTokenRepository    GalleryTokenRepository
+	ContractRepository        ContractRepository
+	BackupRepository          BackupRepository
+	MembershipRepository      MembershipRepository
+}
+
 // GenerateID generates a application-wide unique ID
 func GenerateID() DBID {
 	id, err := ksuid.NewRandom()
