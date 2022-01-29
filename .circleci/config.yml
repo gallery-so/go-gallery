@@ -7,7 +7,7 @@ workflows:
           filters:
             branches:
               only:
-                - "mainnnmn"
+                - "mainnn"
 jobs:
   build:
     working_directory: ~/go-gallery
