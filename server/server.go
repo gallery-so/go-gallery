@@ -43,7 +43,7 @@ type repositories struct {
 }
 
 // Init initializes the server
-func Main() {
+func Init() {
 	setDefaults()
 
 	router := CoreInit(postgres.NewClient())
