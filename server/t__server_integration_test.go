@@ -25,7 +25,7 @@ type UserTestSuite struct {
 	db        *sql.DB
 }
 
-func configureWithCleanup(config *docker.HostConfig) {
+func configureContainerCleanup(config *docker.HostConfig) {
 	config.AutoRemove = true
 	config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 }
@@ -52,15 +52,7 @@ func waitOnCache() (err error) {
 	return
 }
 
-func (s *UserTestSuite) SetupTest() {
-	setDefaults()
-	// create docker client
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-
-	// create a new db instance
+func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 	pg, err := pool.RunWithOptions(
 		&dockertest.RunOptions{
 			Repository: "postgres",
@@ -70,7 +62,7 @@ func (s *UserTestSuite) SetupTest() {
 				"POSTGRES_USER=postgres",
 				"POSTGRES_PORT=5432",
 				"POSTGRES_DB=postgres",
-			}}, configureWithCleanup,
+			}}, configureContainerCleanup,
 	)
 	if err != nil {
 		log.Fatalf("could not start postgres: %s", err)
@@ -84,8 +76,26 @@ func (s *UserTestSuite) SetupTest() {
 		log.Fatalf("could not connect to postgres: %s", err)
 	}
 
+	db = postgres.NewClient()
+	for _, f := range []string{"../scripts/initial_setup.sql", "../scripts/post_import.sql"} {
+		migration, err := os.ReadFile(f)
+
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = db.Exec(string(migration))
+		if err != nil {
+			log.Fatalf("failed to seed the db: %s", err)
+		}
+	}
+
+	return pg, db
+}
+
+func initRedis(pool *dockertest.Pool) *dockertest.Resource {
 	rd, err := pool.RunWithOptions(
-		&dockertest.RunOptions{Repository: "redis", Tag: "6"}, configureWithCleanup,
+		&dockertest.RunOptions{Repository: "redis", Tag: "6"}, configureContainerCleanup,
 	)
 	if err != nil {
 		log.Fatalf("could not start redis: %s", err)
@@ -96,25 +106,21 @@ func (s *UserTestSuite) SetupTest() {
 		log.Fatalf("could not connect to redis: %s", err)
 	}
 
-	s.pool = pool
-	s.db = postgres.NewClient()
-	migration, err := os.ReadFile("../scripts/initial_setup.sql")
-	if err != nil {
-		panic(err)
-	}
-	_, err = s.db.Exec(string(migration))
-	if err != nil {
-		log.Fatalf("failed to seed the db: %s", err)
-	}
-	migration, err = os.ReadFile("../scripts/post_import.sql")
-	if err != nil {
-		panic(err)
-	}
-	_, err = s.db.Exec(string(migration))
-	if err != nil {
-		log.Fatalf("failed to seed the db: %s", err)
-	}
+	return rd
+}
 
+func (s *UserTestSuite) SetupTest() {
+	setDefaults()
+
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("could not connect to docker: %s", err)
+	}
+	pg, pgClient := initPostgres(pool)
+	rd := initRedis(pool)
+
+	s.pool = pool
+	s.db = pgClient
 	s.resources = append(s.resources, pg, rd)
 	s.tc = initializeTestServer(s.db, s.Assertions, s.version)
 }
