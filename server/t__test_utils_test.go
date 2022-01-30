@@ -85,7 +85,10 @@ func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 		db = postgres.NewClient()
 	}
 
-	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
+	return initializeTestServer(db, a, v)
+}
+
+func initializeTestServer(db *sql.DB, a *assert.Assertions, v int) *TestConfig {
 	router := CoreInit(db)
 	router.POST("/fake-cookie", fakeCookie)
 	ts = httptest.NewServer(router)
