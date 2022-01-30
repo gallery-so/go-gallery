@@ -38,7 +38,7 @@ func waitOnDB() (err error) {
 	return
 }
 
-func (s *UserTestSuite) SetupSuite() {
+func (s *UserTestSuite) SetupTest() {
 	setDefaults()
 	// create docker client
 	pool, err := dockertest.NewPool("")
@@ -77,7 +77,7 @@ func (s *UserTestSuite) SetupSuite() {
 	s.tc = initializeTestServer(s.db, s.Assertions, s.apiVersion)
 }
 
-func (s *UserTestSuite) TearDownSuite() {
+func (s *UserTestSuite) TearDownTest() {
 	for _, r := range s.resources {
 		if err := s.pool.Purge(r); err != nil {
 			log.Fatalf("could not purge resource: %s", err)
