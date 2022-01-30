@@ -3,9 +3,11 @@ package server
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -16,11 +18,11 @@ import (
 
 type UserTestSuite struct {
 	suite.Suite
-	apiVersion int
-	resources  []*dockertest.Resource
-	pool       *dockertest.Pool
-	tc         *TestConfig
-	db         *sql.DB
+	version   int
+	resources []*dockertest.Resource
+	pool      *dockertest.Pool
+	tc        *TestConfig
+	db        *sql.DB
 }
 
 func configureWithCleanup(config *docker.HostConfig) {
@@ -34,7 +36,19 @@ func waitOnDB() (err error) {
 			err = errors.New("db is not available")
 		}
 	}()
-	postgres.NewClient().Close()
+
+	postgres.NewClient()
+	return
+}
+
+func waitOnCache() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("cache is not available")
+		}
+	}()
+
+	redis.NewCache(0)
 	return
 }
 
@@ -47,7 +61,7 @@ func (s *UserTestSuite) SetupTest() {
 	}
 
 	// create a new db instance
-	resource, err := pool.RunWithOptions(
+	pg, err := pool.RunWithOptions(
 		&dockertest.RunOptions{
 			Repository: "postgres",
 			Tag:        "14",
@@ -56,14 +70,13 @@ func (s *UserTestSuite) SetupTest() {
 				"POSTGRES_USER=postgres",
 				"POSTGRES_PORT=5432",
 				"POSTGRES_DB=postgres",
-			},
-		}, configureWithCleanup,
+			}}, configureWithCleanup,
 	)
 	if err != nil {
 		log.Fatalf("could not start postgres: %s", err)
 	}
 
-	hostAndPort := strings.Split(resource.GetHostPort("5432/tcp"), ":")
+	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
 	viper.SetDefault("POSTGRES_HOST", hostAndPort[0])
 	viper.SetDefault("POSTGRES_PORT", hostAndPort[1])
 
@@ -71,10 +84,39 @@ func (s *UserTestSuite) SetupTest() {
 		log.Fatalf("could not connect to postgres: %s", err)
 	}
 
+	rd, err := pool.RunWithOptions(
+		&dockertest.RunOptions{Repository: "redis", Tag: "6"}, configureWithCleanup,
+	)
+	if err != nil {
+		log.Fatalf("could not start redis: %s", err)
+	}
+
+	viper.SetDefault("REDIS_URL", rd.GetHostPort("6379/tcp"))
+	if err = pool.Retry(waitOnCache); err != nil {
+		log.Fatalf("could not connect to redis: %s", err)
+	}
+
 	s.pool = pool
 	s.db = postgres.NewClient()
-	s.resources = append(s.resources, resource)
-	s.tc = initializeTestServer(s.db, s.Assertions, s.apiVersion)
+	migration, err := os.ReadFile("../scripts/initial_setup.sql")
+	if err != nil {
+		panic(err)
+	}
+	_, err = s.db.Exec(string(migration))
+	if err != nil {
+		log.Fatalf("failed to seed the db: %s", err)
+	}
+	migration, err = os.ReadFile("../scripts/post_import.sql")
+	if err != nil {
+		panic(err)
+	}
+	_, err = s.db.Exec(string(migration))
+	if err != nil {
+		log.Fatalf("failed to seed the db: %s", err)
+	}
+
+	s.resources = append(s.resources, pg, rd)
+	s.tc = initializeTestServer(s.db, s.Assertions, s.version)
 }
 
 func (s *UserTestSuite) TearDownTest() {
@@ -85,8 +127,8 @@ func (s *UserTestSuite) TearDownTest() {
 	}
 }
 
-func (s *UserTestSuite) TestExample() {
-	s.Equal(5, 5)
+func (s *UserTestSuite) TestUserJourney() {
+	s.Equal(1, 1)
 }
 
 func TestUserTestSuite(t *testing.T) {
