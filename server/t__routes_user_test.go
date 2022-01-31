@@ -399,6 +399,7 @@ func TestGetUserPreviews_Success(t *testing.T) {
 	var body previews
 	util.UnmarshallBody(&body, resp.Body)
 	assert.Len(body.Previews, 3)
+}
 func TestMergeUsers_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
