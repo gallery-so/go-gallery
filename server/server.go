@@ -69,7 +69,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
 		v.RegisterValidation("short_string", validate.ShortStringValidator)
-		v.RegisterValidation("medium_string", validate.MediumStringValidator)
+		v.RegisterValidation("collectors_note", validate.CollectorsNoteValidator)
 		v.RegisterValidation("eth_addr", validate.EthValidator)
 		v.RegisterValidation("nonce", validate.NonceValidator)
 		v.RegisterValidation("signature", validate.SignatureValidator)

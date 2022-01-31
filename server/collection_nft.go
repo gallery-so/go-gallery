@@ -34,13 +34,13 @@ type collectionCreateInput struct {
 	Nfts           []persist.DBID      `json:"nfts" binding:"required"`
 	Layout         persist.TokenLayout `json:"layout"`
 	Name           string              `json:"name"`
-	CollectorsNote string              `json:"collectors_note"`
+	CollectorsNote string              `json:"collectors_note" binding:"collectors_note"`
 }
 
 type collectionUpdateInfoByIDInput struct {
 	ID             persist.DBID `json:"id" binding:"required"`
 	Name           string       `json:"name"`
-	CollectorsNote string       `json:"collectors_note"`
+	CollectorsNote string       `json:"collectors_note" binding:"collectors_note"`
 }
 
 type collectionUpdateHiddenByIDInput struct {

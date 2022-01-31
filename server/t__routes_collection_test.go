@@ -64,6 +64,36 @@ func TestUpdateCollectionNameByID_Success(t *testing.T) {
 	assert.NotEmpty(body.Collection.ID)
 }
 
+func TestUpdateCollectionCollectorsNoteByID_Failure_TooLong(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	nft := persist.NFT{
+		Description:    "asd",
+		OwnerAddress:   tc.user1.address,
+		CollectorsNote: "asd",
+	}
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	assert.Nil(err)
+	// seed DB with collection
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
+		Name:        "very cool collection",
+		OwnerUserID: tc.user1.id,
+		NFTs:        []persist.DBID{nftID},
+	})
+	assert.Nil(err)
+
+	// build update request body
+	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID, CollectorsNote: util.RandStringBytes(1700)}
+	resp := updateCollectionInfoRequest(assert, update, tc.user1)
+
+	errResp := &util.ErrorResponse{}
+	err = util.UnmarshallBody(errResp, resp.Body)
+	assert.Nil(err)
+	assert.NotEmpty(errResp.Error)
+
+	assertErrorResponse(assert, resp)
+}
+
 func TestCreateCollection_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
