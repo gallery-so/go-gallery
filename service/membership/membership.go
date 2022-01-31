@@ -18,7 +18,7 @@ import (
 )
 
 // MembershipTierIDs is a list of all membership tiers
-var MembershipTierIDs = []persist.TokenID{"4", "3", "5", "6", "8"}
+var MembershipTierIDs = []persist.TokenID{"4", "1", "3", "5", "6", "8"}
 
 // PremiumCards is the contract address for the premium membership cards
 const PremiumCards persist.Address = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"
