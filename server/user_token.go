@@ -16,10 +16,6 @@ import (
 
 var errUserIDNotInCtx = errors.New("expected user ID to be in request context")
 
-type getPreviewsForUserInput struct {
-	UserID persist.DBID `form:"user_id"`
-}
-
 type getPreviewsForUserOutput struct {
 	Previews []persist.NullString `json:"previews"`
 }
@@ -182,17 +178,17 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 	}
 }
 
-func getNFTPReviewsToken(galleryRepository persist.GalleryTokenRepository) gin.HandlerFunc {
+func getNFTPReviewsToken(galleryRepository persist.GalleryTokenRepository, userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := getPreviewsForUserInput{}
+		input := nft.GetPreviewsForUserInput{}
 
 		if err := c.ShouldBindQuery(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		output, err := nft.GetPreviewsForUserToken(c, galleryRepository, input.UserID)
+		output, err := nft.GetPreviewsForUserToken(c, galleryRepository, userRepository, input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

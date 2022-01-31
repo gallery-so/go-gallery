@@ -63,17 +63,17 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 	}
 }
 
-func getNFTPReviews(galleryRepository persist.GalleryRepository) gin.HandlerFunc {
+func getNFTPReviews(galleryRepository persist.GalleryRepository, userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		input := getPreviewsForUserInput{}
+		input := nft.GetPreviewsForUserInput{}
 
 		if err := c.ShouldBindQuery(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		output, err := nft.GetPreviewsForUser(c, galleryRepository, input.UserID)
+		output, err := nft.GetPreviewsForUser(c, galleryRepository, userRepository, input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
