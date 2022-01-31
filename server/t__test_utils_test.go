@@ -77,7 +77,7 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 }
 
 // Should be called at the beginning of every integration test
-// Initializes the runtime, connects to mongodb, and starts a test server
+// Initializes the runtime and starts a test server
 func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 	setDefaults()
 
