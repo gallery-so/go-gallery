@@ -13,16 +13,19 @@ import (
 
 // UserRepository represents a user repository in the postgres database
 type UserRepository struct {
-	db                  *sql.DB
-	updateInfoStmt      *sql.Stmt
-	existsByAddressStmt *sql.Stmt
-	createStmt          *sql.Stmt
-	getByIDStmt         *sql.Stmt
-	getByAddressStmt    *sql.Stmt
-	getByUsernameStmt   *sql.Stmt
-	deleteStmt          *sql.Stmt
-	addAddressStmt      *sql.Stmt
-	removeAddressStmt   *sql.Stmt
+	db                    *sql.DB
+	updateInfoStmt        *sql.Stmt
+	existsByAddressStmt   *sql.Stmt
+	createStmt            *sql.Stmt
+	getByIDStmt           *sql.Stmt
+	getByAddressStmt      *sql.Stmt
+	getByUsernameStmt     *sql.Stmt
+	deleteStmt            *sql.Stmt
+	addAddressStmt        *sql.Stmt
+	removeAddressStmt     *sql.Stmt
+	getGalleriesStmt      *sql.Stmt
+	updateCollectionsStmt *sql.Stmt
+	deleteGalleryStmt     *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -57,7 +60,30 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	removeAddressStmt, err := db.PrepareContext(ctx, `UPDATE users u SET ADDRESSES = array_remove(u.ADDRESSES, $2::varchar) WHERE u.ID = $1 AND $2 = ANY(u.ADDRESSES);`)
 	checkNoErr(err)
 
-	return &UserRepository{db: db, updateInfoStmt: updateInfoStmt, existsByAddressStmt: existsByAddressStmt, createStmt: createStmt, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, getByUsernameStmt: getByUsernameStmt, deleteStmt: deleteStmt, addAddressStmt: addAddressStmt, removeAddressStmt: removeAddressStmt}
+	getGalleriesStmt, err := db.PrepareContext(ctx, `SELECT ID, COLLECTIONS FROM galleries WHERE OWNER_USER_ID = $1 and DELETED = false;`)
+	checkNoErr(err)
+
+	updateCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $2 WHERE ID = $1;`)
+	checkNoErr(err)
+
+	deleteGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET DELETED = true WHERE ID = $1;`)
+	checkNoErr(err)
+
+	return &UserRepository{
+		db:                    db,
+		updateInfoStmt:        updateInfoStmt,
+		existsByAddressStmt:   existsByAddressStmt,
+		createStmt:            createStmt,
+		getByIDStmt:           getByIDStmt,
+		getByAddressStmt:      getByAddressStmt,
+		getByUsernameStmt:     getByUsernameStmt,
+		deleteStmt:            deleteStmt,
+		addAddressStmt:        addAddressStmt,
+		removeAddressStmt:     removeAddressStmt,
+		getGalleriesStmt:      getGalleriesStmt,
+		updateCollectionsStmt: updateCollectionsStmt,
+		deleteGalleryStmt:     deleteGalleryStmt,
+	}
 }
 
 // UpdateByID updates the user with the given ID
@@ -246,4 +272,77 @@ func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID,
 	}
 
 	return nil
+}
+
+// MergeUsers merges the given users into the first user
+func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.DBID, pSecondUser persist.DBID) error {
+
+	var user persist.User
+	if err := u.getByIDStmt.QueryRowContext(pCtx, pInitialUser).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated); err != nil {
+		return err
+	}
+
+	var secondUser persist.User
+	if err := u.getByIDStmt.QueryRowContext(pCtx, pSecondUser).Scan(&secondUser.ID, &secondUser.Deleted, &secondUser.Version, &secondUser.Username, &secondUser.UsernameIdempotent, pq.Array(&secondUser.Addresses), &secondUser.Bio, &secondUser.CreationTime, &secondUser.LastUpdated); err != nil {
+		return err
+	}
+
+	tx, err := u.db.BeginTx(pCtx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.StmtContext(pCtx, u.addAddressStmt).ExecContext(pCtx, user.ID, pq.Array(secondUser.Addresses)); err != nil {
+		return err
+	}
+
+	deleteGalleryStmt := tx.StmtContext(pCtx, u.deleteGalleryStmt)
+	mergedCollections := make([]persist.DBID, 0, 3)
+
+	res, err := u.getGalleriesStmt.QueryContext(pCtx, secondUser.ID)
+	if err != nil {
+		return err
+	}
+	defer res.Close()
+
+	for res.Next() {
+		var gallery persist.GalleryDB
+		if err := res.Scan(&gallery.ID, pq.Array(&gallery.Collections)); err != nil {
+			return err
+		}
+
+		mergedCollections = append(mergedCollections, gallery.Collections...)
+
+		if _, err := deleteGalleryStmt.ExecContext(pCtx, gallery.ID); err != nil {
+			return err
+		}
+	}
+
+	if err := res.Err(); err != nil {
+		return err
+	}
+
+	nextRes, err := u.getGalleriesStmt.QueryContext(pCtx, pInitialUser)
+	if err != nil {
+		return err
+	}
+	defer nextRes.Close()
+
+	if nextRes.Next() {
+		var gallery persist.GalleryDB
+		if err := nextRes.Scan(&gallery.ID, pq.Array(&gallery.Collections)); err != nil {
+			return err
+		}
+
+		if _, err := tx.StmtContext(pCtx, u.updateCollectionsStmt).ExecContext(pCtx, gallery.ID, pq.Array(append(gallery.Collections, mergedCollections...))); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.StmtContext(pCtx, u.deleteStmt).ExecContext(pCtx, secondUser.ID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

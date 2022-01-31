@@ -194,7 +194,24 @@ func getNFTPreviewsToken(galleryRepository persist.GalleryTokenRepository, userR
 			return
 		}
 
+
 		c.JSON(http.StatusOK, getPreviewsForUserOutput{Previews: output})
 
 	}
+}
+func mergeUsers(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		  var input user.MergeUsersInput
+		  if err := c.ShouldBindJSON(&input); err != nil {
+  	    util.ErrResponse(c, http.StatusBadRequest, err)
+		  	return
+		  }
+      userID := auth.GetUserIDFromCtx(c)
+
+		  if err := user.MergeUsers(c, userRepository, nonceRepository, userID, input, ethClient); err != nil {
+  	    util.ErrResponse(c, http.StatusInternalServerError, err)
+			  return
+		  }
+  	  c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+  	}
 }
