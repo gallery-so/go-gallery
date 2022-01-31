@@ -352,23 +352,7 @@ func TestMergeUsers_Success(t *testing.T) {
 		OwnerAddress:   persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 		OpenseaTokenID: "1",
 	}
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
-	assert.Nil(err)
-
-	coll := persist.CollectionDB{
-		OwnerUserID: userID,
-		NFTs:        []persist.DBID{nftID},
-		Name:        "test-coll",
-	}
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
-	assert.Nil(err)
-
-	gallery := persist.GalleryDB{
-		OwnerUserID: userID,
-		Collections: []persist.DBID{collID},
-	}
-	galleryID, err := tc.repos.galleryRepository.Create(context.Background(), gallery)
-	assert.Nil(err)
+	galleryID := fillGallery(assert, nft, userID)
 
 	// Set up cookie to make an authenticated request
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
@@ -385,23 +369,7 @@ func TestMergeUsers_Success(t *testing.T) {
 		OwnerAddress:   u2.Addresses[0],
 		OpenseaTokenID: "2",
 	}
-	nftID2, err := tc.repos.nftRepository.Create(context.Background(), nft2)
-	assert.Nil(err)
-
-	coll2 := persist.CollectionDB{
-		OwnerUserID: userID2,
-		NFTs:        []persist.DBID{nftID2},
-		Name:        "test-coll",
-	}
-	collID2, err := tc.repos.collectionRepository.Create(context.Background(), coll2)
-	assert.Nil(err)
-
-	gallery2 := persist.GalleryDB{
-		OwnerUserID: userID2,
-		Collections: []persist.DBID{collID2},
-	}
-	deletedGallery, err := tc.repos.galleryRepository.Create(context.Background(), gallery2)
-	assert.Nil(err)
+	deletedGallery := fillGallery(assert, nft2, userID2)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
@@ -490,6 +458,27 @@ func TestMergeUsers_NoGalleries_Success(t *testing.T) {
 	_, err = tc.repos.userRepository.GetByID(context.Background(), userID2)
 	assert.NotNil(err)
 
+}
+
+func fillGallery(assert *assert.Assertions, nft persist.NFT, userID persist.DBID) persist.DBID {
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	assert.Nil(err)
+
+	coll := persist.CollectionDB{
+		OwnerUserID: userID,
+		NFTs:        []persist.DBID{nftID},
+		Name:        "test-coll",
+	}
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	assert.Nil(err)
+
+	gallery := persist.GalleryDB{
+		OwnerUserID: userID,
+		Collections: []persist.DBID{collID},
+	}
+	galleryID, err := tc.repos.galleryRepository.Create(context.Background(), gallery)
+	assert.Nil(err)
+	return galleryID
 }
 
 func updateUserInfoRequest(assert *assert.Assertions, input user.UpdateUserInput, tu *TestUser) *http.Response {
