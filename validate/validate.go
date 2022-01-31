@@ -78,13 +78,13 @@ var NonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return len(nonce) >= 10 && len(nonce) <= 150
 }
 
-// ShortStringValidator validates short strings
-var ShortStringValidator validator.Func = func(fl validator.FieldLevel) bool {
+// BioValidator validates short strings
+var BioValidator validator.Func = func(fl validator.FieldLevel) bool {
 	s := fl.Field().String()
 	if s == "" {
 		return true
 	}
-	return len(s) > 4 && len(s) < 50
+	return len(s) < 600
 }
 
 // CollectorsNoteValidator validates medium strings

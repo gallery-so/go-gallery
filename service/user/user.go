@@ -28,7 +28,7 @@ var errMustResolveENS = errors.New("ENS username must resolve to owner address")
 // UpdateUserInput is the input for the user update pipeline
 type UpdateUserInput struct {
 	UserName string `json:"username" binding:"username"`
-	BioStr   string `json:"bio"`
+	BioStr   string `json:"bio" binding:"bio"`
 }
 
 // GetUserInput is the input for the user get pipeline
