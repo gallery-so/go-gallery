@@ -11,8 +11,9 @@ stats.json
 
 node_modules/
 yarn.lock
+
 # SECRITS
-decrypted*
+deploy*
 
 *.mp4
 *.jpg
