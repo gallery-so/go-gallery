@@ -83,7 +83,7 @@ func TestUpdateCollectionCollectorsNoteByID_Failure_TooLong(t *testing.T) {
 	assert.Nil(err)
 
 	// build update request body
-	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID, CollectorsNote: util.RandStringBytes(1700)}
+	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID, CollectorsNote: util.RandStringBytes(601)}
 	resp := updateCollectionInfoRequest(assert, update, tc.user1)
 
 	errResp := &util.ErrorResponse{}
