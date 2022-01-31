@@ -45,7 +45,7 @@ jobs:
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: keybase decrypt -i secrits -o deploy.zip
+          command: keybase decrypt -i _encrypted_deploy -o _deploy.zip
       - run:
           name: "Update apt"
           command: apt-get update
@@ -54,7 +54,7 @@ jobs:
           command: apt-get -y install unzip curl sudo python3
       - run:
           name: "Unzip secrets file"
-          command: echo "A" | unzip deploy.zip
+          command: echo "A" | unzip _deploy.zip
       - run:
           name: "Copy Backend app.yaml"
           command: cp -R dev/app-dev-backend.yaml ./app-backend.yaml

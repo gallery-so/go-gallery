@@ -48,7 +48,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "deploy/service-key.json")
+	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("OPENSEA_API_KEY", "")
