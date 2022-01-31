@@ -87,7 +87,6 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 				if err != nil {
 					panic(err)
 				}
-				logrus.Infof("%d token equivelents found for %s", len(tokenEquivelents), fullNFT.OpenseaTokenID)
 				for _, token := range tokenEquivelents {
 					if containsAddress(token.OwnerAddress, addresses) {
 						logrus.Infof("%s is owned by %s", token.TokenID, token.OwnerAddress)

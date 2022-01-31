@@ -20,6 +20,7 @@ func TestMigration_Success(t *testing.T) {
 	userAddr := persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))
 	contractAddr := persist.Address(strings.ToLower("0x8914496dC01Efcc49a2FA340331Fb90969B6F1d2"))
 	pgClient := postgres.NewClient()
+	pgClient.Exec(`TRUNCATE collections, nfts, tokens, users;`)
 
 	t.Cleanup(func() {
 		pgClient.Exec(`TRUNCATE collections, nfts, tokens, users;`)
