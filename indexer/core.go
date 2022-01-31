@@ -42,7 +42,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./deploy/service-key.json"))
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
 		panic(err)
