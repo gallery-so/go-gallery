@@ -178,7 +178,7 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 	}
 }
 
-func getNFTPReviewsToken(galleryRepository persist.GalleryTokenRepository, userRepository persist.UserRepository) gin.HandlerFunc {
+func getNFTPreviewsToken(galleryRepository persist.GalleryTokenRepository, userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := nft.GetPreviewsForUserInput{}
