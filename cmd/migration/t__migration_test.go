@@ -5,12 +5,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMigration_Success(t *testing.T) {
+	setDefaults()
 
 	assert := assert.New(t)
 	ctx := context.Background()
@@ -19,13 +22,14 @@ func TestMigration_Success(t *testing.T) {
 	pgClient := postgres.NewClient()
 
 	t.Cleanup(func() {
-		pgClient.Exec(`DROP TABLE collections, nfts, tokens, users;`)
+		pgClient.Exec(`TRUNCATE collections, nfts, tokens, users;`)
 	})
 
 	collRepo := postgres.NewCollectionRepository(pgClient)
 	nftRepo := postgres.NewNFTRepository(pgClient, nil, nil)
 	tokenRepo := postgres.NewTokenRepository(pgClient)
 	userRepo := postgres.NewUserRepository(pgClient)
+	collTokenRepo := postgres.NewCollectionTokenRepository(pgClient)
 
 	user := persist.User{
 		Username:           "bob",
@@ -36,6 +40,10 @@ func TestMigration_Success(t *testing.T) {
 
 	userID, err := userRepo.Create(ctx, user)
 	assert.Nil(err)
+
+	userInDB, err := userRepo.GetByID(ctx, userID)
+	assert.Nil(err)
+	logrus.Infof("User: %+v %s", userInDB, userInDB.Addresses[0])
 
 	nft := persist.NFT{
 		OpenseaTokenID: "1",
@@ -69,9 +77,20 @@ func TestMigration_Success(t *testing.T) {
 	tokenID, err := tokenRepo.Create(ctx, tokenEqu)
 	assert.Nil(err)
 
+	before, err := collRepo.GetByID(ctx, collID, true)
+	assert.Nil(err)
+	assert.Len(before.NFTs, 1)
+
+	var rawNFTs []persist.DBID
+	pgClient.QueryRowContext(ctx, `SELECT NFTS FROM collections WHERE ID = $1`, collID).Scan(pq.Array(&rawNFTs))
+	logrus.Info(rawNFTs)
+
 	run()
 
-	updatedColl, err := collRepo.GetByID(ctx, collID, true)
+	pgClient.QueryRowContext(ctx, `SELECT NFTS FROM collections WHERE ID = $1`, collID).Scan(pq.Array(&rawNFTs))
+	logrus.Info(rawNFTs)
+
+	updatedColl, err := collTokenRepo.GetByID(ctx, collID, true)
 	assert.Nil(err)
 
 	assert.Len(updatedColl.NFTs, 1)

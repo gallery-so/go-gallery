@@ -8,16 +8,16 @@ import (
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 func main() {
+	setDefaults()
 	run()
 }
 
 func run() {
-
-	setDefaults()
 
 	pgClient := postgres.NewClient()
 
@@ -60,6 +60,7 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 	usersToNewCollections := map[persist.DBID]map[persist.DBID][]persist.DBID{}
 
 	for userID, addresses := range userIDs {
+		logrus.Infof("Processing user %s with addresses %v", userID, addresses[0])
 		res, err := pgClient.QueryContext(ctx, `SELECT ID, NFTS FROM collections WHERE OWNER_USER_ID = $1`, userID)
 		if err != nil {
 			panic(err)
@@ -86,8 +87,10 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 				if err != nil {
 					panic(err)
 				}
+				logrus.Infof("%d token equivelents found for %s", len(tokenEquivelents), fullNFT.OpenseaTokenID)
 				for _, token := range tokenEquivelents {
 					if containsAddress(token.OwnerAddress, addresses) {
+						logrus.Infof("%s is owned by %s", token.TokenID, token.OwnerAddress)
 						newCollsToNFTs[coll] = append(newCollsToNFTs[coll], token.ID)
 					}
 				}
@@ -108,14 +111,14 @@ func getAllUsers(ctx context.Context, pgClient *sql.DB) map[persist.DBID][]persi
 	result := map[persist.DBID][]persist.Address{}
 	for res.Next() {
 		var id persist.DBID
-		var address persist.Address
-		if err = res.Scan(&id, &address); err != nil {
+		var addresses []persist.Address
+		if err = res.Scan(&id, pq.Array(&addresses)); err != nil {
 			panic(err)
 		}
 		if _, ok := result[id]; !ok {
 			result[id] = make([]persist.Address, 0, 3)
 		}
-		result[id] = append(result[id], address)
+		result[id] = append(result[id], addresses...)
 	}
 	return result
 }
