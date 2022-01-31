@@ -1,112 +1,30 @@
 package server
 
 import (
+	"bytes"
 	"database/sql"
-	"errors"
-	"os"
-	"strings"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
-	"github.com/ory/dockertest/docker"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/suite"
 )
 
 type UserTestSuite struct {
 	suite.Suite
-	version   int
-	resources []*dockertest.Resource
-	pool      *dockertest.Pool
-	tc        *TestConfig
-	db        *sql.DB
-}
-
-func configureContainerCleanup(config *docker.HostConfig) {
-	config.AutoRemove = true
-	config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-}
-
-func waitOnDB() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("db is not available")
-		}
-	}()
-
-	postgres.NewClient()
-	return
-}
-
-func waitOnCache() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("cache is not available")
-		}
-	}()
-
-	redis.NewCache(0)
-	return
-}
-
-func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
-	pg, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: "postgres",
-			Tag:        "14",
-			Env: []string{
-				"POSTGRES_HOST_AUTH_METHOD=trust",
-				"POSTGRES_USER=postgres",
-				"POSTGRES_PORT=5432",
-				"POSTGRES_DB=postgres",
-			}}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start postgres: %s", err)
-	}
-
-	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
-	viper.SetDefault("POSTGRES_HOST", hostAndPort[0])
-	viper.SetDefault("POSTGRES_PORT", hostAndPort[1])
-
-	if err = pool.Retry(waitOnDB); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
-	}
-
-	db = postgres.NewClient()
-	for _, f := range []string{"../scripts/initial_setup.sql", "../scripts/post_import.sql"} {
-		migration, err := os.ReadFile(f)
-
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = db.Exec(string(migration))
-		if err != nil {
-			log.Fatalf("failed to seed the db: %s", err)
-		}
-	}
-
-	return pg, db
-}
-
-func initRedis(pool *dockertest.Pool) *dockertest.Resource {
-	rd, err := pool.RunWithOptions(
-		&dockertest.RunOptions{Repository: "redis", Tag: "6"}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start redis: %s", err)
-	}
-
-	viper.SetDefault("REDIS_URL", rd.GetHostPort("6379/tcp"))
-	if err = pool.Retry(waitOnCache); err != nil {
-		log.Fatalf("could not connect to redis: %s", err)
-	}
-
-	return rd
+	tc            *TestConfig
+	version       int
+	pool          *dockertest.Pool
+	pgResource    *dockertest.Resource
+	redisResource *dockertest.Resource
+	db            *sql.DB
 }
 
 func (s *UserTestSuite) SetupTest() {
@@ -119,22 +37,78 @@ func (s *UserTestSuite) SetupTest() {
 	pg, pgClient := initPostgres(pool)
 	rd := initRedis(pool)
 
+	s.version = 1
 	s.pool = pool
 	s.db = pgClient
-	s.resources = append(s.resources, pg, rd)
+	s.pgResource = pg
+	s.redisResource = rd
 	s.tc = initializeTestServer(s.db, s.Assertions, s.version)
 }
 
 func (s *UserTestSuite) TearDownTest() {
-	for _, r := range s.resources {
+	// Kill containers
+	for _, r := range []*dockertest.Resource{s.pgResource, s.redisResource} {
 		if err := s.pool.Purge(r); err != nil {
 			log.Fatalf("could not purge resource: %s", err)
 		}
 	}
+
+	s.db.Close()
+	s.tc.server.Close()
 }
 
-func (s *UserTestSuite) TestUserJourney() {
-	s.Equal(1, 1)
+func (s *UserTestSuite) TestUserCanLogin() {
+	nonce := s.fetchNonce()
+	resp, err := s.loginUser(nonce)
+
+	s.NoError(err)
+	defer resp.Body.Close()
+
+	assertValidResponse(s.Assertions, resp)
+}
+
+func (s *UserTestSuite) fetchNonce() string {
+	resp, err := http.Get(
+		fmt.Sprintf("%s/auth/get_preflight?address=%s", s.tc.serverURL, s.tc.user1.address),
+	)
+	s.NoError(err)
+	defer resp.Body.Close()
+
+	type PreflightResp struct {
+		auth.GetPreflightOutput
+		Error string `json:"error"`
+	}
+	output := &PreflightResp{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+	s.Empty(output.Error)
+
+	return output.Nonce
+}
+
+func (s *UserTestSuite) signNonce(n string) []byte {
+	hash := crypto.Keccak256Hash([]byte(n))
+	sig, err := crypto.Sign(hash.Bytes(), s.tc.user1.pk)
+	s.NoError(err)
+
+	return sig
+}
+
+func (s *UserTestSuite) loginUser(nonce string) (*http.Response, error) {
+	sig := s.signNonce(nonce)
+	data, err := json.Marshal(map[string]interface{}{
+		"address":     s.tc.user1.address,
+		"nonce":       nonce,
+		"wallet_type": 0,
+		"signature":   "0x" + hex.EncodeToString(sig),
+	})
+	s.NoError(err)
+
+	return http.Post(
+		fmt.Sprintf("%s/users/login", s.tc.serverURL),
+		"application/json",
+		bytes.NewBuffer(data),
+	)
 }
 
 func TestUserTestSuite(t *testing.T) {
