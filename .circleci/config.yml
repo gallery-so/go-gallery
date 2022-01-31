@@ -7,7 +7,7 @@ workflows:
           filters:
             branches:
               only:
-                - "robin/encrypt-internal"
+                - "main"
 jobs:
   build:
     working_directory: ~/go-gallery
