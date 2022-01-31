@@ -156,7 +156,7 @@ func deleteUser(db *sql.DB, deleteUserStmt, getGalleriesStmt, deleteGalleryStmt,
 			return
 		}
 
-		res, err := tx.StmtContext(c, getGalleriesStmt).QueryContext(c, input.ID)
+		res, err := getGalleriesStmt.QueryContext(c, input.ID)
 		if err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
@@ -210,13 +210,13 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 		}
 
 		var firstUser persist.User
-		if err := tx.StmtContext(c, getUserByIDStmt).QueryRowContext(c, input.FirstUserID).Scan(&firstUser.ID, pq.Array(&firstUser.Addresses), &firstUser.Bio, &firstUser.Username, &firstUser.UsernameIdempotent, &firstUser.LastUpdated, &firstUser.CreationTime); err != nil {
+		if err := getUserByIDStmt.QueryRowContext(c, input.FirstUserID).Scan(&firstUser.ID, pq.Array(&firstUser.Addresses), &firstUser.Bio, &firstUser.Username, &firstUser.UsernameIdempotent, &firstUser.LastUpdated, &firstUser.CreationTime); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
 
 		var secondUser persist.User
-		if err := tx.StmtContext(c, getUserByIDStmt).QueryRowContext(c, input.SecondUserID).Scan(&secondUser.ID, pq.Array(&secondUser.Addresses), &secondUser.Bio, &secondUser.Username, &secondUser.UsernameIdempotent, &secondUser.LastUpdated, &secondUser.CreationTime); err != nil {
+		if err := getUserByIDStmt.QueryRowContext(c, input.SecondUserID).Scan(&secondUser.ID, pq.Array(&secondUser.Addresses), &secondUser.Bio, &secondUser.Username, &secondUser.UsernameIdempotent, &secondUser.LastUpdated, &secondUser.CreationTime); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
@@ -226,8 +226,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			return
 		}
 
-		gstmt := tx.StmtContext(c, getGalleriesStmt)
-		res, err := gstmt.QueryContext(c, input.FirstUserID)
+		res, err := getGalleriesStmt.QueryContext(c, input.FirstUserID)
 		if err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
@@ -249,7 +248,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			return
 		}
 
-		nextRes, err := gstmt.QueryContext(c, input.SecondUserID)
+		nextRes, err := getGalleriesStmt.QueryContext(c, input.SecondUserID)
 		if err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return

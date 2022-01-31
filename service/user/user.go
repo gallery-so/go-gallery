@@ -81,6 +81,16 @@ type AddAddressPubSubInput struct {
 	UserID  persist.DBID    `json:"user_id"`
 	Address persist.Address `json:"address"`
 }
+
+// MergeUsersInput is the input for the user merge pipeline
+type MergeUsersInput struct {
+	SecondUserID persist.DBID    `json:"second_user_id" binding:"required"`
+	Signature    string          `json:"signature" binding:"signature"`
+	Nonce        string          `json:"nonce"`
+	Address      persist.Address `json:"address"   binding:"required,eth_addr"`
+	WalletType   auth.WalletType `json:"wallet_type"`
+}
+
 type errUserNotFound struct {
 	userID   persist.DBID
 	address  persist.Address
@@ -472,6 +482,37 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		return err
 	}
 	return nil
+}
+
+// MergeUsers merges two users together
+func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, pUserID persist.DBID, pInput MergeUsersInput, ethClient *ethclient.Client) error {
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	if nonce == "" {
+		return errNonceNotFound{address: pInput.Address}
+	}
+	if id != pInput.SecondUserID {
+		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
+	}
+
+	if pInput.WalletType != auth.WalletTypeEOA {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
+			return auth.ErrNonceMismatch
+		}
+	}
+
+	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
+		nonce,
+		pInput.Address, pInput.WalletType, ethClient)
+	if err != nil {
+		return err
+	}
+
+	if !sigValidBool {
+		return fmt.Errorf("signature is invalid for address %s", pInput.Address)
+	}
+
+	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
+
 }
 
 func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID) error {

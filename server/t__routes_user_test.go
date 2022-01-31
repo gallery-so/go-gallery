@@ -338,6 +338,149 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 
 }
 
+func TestMergeUsers_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	// Create user
+	u := persist.User{
+		Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+	}
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	assert.Nil(err)
+
+	nft := persist.NFT{
+		OwnerAddress:   persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+		OpenseaTokenID: "1",
+	}
+	galleryID := fillGallery(assert, nft, userID)
+
+	// Set up cookie to make an authenticated request
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	assert.Nil(err)
+	tu := createCookieAndSetOnUser(assert, userID, jwt)
+
+	u2 := persist.User{
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+	}
+	userID2, err := tc.repos.userRepository.Create(context.Background(), u2)
+	assert.Nil(err)
+
+	nft2 := persist.NFT{
+		OwnerAddress:   u2.Addresses[0],
+		OpenseaTokenID: "2",
+	}
+	deletedGallery := fillGallery(assert, nft2, userID2)
+
+	nonce := persist.UserNonce{
+		Value:   "TestNonce",
+		Address: u2.Addresses[0],
+	}
+	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	assert.Nil(err)
+
+	mergeInput := user.MergeUsersInput{
+		SecondUserID: userID2,
+		Signature:    "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
+		Nonce:        "TestNonce",
+		Address:      u2.Addresses[0],
+		WalletType:   auth.WalletTypeEOA,
+	}
+
+	resp := mergeUserRequest(assert, mergeInput, tu)
+	defer resp.Body.Close()
+	assertValidResponse(assert, resp)
+
+	errResp := util.ErrorResponse{}
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Nil(err)
+	assert.Empty(errResp.Error)
+
+	newInitialUser, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	assert.Nil(err)
+	assert.Len(newInitialUser.Addresses, 2)
+
+	newGallery, err := tc.repos.galleryRepository.GetByID(context.Background(), galleryID)
+	assert.Nil(err)
+	assert.Len(newGallery.Collections, 2)
+
+	_, err = tc.repos.galleryRepository.GetByID(context.Background(), deletedGallery)
+	assert.NotNil(err)
+
+	_, err = tc.repos.userRepository.GetByID(context.Background(), userID2)
+	assert.NotNil(err)
+
+}
+
+func TestMergeUsers_NoGalleries_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	// Create user
+	u := persist.User{
+		Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+	}
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	assert.Nil(err)
+
+	// Set up cookie to make an authenticated request
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	assert.Nil(err)
+	tu := createCookieAndSetOnUser(assert, userID, jwt)
+
+	u2 := persist.User{
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+	}
+	userID2, err := tc.repos.userRepository.Create(context.Background(), u2)
+	assert.Nil(err)
+
+	nonce := persist.UserNonce{
+		Value:   "TestNonce",
+		Address: u2.Addresses[0],
+	}
+	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	assert.Nil(err)
+
+	mergeInput := user.MergeUsersInput{
+		SecondUserID: userID2,
+		Signature:    "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
+		Nonce:        "TestNonce",
+		Address:      u2.Addresses[0],
+		WalletType:   auth.WalletTypeEOA,
+	}
+
+	resp := mergeUserRequest(assert, mergeInput, tu)
+	defer resp.Body.Close()
+	assertValidResponse(assert, resp)
+
+	newInitialUser, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	assert.Nil(err)
+	assert.Len(newInitialUser.Addresses, 2)
+
+	_, err = tc.repos.userRepository.GetByID(context.Background(), userID2)
+	assert.NotNil(err)
+
+}
+
+func fillGallery(assert *assert.Assertions, nft persist.NFT, userID persist.DBID) persist.DBID {
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	assert.Nil(err)
+
+	coll := persist.CollectionDB{
+		OwnerUserID: userID,
+		NFTs:        []persist.DBID{nftID},
+		Name:        "test-coll",
+	}
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	assert.Nil(err)
+
+	gallery := persist.GalleryDB{
+		OwnerUserID: userID,
+		Collections: []persist.DBID{collID},
+	}
+	galleryID, err := tc.repos.galleryRepository.Create(context.Background(), gallery)
+	assert.Nil(err)
+	return galleryID
+}
+
 func updateUserInfoRequest(assert *assert.Assertions, input user.UpdateUserInput, tu *TestUser) *http.Response {
 	data, err := json.Marshal(input)
 	assert.Nil(err)
@@ -381,6 +524,18 @@ func updateUserInfoNoAuthRequest(assert *assert.Assertions, input user.UpdateUse
 	assert.Nil(err)
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	assert.Nil(err)
+	return resp
+}
+
+func mergeUserRequest(assert *assert.Assertions, input user.MergeUsersInput, tu *TestUser) *http.Response {
+	data, err := json.Marshal(input)
+	assert.Nil(err)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/users/merge", tc.serverURL), bytes.NewBuffer(data))
+	assert.Nil(err)
+
+	resp, err := tu.client.Do(req)
 	assert.Nil(err)
 	return resp
 }
