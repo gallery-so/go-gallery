@@ -298,7 +298,7 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	}
 
 	deleteGalleryStmt := tx.StmtContext(pCtx, u.deleteGalleryStmt)
-	mergedCollections := make([]persist.DBID, 0, 10)
+	mergedCollections := make([]persist.DBID, 0, 3)
 
 	res, err := u.getGalleriesStmt.QueryContext(pCtx, secondUser.ID)
 	if err != nil {
