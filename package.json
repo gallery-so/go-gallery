@@ -1,6 +1,6 @@
 {
   "name": "go-gallery",
-  "version": "1.0.0",
+  "version": "1.0.0wtf",
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^1.22.5",
