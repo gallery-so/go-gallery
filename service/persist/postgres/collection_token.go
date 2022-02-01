@@ -243,8 +243,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	var collection persist.CollectionToken
 	nfts := make([]persist.TokenInCollection, 0, 10)
 
-	i := 0
-	for ; res.Next(); i++ {
+	for res.Next() {
 		colID := collection.ID
 		var nft persist.TokenInCollection
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
