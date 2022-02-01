@@ -43,6 +43,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClie
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.membershipRepository, repos.userRepository, repos.tokenRepository, repos.galleryTokenRepository, ethClient))
 	usersGroup.POST("/create", createUserToken(repos.userRepository, repos.nonceRepository, repos.galleryTokenRepository, psub, ethClient))
+	usersGroup.GET("/previews", getNFTPreviewsToken(repos.galleryTokenRepository, repos.userRepository))
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.userRepository, ethClient), mergeUsers(repos.userRepository, repos.nonceRepository, ethClient))
 }
 
@@ -68,6 +69,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.userRepository))
 	usersGroup.GET("/membership", getMembershipTiers(repos.membershipRepository, repos.userRepository, repos.galleryRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.userRepository, repos.nonceRepository, repos.galleryRepository, psub, ethClient))
+	usersGroup.GET("/previews", getNFTPreviews(repos.galleryRepository, repos.userRepository))
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.userRepository, ethClient), mergeUsers(repos.userRepository, repos.nonceRepository, ethClient))
 
 }

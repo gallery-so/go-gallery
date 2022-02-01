@@ -338,6 +338,68 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 
 }
 
+func TestGetUserPreviews_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	nfts := []persist.NFT{
+		{
+			OwnerAddress:      tc.user1.address,
+			Name:              "test",
+			OpenseaTokenID:    "10",
+			OpenseaID:         2,
+			ImageURL:          "https://example.com/test.png",
+			ImagePreviewURL:   "https://example.com/test.png",
+			ImageThumbnailURL: "https://example.com/test.png",
+		},
+		{
+			OwnerAddress:      tc.user1.address,
+			Name:              "test",
+			OpenseaTokenID:    "9",
+			OpenseaID:         1,
+			ImageURL:          "https://example.com/test.png",
+			ImagePreviewURL:   "https://example.com/test.png",
+			ImageThumbnailURL: "https://example.com/test.png",
+		},
+		{
+			OwnerAddress:      tc.user1.address,
+			Name:              "test",
+			OpenseaTokenID:    "8",
+			OpenseaID:         10,
+			ImageURL:          "https://example.com/test.png",
+			ImagePreviewURL:   "https://example.com/test.png",
+			ImageThumbnailURL: "https://example.com/test.png",
+		},
+	}
+	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
+	assert.Nil(err)
+
+	coll := persist.CollectionDB{
+		Name:           "test",
+		CollectorsNote: "test",
+		NFTs:           nftIDs,
+		OwnerUserID:    tc.user1.id,
+	}
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	assert.Nil(err)
+
+	gallery := persist.GalleryDB{
+		OwnerUserID: tc.user1.id,
+		Collections: []persist.DBID{collID},
+	}
+	_, err = tc.repos.galleryRepository.Create(context.Background(), gallery)
+	assert.Nil(err)
+
+	resp, err := http.Get(fmt.Sprintf("%s/users/previews?user_id=%s", tc.serverURL, tc.user1.id))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	type previews struct {
+		Previews []string `json:"previews"`
+	}
+	var body previews
+	util.UnmarshallBody(&body, resp.Body)
+	assert.Len(body.Previews, 3)
+}
 func TestMergeUsers_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
