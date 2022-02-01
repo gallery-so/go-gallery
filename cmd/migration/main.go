@@ -46,8 +46,10 @@ func setDefaults() {
 }
 
 func updateCollections(ctx context.Context, pgClient *sql.DB, usersToNewCollections map[persist.DBID]map[persist.DBID][]persist.DBID) {
-	for _, newCollections := range usersToNewCollections {
+	for userID, newCollections := range usersToNewCollections {
+		logrus.Infof("Updating %d collections for user %s", len(newCollections), userID)
 		for coll, nfts := range newCollections {
+			logrus.Infof("Updating collection %s with %d nfts for user %s", coll, len(nfts), userID)
 			_, err := pgClient.ExecContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
 			if err != nil {
 				panic(err)
@@ -60,8 +62,8 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 	usersToNewCollections := map[persist.DBID]map[persist.DBID][]persist.DBID{}
 
 	for userID, addresses := range userIDs {
-		logrus.Infof("Processing user %s with addresses %v", userID, addresses[0])
-		res, err := pgClient.QueryContext(ctx, `SELECT ID, NFTS FROM collections WHERE OWNER_USER_ID = $1`, userID)
+		logrus.Infof("Processing user %s with addresses %v", userID, addresses)
+		res, err := pgClient.QueryContext(ctx, `SELECT ID, NFTS FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`, userID)
 		if err != nil {
 			panic(err)
 		}
@@ -77,19 +79,28 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 		newCollsToNFTs := map[persist.DBID][]persist.DBID{}
 		for coll, nftIDs := range collsToNFTs {
 			newCollsToNFTs[coll] = make([]persist.DBID, 0, 10)
+			logrus.Infof("Processing collection %s with %d nfts for user %s", coll, len(nftIDs), userID)
 			for _, nftID := range nftIDs {
 				fullNFT, err := nftRepo.GetByID(ctx, nftID)
 				if err != nil {
-					panic(err)
+					if _, ok := err.(persist.ErrNFTNotFoundByID); !ok {
+						panic(err)
+					} else {
+						logrus.Infof("NFT %s not found for collection %s", nftID, coll)
+					}
 				}
 
 				tokenEquivelents, err := tokenRepo.GetByTokenIdentifiers(ctx, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
 				if err != nil {
-					panic(err)
+					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); !ok {
+						panic(err)
+					} else {
+						logrus.Infof("Token equi not found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+					}
 				}
 				for _, token := range tokenEquivelents {
 					if containsAddress(token.OwnerAddress, addresses) {
-						logrus.Infof("%s is owned by %s", token.TokenID, token.OwnerAddress)
+						logrus.Infof("token %s-%s is owned by %s", token.ContractAddress, token.TokenID, token.OwnerAddress)
 						newCollsToNFTs[coll] = append(newCollsToNFTs[coll], token.ID)
 					}
 				}
@@ -102,7 +113,7 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 
 func getAllUsers(ctx context.Context, pgClient *sql.DB) map[persist.DBID][]persist.Address {
 
-	res, err := pgClient.QueryContext(ctx, `SELECT ID,ADDRESSES FROM users;`)
+	res, err := pgClient.QueryContext(ctx, `SELECT ID,ADDRESSES FROM users WHERE DELETED = false;`)
 	if err != nil {
 		panic(err)
 	}
