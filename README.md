@@ -68,4 +68,4 @@ Run a specific test by passing the name as an option:
 go test -run {testName}
 ```
 
-Add `-v` for detailed logs
+Add `-v` for detailed logs.
