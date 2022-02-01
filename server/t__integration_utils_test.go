@@ -4,15 +4,31 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/asottile/dockerfile"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
+
+// N.B. This isn't the entire Docker Compose spec...
+type ComposeFile struct {
+	Version  string
+	Services map[string]Service
+}
+
+type Service struct {
+	Image       string
+	Ports       []string
+	Build       map[string]string
+	Environment []string
+}
 
 func configureContainerCleanup(config *docker.HostConfig) {
 	config.AutoRemove = true
@@ -39,17 +55,56 @@ func waitOnCache() (err error) {
 	return
 }
 
+func loadComposeFile(path string) (f ComposeFile) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = yaml.Unmarshal(data, &f)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return
+}
+
+func getImageAndVersion(s string) ([]string, error) {
+	imgAndVer := strings.Split(s, ":")
+	if len(imgAndVer) != 2 {
+		return nil, errors.New("no version specified for image")
+	}
+	return imgAndVer, nil
+}
+
+func getBuildImage(s Service) ([]string, error) {
+	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, cmd := range res {
+		if cmd.Cmd == "FROM" {
+			return getImageAndVersion(cmd.Value[0])
+		}
+	}
+
+	return nil, errors.New("no `FROM` directive found in dockerfile")
+}
+
 func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
+	apps := loadComposeFile("../docker-compose.yml")
+	imgAndVer, err := getBuildImage(apps.Services["postgres"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	pg, err := pool.RunWithOptions(
 		&dockertest.RunOptions{
-			Repository: "postgres",
-			Tag:        "14",
-			Env: []string{
-				"POSTGRES_HOST_AUTH_METHOD=trust",
-				"POSTGRES_USER=postgres",
-				"POSTGRES_PORT=5432",
-				"POSTGRES_DB=postgres",
-			}}, configureContainerCleanup,
+			Repository: imgAndVer[0],
+			Tag:        imgAndVer[1],
+			Env:        apps.Services["postgres"].Environment,
+		}, configureContainerCleanup,
 	)
 	if err != nil {
 		log.Fatalf("could not start postgres: %s", err)
@@ -82,8 +137,17 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 }
 
 func initRedis(pool *dockertest.Pool) *dockertest.Resource {
+	apps := loadComposeFile("../docker-compose.yml")
+	imgAndVer, err := getImageAndVersion(apps.Services["redis"].Image)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	rd, err := pool.RunWithOptions(
-		&dockertest.RunOptions{Repository: "redis", Tag: "6"}, configureContainerCleanup,
+		&dockertest.RunOptions{
+			Repository: imgAndVer[0],
+			Tag:        imgAndVer[1],
+		}, configureContainerCleanup,
 	)
 	if err != nil {
 		log.Fatalf("could not start redis: %s", err)

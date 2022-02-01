@@ -9,6 +9,7 @@ require (
 	cloud.google.com/go/secretmanager v1.0.0
 	cloud.google.com/go/storage v1.18.2
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
+	github.com/asottile/dockerfile v3.1.0+incompatible // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
@@ -27,6 +28,7 @@ require (
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/lib/pq v1.10.4
 	github.com/microcosm-cc/bluemonday v1.0.17
+	github.com/moby/buildkit v0.9.3 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opencontainers/runc v1.1.0 // indirect
@@ -46,4 +48,5 @@ require (
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20220118154757-00ab72f36ad5
 	google.golang.org/grpc v1.43.0
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
