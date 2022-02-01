@@ -93,7 +93,7 @@ var CollectorsNoteValidator validator.Func = func(fl validator.FieldLevel) bool 
 	if s == "" {
 		return true
 	}
-	return len(s) < 1600
+	return len(s) < 1200
 }
 
 // UsernameValidator ensures that usernames are not reserved, are alphanumeric with the exception of underscores and periods, and do not contain consecutive periods or underscores
