@@ -45,7 +45,7 @@ $ docker-compose down
 Verify that the server is running by calling the `/v1/health` endpoint.
 
 ```bash
-$ curl localhost:4000/v1/health
+$ curl localhost:4000/glry/v1/health
 ```
 
 ## Testing
