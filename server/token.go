@@ -43,7 +43,7 @@ type getUnassignedTokensOutput struct {
 
 type updateTokenByIDInput struct {
 	ID             persist.DBID `json:"id" binding:"required"`
-	CollectorsNote string       `json:"collectors_note" binding:"required"`
+	CollectorsNote string       `json:"collectors_note" binding:"required,collectors_note"`
 }
 
 type errCouldNotMakeMedia struct {
