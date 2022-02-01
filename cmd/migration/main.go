@@ -83,12 +83,20 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 			for _, nftID := range nftIDs {
 				fullNFT, err := nftRepo.GetByID(ctx, nftID)
 				if err != nil {
-					panic(err)
+					if _, ok := err.(persist.ErrNFTNotFoundByID); !ok {
+						panic(err)
+					} else {
+						logrus.Infof("NFT %s not found for collection %s", nftID, coll)
+					}
 				}
 
 				tokenEquivelents, err := tokenRepo.GetByTokenIdentifiers(ctx, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
 				if err != nil {
-					panic(err)
+					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); !ok {
+						panic(err)
+					} else {
+						logrus.Infof("Token equi not found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+					}
 				}
 				for _, token := range tokenEquivelents {
 					if containsAddress(token.OwnerAddress, addresses) {
