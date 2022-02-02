@@ -27,6 +27,8 @@ func NewClient() *sql.DB {
 		panic(err)
 	}
 
+	db.SetMaxOpenConns(100)
+
 	err = db.Ping()
 	if err != nil {
 		panic(err)
