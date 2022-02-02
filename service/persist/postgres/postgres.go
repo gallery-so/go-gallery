@@ -27,6 +27,10 @@ func NewClient() *sql.DB {
 		panic(err)
 	}
 
+	if viper.GetString("ENV") != "local" {
+		db.SetMaxOpenConns(100)
+	}
+
 	err = db.Ping()
 	if err != nil {
 		panic(err)
