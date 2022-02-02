@@ -19,12 +19,7 @@ func NewClient() *sql.DB {
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
-	var psqlInfo string
-	if viper.GetString("ENV") != "local" {
-		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d", dbUser, dbPwd, dbName, dbHost, dbPort)
-	} else {
-		psqlInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
-	}
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
 
 	db, err := sql.Open("pgx", psqlInfo)
 	if err != nil {
