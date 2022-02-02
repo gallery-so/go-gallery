@@ -18,7 +18,7 @@ type getNFTsInput struct {
 }
 
 type refreshNFTsInput struct {
-	UserID persist.DBID `form:"user_id"`
+	UserID persist.DBID `form:"user_id" binding:"required"`
 }
 
 func getNFTs(nftRepo persist.NFTRepository) gin.HandlerFunc {
