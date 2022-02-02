@@ -13,7 +13,7 @@ jobs:
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
-      - image: redis:latest
+      - image: redis:6
       - image: bcgallery/gallery-postgres:circle
     steps:
       - checkout
