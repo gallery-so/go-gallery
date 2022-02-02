@@ -128,7 +128,7 @@ func updateUser(updateUserStmt *sql.Stmt) gin.HandlerFunc {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		if _, err := updateUserStmt.ExecContext(c, pq.Array(input.Addresses), input.Bio, input.Username, strings.ToLower(input.Username), input.ID); err != nil {
+		if _, err := updateUserStmt.ExecContext(c, pq.Array(input.Addresses), input.Bio, input.Username, strings.ToLower(input.Username), persist.LastUpdatedTime{}, input.ID); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
