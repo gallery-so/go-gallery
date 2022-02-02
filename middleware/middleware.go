@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -171,6 +173,17 @@ func ErrLogger() gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			logrus.Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
 		}
+	}
+}
+
+// GinContextToContext is a middleware that adds the Gin context to the request context,
+// allowing the Gin context to be retrieved from within GraphQL resolvers.
+// See: https://gqlgen.com/recipes/gin/
+func GinContextToContext() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), graphql.GinContextKey, c)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
 	}
 }
 

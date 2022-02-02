@@ -49,7 +49,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
