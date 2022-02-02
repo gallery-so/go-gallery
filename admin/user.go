@@ -221,7 +221,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			return
 		}
 
-		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Addresses, secondUser.Addresses...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, firstUser.ID); err != nil {
+		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Addresses, secondUser.Addresses...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, persist.LastUpdatedTime{}, firstUser.ID); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
