@@ -111,6 +111,9 @@ func (s *UserTestSuite) loginUser(nonce string) (*http.Response, error) {
 	)
 }
 
-func TestUserTestSuite(t *testing.T) {
+func TestIntegrationTestUserTestSuite(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	suite.Run(t, new(UserTestSuite))
 }
