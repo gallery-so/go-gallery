@@ -2,30 +2,62 @@ package server
 
 import (
 	"cloud.google.com/go/storage"
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/graphql/generated"
+	"github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/spf13/viper"
 )
 
 func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, psub pubsub.PubSub, storageClient *storage.Client) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
-	graphQLGroup := router.Group("/glry/graphql")
+	graphqlGroup := router.Group("/glry/graphql")
 
 	nftHandlersInit(apiGroupV1, repos, ethClient, psub)
 	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, psub, storageClient)
-	graphQLHandlersInit(graphQLGroup, repos)
+	graphqlHandlersInit(graphqlGroup, repos, ethClient)
 
 	return router
 }
 
-func authHandlersInitToken(parent *gin.RouterGroup, repos *repositories, ethClient *ethclient.Client, psub pubsub.PubSub) {
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client) {
+	// TODO: Need to look at auth more closely, but using AuthOptional for initial resolvers (preflight and login)
+	parent.POST("/query", middleware.AuthOptional(), graphqlHandler(repos, ethClient))
+
+	// TODO: Consider completely disabling introspection in production
+	if viper.GetString("ENV") != "production" {
+		parent.GET("/playground", graphqlPlaygroundHandler())
+	}
+}
+
+func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client) gin.HandlerFunc {
+	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}))
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// GraphQL playground GUI for experimenting and debugging
+func graphqlPlaygroundHandler() gin.HandlerFunc {
+	h := playground.Handler("GraphQL", "/glry/graphql/query")
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, psub pubsub.PubSub) {
 
 	usersGroup := parent.Group("/users")
 
