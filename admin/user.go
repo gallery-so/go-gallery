@@ -128,7 +128,7 @@ func updateUser(updateUserStmt *sql.Stmt) gin.HandlerFunc {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		if _, err := updateUserStmt.ExecContext(c, pq.Array(input.Addresses), input.Bio, input.Username, strings.ToLower(input.Username), input.ID); err != nil {
+		if _, err := updateUserStmt.ExecContext(c, pq.Array(input.Addresses), input.Bio, input.Username, strings.ToLower(input.Username), persist.LastUpdatedTime{}, input.ID); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -221,7 +221,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			return
 		}
 
-		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Addresses, secondUser.Addresses...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, firstUser.ID); err != nil {
+		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Addresses, secondUser.Addresses...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, persist.LastUpdatedTime{}, firstUser.ID); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
@@ -286,7 +286,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			}
 		}
 
-		if _, err := tx.StmtContext(c, updateGalleryStmt).ExecContext(c, pq.Array(gallery.Collections), gallery.ID); err != nil {
+		if _, err := tx.StmtContext(c, updateGalleryStmt).ExecContext(c, pq.Array(gallery.Collections), persist.LastUpdatedTime{}, gallery.ID); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
