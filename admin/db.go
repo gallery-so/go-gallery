@@ -23,6 +23,8 @@ type statements struct {
 	createUserStmt        *sql.Stmt
 	createGalleryStmt     *sql.Stmt
 	createNonceStmt       *sql.Stmt
+	getCollectionsStmt    *sql.Stmt
+	updateCollectionStmt  *sql.Stmt
 
 	galleryRepo persist.GalleryRepository
 	nftRepo     persist.NFTRepository
@@ -67,6 +69,12 @@ func newStatements(db *sql.DB) *statements {
 	createNonceStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,USER_ID, ADDRESS, VALUE) VALUES ($1, $2, $3, $4);`)
 	checkNoErr(err)
 
+	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID,OWNER_USER_ID,NFTS,NAME,COLLECTORS_NOTE,LAYOUT,HIDDEN,VERSION,CREATED_AT,LAST_UPDATED FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	updateCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, NAME = $2, COLLECTORS_NOTE = $3, LAYOUT = $4, HIDDEN = $5, LAST_UPDATED = $6 WHERE ID = $8;`)
+	checkNoErr(err)
+
 	return &statements{
 		getUserByIDStmt:       getUserByIDStmt,
 		getUserByUsernameStmt: getUserByUsernameStmt,
@@ -79,6 +87,8 @@ func newStatements(db *sql.DB) *statements {
 		createUserStmt:        createUserStmt,
 		createGalleryStmt:     createGalleryStmt,
 		createNonceStmt:       createNonceStmt,
+		getCollectionsStmt:    getCollectionsStmt,
+		updateCollectionStmt:  updateCollectionStmt,
 
 		galleryRepo: postgres.NewGalleryRepository(db, nil),
 		nftRepo:     postgres.NewNFTRepository(db, nil, nil),

@@ -32,5 +32,10 @@ func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethc
 	snapshot.GET("/get", getSnapshot(stg))
 	snapshot.POST("/update", updateSnapshot(stg))
 
+	collections := api.Group("/collections")
+	collections.GET("/get", getCollections(stmts.getCollectionsStmt))
+	collections.POST("/update", updateCollection(stmts.updateCollectionStmt))
+	collections.POST("/delete", deleteCollection(stmts.deleteCollectionStmt))
+
 	return router
 }
