@@ -286,7 +286,7 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 			}
 		}
 
-		if _, err := tx.StmtContext(c, updateGalleryStmt).ExecContext(c, pq.Array(gallery.Collections), gallery.ID); err != nil {
+		if _, err := tx.StmtContext(c, updateGalleryStmt).ExecContext(c, pq.Array(gallery.Collections), persist.LastUpdatedTime{}, gallery.ID); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
