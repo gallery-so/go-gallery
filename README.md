@@ -8,6 +8,8 @@
 
 ## Clone and install deps
 
+foobar
+
 ```bash
 $ git clone git@github.com:gallery-so/go-gallery.git
 $ cd go-gallery
