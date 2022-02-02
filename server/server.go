@@ -66,7 +66,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub(), newGCPStorageClient())
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub())
 }
 
 func setDefaults() {
@@ -83,7 +83,7 @@ func setDefaults() {
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
-	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "decrypted/service-key.json")
+	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "deploy/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("REQUIRE_NFTS", false)
@@ -153,35 +153,29 @@ func newGCPPubSub() pubsub.PubSub {
 func newGCPStorageClient() *storage.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
 	defer cancel()
-	if viper.GetString("ENV") != "production" || viper.GetString("ENV") != "development" {
 
-		appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
-		_, err := os.Stat(appCredentials)
-		if err != nil {
-			_, err = os.Stat(filepath.Join("..", appCredentials))
-			if err == nil {
-				appCredentials = filepath.Join("..", appCredentials)
-				viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
-			}
-		}
-		if err != nil {
-			logrus.Errorf("err getting app creds: %s", err)
-			client, err := storage.NewClient(ctx, option.WithCredentialsJSON([]byte(viper.GetString("GCLOUD_SERVICE_KEY"))))
-			if err != nil {
-				panic(err)
-			}
-			return client
-		}
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
+	if viper.GetString("ENV") != "local" {
+		client, err := storage.NewClient(ctx)
 		if err != nil {
 			panic(err)
 		}
 		return client
 	}
-	client, err := storage.NewClient(ctx)
+
+	appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
+	_, err := os.Stat(appCredentials)
+	if err != nil {
+		_, err = os.Stat(filepath.Join("..", appCredentials))
+		if err != nil {
+			logrus.Info("credentials file doesn't exist locally")
+			return nil
+		}
+		appCredentials = filepath.Join("..", appCredentials)
+		viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
+	}
+	client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
 	if err != nil {
 		panic(err)
 	}
 	return client
-
 }

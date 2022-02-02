@@ -112,8 +112,8 @@ func (e ErrUserNotFound) Error() string {
 	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.Address, e.UserID, e.Username)
 }
 
-// generateNonce generates a random nonce to be signed by a wallet
-func generateNonce() string {
+// GenerateNonce generates a random nonce to be signed by a wallet
+func GenerateNonce() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonceInt := seededRand.Int()
 	nonceStr := fmt.Sprintf("%d", nonceInt)
@@ -384,7 +384,7 @@ func GetPreflight(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 		if err != nil || nonce.ID == "" {
 			nonce = persist.UserNonce{
 				Address: pAddress,
-				Value:   persist.NullString(generateNonce()),
+				Value:   persist.NullString(GenerateNonce()),
 			}
 
 			err = nonceRepo.Create(pCtx, nonce)
@@ -427,7 +427,7 @@ func GetPreflightREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed
 func NonceRotate(pCtx context.Context, pAddress persist.Address, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := persist.UserNonce{
-		Value:   persist.NullString(generateNonce()),
+		Value:   persist.NullString(GenerateNonce()),
 		Address: pAddress,
 	}
 

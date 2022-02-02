@@ -21,7 +21,7 @@ func NewClient() *sql.DB {
 
 	var psqlInfo string
 	if viper.GetString("ENV") != "local" {
-		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=/cloudsql/%s", dbUser, dbPwd, dbName, dbHost)
+		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=%s", dbUser, dbPwd, dbName, dbHost)
 	} else {
 		psqlInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", dbHost, dbPort, dbUser, dbPwd, dbName)
 	}
