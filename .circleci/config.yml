@@ -12,6 +12,9 @@ workflows:
             branches:
               only:
                 - "main"
+      - post-deploy:
+          requires:
+            - deploy
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -161,3 +164,39 @@ jobs:
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
+  post-deploy:
+    working_directory: ~/go-gallery
+    docker:
+      - image: cimg/base:stable
+    environment:
+      - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
+      - GRACE: 20
+      - TIMES: 5
+      - INTERVAL: 10
+    steps:
+      - run:
+          name: "Ping Backend"
+          command: |
+            echo "-------------------------------"
+            echo " INFO: letting backend startup "
+            echo "-------------------------------"
+            sleep $GRACE
+
+            for ((i=0; i<$TIMES; i++)); do
+            if [[ -z $(curl -XGET -Is $HEALTH_URL | head -n1 | grep 200) ]]; then
+              echo "-------------------------------"
+              echo " INFO: [attempt $i] waiting... "
+              echo "-------------------------------"
+              sleep $INTERVAL
+            else
+              echo "-------------------------------"
+              echo " INFO: backend is operational! "
+              echo "-------------------------------"
+              exit 0
+            fi
+            done
+
+            echo "-------------------------------"
+            echo " ERROR: failed to hit backend! "
+            echo "-------------------------------"
+            exit 1
