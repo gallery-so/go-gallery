@@ -137,7 +137,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		return bs, nil
 	case persist.URITypeHTTP:
-		var body io.ReadCloser
+
 		resp, err := client.Get(asString)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
@@ -145,11 +145,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if resp.StatusCode > 299 || resp.StatusCode < 200 {
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
-		body = resp.Body
-		defer body.Close()
+		defer resp.Body.Close()
 
 		buf := &bytes.Buffer{}
-		if _, err := io.Copy(buf, body); err != nil {
+		if _, err := io.Copy(buf, resp.Body); err != nil {
 			return nil, err
 		}
 
