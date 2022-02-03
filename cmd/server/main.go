@@ -9,12 +9,12 @@ import (
 )
 
 func main() {
+	server.Init()
 	if appengine.IsAppEngine() {
 		logrus.Info("Running in App Engine Mode")
 		appengine.Main()
 	} else {
 		logrus.Info("Running in Default Mode")
-		server.Init()
 		http.ListenAndServe(":4000", nil)
 	}
 }
