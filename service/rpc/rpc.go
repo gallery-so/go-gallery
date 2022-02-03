@@ -135,23 +135,16 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return bs, nil
 	case persist.URITypeHTTP:
 		var body io.ReadCloser
-		if strings.Contains(asString, "ipfs/") {
-			toCat := asString[strings.Index(asString, "ipfs/")+5:]
-			it, err := ipfsClient.Cat(toCat)
-			if err != nil {
-				return nil, fmt.Errorf("error getting data from http IPFS: %s", err)
-			}
-			body = it
-		} else {
-			resp, err := client.Get(asString)
-			if err != nil {
-				return nil, fmt.Errorf("error getting data from http: %s", err)
-			}
-			if resp.StatusCode > 299 || resp.StatusCode < 200 {
-				return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
-			}
-			body = resp.Body
+
+		resp, err := client.Get(asString)
+		if err != nil {
+			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
+		if resp.StatusCode > 299 || resp.StatusCode < 200 {
+			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
+		}
+		body = resp.Body
+
 		defer body.Close()
 
 		buf := &bytes.Buffer{}
