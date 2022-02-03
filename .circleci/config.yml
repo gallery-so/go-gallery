@@ -3,8 +3,12 @@ workflows:
   main:
     jobs:
       - build
-      - unit-tests
-      - integration-tests
+      - unit-tests:
+          requires:
+            - build
+      - integration-tests:
+          requires:
+            - build
       - deploy:
           filters:
             branches:
@@ -28,8 +32,6 @@ jobs:
           paths:
             - "/go/pkg/mod"
   unit-tests:
-    requires:
-      - build
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
@@ -41,13 +43,6 @@ jobs:
           keys:
             - go-mod-v5-{{ checksum "go.sum" }}
       - run:
-          name: Install Dependencies
-          command: go mod download
-      - save_cache:
-          key: go-mod-v5-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
-      - run:
           name: Run tests
           command: |
             mkdir -p /tmp/test-reports
@@ -55,8 +50,6 @@ jobs:
       - store_test_results:
           path: /tmp/test-reports
   integration-tests:
-    requires:
-      - build
     working_directory: ~/go-gallery
     machine:
       image: ubuntu-2004:202111-02
@@ -81,12 +74,7 @@ jobs:
           name: Install Dependencies
           command: |
             cp /go/pkg/mod ~/go/pkg/mod
-            go mod download -x
             go get gotest.tools/gotestsum@v$GOTESTSUM_VERSION
-      - save_cache:
-          key: go-mod-v5-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
       - run:
           name: Run integration-tests
           command: |
