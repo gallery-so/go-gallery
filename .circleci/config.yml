@@ -47,6 +47,8 @@ jobs:
             gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
       - store_test_results:
           path: /tmp/test-reports
+  # using a machine executor to run docker, which in turn installs postgres + redis and runs underlying tests
+  # https://circleci.com/docs/2.0/executor-types/#using-machine
   integration-tests:
     working_directory: ~/go-gallery
     machine:
