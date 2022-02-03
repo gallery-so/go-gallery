@@ -97,7 +97,7 @@ func (GalleryUser) IsGalleryByUserPayload() {}
 
 type GetLoginNoncePayload struct {
 	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"user_exists"`
+	UserExists *bool   `json:"userExists"`
 }
 
 type ImageNft struct {

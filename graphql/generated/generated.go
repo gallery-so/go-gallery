@@ -403,7 +403,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GetLoginNoncePayload.Nonce(childComplexity), true
 
-	case "GetLoginNoncePayload.user_exists":
+	case "GetLoginNoncePayload.userExists":
 		if e.complexity.GetLoginNoncePayload.UserExists == nil {
 			break
 		}
@@ -1078,7 +1078,7 @@ type RefreshOpenSeaNftsPayload {
 
 type GetLoginNoncePayload {
   nonce: String
-  user_exists: Boolean
+  userExists: Boolean
 }
 
 type LoginPayload {
@@ -2156,7 +2156,7 @@ func (ec *executionContext) _GetLoginNoncePayload_nonce(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _GetLoginNoncePayload_user_exists(ctx context.Context, field graphql.CollectedField, obj *model.GetLoginNoncePayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _GetLoginNoncePayload_userExists(ctx context.Context, field graphql.CollectedField, obj *model.GetLoginNoncePayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5879,9 +5879,9 @@ func (ec *executionContext) _GetLoginNoncePayload(ctx context.Context, sel ast.S
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "user_exists":
+		case "userExists":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GetLoginNoncePayload_user_exists(ctx, field, obj)
+				return ec._GetLoginNoncePayload_userExists(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

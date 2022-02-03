@@ -190,7 +190,7 @@ type RefreshOpenSeaNftsPayload {
 
 type GetLoginNoncePayload {
   nonce: String
-  user_exists: Boolean
+  userExists: Boolean
 }
 
 type LoginPayload {
