@@ -28,7 +28,8 @@ jobs:
           paths:
             - "/go/pkg/mod"
   unit-tests:
-    requires: build
+    requires:
+      - build
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
@@ -54,7 +55,8 @@ jobs:
       - store_test_results:
           path: /tmp/test-reports
   integration-tests:
-    requires: build
+    requires:
+      - build
     working_directory: ~/go-gallery
     machine:
       image: ubuntu-2004:202111-02
