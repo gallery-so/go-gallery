@@ -79,6 +79,9 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 		return persist.TokenMetadata{}, err
 	}
 
+	// remove BOM https://en.wikipedia.org/wiki/Byte_order_mark
+	bs = bytes.TrimPrefix(bs, []byte("\xef\xbb\xbf"))
+
 	var metadata persist.TokenMetadata
 	switch turi.Type() {
 
@@ -135,7 +138,6 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return bs, nil
 	case persist.URITypeHTTP:
 		var body io.ReadCloser
-
 		resp, err := client.Get(asString)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
@@ -144,7 +146,6 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
 		body = resp.Body
-
 		defer body.Close()
 
 		buf := &bytes.Buffer{}
