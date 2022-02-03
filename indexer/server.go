@@ -299,6 +299,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 				}
 			}
 		}
+		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient)
 
 		t := persist.Token{
 			Name:            persist.NullString(a.Name),
@@ -309,11 +310,9 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			OwnerAddress:    a.Owner.Address,
 			TokenURI:        persist.TokenURI(a.TokenMetadataURL),
 			ExternalURL:     persist.NullString(a.ExternalURL),
-			TokenMetadata: persist.TokenMetadata{
-				"image": a.ImageURL,
-			},
-			Media:       media,
-			BlockNumber: persist.BlockNumber(block),
+			TokenMetadata:   metadata,
+			Media:           media,
+			BlockNumber:     persist.BlockNumber(block),
 		}
 		if a.AnimationURL != "" {
 			t.TokenMetadata["animation"] = a.AnimationURL
