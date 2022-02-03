@@ -171,9 +171,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return buf.Bytes(), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
-		asString = strings.Replace(asString, "data:application/json;utf8,", "", 0)
-		asString = strings.Replace(asString, "data:text/plain,{,", "{", 0)
-		return []byte(asString), nil
+		idx := strings.IndexByte(asString, '{')
+		if idx == -1 {
+			return []byte(asString), nil
+		}
+		return []byte(asString[idx:]), nil
+
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
