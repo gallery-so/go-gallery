@@ -69,12 +69,16 @@ jobs:
             echo 'export PATH=$GOROOT/bin:$GOPATH/bin:$PATH' >> $BASH_ENV
       - restore_cache:
           keys:
-            - go-mod-v5-{{ checksum "go.sum" }}
+            - go-mod-v1-usr-{{ checksum "go.sum" }}
       - run:
           name: Install Dependencies
           command: |
-            cp /go/pkg/mod ~/go/pkg/mod
+            go mod download
             go get gotest.tools/gotestsum@v$GOTESTSUM_VERSION
+      - save_cache:
+          key: go-mod-v1-usr-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
       - run:
           name: Run integration-tests
           command: |
