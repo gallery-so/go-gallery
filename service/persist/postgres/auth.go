@@ -51,6 +51,9 @@ func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Address) (p
 	var nonce persist.UserNonce
 	err := n.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.UserNonce{}, persist.ErrNonceNotFoundForAddress{Address: pAddress}
+		}
 		return persist.UserNonce{}, err
 	}
 	return nonce, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -212,6 +213,11 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			return
 		}
 
+		if err := processAccountForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
 		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 		for _, address := range user.Addresses {
 			assets, err := opensea.FetchAssetsForWallet(address, 0, 0, nil)
@@ -261,7 +267,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 				allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
 			}
 
-			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
+			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
 				logrus.WithError(err).Error("failed to process unaccounted for NFTs")
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
@@ -274,8 +280,44 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 	}
 }
 
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
-	store := map[persist.TokenIdentifiers]*persist.Token{}
+func processAccountForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell) error {
+	for _, token := range tokens {
+		uriType := token.TokenURI.Type()
+		needsUpdate := false
+		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown {
+			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
+			if err != nil {
+				return fmt.Errorf("failed to get token URI for token %s: %v", token.TokenID, err)
+			}
+			token.TokenURI = uri
+			needsUpdate = true
+		}
+
+		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {
+			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient)
+			if err != nil {
+				return fmt.Errorf("failed to get token metadata for token %s: %v", token.TokenID, err)
+			}
+			token.TokenMetadata = metadata
+			needsUpdate = true
+		}
+
+		if needsUpdate {
+			update := persist.TokenUpdateMediaInput{
+				TokenURI: token.TokenURI,
+				Metadata: token.TokenMetadata,
+				Media:    token.Media,
+			}
+
+			if err := tokenRepository.UpdateByIDUnsafe(ctx, token.ID, update); err != nil {
+				return fmt.Errorf("failed to update token %s: %v", token.TokenID, err)
+			}
+		}
+
+	}
+	return nil
+}
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addresses []persist.Address, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
 	allTokens := make([]persist.Token, 0, len(assets))
 	cntracts := make([]persist.Contract, 0, len(assets))
 	block, err := ethcl.BlockNumber(ctx)
@@ -283,6 +325,8 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 		return err
 	}
 	for _, a := range assets {
+
+		logrus.Debugf("processing asset: %+v", a)
 
 		asURI := persist.TokenURI(a.ImageURL)
 		media := persist.Media{}
@@ -299,8 +343,12 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 				}
 			}
 		}
+
+		logrus.Debugf("media: %+v", media)
+
 		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient)
 
+		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{
 			Name:            persist.NullString(a.Name),
 			Description:     persist.NullString(a.Description),
@@ -320,22 +368,31 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 		switch a.Contract.ContractSchemaName {
 		case "ERC721":
 			t.TokenType = persist.TokenTypeERC721
+			allTokens = append(allTokens, t)
 		case "ERC1155":
 			t.TokenType = persist.TokenTypeERC1155
 			ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethcl)
 			if err != nil {
 				return err
 			}
-			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, t.OwnerAddress.Address(), t.TokenID.BigInt())
-			if err != nil {
-				return err
+			bigZero := big.NewInt(0)
+			for _, addr := range addresses {
+				new := t
+				bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, addr.Address(), t.TokenID.BigInt())
+				if err != nil {
+					return err
+				}
+				if bal.Cmp(bigZero) > 0 {
+					new.OwnerAddress = addr
+					new.Quantity = persist.HexString(bal.Text(16))
+
+					allTokens = append(allTokens, new)
+				}
 			}
-			t.Quantity = persist.HexString(bal.Text(16))
 		default:
 			return fmt.Errorf("unsupported token type: %s", a.Contract.ContractSchemaName)
 		}
-		store[persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID)] = &t
-		allTokens = append(allTokens, t)
+
 		c := persist.Contract{
 			Address:     a.Contract.ContractAddress,
 			Symbol:      a.Contract.ContractSymbol,

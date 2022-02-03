@@ -308,17 +308,20 @@ func (uri TokenURI) URL() (*url.URL, error) {
 }
 
 func (uri TokenURI) String() string {
-	result := string(uri)
-	if strings.Contains(result, "://") {
-		result = url.QueryEscape(result)
+	url, err := url.QueryUnescape(string(uri))
+	if err == nil && url != string(uri) {
+		return url
 	}
-
-	return result
+	return string(uri)
 }
 
 // Value implements the driver.Valuer interface for token URIs
 func (uri TokenURI) Value() (driver.Value, error) {
-	return strings.ToValidUTF8(uri.String(), ""), nil
+	result := string(uri)
+	if strings.Contains(result, "://") {
+		result = url.QueryEscape(result)
+	}
+	return strings.ToValidUTF8(result, ""), nil
 }
 
 // Scan implements the sql.Scanner interface for token URIs
@@ -334,18 +337,19 @@ func (uri *TokenURI) Scan(src interface{}) error {
 // Type returns the type of the token URI
 func (uri TokenURI) Type() URIType {
 	asString := uri.String()
+	asString = strings.TrimSpace(asString)
 	switch {
-	case strings.Contains(asString, "ipfs://"), strings.HasPrefix(asString, "Qm"):
+	case strings.HasPrefix(asString, "ipfs"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
-	case strings.Contains(asString, "data:application/json;base64,"):
+	case strings.HasPrefix(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
-	case strings.Contains(asString, "data:image/svg+xml;base64,"):
+	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"):
 		return URITypeBase64SVG
 	case strings.Contains(asString, "base64,"):
 		return URITypeBase64JSON
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
-	case strings.Contains(asString, "http://"), strings.Contains(asString, "https://"):
+	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
