@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	_ "github.com/mikeydub/go-gallery/server"
+	"github.com/mikeydub/go-gallery/server"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/appengine"
 )
@@ -14,6 +14,7 @@ func main() {
 		appengine.Main()
 	} else {
 		logrus.Info("Running in Default Mode")
+		server.Init()
 		http.ListenAndServe(":4000", nil)
 	}
 }

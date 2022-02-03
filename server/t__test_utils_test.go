@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -42,6 +44,7 @@ var ts *httptest.Server
 
 type TestUser struct {
 	id       persist.DBID
+	pk       *ecdsa.PrivateKey
 	address  persist.Address
 	jwt      string
 	username string
@@ -53,7 +56,12 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 
 	username := util.RandStringBytes(40)
 
-	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandHexString(40))))
+	pk, err := crypto.GenerateKey()
+	a.NoError(err)
+
+	pub := crypto.PubkeyToAddress(pk.PublicKey).String()
+	address := persist.Address(strings.ToLower(pub))
+
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
@@ -73,7 +81,7 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 	getFakeCookie(a, jwt, c)
 	auth.NonceRotate(ctx, address, id, repos.nonceRepository)
 	log.Info(id, username)
-	return &TestUser{id, address, jwt, username, c}
+	return &TestUser{id, pk, address, jwt, username, c}
 }
 
 // Should be called at the beginning of every integration test
@@ -85,11 +93,15 @@ func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 		db = postgres.NewClient()
 	}
 
-	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
+	return initializeTestServer(db, a, v)
+}
+
+func initializeTestServer(db *sql.DB, a *assert.Assertions, v int) *TestConfig {
 	router := CoreInit(db)
 	router.POST("/fake-cookie", fakeCookie)
 	ts = httptest.NewServer(router)
 
+	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	repos := newRepos(db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
 	log.Infof("test server connected at %s ✅", ts.URL)
