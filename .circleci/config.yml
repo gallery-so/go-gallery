@@ -3,6 +3,7 @@ workflows:
   main:
     jobs:
       - build
+      - unit-tests
       - integration-tests
       - deploy:
           filters:
@@ -11,6 +12,22 @@ workflows:
                 - "main"
 jobs:
   build:
+    working_directory: ~/go-gallery
+    docker:
+      - image: cimg/go:1.16
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v5-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod download
+      - save_cache:
+          key: go-mod-v5-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+  unit-tests:
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
