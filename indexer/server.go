@@ -285,13 +285,20 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 	for _, a := range assets {
 
 		asURI := persist.TokenURI(a.ImageURL)
+		media := persist.Media{}
 
 		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient)
-		if err != nil {
-			return err
+		if err == nil {
+			mediaType := persist.SniffMediaType(bs)
+			if mediaType != persist.MediaTypeUnknown {
+				media = persist.Media{
+					MediaURL:     persist.NullString(a.ImageURL),
+					ThumbnailURL: persist.NullString(a.ImageThumbnailURL),
+					PreviewURL:   persist.NullString(a.ImagePreviewURL),
+					MediaType:    mediaType,
+				}
+			}
 		}
-
-		mediaType := persist.SniffMediaType(bs)
 
 		t := persist.Token{
 			Name:            persist.NullString(a.Name),
@@ -305,12 +312,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			TokenMetadata: persist.TokenMetadata{
 				"image": a.ImageURL,
 			},
-			Media: persist.Media{
-				MediaURL:     persist.NullString(a.ImageURL),
-				ThumbnailURL: persist.NullString(a.ImageThumbnailURL),
-				PreviewURL:   persist.NullString(a.ImagePreviewURL),
-				MediaType:    mediaType,
-			},
+			Media:       media,
 			BlockNumber: persist.BlockNumber(block),
 		}
 		if a.AnimationURL != "" {
