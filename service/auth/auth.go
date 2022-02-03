@@ -342,13 +342,13 @@ func VerifySignature(pSignatureStr string,
 
 }
 
-// GetPreflight will establish if a user is permitted to preflight a login and generate a nonce to be signed
-func GetPreflight(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
+// GetLoginNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
+func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.GetLoginNoncePayload, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
-		logrus.WithError(err).Error("error retrieving user by address for auth preflight")
+		logrus.WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
 	userExistsBool := user.ID != ""
@@ -406,11 +406,11 @@ func GetPreflight(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	return &output, nil
 }
 
-// GetPreflight will establish if a user is permitted to preflight a login and generate a nonce to be signed
-func GetPreflightREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
+// GetLoginNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
+func GetLoginNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
 
-	gqlOutput, err := GetPreflight(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
+	gqlOutput, err := GetLoginNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
 	if err != nil {
 		return nil, err
 	}

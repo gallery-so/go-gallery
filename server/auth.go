@@ -31,7 +31,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		authed := c.GetBool(auth.AuthContextKey)
 
-		output, err := auth.GetPreflightREST(c, input, authed, userRepository, authNonceRepository, ethClient)
+		output, err := auth.GetLoginNonceREST(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrNonceNotFoundForAddress); ok {

@@ -55,7 +55,7 @@ func (r *mutationResolver) GetLoginNonce(ctx context.Context, address string) (*
 	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
 	authed := gc.GetBool(auth.AuthContextKey)
 
-	output, err := auth.GetPreflight(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
+	output, err := auth.GetLoginNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
 	if err != nil {
 		// TODO: Map errors to GraphQL types
 		//status := http.StatusInternalServerError
