@@ -76,7 +76,7 @@ func (r *mutationResolver) LoginWithEoa(ctx context.Context, address string, non
 		return nil, err
 	}
 
-	output, err := auth.LoginAndMemorizeAttempt(ctx, address, nonce, signature, auth.WalletTypeEOA, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
+	output, err := auth.LoginAndRecordAttempt(ctx, address, nonce, signature, auth.WalletTypeEOA, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
 	if err != nil {
 		gc.Error(err)
 		return nil, err
@@ -93,7 +93,7 @@ func (r *mutationResolver) LoginWithSmartContract(ctx context.Context, address s
 		return nil, err
 	}
 
-	output, err := auth.LoginAndMemorizeAttempt(ctx, address, nonce, signature, auth.WalletTypeGnosis, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
+	output, err := auth.LoginAndRecordAttempt(ctx, address, nonce, signature, auth.WalletTypeGnosis, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
 	if err != nil {
 		gc.Error(err)
 		return nil, err

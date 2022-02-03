@@ -120,12 +120,12 @@ func GenerateNonce() string {
 	return nonceStr
 }
 
-// LoginAndMemorizeAttemptREST will run the login pipeline and memorize the result
-func LoginAndMemorizeAttemptREST(pCtx context.Context, pInput LoginInput,
+// LoginAndRecordAttemptREST will run the login pipeline and memorize the result
+func LoginAndRecordAttemptREST(pCtx context.Context, pInput LoginInput,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
 
-	gqlOutput, err := LoginAndMemorizeAttempt(pCtx, pInput.Address.String(), pInput.Nonce, pInput.Signature, pInput.WalletType, pReq, userRepo, nonceRepo, loginRepo, ec)
+	gqlOutput, err := LoginAndRecordAttempt(pCtx, pInput.Address.String(), pInput.Nonce, pInput.Signature, pInput.WalletType, pReq, userRepo, nonceRepo, loginRepo, ec)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -145,8 +145,8 @@ func LoginAndMemorizeAttemptREST(pCtx context.Context, pInput LoginInput,
 	return output, nil
 }
 
-// LoginAndMemorizeAttempt will run the login pipeline and memorize the result
-func LoginAndMemorizeAttempt(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
+// LoginAndRecordAttempt will run the login pipeline and memorize the result
+func LoginAndRecordAttempt(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (*model.LoginPayload, error) {
 

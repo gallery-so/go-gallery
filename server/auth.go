@@ -53,7 +53,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			return
 		}
 
-		output, err := auth.LoginAndMemorizeAttemptREST(
+		output, err := auth.LoginAndRecordAttemptREST(
 			c,
 			input,
 			c.Request,
