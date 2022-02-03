@@ -3,6 +3,7 @@ workflows:
   main:
     jobs:
       - build
+      - integration-tests
       - unit-tests:
           requires:
             - build
