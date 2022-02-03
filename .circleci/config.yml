@@ -28,6 +28,7 @@ jobs:
           paths:
             - "/go/pkg/mod"
   unit-tests:
+    requires: build
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
@@ -53,6 +54,7 @@ jobs:
       - store_test_results:
           path: /tmp/test-reports
   integration-tests:
+    requires: build
     working_directory: ~/go-gallery
     machine:
       image: ubuntu-2004:202111-02
@@ -72,16 +74,17 @@ jobs:
             echo 'export PATH=$GOROOT/bin:$GOPATH/bin:$PATH' >> $BASH_ENV
       - restore_cache:
           keys:
-            - go-mod-usr-v1-{{ checksum "go.sum" }}
+            - go-mod-v5-{{ checksum "go.sum" }}
       - run:
           name: Install Dependencies
           command: |
+            cp /go/pkg/mod ~/go/pkg/mod
             go mod download -x
             go get gotest.tools/gotestsum@v$GOTESTSUM_VERSION
       - save_cache:
-          key: go-mod-usr-v1-{{ checksum "go.sum" }}
+          key: go-mod-v5-{{ checksum "go.sum" }}
           paths:
-            - "~/go/pkg/mod"
+            - "/go/pkg/mod"
       - run:
           name: Run integration-tests
           command: |
