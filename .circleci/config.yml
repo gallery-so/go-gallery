@@ -3,6 +3,10 @@ workflows:
   main:
     jobs:
       - build
+      - integration-tests
+      - unit-tests:
+          requires:
+            - build
       - deploy:
           filters:
             branches:
@@ -13,8 +17,6 @@ jobs:
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
-      - image: redis:latest
-      - image: bcgallery/gallery-postgres:circle
     steps:
       - checkout
       - restore_cache:
@@ -27,11 +29,61 @@ jobs:
           key: go-mod-v5-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+  unit-tests:
+    working_directory: ~/go-gallery
+    docker:
+      - image: cimg/go:1.16
+      - image: redis:6
+      - image: bcgallery/gallery-postgres:circle
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v5-{{ checksum "go.sum" }}
       - run:
           name: Run tests
           command: |
             mkdir -p /tmp/test-reports
-            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
+      - store_test_results:
+          path: /tmp/test-reports
+  # using a machine executor to run docker, which in turn installs postgres + redis and runs underlying tests
+  # https://circleci.com/docs/2.0/executor-types/#using-machine
+  integration-tests:
+    working_directory: ~/go-gallery
+    machine:
+      image: ubuntu-2004:202111-02
+      docker_layer_caching: false  # can enable when on performance plan
+    environment:
+      GO_VERSION: 1.16.13
+      GOTESTSUM_VERSION: 1.7.0
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            mkdir -p ~/bin ~/go
+            curl -L --output - https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz | tar xz -C ~/bin
+            echo 'export GOROOT=~/bin/go' >> $BASH_ENV
+            echo 'export GOPATH=~/go' >> $BASH_ENV
+            echo 'export PATH=$GOROOT/bin:$GOPATH/bin:$PATH' >> $BASH_ENV
+      - restore_cache:
+          keys:
+            - go-mod-v1-usr-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: |
+            go mod download
+            go get gotest.tools/gotestsum@v$GOTESTSUM_VERSION
+      - save_cache:
+          key: go-mod-v1-usr-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
+      - run:
+          name: Run integration-tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -run TestIntegrationTest ./...
       - store_test_results:
           path: /tmp/test-reports
   deploy:
