@@ -80,7 +80,7 @@ func TestUserCreate_Success(t *testing.T) {
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address)
@@ -104,13 +104,13 @@ func TestUserCreate_UserWithEmptyUsernameExists_Success(t *testing.T) {
 	otherUser := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F0AC5"))},
 	}
-	_, err := tc.repos.userRepository.Create(context.Background(), otherUser)
+	_, err := tc.repos.UserRepository.Create(context.Background(), otherUser)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address)
@@ -134,7 +134,7 @@ func TestUserCreate_WrongNonce_Failure(t *testing.T) {
 		Value:   "Wrong Nonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address)
@@ -148,7 +148,7 @@ func TestUserCreate_WrongSig_Failure(t *testing.T) {
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := createUserRequest(assert, "0x0a22246c5feee38a90dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb808s191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b", nonce.Address)
@@ -162,7 +162,7 @@ func TestUserCreate_WrongAddress_Failure(t *testing.T) {
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3349a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := createUserRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", nonce.Address)
@@ -183,14 +183,14 @@ func TestUserLogin_Success(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", nonce.Address, auth.WalletTypeEOA)
@@ -215,14 +215,14 @@ func TestUserLoginGnosis_Success(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TEST NONCE",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "", auth.NoncePrepend+"TEST NONCE", nonce.Address, auth.WalletTypeGnosis)
@@ -247,14 +247,14 @@ func TestUserLoginGnosis_WrongNonce_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TEST NONCE",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "", "0x", nonce.Address, auth.WalletTypeGnosis)
@@ -277,14 +277,14 @@ func TestUserLoginGnosis_WrongSig_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   " TEST NONCE",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "", " TEST NONCE", nonce.Address, auth.WalletTypeGnosis)
@@ -306,14 +306,14 @@ func TestUserLogin_WrongNonce_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "Wrong Nonce",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", nonce.Address, auth.WalletTypeEOA)
@@ -327,14 +327,14 @@ func TestUserLogin_WrongSig_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x0a22246c5feee38a80dc6898b453c944e7e7c2f9850218d7c13f3f17f992ea691bb8083191a59ad2c83a5d7f4b41d85df1e693a96b5a251f0a66751b7dc235091b", "", nonce.Address, auth.WalletTypeEOA)
@@ -348,14 +348,14 @@ func TestUserLogin_WrongAddr_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: user.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", auth.WalletTypeEOA)
@@ -369,7 +369,7 @@ func TestUserLogin_NoNonce_Failure(t *testing.T) {
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
 
-	_, err := tc.repos.userRepository.Create(context.Background(), user)
+	_, err := tc.repos.UserRepository.Create(context.Background(), user)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", auth.WalletTypeEOA)
@@ -383,7 +383,7 @@ func TestUserLogin_UserNotExist_Failure(t *testing.T) {
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", nonce.Address, auth.WalletTypeEOA)
@@ -397,7 +397,7 @@ func TestUserLogin_UserNotOwnAddress_Failure(t *testing.T) {
 		Value:   "TestNonce",
 		Address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5",
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	resp := loginRequest(assert, "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b", "", nonce.Address, auth.WalletTypeEOA)
