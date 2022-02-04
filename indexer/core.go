@@ -34,8 +34,6 @@ func coreInit() (*gin.Engine, *Indexer) {
 
 	setDefaults()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-
 	tokenRepo, contractRepo, userRepo := newRepos()
 	var s *storage.Client
 	var err error
@@ -50,11 +48,13 @@ func coreInit() (*gin.Engine, *Indexer) {
 	ipfsClient := newIPFSShell()
 	ethClient := newEthClient()
 	tq := task.NewQueue()
+
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 	i := NewIndexer(ethClient, ipfsClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
-	if viper.GetString("ENV") == "local" {
+	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}

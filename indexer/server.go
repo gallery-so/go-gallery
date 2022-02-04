@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -212,6 +213,11 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			return
 		}
 
+		if err := processAccountForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
 		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 		for _, address := range user.Addresses {
 			assets, err := opensea.FetchAssetsForWallet(address, 0, 0, nil)
@@ -254,22 +260,18 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 				accountedForKeys = append(accountedForKeys, k.String())
 			}
 			output.Success = false
-			output.Message = fmt.Sprintf("user %s has unaccounted for NFTs: %v\naccounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
-			c.JSON(http.StatusOK, output)
+			output.Message = fmt.Sprintf("user %s has unaccounted for NFTs: %v | accounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
 
-			go func() {
-				allUnaccountedForAssets := make([]opensea.Asset, 0, len(unaccountedFor))
-				for _, asset := range unaccountedFor {
-					allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				defer cancel()
-				if err := processUnaccountedForNFTs(ctx, allUnaccountedForAssets, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
-					logrus.WithError(err).Error("failed to process unaccounted for NFTs")
-				}
-			}()
+			allUnaccountedForAssets := make([]opensea.Asset, 0, len(unaccountedFor))
+			for _, asset := range unaccountedFor {
+				allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
+			}
 
-			return
+			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
+				logrus.WithError(err).Error("failed to process unaccounted for NFTs")
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
 		}
 
 		output.Success = true
@@ -278,17 +280,75 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 	}
 }
 
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
-	store := map[persist.TokenIdentifiers]*persist.Token{}
-	allTokens := make([]persist.Token, 0, len(assets))
-	cntracts := make([]persist.Contract, 0, len(assets))
-	for _, a := range assets {
-
-		block, err := ethcl.BlockNumber(ctx)
-		if err != nil {
-			return err
+func processAccountForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell) error {
+	for _, token := range tokens {
+		uriType := token.TokenURI.Type()
+		needsUpdate := false
+		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown {
+			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
+			if err != nil {
+				return fmt.Errorf("failed to get token URI for token %s: %v", token.TokenID, err)
+			}
+			token.TokenURI = uri
+			needsUpdate = true
 		}
 
+		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {
+			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient)
+			if err != nil {
+				return fmt.Errorf("failed to get token metadata for token %s: %v", token.TokenID, err)
+			}
+			token.TokenMetadata = metadata
+			needsUpdate = true
+		}
+
+		if needsUpdate {
+			update := persist.TokenUpdateMediaInput{
+				TokenURI: token.TokenURI,
+				Metadata: token.TokenMetadata,
+				Media:    token.Media,
+			}
+
+			if err := tokenRepository.UpdateByIDUnsafe(ctx, token.ID, update); err != nil {
+				return fmt.Errorf("failed to update token %s: %v", token.TokenID, err)
+			}
+		}
+
+	}
+	return nil
+}
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addresses []persist.Address, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
+	allTokens := make([]persist.Token, 0, len(assets))
+	cntracts := make([]persist.Contract, 0, len(assets))
+	block, err := ethcl.BlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	for _, a := range assets {
+
+		logrus.Debugf("processing asset: %+v", a)
+
+		asURI := persist.TokenURI(a.ImageURL)
+		media := persist.Media{}
+
+		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient)
+		if err == nil {
+			mediaType := persist.SniffMediaType(bs)
+			if mediaType != persist.MediaTypeUnknown {
+				media = persist.Media{
+					MediaURL:     persist.NullString(a.ImageURL),
+					ThumbnailURL: persist.NullString(a.ImageThumbnailURL),
+					PreviewURL:   persist.NullString(a.ImagePreviewURL),
+					MediaType:    mediaType,
+				}
+			}
+		}
+
+		logrus.Debugf("media: %+v", media)
+
+		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient)
+
+		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{
 			Name:            persist.NullString(a.Name),
 			Description:     persist.NullString(a.Description),
@@ -298,10 +358,9 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			OwnerAddress:    a.Owner.Address,
 			TokenURI:        persist.TokenURI(a.TokenMetadataURL),
 			ExternalURL:     persist.NullString(a.ExternalURL),
-			TokenMetadata: persist.TokenMetadata{
-				"image": a.ImageURL,
-			},
-			BlockNumber: persist.BlockNumber(block),
+			TokenMetadata:   metadata,
+			Media:           media,
+			BlockNumber:     persist.BlockNumber(block),
 		}
 		if a.AnimationURL != "" {
 			t.TokenMetadata["animation"] = a.AnimationURL
@@ -309,22 +368,31 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 		switch a.Contract.ContractSchemaName {
 		case "ERC721":
 			t.TokenType = persist.TokenTypeERC721
+			allTokens = append(allTokens, t)
 		case "ERC1155":
 			t.TokenType = persist.TokenTypeERC1155
 			ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethcl)
 			if err != nil {
 				return err
 			}
-			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, t.OwnerAddress.Address(), t.TokenID.BigInt())
-			if err != nil {
-				return err
+			bigZero := big.NewInt(0)
+			for _, addr := range addresses {
+				new := t
+				bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, addr.Address(), t.TokenID.BigInt())
+				if err != nil {
+					return err
+				}
+				if bal.Cmp(bigZero) > 0 {
+					new.OwnerAddress = addr
+					new.Quantity = persist.HexString(bal.Text(16))
+
+					allTokens = append(allTokens, new)
+				}
 			}
-			t.Quantity = persist.HexString(bal.Text(16))
 		default:
 			return fmt.Errorf("unsupported token type: %s", a.Contract.ContractSchemaName)
 		}
-		store[persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID)] = &t
-		allTokens = append(allTokens, t)
+
 		c := persist.Contract{
 			Address:     a.Contract.ContractAddress,
 			Symbol:      a.Contract.ContractSymbol,
@@ -332,27 +400,6 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, toke
 			LatestBlock: persist.BlockNumber(block),
 		}
 		cntracts = append(cntracts, c)
-	}
-
-	updates, errs := updateMediaForTokens(ctx, allTokens, ethcl, ipfsClient, stg)
-	for i := 0; i < len(allTokens); i++ {
-		select {
-		case update := <-updates:
-			if update.TokenID != "" && update.ContractAddress != "" {
-				t := store[persist.NewTokenIdentifiers(update.ContractAddress, update.TokenID)]
-				if t != nil {
-					t.TokenMetadata = update.Update.Metadata
-					t.TokenURI = update.Update.TokenURI
-					t.Media = update.Update.Media
-				}
-			}
-		case err := <-errs:
-			if err != nil {
-				logrus.WithError(err).Error("failed to update media for token")
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
 	}
 
 	if err := contractRepository.BulkUpsert(ctx, cntracts); err != nil {

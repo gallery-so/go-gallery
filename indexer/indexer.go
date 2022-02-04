@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum"
@@ -33,8 +32,6 @@ import (
 )
 
 var defaultStartingBlock persist.BlockNumber = 5000000
-
-var logSize = unsafe.Sizeof(types.Log{})
 
 const blocksPerLogsCall = 50
 

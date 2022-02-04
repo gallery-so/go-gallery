@@ -79,6 +79,9 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 		return persist.TokenMetadata{}, err
 	}
 
+	// remove BOM https://en.wikipedia.org/wiki/Byte_order_mark
+	bs = bytes.TrimPrefix(bs, []byte("\xef\xbb\xbf"))
+
 	var metadata persist.TokenMetadata
 	switch turi.Type() {
 
@@ -134,28 +137,18 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		return bs, nil
 	case persist.URITypeHTTP:
-		var body io.ReadCloser
-		if strings.Contains(asString, "ipfs/") {
-			toCat := asString[strings.Index(asString, "ipfs/")+5:]
-			it, err := ipfsClient.Cat(toCat)
-			if err != nil {
-				return nil, fmt.Errorf("error getting data from http IPFS: %s", err)
-			}
-			body = it
-		} else {
-			resp, err := client.Get(asString)
-			if err != nil {
-				return nil, fmt.Errorf("error getting data from http: %s", err)
-			}
-			if resp.StatusCode > 299 || resp.StatusCode < 200 {
-				return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
-			}
-			body = resp.Body
+
+		resp, err := client.Get(asString)
+		if err != nil {
+			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
-		defer body.Close()
+		if resp.StatusCode > 299 || resp.StatusCode < 200 {
+			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
+		}
+		defer resp.Body.Close()
 
 		buf := &bytes.Buffer{}
-		if _, err := io.Copy(buf, body); err != nil {
+		if _, err := io.Copy(buf, resp.Body); err != nil {
 			return nil, err
 		}
 
@@ -178,9 +171,12 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return buf.Bytes(), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
-		asString = strings.Replace(asString, "data:application/json;utf8,", "", 0)
-		asString = strings.Replace(asString, "data:text/plain,{,", "{", 0)
-		return []byte(asString), nil
+		idx := strings.IndexByte(asString, '{')
+		if idx == -1 {
+			return []byte(asString), nil
+		}
+		return []byte(asString[idx:]), nil
+
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
