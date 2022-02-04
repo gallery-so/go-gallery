@@ -345,15 +345,13 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64JSON
 	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"):
 		return URITypeBase64SVG
-	case strings.Contains(asString, "base64,"):
-		return URITypeBase64JSON
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
-	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
+	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
-	case strings.HasPrefix(asString, "<svg"):
+	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml"):
 		return URITypeSVG
 	case asString == InvalidTokenURI.String():
 		return URITypeInvalid

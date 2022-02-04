@@ -21,14 +21,12 @@ import (
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/appengine"
 )
 
 var defaultStartingBlock persist.BlockNumber = 5000000
@@ -156,7 +154,7 @@ func (i *Indexer) Start() {
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
-	wp := workerpool.New(10)
+	wp := workerpool.New(8)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -171,7 +169,7 @@ func (i *Indexer) Start() {
 		toQueue := func() {
 			i.startPipeline(input, topics)
 		}
-		if wp.WaitingQueueSize() > 100 {
+		if wp.WaitingQueueSize() > 25 {
 			wp.SubmitWait(toQueue)
 		} else {
 			wp.Submit(toQueue)
@@ -617,7 +615,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	go receivePreviousOwners(wg, previousOwners, previousOwnersMap, i.tokenRepo)
 	wg.Wait()
 
-	logrus.Info("Done recieving field data, convering fields into tokens...")
+	logrus.Info("Done recieving field data, converting fields into tokens...")
 
 	tokens := i.storedDataToTokens(ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap)
 	if tokens == nil || len(tokens) == 0 {
@@ -746,26 +744,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 			Chain:            i.chain,
 			BlockNumber:      v.block,
 		}
-		if metadata.md != nil && len(metadata.md) > 0 {
-			if _, ok := metadata.md["error"]; !ok {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-				exists, err := i.userRepo.ExistsByAddress(ctx, t.OwnerAddress)
-				cancel()
-				if err != nil {
-					logrus.WithError(err).Error("error checking if user exists")
-					panic(err)
-				} else if exists {
-					ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
-					med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, t.TokenURI, i.ipfsClient, i.storageClient)
-					cancel()
-					if err != nil {
-						logrus.WithError(err).Error("error making previews")
-					} else {
-						t.Media = med
-					}
-				}
-			}
-		}
+
 		result[j] = t
 		j++
 		delete(owners, k)
@@ -790,33 +769,7 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 		uri := uris[k]
 		delete(uris, k)
 
-		var m persist.Media
-		hasMetadata := metadata.md != nil && len(metadata.md) > 0
-
 		for addr, balance := range v {
-			if hasMetadata && m.MediaType == "" && m.MediaURL == "" {
-				if _, ok := metadata.md["error"]; !ok {
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-					exists, err := i.userRepo.ExistsByAddress(ctx, addr)
-					cancel()
-					if err != nil {
-						logrus.WithError(err).Error("error checking if user exists")
-						panic(err)
-					} else if exists {
-						aeCtx := appengine.BackgroundContext()
-
-						ctx, cancel = context.WithTimeout(aeCtx, time.Second*30)
-						med, err := media.MakePreviewsForMetadata(ctx, metadata.md, contractAddress, tokenID, uri.uri, i.ipfsClient, i.storageClient)
-						cancel()
-						if err != nil {
-							logrus.WithError(err).Error("error making previews")
-						} else {
-							m = med
-						}
-
-					}
-				}
-			}
 
 			t := persist.Token{
 				TokenID:         tokenID,
@@ -830,7 +783,6 @@ func (i *Indexer) storedDataToTokens(owners map[tokenIdentifiers]ownerAtBlock, p
 				Description:     persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
 				Chain:           i.chain,
 				BlockNumber:     balance.block,
-				Media:           m,
 			}
 			result[j] = t
 			j++

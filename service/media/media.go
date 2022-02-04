@@ -265,11 +265,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	switch mediaType {
 	case persist.MediaTypeVideo:
-		scaled, err := scaleVideo(pCtx, bs, -1, 720)
-		if err != nil {
-			return mediaType, fmt.Errorf("error scaling video: %s", err)
-		}
-		err = cacheRawMedia(pCtx, scaled, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
+		err = cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
 		if err != nil {
 			return mediaType, fmt.Errorf("error caching video: %s", err)
 		}

@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 )
@@ -79,6 +80,23 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 				}
 			}
 		}
+	}
+	return nil
+}
+
+var errDataTooLarge = errors.New("data too large")
+
+// CopyMax will copy until a certain point and error after that point
+func CopyMax(writer io.Writer, it io.Reader, max int64) error {
+	if _, err := io.CopyN(writer, it, max); err != nil {
+		if err != io.EOF {
+			return err
+		}
+		return nil
+	}
+	extra := make([]byte, 1)
+	if n, _ := io.ReadFull(it, extra); n > 0 {
+		return errDataTooLarge
 	}
 	return nil
 }

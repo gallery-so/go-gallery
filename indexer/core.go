@@ -95,7 +95,14 @@ func newEthClient() *ethclient.Client {
 }
 
 func newIPFSShell() *shell.Shell {
-	sh := shell.NewShell(viper.GetString("IPFS_URL"))
+	client := http.Client{
+		Timeout: time.Second * 10,
+		Transport: &http.Transport{
+			Proxy:             http.ProxyFromEnvironment,
+			DisableKeepAlives: true,
+		},
+	}
+	sh := shell.NewShellWithClient(viper.GetString("IPFS_URL"), &client)
 	sh.SetTimeout(time.Second * 15)
 	return sh
 }

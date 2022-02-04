@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -19,6 +18,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -127,15 +127,17 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		it, err := ipfsClient.Cat(pathMinusExtra)
 		if err != nil {
-			return nil, fmt.Errorf("error getting data from ipfs: %s", err)
+			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, pathMinusExtra)
 		}
 		defer it.Close()
 
-		bs, err := io.ReadAll(it)
+		buf := &bytes.Buffer{}
+		err = util.CopyMax(buf, it, 1024*1024*1024)
 		if err != nil {
-			return nil, fmt.Errorf("error reading data from ipfs: %s", err)
+			return nil, err
 		}
-		return bs, nil
+
+		return buf.Bytes(), nil
 	case persist.URITypeHTTP:
 
 		resp, err := client.Get(asString)
@@ -148,7 +150,8 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		defer resp.Body.Close()
 
 		buf := &bytes.Buffer{}
-		if _, err := io.Copy(buf, resp.Body); err != nil {
+		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
+		if err != nil {
 			return nil, err
 		}
 
@@ -165,7 +168,8 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		defer it.Close()
 		buf := &bytes.Buffer{}
-		if _, err = io.Copy(buf, it); err != nil {
+		err = util.CopyMax(buf, it, 1024*1024*1024)
+		if err != nil {
 			return nil, err
 		}
 
