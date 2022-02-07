@@ -302,16 +302,6 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 				continue
 			}
 
-			// t := time.Now()
-			// erc20, err := contracts.NewIERC20Caller(pLog.Address, ethClient)
-			// if err == nil {
-			// 	_, err := erc20.Allowance(&bind.CallOpts{}, common.HexToAddress(pLog.Topics[1].Hex()), common.HexToAddress(pLog.Topics[2].Hex()))
-			// 	if err == nil {
-			// 		continue
-			// 	}
-			// }
-			// logrus.Infof("Figured out if contract was ERC20 in %s", time.Since(t))
-
 			result = append(result, rpc.Transfer{
 				From:            persist.Address(pLog.Topics[1].Hex()),
 				To:              persist.Address(pLog.Topics[2].Hex()),

@@ -9,7 +9,6 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -30,9 +29,9 @@ import (
 	appimage "google.golang.org/appengine/image"
 )
 
-var videoMu = &sync.Mutex{}
-
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
+
+var downloadLock = &sync.Mutex{}
 
 type errUnsupportedURL struct {
 	url string
@@ -255,6 +254,8 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
+	downloadLock.Lock()
+	defer downloadLock.Unlock()
 	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient)
 	if err != nil {
 		return mediaType, err
@@ -330,28 +331,6 @@ func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {
 		return nil, err
 	}
 	return out.Bytes(), nil
-
-}
-
-func scaleVideo(pCtx context.Context, vid []byte, w, h int) ([]byte, error) {
-	testFile, err := os.CreateTemp("/tmp", "resize-*.mp4")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(testFile.Name())
-	defer testFile.Close()
-
-	videoMu.Lock()
-	defer videoMu.Unlock()
-
-	c := exec.Command("ffmpeg", "-y", "-i", "pipe:0", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "-f", "mp4", testFile.Name())
-
-	err = pipeIOForCmdNoOut(c, vid)
-	if err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(testFile)
 
 }
 

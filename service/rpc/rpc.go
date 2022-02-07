@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -251,6 +252,55 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, p
 	}
 
 	return bal, nil
+}
+
+// GetContractCreator returns the address of the contract creator
+func GetContractCreator(ctx context.Context, contractAddress persist.Address, ethClient *ethclient.Client) (persist.Address, error) {
+	highestBlock, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting highest block: %s", err.Error())
+	}
+	_, err = ethClient.CodeAt(ctx, contractAddress.Address(), big.NewInt(int64(highestBlock)))
+	if err != nil {
+		return "", fmt.Errorf("error getting code at: %s", err.Error())
+	}
+	lowestBlock := uint64(0)
+
+	for lowestBlock <= highestBlock {
+		midBlock := uint64((highestBlock + lowestBlock) / 2)
+		codeAt, err := ethClient.CodeAt(ctx, contractAddress.Address(), big.NewInt(int64(midBlock)))
+		if err != nil {
+			return "", fmt.Errorf("error getting code at: %s", err.Error())
+		}
+		if len(codeAt) > 0 {
+			highestBlock = midBlock
+		} else {
+			lowestBlock = midBlock
+		}
+
+		if lowestBlock+1 == highestBlock {
+			break
+		}
+	}
+	block, err := ethClient.BlockByNumber(ctx, big.NewInt(int64(highestBlock)))
+	if err != nil {
+		return "", fmt.Errorf("error getting block: %s", err.Error())
+	}
+	txs := block.Transactions()
+	for _, tx := range txs {
+		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
+		if err != nil {
+			return "", fmt.Errorf("error getting transaction receipt: %s", err.Error())
+		}
+		if receipt.ContractAddress == contractAddress.Address() {
+			msg, err := tx.AsMessage(types.HomesteadSigner{}, nil)
+			if err != nil {
+				return "", fmt.Errorf("error getting message: %s", err.Error())
+			}
+			return persist.Address(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
+		}
+	}
+	return "", fmt.Errorf("could not find contract creator")
 }
 
 func padHex(pHex string, pLength int) string {

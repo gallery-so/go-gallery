@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -24,6 +26,8 @@ import (
 )
 
 var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
+
+var mediaDownloadLock = &sync.Mutex{}
 
 // UpdateMediaInput is the input for the update media endpoint that will find all of the media content
 // for an addresses NFTs and cache it in a storage bucket
@@ -107,6 +111,8 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 		}
 		ginContext.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
+		updateByID := input.OwnerAddress != ""
+
 		tq.QueueTask(key, func() {
 			c, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -114,12 +120,12 @@ func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethCli
 			for i := 0; i < len(tokens); i++ {
 				select {
 				case update := <-updates:
-					if input.OwnerAddress != "" {
+					if updateByID {
 						if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
 							logrus.WithError(err).Error("failed to update token in database")
 							return
 						}
-					} else if input.ContractAddress != "" && input.TokenID != "" {
+					} else {
 						if err := tokenRepository.UpdateByTokenIdentifiersUnsafe(c, update.TokenID, update.ContractAddress, update.Update); err != nil {
 							logrus.WithError(err).Error("failed to update token in database")
 							return
@@ -159,7 +165,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 					errChan <- fmt.Errorf("failed to get token URI: %v", err)
 					return
 				}
-				uri = u
+				uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.String()))
 			}
 
 			if metadata == nil || len(metadata) == 0 {
@@ -213,7 +219,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			return
 		}
 
-		if err := processAccountForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient); err != nil {
+		if err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -280,26 +286,35 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 	}
 }
 
-func processAccountForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell) error {
+func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell) error {
 	for _, token := range tokens {
 		uriType := token.TokenURI.Type()
+		if uriType == persist.URITypeInvalid {
+			continue
+		}
 		needsUpdate := false
 		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown {
 			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
-			if err != nil {
-				return fmt.Errorf("failed to get token URI for token %s: %v", token.TokenID, err)
+			if err == nil {
+				token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.String()))
+				needsUpdate = true
+			} else {
+				logrus.Errorf("failed to get token URI for token %s: %v", token.TokenID, err)
+				continue
 			}
-			token.TokenURI = uri
-			needsUpdate = true
+
 		}
 
 		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {
 			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient)
-			if err != nil {
-				return fmt.Errorf("failed to get token metadata for token %s: %v", token.TokenID, err)
+			if err == nil {
+				token.TokenMetadata = metadata
+				needsUpdate = true
+			} else {
+				logrus.Errorf("failed to get token metadata for token %s: %v", token.TokenID, err)
+				continue
 			}
-			token.TokenMetadata = metadata
-			needsUpdate = true
+
 		}
 
 		if needsUpdate {

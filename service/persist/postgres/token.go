@@ -414,6 +414,7 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUs
 		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pq.Array(addresses))
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
+		// TODO this update has to update more than just media
 		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pID, pq.Array(addresses))
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -441,6 +442,7 @@ func (t *TokenRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, p
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
+		// TODO this update has to update more than just media
 		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
