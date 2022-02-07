@@ -121,6 +121,9 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
 		return fmt.Errorf("failed to claim NFTs: %w", err)
 	}
+	if err := collRepo.RemoveNFTsOfOldAddresses(pCtx, pUserID); err != nil {
+		return fmt.Errorf("failed to remove NFTs of old addresses: %w", err)
+	}
 
 	return nil
 }

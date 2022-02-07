@@ -36,7 +36,7 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 	}
 }
 
-func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
+func removeAddresses(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.RemoveUserAddressesInput{}
@@ -52,7 +52,7 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		err := user.RemoveAddressesFromUser(c, userID, input, userRepository, collRepo)
+		err := user.RemoveAddressesFromUser(c, userID, input, userRepository)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
