@@ -9,6 +9,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // GalleryRepository is the repository for interacting with galleries in a postgres database
@@ -208,9 +209,9 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 	collections := make(map[persist.DBID][]persist.Collection)
 	var gallery persist.Gallery
 	var collection persist.Collection
-	var nft persist.CollectionNFT
 	for rows.Next() {
 		lastCollID := collection.ID
+		var nft persist.CollectionNFT
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
@@ -226,22 +227,26 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 
 		colls, ok := collections[gallery.ID]
 		if !ok {
+			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
 			colls = make([]persist.Collection, 0, 10)
+		}
+
+		if lastCollID != collection.ID {
+			logrus.Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
+				logrus.Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
+			} else {
+				collection.NFTs = []persist.CollectionNFT{}
+				logrus.Infof("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
-			collections[gallery.ID] = colls
 		} else {
-			if lastCollID != collection.ID {
-				if nft.ID != "" {
-					collection.NFTs = []persist.CollectionNFT{nft}
-				}
-				colls = append(colls, collection)
-			} else {
-				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
-			}
+			lastColl := colls[len(colls)-1]
+			lastColl.NFTs = append(lastColl.NFTs, nft)
+			colls[len(colls)-1] = lastColl
 		}
+
 		collections[gallery.ID] = colls
 	}
 	if err := rows.Err(); err != nil {
@@ -270,6 +275,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 		return result, nil
 	}
+
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
@@ -297,8 +303,9 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 	collections := make(map[persist.DBID][]persist.Collection)
 	var gallery persist.Gallery
 	var collection persist.Collection
-	var nft persist.CollectionNFT
+
 	for rows.Next() {
+		var nft persist.CollectionNFT
 		lastCollID := collection.ID
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
@@ -312,24 +319,29 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
 		}
+
 		colls, ok := collections[gallery.ID]
 		if !ok {
+			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
 			colls = make([]persist.Collection, 0, 10)
+		}
+
+		if lastCollID != collection.ID {
+			logrus.Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
+				logrus.Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
+			} else {
+				collection.NFTs = []persist.CollectionNFT{}
+				logrus.Infof("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
-			collections[gallery.ID] = colls
 		} else {
-			if lastCollID != collection.ID {
-				if nft.ID != "" {
-					collection.NFTs = []persist.CollectionNFT{nft}
-				}
-				colls = append(colls, collection)
-			} else {
-				colls[len(colls)-1].NFTs = append(colls[len(colls)-1].NFTs, nft)
-			}
+			lastColl := colls[len(colls)-1]
+			lastColl.NFTs = append(lastColl.NFTs, nft)
+			colls[len(colls)-1] = lastColl
 		}
+
 		collections[gallery.ID] = colls
 	}
 	if err := rows.Err(); err != nil {
