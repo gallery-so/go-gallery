@@ -97,6 +97,13 @@ type NFTUpdateInfoInput struct {
 	CollectorsNote NullString `bson:"collectors_note"`
 }
 
+// NFTUpdateOwnerAddressInput represents an update to an NFTs owner address
+type NFTUpdateOwnerAddressInput struct {
+	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+
+	OwnerAddress Address `bson:"owner_address"`
+}
+
 // NFTRepository represents the interface for interacting with persisted NFTs
 type NFTRepository interface {
 	CreateBulk(context.Context, []NFT) ([]DBID, error)
@@ -107,6 +114,7 @@ type NFTRepository interface {
 	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
 	GetByOpenseaID(context.Context, NullInt64, Address) ([]NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
+	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	BulkUpsert(context.Context, DBID, []NFT) ([]DBID, error)
 	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
 	OpenseaCacheSet(context.Context, []Address, []NFT) error

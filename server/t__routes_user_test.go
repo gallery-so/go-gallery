@@ -270,12 +270,96 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 
 	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
-	assert.Len(res.NFTs, 1)
+	assert.Len(res.NFTs, 2)
 
 	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Len(user.Addresses, 1)
 
+}
+
+func TestUserRemoveAddresses_MoveNFTs_Success(t *testing.T) {
+	assert := setupTest(t, 1)
+
+	u := persist.User{
+		Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+		Username:           "TestUser",
+		UsernameIdempotent: "testuser",
+	}
+	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	assert.NoError(err)
+
+	nft := persist.NFT{
+		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+		Name:         "test",
+		OpenseaID:    2,
+	}
+	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+
+	nft2 := persist.NFT{
+		OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+		Name:         "blah",
+		OpenseaID:    1,
+	}
+	nftID2, err := tc.repos.nftRepository.Create(context.Background(), nft2)
+
+	coll := persist.CollectionDB{
+		NFTs:        []persist.DBID{nftID, nftID2},
+		Name:        "test-coll",
+		OwnerUserID: userID,
+	}
+	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	assert.NoError(err)
+
+	update := user.RemoveUserAddressesInput{
+		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+	}
+	j, err := cookiejar.New(nil)
+	client := &http.Client{Jar: j}
+	tu := &TestUser{
+		id:     userID,
+		jwt:    jwt,
+		client: client,
+	}
+	getFakeCookie(assert, jwt, client)
+
+	resp := userRemoveAddressesRequest(assert, update, tu)
+	assertValidJSONResponse(assert, resp)
+
+	errResp := &util.ErrorResponse{}
+	util.UnmarshallBody(errResp, resp.Body)
+	assert.Empty(errResp.Error)
+
+	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
+	assert.NoError(err)
+	assert.Len(nfts, 1)
+
+	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	assert.NoError(err)
+	assert.Len(res.NFTs, 2)
+
+	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	assert.NoError(err)
+	assert.Len(user.Addresses, 1)
+
+	err = tc.repos.nftRepository.UpdateByIDUnsafe(context.Background(), nftID2, persist.NFTUpdateOwnerAddressInput{
+		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+	})
+	assert.NoError(err)
+
+	newNFT2, err := tc.repos.nftRepository.GetByID(context.Background(), nftID2)
+	assert.NoError(err)
+	assert.Equal(newNFT2.OwnerAddress, persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")))
+
+	// This would happen in an opensea refresh
+	err = tc.repos.collectionRepository.RemoveNFTsOfOldAddresses(context.Background(), userID)
+	assert.NoError(err)
+
+	res, err = tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	assert.NoError(err)
+	assert.Len(res.NFTs, 0)
 }
 
 func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {

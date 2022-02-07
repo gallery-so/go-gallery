@@ -87,6 +87,7 @@ type CollectionRepository interface {
 	UpdateNFTs(context.Context, DBID, DBID, CollectionUpdateNftsInput) error
 	ClaimNFTs(context.Context, DBID, []Address, CollectionUpdateNftsInput) error
 	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
+	RemoveNFTsOfOldAddresses(context.Context, DBID) error
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (Collection, error)
 	RefreshUnassigned(context.Context, DBID) error

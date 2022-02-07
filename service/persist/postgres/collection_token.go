@@ -442,6 +442,32 @@ func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 	return nil
 }
 
+// RemoveNFTsOfOldAddresses removes nfts of addresses that a user no longer has
+func (c *CollectionTokenRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pUserID persist.DBID) error {
+	colls, err := c.GetByUserID(pCtx, pUserID, true)
+	if err != nil {
+		return err
+	}
+
+	var addresses []persist.Address
+	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses)); err != nil {
+		return err
+	}
+
+	for _, coll := range colls {
+		for _, nft := range coll.NFTs {
+			if !containsAddress(addresses, nft.OwnerAddress) {
+				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // Delete deletes a collection from the database
 func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBID, pUserID persist.DBID) error {
 	res, err := c.deleteCollectionStmt.ExecContext(pCtx, pID, pUserID)

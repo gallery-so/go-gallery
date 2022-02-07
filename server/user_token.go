@@ -151,7 +151,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 	}
 }
 
-func removeAddressesToken(userRepository persist.UserRepository, collRepo persist.CollectionTokenRepository) gin.HandlerFunc {
+func removeAddressesToken(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.RemoveUserAddressesInput{}
@@ -167,7 +167,7 @@ func removeAddressesToken(userRepository persist.UserRepository, collRepo persis
 			return
 		}
 
-		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository, collRepo)
+		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -194,24 +194,23 @@ func getNFTPreviewsToken(galleryRepository persist.GalleryTokenRepository, userR
 			return
 		}
 
-
 		c.JSON(http.StatusOK, getPreviewsForUserOutput{Previews: output})
 
 	}
 }
 func mergeUsers(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		  var input user.MergeUsersInput
-		  if err := c.ShouldBindJSON(&input); err != nil {
-  	    util.ErrResponse(c, http.StatusBadRequest, err)
-		  	return
-		  }
-      userID := auth.GetUserIDFromCtx(c)
+		var input user.MergeUsersInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+		userID := auth.GetUserIDFromCtx(c)
 
-		  if err := user.MergeUsers(c, userRepository, nonceRepository, userID, input, ethClient); err != nil {
-  	    util.ErrResponse(c, http.StatusInternalServerError, err)
-			  return
-		  }
-  	  c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-  	}
+		if err := user.MergeUsers(c, userRepository, nonceRepository, userID, input, ethClient); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
 }
