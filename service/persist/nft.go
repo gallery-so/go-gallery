@@ -92,16 +92,16 @@ type ContractCollectionNFT struct {
 // NFTUpdateInfoInput represents a MongoDB input to update the user defined info
 // associated with a given NFT in the DB
 type NFTUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 // NFTUpdateOwnerAddressInput represents an update to an NFTs owner address
 type NFTUpdateOwnerAddressInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	OwnerAddress Address `bson:"owner_address"`
+	OwnerAddress Address `json:"owner_address"`
 }
 
 // NFTRepository represents the interface for interacting with persisted NFTs

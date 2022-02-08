@@ -57,7 +57,7 @@ func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstor
 	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET LAST_UPDATED = $1, COLLECTORS_NOTE = $3 WHERE ID = $2 AND OWNER_ADDRESS = ANY($4);`)
+	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET LAST_UPDATED = $1, COLLECTORS_NOTE = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4);`)
 	checkNoErr(err)
 
 	updateOwnerAddressStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET OWNER_ADDRESS = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4);`)
@@ -247,7 +247,7 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 	switch pUpdate.(type) {
 	case persist.NFTUpdateInfoInput:
 		update := pUpdate.(persist.NFTUpdateInfoInput)
-		it, err := n.updateInfoStmt.ExecContext(pCtx, time.Now(), pID, update.CollectorsNote, pq.Array(userAddresses))
+		it, err := n.updateInfoStmt.ExecContext(pCtx, time.Now(), update.CollectorsNote, pID, pq.Array(userAddresses))
 		if err != nil {
 			return err
 		}
