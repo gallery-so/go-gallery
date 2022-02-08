@@ -38,6 +38,8 @@ const (
 	MediaTypeBase64SVG MediaType = "base64svg"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
+	// MediaTypeHTML represents html
+	MediaTypeHTML MediaType = "html"
 	// MediaTypeBase64Text represents a base64 encoded plain text
 	MediaTypeBase64Text MediaType = "base64text"
 	// MediaTypeAudio represents audio
@@ -248,13 +250,12 @@ type ErrTokenNotFoundByID struct {
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
-	var slice []byte
-	if len(buf) > 512 {
-		slice = buf[:512]
-	} else {
-		slice = buf
+
+	contentType := http.DetectContentType(buf)
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
 	}
-	contentType := http.DetectContentType(slice)
 	spl := strings.Split(contentType, "/")
 
 	switch spl[0] {
@@ -272,7 +273,12 @@ func SniffMediaType(buf []byte) MediaType {
 	case "audio":
 		return MediaTypeAudio
 	case "text":
-		return MediaTypeText
+		switch spl[1] {
+		case "html":
+			return MediaTypeHTML
+		default:
+			return MediaTypeText
+		}
 	default:
 		return MediaTypeUnknown
 	}
@@ -460,6 +466,21 @@ func (a Address) Address() common.Address {
 // Value implements the database/sql/driver Valuer interface for the address type
 func (a Address) Value() (driver.Value, error) {
 	return a.String(), nil
+}
+
+// MarshallJSON implements the json.Marshaller interface for the address type
+func (a Address) MarshallJSON() ([]byte, error) {
+	return json.Marshal(a.String())
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for the address type
+func (a *Address) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*a = Address(normalizeAddress(strings.ToLower(s)))
+	return nil
 }
 
 // Scan implements the database/sql Scanner interface
