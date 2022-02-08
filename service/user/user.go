@@ -291,7 +291,7 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
+	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -302,15 +302,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return errUserCannotRemoveAllAddresses
 	}
 
-	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	err = collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	return nil
+	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
@@ -389,7 +381,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository) error {
+	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -400,11 +392,8 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 		return errUserCannotRemoveAllAddresses
 	}
 
-	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
+
 }
 
 // GetUser returns a user by ID or address or username

@@ -338,9 +338,6 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 	}
 
 	if err := nftsToRemove.Err(); err != nil {
-		if err == sql.ErrNoRows {
-			return nil
-		}
 		return err
 	}
 
@@ -391,6 +388,32 @@ func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID p
 		_, err = c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft, pID)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveNFTsOfOldAddresses removes nfts of addresses that a user no longer has
+func (c *CollectionRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pUserID persist.DBID) error {
+	colls, err := c.GetByUserID(pCtx, pUserID, true)
+	if err != nil {
+		return err
+	}
+
+	var addresses []persist.Address
+	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses)); err != nil {
+		return err
+	}
+
+	for _, coll := range colls {
+		for _, nft := range coll.NFTs {
+			if !containsAddress(addresses, nft.OwnerAddress) {
+				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -466,4 +489,13 @@ func ensureNFTsOwnedByUser(pCtx context.Context, c *CollectionRepository, pUserI
 		return errNotOwnedByUser
 	}
 	return nil
+}
+
+func containsAddress(addresses []persist.Address, address persist.Address) bool {
+	for _, a := range addresses {
+		if a == address {
+			return true
+		}
+	}
+	return false
 }
