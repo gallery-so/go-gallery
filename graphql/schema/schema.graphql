@@ -180,12 +180,12 @@ type RefreshOpenSeaNftsPayload {
   wallet: Wallet
 }
 
-type LoginNonce {
+type AuthNonce {
   nonce: String
   userExists: Boolean
 }
 
-union GetAuthNoncePayload = LoginNonce | ErrAddressDoesNotOwnRequiredNFT
+union GetAuthNoncePayload = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
 
 type ErrAddressDoesNotOwnRequiredNFT implements Error {
   message: String!

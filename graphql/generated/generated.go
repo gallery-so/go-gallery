@@ -43,6 +43,11 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AuthNonce struct {
+		Nonce      func(childComplexity int) int
+		UserExists func(childComplexity int) int
+	}
+
 	CreateCollectionPayload struct {
 		Gallery func(childComplexity int) int
 	}
@@ -123,11 +128,6 @@ type ComplexityRoot struct {
 		Name                func(childComplexity int) int
 		Owner               func(childComplexity int) int
 		TokenCollectionName func(childComplexity int) int
-	}
-
-	LoginNonce struct {
-		Nonce      func(childComplexity int) int
-		UserExists func(childComplexity int) int
 	}
 
 	LoginResult struct {
@@ -255,6 +255,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AuthNonce.nonce":
+		if e.complexity.AuthNonce.Nonce == nil {
+			break
+		}
+
+		return e.complexity.AuthNonce.Nonce(childComplexity), true
+
+	case "AuthNonce.userExists":
+		if e.complexity.AuthNonce.UserExists == nil {
+			break
+		}
+
+		return e.complexity.AuthNonce.UserExists(childComplexity), true
 
 	case "CreateCollectionPayload.gallery":
 		if e.complexity.CreateCollectionPayload.Gallery == nil {
@@ -514,20 +528,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ImageNft.TokenCollectionName(childComplexity), true
-
-	case "LoginNonce.nonce":
-		if e.complexity.LoginNonce.Nonce == nil {
-			break
-		}
-
-		return e.complexity.LoginNonce.Nonce(childComplexity), true
-
-	case "LoginNonce.userExists":
-		if e.complexity.LoginNonce.UserExists == nil {
-			break
-		}
-
-		return e.complexity.LoginNonce.UserExists(childComplexity), true
 
 	case "LoginResult.address":
 		if e.complexity.LoginResult.Address == nil {
@@ -1148,12 +1148,12 @@ type RefreshOpenSeaNftsPayload {
   wallet: Wallet
 }
 
-type LoginNonce {
+type AuthNonce {
   nonce: String
   userExists: Boolean
 }
 
-union GetAuthNoncePayload = LoginNonce | ErrAddressDoesNotOwnRequiredNFT
+union GetAuthNoncePayload = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
 
 type ErrAddressDoesNotOwnRequiredNFT implements Error {
   message: String!
@@ -1553,6 +1553,70 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AuthNonce_nonce(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AuthNonce",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nonce, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field graphql.CollectedField, obj *model.AuthNonce) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AuthNonce",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserExists, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
 
 func (ec *executionContext) _CreateCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.CreateCollectionPayload) (ret graphql.Marshaler) {
 	defer func() {
@@ -2769,70 +2833,6 @@ func (ec *executionContext) _ImageNft_imageUrl(ctx context.Context, field graphq
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _LoginNonce_nonce(ctx context.Context, field graphql.CollectedField, obj *model.LoginNonce) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "LoginNonce",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Nonce, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _LoginNonce_userExists(ctx context.Context, field graphql.CollectedField, obj *model.LoginNonce) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "LoginNonce",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.UserExists, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _LoginResult_jwtToken(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
@@ -5914,13 +5914,13 @@ func (ec *executionContext) _GetAuthNoncePayload(ctx context.Context, sel ast.Se
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.LoginNonce:
-		return ec._LoginNonce(ctx, sel, &obj)
-	case *model.LoginNonce:
+	case model.AuthNonce:
+		return ec._AuthNonce(ctx, sel, &obj)
+	case *model.AuthNonce:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._LoginNonce(ctx, sel, obj)
+		return ec._AuthNonce(ctx, sel, obj)
 	case model.ErrAddressDoesNotOwnRequiredNft:
 		return ec._ErrAddressDoesNotOwnRequiredNFT(ctx, sel, &obj)
 	case *model.ErrAddressDoesNotOwnRequiredNft:
@@ -6114,6 +6114,41 @@ func (ec *executionContext) _ViewerPayload(ctx context.Context, sel ast.Selectio
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var authNonceImplementors = []string{"AuthNonce", "GetAuthNoncePayload"}
+
+func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet, obj *model.AuthNonce) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authNonceImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthNonce")
+		case "nonce":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._AuthNonce_nonce(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "userExists":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._AuthNonce_userExists(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
 
 var createCollectionPayloadImplementors = []string{"CreateCollectionPayload"}
 
@@ -6707,41 +6742,6 @@ func (ec *executionContext) _ImageNft(ctx context.Context, sel ast.SelectionSet,
 		case "imageUrl":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ImageNft_imageUrl(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var loginNonceImplementors = []string{"LoginNonce", "GetAuthNoncePayload"}
-
-func (ec *executionContext) _LoginNonce(ctx context.Context, sel ast.SelectionSet, obj *model.LoginNonce) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, loginNonceImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("LoginNonce")
-		case "nonce":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LoginNonce_nonce(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "userExists":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LoginNonce_userExists(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

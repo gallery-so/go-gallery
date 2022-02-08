@@ -46,6 +46,13 @@ type ViewerPayload interface {
 	IsViewerPayload()
 }
 
+type AuthNonce struct {
+	Nonce      *string `json:"nonce"`
+	UserExists *bool   `json:"userExists"`
+}
+
+func (AuthNonce) IsGetAuthNoncePayload() {}
+
 type CreateCollectionInput struct {
 	GalleryID      string                        `json:"galleryId"`
 	Name           *string                       `json:"name"`
@@ -177,13 +184,6 @@ type ImageNft struct {
 func (ImageNft) IsNftInterface() {}
 func (ImageNft) IsNode()         {}
 func (ImageNft) IsNft()          {}
-
-type LoginNonce struct {
-	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"userExists"`
-}
-
-func (LoginNonce) IsGetAuthNoncePayload() {}
 
 type LoginResult struct {
 	JwtToken *string `json:"jwtToken"`

@@ -52,7 +52,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
 	authed := gc.GetBool(auth.AuthContextKey)
 
-	output, err := auth.GetLoginNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
+	output, err := auth.GetAuthNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
 
 	if err != nil {
 		// Map known errors to GraphQL return types

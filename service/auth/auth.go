@@ -354,9 +354,9 @@ func VerifySignature(pSignatureStr string,
 
 }
 
-// GetLoginNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.LoginNonce, error) {
+// GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
+func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.AuthNonce, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
@@ -365,7 +365,7 @@ func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bo
 
 	userExistsBool := user.ID != ""
 
-	output := model.LoginNonce{
+	output := model.AuthNonce{
 		UserExists: &userExistsBool,
 	}
 
@@ -418,11 +418,11 @@ func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bo
 	return &output, nil
 }
 
-// GetLoginNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetLoginNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
+// GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
+func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
 
-	gqlOutput, err := GetLoginNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
+	gqlOutput, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
 	if err != nil {
 		return nil, err
 	}
