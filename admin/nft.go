@@ -18,7 +18,8 @@ type getNFTsInput struct {
 }
 
 type refreshNFTsInput struct {
-	UserID persist.DBID `form:"user_id" binding:"required"`
+	UserIDs   []persist.DBID    `json:"user_ids"`
+	Addresses []persist.Address `json:"addresses"`
 }
 
 func getNFTs(nftRepo persist.NFTRepository) gin.HandlerFunc {
@@ -58,15 +59,26 @@ func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserReposito
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		user, err := userRepo.GetByID(c, input.UserID)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+		if input.UserIDs != nil && len(input.UserIDs) > 0 {
+			for _, userID := range input.UserIDs {
+				user, err := userRepo.GetByID(c, userID)
+				if err != nil {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
+				err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo)
+				if err != nil {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
+			}
+		} else if input.Addresses != nil && len(input.Addresses) > 0 {
+			for _, address := range input.Addresses {
+				if _, err := opensea.UpdateAssetsForWallet(c, []persist.Address{address}, nftRepo); err != nil {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
+			}
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
