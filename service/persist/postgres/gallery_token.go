@@ -182,7 +182,7 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 		if err != nil {
 			return err
 		}
-		galleryCollIDs = append(galleryCollIDs, pCollections...)
+		galleryCollIDs = append(pCollections, galleryCollIDs...)
 
 		allColls, err := addUnaccountedForCollectionsToken(pCtx, g, pUserID, galleryCollIDs)
 		if err != nil {
