@@ -163,7 +163,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		if err != nil {
 			return err
 		}
-		galleryCollIDs = append(galleryCollIDs, pCollections...)
+		galleryCollIDs = append(pCollections, galleryCollIDs...)
 
 		allColls, err := addUnaccountedForCollections(pCtx, g, pUserID, galleryCollIDs)
 		if err != nil {
