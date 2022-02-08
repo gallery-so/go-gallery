@@ -69,6 +69,7 @@ type CollectionNFT struct {
 	ImageThumbnailURL    NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURL      NullString `bson:"image_preview_url"   json:"image_preview_url"`
 	AnimationOriginalURL NullString `bson:"animation_original_url" json:"animation_original_url"`
+	AnimationURL         NullString `bson:"animation_url" json:"animation_url"`
 }
 
 // NFTContract represents a smart contract's information for a given NFT
