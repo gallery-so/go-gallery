@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"net/http"
 	"strings"
 	"time"
@@ -90,7 +91,7 @@ type errUserNotFound struct {
 type errNonceNotFound struct {
 	address persist.Address
 }
-type errUserExistsWithAddress struct {
+type ErrUserExistsWithAddress struct {
 	address persist.Address
 }
 
@@ -108,7 +109,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		return CreateUserOutput{}, errNonceNotFound{address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, errUserExistsWithAddress{address: pInput.Address}
+		return CreateUserOutput{}, ErrUserExistsWithAddress{address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -194,7 +195,92 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (CreateUserOutput, error) {
+func CreateUser(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType auth.WalletType, userRepo persist.UserRepository,
+	nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (*model.CreateUserResult, error) {
+
+	address := persist.Address(pAddress)
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, address, userRepo, nonceRepo)
+	if nonce == "" {
+		return nil, errNonceNotFound{address}
+	}
+	if id != "" {
+		return nil, ErrUserExistsWithAddress{address: address}
+	}
+
+	if pWalletType != auth.WalletTypeEOA {
+		if auth.NewNoncePrepend+nonce != pNonce && auth.NoncePrepend+nonce != pNonce {
+			return nil, auth.ErrNonceMismatch
+		}
+	}
+
+	sigValidBool, err := auth.VerifySignatureAllMethods(pSignature,
+		nonce,
+		address, pWalletType, ethClient)
+	if err != nil {
+		return nil, auth.ErrSignatureVerificationFailed{WrappedErr: err}
+	}
+
+	if !sigValidBool {
+		return nil, auth.ErrSignatureVerificationFailed{WrappedErr: auth.ErrSignatureInvalid}
+	}
+
+	user := persist.User{
+		Addresses: []persist.Address{address},
+	}
+
+	userID, err := userRepo.Create(pCtx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		// user has been created successfully, validate that the user's NFTs are valid and have cached media content
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := validateNFTsForUser(ctx, userID)
+			if err != nil {
+				logrus.WithError(err).Error("validateNFTsForUser")
+			}
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			err := ensureMediaContent(ctx, address)
+			if err != nil {
+				logrus.WithError(err).Error("ensureMediaForUser")
+			}
+		}()
+	}()
+
+	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = auth.NonceRotate(pCtx, address, userID, nonceRepo)
+	if err != nil {
+		return nil, err
+	}
+
+	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+
+	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
+	if err != nil {
+		return nil, err
+	}
+
+	output := model.CreateUserResult{
+		JwtToken:  &jwtTokenStr,
+		UserID:    util.StringToPointer(userID.String()),
+		GalleryID: util.StringToPointer(galleryID.String()),
+	}
+
+	return &output, nil
+}
+
+// CreateUserREST creates a new user
+func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (CreateUserOutput, error) {
 
 	output := CreateUserOutput{}
 
@@ -203,7 +289,7 @@ func CreateUser(pCtx context.Context, pInput AddUserAddressesInput, userRepo per
 		return CreateUserOutput{}, errNonceNotFound{pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, errUserExistsWithAddress{address: pInput.Address}
+		return CreateUserOutput{}, ErrUserExistsWithAddress{address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -314,7 +400,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		return AddUserAddressOutput{}, errNonceNotFound{pInput.Address}
 	}
 	if userID != "" {
-		return AddUserAddressOutput{}, errUserExistsWithAddress{pInput.Address}
+		return AddUserAddressOutput{}, ErrUserExistsWithAddress{pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -592,7 +678,7 @@ func (e errNonceNotFound) Error() string {
 	return fmt.Sprintf("nonce not found for address: %s", e.address)
 }
 
-func (e errUserExistsWithAddress) Error() string {
+func (e ErrUserExistsWithAddress) Error() string {
 	return fmt.Sprintf("user already exists with address: %s", e.address)
 }
 

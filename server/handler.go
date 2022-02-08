@@ -30,11 +30,12 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *et
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client) {
-	// TODO: Need to look at auth more closely, but using AuthOptional for initial resolvers (preflight and login)
-	parent.POST("/query", middleware.AuthOptional(), graphqlHandler(repos, ethClient))
-
-	// TODO: Consider completely disabling introspection in production
 	if viper.GetString("ENV") != "production" {
+		// Keep graphql route out of prod while it's under development
+		// TODO: Need to look at auth more closely, but using AuthOptional for initial resolvers (preflight and login)
+		parent.POST("/query", middleware.AuthOptional(), graphqlHandler(repos, ethClient))
+
+		// TODO: Consider completely disabling introspection in production
 		parent.GET("/playground", graphqlPlaygroundHandler())
 	}
 }

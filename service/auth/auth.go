@@ -64,6 +64,9 @@ var ErrNoJWT = errors.New("no jwt passed as cookie")
 // ErrInvalidAuthHeader is returned when the auth header is invalid
 var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 
+// ErrSignatureInvalid is returned when the signed nonce's signature is invalid
+var ErrSignatureInvalid = errors.New("signature invalid")
+
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
 // LoginInput is the input to the login pipeline
@@ -93,11 +96,23 @@ type GetPreflightOutput struct {
 	UserExists bool   `json:"user_exists"`
 }
 
-type errAddressDoesNotOwnRequiredNFT struct {
+type ErrSignatureVerificationFailed struct {
+	WrappedErr error
+}
+
+func (e ErrSignatureVerificationFailed) Unwrap() error {
+	return e.WrappedErr
+}
+
+func (e ErrSignatureVerificationFailed) Error() string {
+	return fmt.Sprintf("signature verification failed: %s", e.WrappedErr.Error())
+}
+
+type ErrAddressDoesNotOwnRequiredNFT struct {
 	address persist.Address
 }
 
-func (e errAddressDoesNotOwnRequiredNFT) Error() string {
+func (e ErrAddressDoesNotOwnRequiredNFT) Error() string {
 	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
 }
 
@@ -130,16 +145,11 @@ func LoginAndRecordAttemptREST(pCtx context.Context, pInput LoginInput,
 		return LoginOutput{}, err
 	}
 
-	// TODO: Current handling returns nil pointers for all other fields if the signature is not valid.
-	// Rework this to use an explicit SignatureInvalid error instead.
 	output := LoginOutput{
-		SignatureValid: *gqlOutput.SignatureValid,
-	}
-
-	if output.SignatureValid {
-		output.JWTtoken = *gqlOutput.JwtToken
-		output.UserID = persist.DBID(*gqlOutput.UserID)
-		output.Address = persist.Address(*gqlOutput.Address)
+		SignatureValid: true,
+		JWTtoken:       *gqlOutput.JwtToken,
+		UserID:         persist.DBID(*gqlOutput.UserID),
+		Address:        persist.Address(*gqlOutput.Address),
 	}
 
 	return output, nil
@@ -148,18 +158,25 @@ func LoginAndRecordAttemptREST(pCtx context.Context, pInput LoginInput,
 // LoginAndRecordAttempt will run the login pipeline and memorize the result
 func LoginAndRecordAttempt(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (*model.LoginPayload, error) {
+	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (*model.LoginResult, error) {
+
+	signatureValid := true
 
 	output, err := Login(pCtx, pAddress, pNonce, pSignature, pWalletType, userRepo, nonceRepo, ec)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, ErrSignatureInvalid) {
+			return nil, err
+		}
+
+		signatureValid = false
 	}
 
 	loginAttempt := persist.UserLoginAttempt{
-
+		// TODO: It might be nice to store any returned login error instead of just storing a SignatureValid bool,
+		// since any other signature verification or login errors won't currently be stored.
 		Address:        persist.Address(pAddress),
 		Signature:      persist.NullString(pSignature),
-		SignatureValid: persist.NullBool(*output.SignatureValid),
+		SignatureValid: persist.NullBool(signatureValid),
 
 		ReqHostAddr: persist.NullString(pReq.RemoteAddr),
 		ReqHeaders:  persist.ReqHeaders(pReq.Header),
@@ -175,7 +192,7 @@ func LoginAndRecordAttempt(pCtx context.Context, pAddress string, pNonce string,
 
 // Login logs in a user by validating their signed nonce
 func Login(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ec *ethclient.Client) (*model.LoginPayload, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ec *ethclient.Client) (*model.LoginResult, error) {
 
 	address := persist.Address(pAddress)
 	nonce, userID, err := GetUserWithNonce(pCtx, address, userRepo, nonceRepo)
@@ -193,32 +210,27 @@ func Login(pCtx context.Context, pAddress string, pNonce string, pSignature stri
 		nonce,
 		address, pWalletType, ec)
 	if err != nil {
-		return nil, err
+		return nil, ErrSignatureVerificationFailed{err}
 	}
 
-	// TODO: Rework this to return a nil LoginPayload and an explicit SignatureInvalid error
-	output := model.LoginPayload{
-		SignatureValid: &sigValid,
-	}
-
-	output.SignatureValid = &sigValid
 	if !sigValid {
-		return &output, nil
+		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
-
-	output.UserID = util.StringToPointer(userID.String())
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	output.JwtToken = &jwtTokenStr
-	output.Address = &pAddress
-
 	err = NonceRotate(pCtx, address, userID, nonceRepo)
 	if err != nil {
 		return nil, err
+	}
+
+	output := model.LoginResult{
+		JwtToken: &jwtTokenStr,
+		UserID:   util.StringToPointer(userID.String()),
+		Address:  &pAddress,
 	}
 
 	return &output, nil
@@ -344,7 +356,7 @@ func VerifySignature(pSignatureStr string,
 
 // GetLoginNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
 func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.GetLoginNoncePayload, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.LoginNonce, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
@@ -353,7 +365,7 @@ func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bo
 
 	userExistsBool := user.ID != ""
 
-	output := model.GetLoginNoncePayload{
+	output := model.LoginNonce{
 		UserExists: &userExistsBool,
 	}
 
@@ -375,7 +387,7 @@ func GetLoginNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bo
 				}
 			}
 			if !has {
-				return nil, errAddressDoesNotOwnRequiredNFT{pAddress}
+				return nil, ErrAddressDoesNotOwnRequiredNFT{pAddress}
 			}
 
 		}

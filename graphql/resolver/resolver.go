@@ -2,11 +2,9 @@ package graphql
 
 import (
 	"context"
-	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // Add gqlgen to "go generate"
@@ -23,20 +21,18 @@ type Resolver struct {
 	EthClient *ethclient.Client
 }
 
-func GinContextFromContext(ctx context.Context) (*gin.Context, error) {
+// GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
+// or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
+func GinContextFromContext(ctx context.Context) *gin.Context {
 	ginContext := ctx.Value(GinContextKey)
 	if ginContext == nil {
-		err := fmt.Errorf("gin.Context not found in current context")
-		logrus.Errorf("could not retrieve gin.Context: %v", err)
-		return nil, err
+		panic("gin.Context not found in current context")
 	}
 
 	gc, ok := ginContext.(*gin.Context)
 	if !ok {
-		err := fmt.Errorf("gin.Context has wrong type")
-		logrus.Errorf("could not retrieve gin.Context: %v", err)
-		return nil, err
+		panic("gin.Context has wrong type")
 	}
 
-	return gc, nil
+	return gc
 }

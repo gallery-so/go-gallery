@@ -45,23 +45,22 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context) (*model.Refre
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) GetLoginNonce(ctx context.Context, address string) (*model.GetLoginNoncePayload, error) {
-	gc, err := GinContextFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayload, error) {
+	gc := GinContextFromContext(ctx)
 
 	// TODO: This currently gets its value from the AuthOptional middleware applied to the entire GraphQL endpoint,
 	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
 	authed := gc.GetBool(auth.AuthContextKey)
 
 	output, err := auth.GetLoginNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
+
 	if err != nil {
-		// TODO: Map errors to GraphQL types
-		//status := http.StatusInternalServerError
-		//if _, ok := err.(persist.ErrNonceNotFoundForAddress); ok {
-		//	status = http.StatusNotFound
-		//}
+		// Map known errors to GraphQL return types
+		if errorType, ok := r.ErrorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.GetAuthNoncePayload); ok {
+				return returnType, nil
+			}
+		}
 
 		gc.Error(err)
 		return nil, err
@@ -70,38 +69,20 @@ func (r *mutationResolver) GetLoginNonce(ctx context.Context, address string) (*
 	return output, nil
 }
 
-func (r *mutationResolver) LoginWithEoa(ctx context.Context, address string, nonce string, signature string) (*model.LoginPayload, error) {
-	gc, err := GinContextFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	output, err := auth.LoginAndRecordAttempt(ctx, address, nonce, signature, auth.WalletTypeEOA, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
-	if err != nil {
-		gc.Error(err)
-		return nil, err
-	}
-
-	auth.SetJWTCookie(gc, *output.JwtToken)
-
-	return output, nil
+func (r *mutationResolver) CreateUserWithEoa(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error) {
+	return r.CreateUserWithEthereum(ctx, address, nonce, signature, auth.WalletTypeEOA)
 }
 
-func (r *mutationResolver) LoginWithSmartContract(ctx context.Context, address string, nonce string, signature string) (*model.LoginPayload, error) {
-	gc, err := GinContextFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (r *mutationResolver) CreateUserWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error) {
+	return r.CreateUserWithEthereum(ctx, address, nonce, signature, auth.WalletTypeGnosis)
+}
 
-	output, err := auth.LoginAndRecordAttempt(ctx, address, nonce, signature, auth.WalletTypeGnosis, gc.Request, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.LoginRepository, r.EthClient)
-	if err != nil {
-		gc.Error(err)
-		return nil, err
-	}
+func (r *mutationResolver) LoginWithEoa(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error) {
+	return r.LoginWithEthereum(ctx, address, nonce, signature, auth.WalletTypeEOA)
+}
 
-	auth.SetJWTCookie(gc, *output.JwtToken)
-
-	return output, nil
+func (r *mutationResolver) LoginWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error) {
+	return r.LoginWithEthereum(ctx, address, nonce, signature, auth.WalletTypeGnosis)
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error) {

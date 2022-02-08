@@ -4,6 +4,10 @@ interface Node {
   id: ID!
 }
 
+interface Error {
+  message: String!
+}
+
 type GalleryUser implements Node {
   id: ID!
   username: String
@@ -73,11 +77,7 @@ type Gallery implements Node {
   collections: [GalleryCollection]
 }
 
-type NotFound {
-  message: String!
-}
-
-union GalleryByUsernamePayload = Gallery | NotFound
+union GalleryByUsernamePayload = Gallery | ErrUserNotFound
 
 type MembershipTierOwner implements Node {
   id: ID!
@@ -94,14 +94,6 @@ type MembershipTier implements Node {
   owners: [MembershipTierOwner]
 }
 
-type SessionExpired {
-  message: String!
-}
-
-type MissingCookie {
-  message: String!
-}
-
 # We have this extra type in case we need to stick authed data
 # in here one day.
 type ViewerGallery {
@@ -113,9 +105,9 @@ type Viewer {
   wallets: [Wallet]
   viewerGallery: ViewerGallery
 }
-union GalleryByUserPayload = GalleryUser | NotFound
+union GalleryByUserPayload = GalleryUser | ErrUserNotFound
 
-union ViewerPayload = Viewer | MissingCookie | SessionExpired
+union ViewerPayload = Viewer | ErrMissingCookie | ErrSessionExpired
 
 type Query {
   viewer: ViewerPayload
@@ -188,17 +180,51 @@ type RefreshOpenSeaNftsPayload {
   wallet: Wallet
 }
 
-type GetLoginNoncePayload {
+type LoginNonce {
   nonce: String
   userExists: Boolean
 }
 
-type LoginPayload {
-  signatureValid: Boolean
+union GetAuthNoncePayload = LoginNonce | ErrAddressDoesNotOwnRequiredNFT
+
+type ErrAddressDoesNotOwnRequiredNFT implements Error {
+  message: String!
+}
+
+type ErrSignatureVerificationFailed implements Error {
+  message: String!
+}
+
+type ErrUserExistsWithAddress implements Error {
+  message: String!
+}
+
+type ErrSessionExpired implements Error {
+  message: String!
+}
+
+type ErrMissingCookie implements Error {
+  message: String!
+}
+
+type ErrUserNotFound implements Error {
+  message: String!
+}
+
+type LoginResult {
   jwtToken: String # probably not needed anymore?
   userId: ID
   address: String
 }
+
+type CreateUserResult {
+  jwtToken: String # probably not needed anymore?
+  userId: ID
+  galleryId: String
+}
+
+union LoginPayload = LoginResult | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union CreateUserPayload = CreateUserResult | ErrUserExistsWithAddress | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
 
 type Mutation {
   # Collection Mutations
@@ -218,7 +244,13 @@ type Mutation {
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
-  getLoginNonce(address: String!): GetLoginNoncePayload
+  getAuthNonce(address: String!): GetAuthNoncePayload
+
+  # Create user with wallet type 0
+  createUserWithEOA(address: String!, nonce: String!, signature: String!): CreateUserPayload
+
+  # Create user with wallet type 1
+  createUserWithSmartContract(address: String!, nonce: String!, signature: String!): CreateUserPayload
 
   # Login with wallet type 0
   loginWithEOA(address: String!, nonce: String!, signature: String!): LoginPayload

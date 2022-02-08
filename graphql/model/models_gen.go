@@ -6,12 +6,28 @@ type AddressOrGalleryUser interface {
 	IsAddressOrGalleryUser()
 }
 
+type CreateUserPayload interface {
+	IsCreateUserPayload()
+}
+
+type Error interface {
+	IsError()
+}
+
 type GalleryByUserPayload interface {
 	IsGalleryByUserPayload()
 }
 
 type GalleryByUsernamePayload interface {
 	IsGalleryByUsernamePayload()
+}
+
+type GetAuthNoncePayload interface {
+	IsGetAuthNoncePayload()
+}
+
+type LoginPayload interface {
+	IsLoginPayload()
 }
 
 type Nft interface {
@@ -42,9 +58,64 @@ type CreateCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
 
+type CreateUserResult struct {
+	JwtToken  *string `json:"jwtToken"`
+	UserID    *string `json:"userId"`
+	GalleryID *string `json:"galleryId"`
+}
+
+func (CreateUserResult) IsCreateUserPayload() {}
+
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
+
+type ErrAddressDoesNotOwnRequiredNft struct {
+	Message string `json:"message"`
+}
+
+func (ErrAddressDoesNotOwnRequiredNft) IsGetAuthNoncePayload() {}
+func (ErrAddressDoesNotOwnRequiredNft) IsError()               {}
+func (ErrAddressDoesNotOwnRequiredNft) IsLoginPayload()        {}
+func (ErrAddressDoesNotOwnRequiredNft) IsCreateUserPayload()   {}
+
+type ErrMissingCookie struct {
+	Message string `json:"message"`
+}
+
+func (ErrMissingCookie) IsViewerPayload() {}
+func (ErrMissingCookie) IsError()         {}
+
+type ErrSessionExpired struct {
+	Message string `json:"message"`
+}
+
+func (ErrSessionExpired) IsViewerPayload() {}
+func (ErrSessionExpired) IsError()         {}
+
+type ErrSignatureVerificationFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrSignatureVerificationFailed) IsError()             {}
+func (ErrSignatureVerificationFailed) IsLoginPayload()      {}
+func (ErrSignatureVerificationFailed) IsCreateUserPayload() {}
+
+type ErrUserExistsWithAddress struct {
+	Message string `json:"message"`
+}
+
+func (ErrUserExistsWithAddress) IsError()             {}
+func (ErrUserExistsWithAddress) IsCreateUserPayload() {}
+
+type ErrUserNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrUserNotFound) IsGalleryByUsernamePayload() {}
+func (ErrUserNotFound) IsGalleryByUserPayload()     {}
+func (ErrUserNotFound) IsError()                    {}
+func (ErrUserNotFound) IsLoginPayload()             {}
 
 type Gallery struct {
 	ID          string               `json:"id"`
@@ -95,11 +166,6 @@ func (GalleryUser) IsNode()                 {}
 func (GalleryUser) IsAddressOrGalleryUser() {}
 func (GalleryUser) IsGalleryByUserPayload() {}
 
-type GetLoginNoncePayload struct {
-	Nonce      *string `json:"nonce"`
-	UserExists *bool   `json:"userExists"`
-}
-
 type ImageNft struct {
 	ID                  string               `json:"id"`
 	Name                *string              `json:"name"`
@@ -112,12 +178,20 @@ func (ImageNft) IsNftInterface() {}
 func (ImageNft) IsNode()         {}
 func (ImageNft) IsNft()          {}
 
-type LoginPayload struct {
-	SignatureValid *bool   `json:"signatureValid"`
-	JwtToken       *string `json:"jwtToken"`
-	UserID         *string `json:"userId"`
-	Address        *string `json:"address"`
+type LoginNonce struct {
+	Nonce      *string `json:"nonce"`
+	UserExists *bool   `json:"userExists"`
 }
+
+func (LoginNonce) IsGetAuthNoncePayload() {}
+
+type LoginResult struct {
+	JwtToken *string `json:"jwtToken"`
+	UserID   *string `json:"userId"`
+	Address  *string `json:"address"`
+}
+
+func (LoginResult) IsLoginPayload() {}
 
 type MembershipTier struct {
 	ID       string                 `json:"id"`
@@ -137,19 +211,6 @@ type MembershipTierOwner struct {
 
 func (MembershipTierOwner) IsNode() {}
 
-type MissingCookie struct {
-	Message string `json:"message"`
-}
-
-func (MissingCookie) IsViewerPayload() {}
-
-type NotFound struct {
-	Message string `json:"message"`
-}
-
-func (NotFound) IsGalleryByUsernamePayload() {}
-func (NotFound) IsGalleryByUserPayload()     {}
-
 type RefreshOpenSeaNftsPayload struct {
 	Wallet *Wallet `json:"wallet"`
 }
@@ -157,12 +218,6 @@ type RefreshOpenSeaNftsPayload struct {
 type RemoveUserAddressPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
-
-type SessionExpired struct {
-	Message string `json:"message"`
-}
-
-func (SessionExpired) IsViewerPayload() {}
 
 type UpdateCollectionInfoInput struct {
 	CollectionID   string  `json:"collectionId"`
