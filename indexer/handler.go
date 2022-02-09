@@ -13,7 +13,7 @@ func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenR
 	router.GET("/status", getStatus(i, tokenRepository))
 
 	mediaGroup := router.Group("/media")
-	mediaGroup.POST("/update", updateMedia(tq, tokenRepository, ethClient, ipfsClient, storageClient))
+	mediaGroup.POST("/update", updateMedia(tokenRepository, ethClient, ipfsClient, storageClient))
 
 	nftsGroup := router.Group("/nfts")
 	nftsGroup.POST("/validate", validateUsersNFTs(tokenRepository, contractRepository, userRepository, ethClient, ipfsClient, storageClient))

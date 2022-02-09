@@ -20,7 +20,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
@@ -81,67 +80,55 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 	}
 }
 
-func updateMedia(tq *task.Queue, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client) gin.HandlerFunc {
-	return func(ginContext *gin.Context) {
+func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		input := UpdateMediaInput{}
-		if err := ginContext.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(ginContext, http.StatusBadRequest, err)
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
 		var tokens []persist.Token
-		var key string
+		var err error
 		if input.OwnerAddress != "" {
-			t, err := tokenRepository.GetByWallet(ginContext, input.OwnerAddress, -1, -1)
-			if err != nil {
-				util.ErrResponse(ginContext, http.StatusInternalServerError, err)
-				return
-			}
-			tokens = t
-			key = input.OwnerAddress.String()
+			tokens, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
 		} else if input.TokenID != "" && input.ContractAddress != "" {
-			t, err := tokenRepository.GetByTokenIdentifiers(ginContext, input.TokenID, input.ContractAddress, 1, 0)
-			if err != nil {
-				util.ErrResponse(ginContext, http.StatusInternalServerError, err)
-				return
-			}
-			tokens = t
-			key = persist.NewTokenIdentifiers(input.ContractAddress, input.TokenID).String()
+			tokens, err = tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
 		} else {
-			util.ErrResponse(ginContext, http.StatusBadRequest, errInvalidUpdateMediaInput)
+			util.ErrResponse(c, http.StatusBadRequest, errInvalidUpdateMediaInput)
 			return
 		}
-		ginContext.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 		updateByID := input.OwnerAddress != ""
 
-		tq.QueueTask(key, func() {
-			c, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, storageClient)
-			for i := 0; i < len(tokens); i++ {
-				select {
-				case update := <-updates:
-					if updateByID {
-						if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
-							logrus.WithError(err).Error("failed to update token in database")
-							return
-						}
-					} else {
-						if err := tokenRepository.UpdateByTokenIdentifiersUnsafe(c, update.TokenID, update.ContractAddress, update.Update); err != nil {
-							logrus.WithError(err).Error("failed to update token in database")
-							return
-						}
+		updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, storageClient)
+		for i := 0; i < len(tokens); i++ {
+			select {
+			case update := <-updates:
+				if updateByID {
+					if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
+						logrus.WithError(err).Error("failed to update token in database")
+						util.ErrResponse(c, http.StatusInternalServerError, err)
+						return
 					}
-				case err := <-errChan:
-					if err != nil {
-						logrus.WithError(err).Error("failed to update media for token")
+				} else {
+					if err := tokenRepository.UpdateByTokenIdentifiersUnsafe(c, update.TokenID, update.ContractAddress, update.Update); err != nil {
+						logrus.WithError(err).Error("failed to update token in database")
+						util.ErrResponse(c, http.StatusInternalServerError, err)
+						return
 					}
 				}
-
+			case err := <-errChan:
+				if err != nil {
+					logrus.WithError(err).Error("failed to update media for token")
+				}
 			}
+		}
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
-		})
 	}
 }
 
@@ -154,9 +141,8 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
-			med := token.Media
 
-			if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || med.MediaType == persist.MediaTypeInvalid {
+			if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || token.Media.MediaType == persist.MediaTypeInvalid {
 				errChan <- nil
 				return
 			}
@@ -179,13 +165,10 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 				metadata = md
 			}
 
-			if med.MediaType == "" && med.MediaURL == "" {
-				m, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, storageClient)
-				if err != nil {
-					errChan <- fmt.Errorf("failed to make media for token %s: %v", token.TokenID, err)
-					return
-				}
-				med = m
+			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, storageClient)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to make media for token %s: %v", token.TokenID, err)
+				return
 			}
 
 			updateChan <- tokenUpdateMedia{

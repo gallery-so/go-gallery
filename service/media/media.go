@@ -68,32 +68,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	res := persist.Media{}
 
-	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
-	if err == nil {
-		res.ThumbnailURL = persist.NullString(imageURL + "=256")
-		res.PreviewURL = persist.NullString(imageURL + "=512")
-		res.MediaURL = persist.NullString(imageURL + "=s1024")
-		res.MediaType = persist.MediaTypeImage
-		return res, nil
-	}
-
-	videoURL, err := getVideoURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
-	if err == nil {
-		if imageURL != "" {
-			res.ThumbnailURL = persist.NullString(imageURL + "=256")
-			res.PreviewURL = persist.NullString(imageURL + "=512")
-		} else {
-			thumbnail, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-			if err == nil {
-				res.ThumbnailURL = persist.NullString(thumbnail + "=256")
-				res.PreviewURL = persist.NullString(thumbnail + "=512")
-			}
-		}
-
-		res.MediaURL = persist.NullString(videoURL)
-		res.MediaType = persist.MediaTypeVideo
-	}
-
 	imgURL := ""
 	vURL := ""
 
@@ -170,7 +144,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	switch mediaType {
 	case persist.MediaTypeImage:
-		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
 			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
 			res.PreviewURL = persist.NullString(imageURL + "=s512")
@@ -179,7 +153,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			logrus.WithError(err).Error("could not get image serving URL")
 		}
 	case persist.MediaTypeVideo:
-		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
 			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
 			res.PreviewURL = persist.NullString(imageURL + "=s512")
@@ -193,10 +167,31 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 		res.MediaURL = persist.NullString(vURL)
+	case persist.MediaTypeAudio, persist.MediaTypeHTML:
+		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+		if err == nil {
+			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
+			res.PreviewURL = persist.NullString(imageURL + "=s512")
+		} else {
+			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+			if err == nil {
+				res.ThumbnailURL = persist.NullString(imageURL + "=s256")
+				res.PreviewURL = persist.NullString(imageURL + "=s512")
+			} else {
+				logrus.WithError(err).Error("could not get image serving URL")
+			}
+		}
+		if vURL != "" {
+			res.MediaURL = persist.NullString(vURL)
+		} else if imageURL != "" {
+			res.MediaURL = persist.NullString(imageURL)
+		}
 	default:
-		res.MediaURL = persist.NullString(imgURL)
-		res.ThumbnailURL = persist.NullString(imgURL)
-		res.PreviewURL = persist.NullString(imgURL)
+		if vURL != "" {
+			res.MediaURL = persist.NullString(vURL)
+		} else if imgURL != "" {
+			res.MediaURL = persist.NullString(imgURL)
+		}
 	}
 
 	return res, nil
@@ -301,6 +296,10 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return mediaType, fmt.Errorf("error encoding gif thumbnail as jpeg: %s", err)
 		}
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+	case persist.MediaTypeHTML:
+		return persist.MediaTypeHTML, nil
+	case persist.MediaTypeAudio:
+		return persist.MediaTypeAudio, nil
 	default:
 		img, _, err := image.Decode(buf)
 		if err != nil {
