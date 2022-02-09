@@ -231,7 +231,7 @@ func fetchUser(s suite.Suite, serverURL string, userID persist.DBID) *user.GetUs
 	return output
 }
 
-func fetchUserResponse(s suite.Suite, serverURL string, client *http.Client, jwt string) *http.Response {
+func fetchCurrentUserResponse(s suite.Suite, serverURL string, client *http.Client, jwt string) *http.Response {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get/current", serverURL), nil)
 	s.NoError(err)
 
@@ -243,7 +243,7 @@ func fetchUserResponse(s suite.Suite, serverURL string, client *http.Client, jwt
 }
 
 func fetchCurrentUserIsValid(s suite.Suite, serverURL string, client *http.Client, jwt string) *user.GetUserOutput {
-	resp := fetchUserResponse(s, serverURL, client, jwt)
+	resp := fetchCurrentUserResponse(s, serverURL, client, jwt)
 
 	assertValidResponse(s.Assertions, resp)
 

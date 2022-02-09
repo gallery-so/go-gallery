@@ -137,7 +137,7 @@ func (s *UserTestSuite) TestEligibleWalletCanBecomeMember() {
 	s.NotEmpty(jwtCookie)
 
 	// get current user
-	afterLogout := fetchUserResponse(s.Suite, s.serverURL, client, jwtCookie.Value)
+	afterLogout := fetchCurrentUserResponse(s.Suite, s.serverURL, client, jwtCookie.Value)
 
 	s.Equal(loginOutput.UserID, currentUserOutput.UserID)
 	s.Equal(loginOutput.UserID, userOutput.UserID)
