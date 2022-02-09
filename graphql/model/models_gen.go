@@ -46,6 +46,11 @@ type ViewerPayload interface {
 	IsViewerPayload()
 }
 
+type AuthMechanism struct {
+	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
+	GnosisSafe  *GnosisSafeAuth  `json:"gnosisSafe"`
+}
+
 type AuthNonce struct {
 	Nonce      *string `json:"nonce"`
 	UserExists *bool   `json:"userExists"`
@@ -124,6 +129,12 @@ func (ErrUserNotFound) IsGalleryByUserPayload()     {}
 func (ErrUserNotFound) IsError()                    {}
 func (ErrUserNotFound) IsLoginPayload()             {}
 
+type EthereumEoaAuth struct {
+	Address   string `json:"address"`
+	Nonce     string `json:"nonce"`
+	Signature string `json:"signature"`
+}
+
 type Gallery struct {
 	ID          string               `json:"id"`
 	Owner       *GalleryUser         `json:"owner"`
@@ -173,6 +184,12 @@ func (GalleryUser) IsNode()                 {}
 func (GalleryUser) IsAddressOrGalleryUser() {}
 func (GalleryUser) IsGalleryByUserPayload() {}
 
+type GnosisSafeAuth struct {
+	Address   string `json:"address"`
+	Nonce     string `json:"nonce"`
+	Signature string `json:"signature"`
+}
+
 type ImageNft struct {
 	ID                  string               `json:"id"`
 	Name                *string              `json:"name"`
@@ -188,7 +205,6 @@ func (ImageNft) IsNft()          {}
 type LoginResult struct {
 	JwtToken *string `json:"jwtToken"`
 	UserID   *string `json:"userId"`
-	Address  *string `json:"address"`
 }
 
 func (LoginResult) IsLoginPayload() {}

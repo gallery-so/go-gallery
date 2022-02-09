@@ -88,11 +88,11 @@ type errUserNotFound struct {
 	username string
 }
 
-type errNonceNotFound struct {
-	address persist.Address
+type ErrNonceNotFound struct {
+	Address persist.Address
 }
 type ErrUserExistsWithAddress struct {
-	address persist.Address
+	Address persist.Address
 }
 
 type errCouldNotEnsureMediaForAddress struct {
@@ -106,10 +106,10 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return CreateUserOutput{}, errNonceNotFound{address: pInput.Address}
+		return CreateUserOutput{}, ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserExistsWithAddress{address: pInput.Address}
+		return CreateUserOutput{}, ErrUserExistsWithAddress{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -201,10 +201,10 @@ func CreateUser(pCtx context.Context, pAddress string, pNonce string, pSignature
 	address := persist.Address(pAddress)
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, address, userRepo, nonceRepo)
 	if nonce == "" {
-		return nil, errNonceNotFound{address}
+		return nil, ErrNonceNotFound{Address: address}
 	}
 	if id != "" {
-		return nil, ErrUserExistsWithAddress{address: address}
+		return nil, ErrUserExistsWithAddress{Address: address}
 	}
 
 	if pWalletType != auth.WalletTypeEOA {
@@ -286,10 +286,10 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return CreateUserOutput{}, errNonceNotFound{pInput.Address}
+		return CreateUserOutput{}, ErrNonceNotFound{pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserExistsWithAddress{address: pInput.Address}
+		return CreateUserOutput{}, ErrUserExistsWithAddress{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -397,7 +397,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 
 	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return AddUserAddressOutput{}, errNonceNotFound{pInput.Address}
+		return AddUserAddressOutput{}, ErrNonceNotFound{pInput.Address}
 	}
 	if userID != "" {
 		return AddUserAddressOutput{}, ErrUserExistsWithAddress{pInput.Address}
@@ -674,12 +674,12 @@ func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress 
 	return nil
 }
 
-func (e errNonceNotFound) Error() string {
-	return fmt.Sprintf("nonce not found for address: %s", e.address)
+func (e ErrNonceNotFound) Error() string {
+	return fmt.Sprintf("nonce not found for address: %s", e.Address)
 }
 
 func (e ErrUserExistsWithAddress) Error() string {
-	return fmt.Sprintf("user already exists with address: %s", e.address)
+	return fmt.Sprintf("user already exists with address: %s", e.Address)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {

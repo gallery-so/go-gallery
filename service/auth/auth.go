@@ -135,12 +135,22 @@ func GenerateNonce() string {
 	return nonceStr
 }
 
-// LoginAndRecordAttemptREST will run the login pipeline and memorize the result
-func LoginAndRecordAttemptREST(pCtx context.Context, pInput LoginInput,
+// LoginREST will run the login pipeline and memorize the result
+func LoginREST(pCtx context.Context, pInput LoginInput,
 	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
 
-	gqlOutput, err := LoginAndRecordAttempt(pCtx, pInput.Address.String(), pInput.Nonce, pInput.Signature, pInput.WalletType, pReq, userRepo, nonceRepo, loginRepo, ec)
+	authenticator := EthereumNonceAuthenticator{
+		Address:    pInput.Address.String(),
+		Nonce:      pInput.Nonce,
+		Signature:  pInput.Signature,
+		WalletType: pInput.WalletType,
+		UserRepo:   userRepo,
+		NonceRepo:  nonceRepo,
+		EthClient:  ec,
+	}
+
+	gqlOutput, err := Login(pCtx, authenticator)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -149,66 +159,46 @@ func LoginAndRecordAttemptREST(pCtx context.Context, pInput LoginInput,
 		SignatureValid: true,
 		JWTtoken:       *gqlOutput.JwtToken,
 		UserID:         persist.DBID(*gqlOutput.UserID),
-		Address:        persist.Address(*gqlOutput.Address),
 	}
 
 	return output, nil
 }
 
-// LoginAndRecordAttempt will run the login pipeline and memorize the result
-func LoginAndRecordAttempt(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
-	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (*model.LoginResult, error) {
-
-	signatureValid := true
-
-	output, err := Login(pCtx, pAddress, pNonce, pSignature, pWalletType, userRepo, nonceRepo, ec)
-	if err != nil {
-		if !errors.Is(err, ErrSignatureInvalid) {
-			return nil, err
-		}
-
-		signatureValid = false
-	}
-
-	loginAttempt := persist.UserLoginAttempt{
-		// TODO: It might be nice to store any returned login error instead of just storing a SignatureValid bool,
-		// since any other signature verification or login errors won't currently be stored.
-		Address:        persist.Address(pAddress),
-		Signature:      persist.NullString(pSignature),
-		SignatureValid: persist.NullBool(signatureValid),
-
-		ReqHostAddr: persist.NullString(pReq.RemoteAddr),
-		ReqHeaders:  persist.ReqHeaders(pReq.Header),
-	}
-
-	_, err = loginRepo.Create(pCtx, loginAttempt)
-	if err != nil {
-		return nil, err
-	}
-
-	return output, nil
+type EthereumNonceAuthenticator struct {
+	Address    string
+	Nonce      string
+	Signature  string
+	WalletType WalletType
+	UserRepo   persist.UserRepository
+	NonceRepo  persist.NonceRepository
+	EthClient  *ethclient.Client
 }
 
-// Login logs in a user by validating their signed nonce
-func Login(pCtx context.Context, pAddress string, pNonce string, pSignature string, pWalletType WalletType,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ec *ethclient.Client) (*model.LoginResult, error) {
+type AuthResult struct {
+	userID    persist.DBID
+	addresses []persist.Address
+}
 
-	address := persist.Address(pAddress)
-	nonce, userID, err := GetUserWithNonce(pCtx, address, userRepo, nonceRepo)
-	if err != nil {
-		return nil, err
+type Authenticator interface {
+	Authenticate(context.Context) (*AuthResult, error)
+}
+
+func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
+
+	address := persist.Address(e.Address)
+	nonce, userID, _ := GetUserWithNonce(pCtx, address, e.UserRepo, e.NonceRepo)
+	if nonce == "" {
+		// TODO: Move ErrNonceNotFound into this namespace. All existing uses are by things that will eventually use the new auth handling.
+		return nil, fmt.Errorf("NonceNotFoundForAddress -- TODO") // user.ErrNonceNotFound{Address: address}
 	}
 
-	if pWalletType != WalletTypeEOA {
-		if NewNoncePrepend+nonce != pNonce && NoncePrepend+nonce != pNonce {
+	if e.WalletType != WalletTypeEOA {
+		if NewNoncePrepend+nonce != e.Nonce && NoncePrepend+nonce != e.Nonce {
 			return nil, ErrNonceMismatch
 		}
 	}
 
-	sigValid, err := VerifySignatureAllMethods(pSignature,
-		nonce,
-		address, pWalletType, ec)
+	sigValid, err := VerifySignatureAllMethods(e.Signature, nonce, address, e.WalletType, e.EthClient)
 	if err != nil {
 		return nil, ErrSignatureVerificationFailed{err}
 	}
@@ -217,20 +207,63 @@ func Login(pCtx context.Context, pAddress string, pNonce string, pSignature stri
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, userID)
+	err = NonceRotate(pCtx, address, userID, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
-	err = NonceRotate(pCtx, address, userID, nonceRepo)
+	// All authenticated addresses for the user, including the one they just authenticated with
+	var addresses []persist.Address
+
+	if userID != "" {
+		user, err := e.UserRepo.GetByID(pCtx, userID)
+		if err != nil {
+			return nil, err
+		}
+
+		addresses = make([]persist.Address, len(user.Addresses), len(user.Addresses)+1)
+		copy(addresses, user.Addresses)
+
+		// TODO: Test this, probably with the "add address to account" method
+		if !containsAddress(addresses, address) {
+			addresses = addresses[:cap(addresses)]
+			addresses[cap(addresses)-1] = address
+		}
+	} else {
+		addresses = []persist.Address{address}
+	}
+
+	authResult := AuthResult{
+		addresses: addresses,
+		userID:    userID,
+	}
+
+	return &authResult, nil
+}
+
+// Login logs in a user by validating their signed nonce
+func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResult, error) {
+
+	authResult, err := authenticator.Authenticate(pCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: ErrUserNotFound accepts an address parameter, but we don't have one to supply here
+	// Might be worthwhile for an authenticator interface to have a method for some sort of credential/ID/info-dump string
+	// that we can use in situations like this
+	if authResult.userID == "" {
+		return nil, ErrUserNotFound{}
+	}
+
+	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.userID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := model.LoginResult{
 		JwtToken: &jwtTokenStr,
-		UserID:   util.StringToPointer(userID.String()),
-		Address:  &pAddress,
+		UserID:   util.StringToPointer(authResult.userID.String()),
 	}
 
 	return &output, nil
@@ -504,6 +537,17 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 		}
 	}
 	return res
+}
+
+// ContainsAddress checks whether an address exists in a slice
+func containsAddress(a []persist.Address, b persist.Address) bool {
+	for _, v := range a {
+		if v == b {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SetJWTCookie sets the cookie for auth on the response

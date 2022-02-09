@@ -211,10 +211,26 @@ type ErrUserNotFound implements Error {
   message: String!
 }
 
+input AuthMechanism {
+  ethereumEoa: EthereumEoaAuth
+  gnosisSafe: GnosisSafeAuth
+}
+
+input EthereumEoaAuth {
+  address: String!
+  nonce: String!
+  signature: String!
+}
+
+input GnosisSafeAuth {
+  address: String!
+  nonce: String!
+  signature: String!
+}
+
 type LoginResult {
   jwtToken: String # probably not needed anymore?
   userId: ID
-  address: String
 }
 
 type CreateUserResult {
@@ -246,15 +262,6 @@ type Mutation {
 
   getAuthNonce(address: String!): GetAuthNoncePayload
 
-  # Create user with wallet type 0
-  createUserWithEOA(address: String!, nonce: String!, signature: String!): CreateUserPayload
-
-  # Create user with wallet type 1
-  createUserWithSmartContract(address: String!, nonce: String!, signature: String!): CreateUserPayload
-
-  # Login with wallet type 0
-  loginWithEOA(address: String!, nonce: String!, signature: String!): LoginPayload
-
-  # Login with wallet type 1
-  loginWithSmartContract(address: String!, nonce: String!, signature: String!): LoginPayload
+  createUser(authMechanism: AuthMechanism!): CreateUserPayload
+  login(authMechanism: AuthMechanism!): LoginPayload
 }

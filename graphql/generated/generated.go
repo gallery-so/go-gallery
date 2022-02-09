@@ -131,7 +131,6 @@ type ComplexityRoot struct {
 	}
 
 	LoginResult struct {
-		Address  func(childComplexity int) int
 		JwtToken func(childComplexity int) int
 		UserID   func(childComplexity int) int
 	}
@@ -151,19 +150,17 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateCollection            func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUserWithEoa           func(childComplexity int, address string, nonce string, signature string) int
-		CreateUserWithSmartContract func(childComplexity int, address string, nonce string, signature string) int
-		DeleteCollection            func(childComplexity int, collectionID *int) int
-		GetAuthNonce                func(childComplexity int, address string) int
-		LoginWithEoa                func(childComplexity int, address string, nonce string, signature string) int
-		LoginWithSmartContract      func(childComplexity int, address string, nonce string, signature string) int
-		RefreshOpenSeaNfts          func(childComplexity int) int
-		RemoveUserAddress           func(childComplexity int, address string) int
-		UpdateCollectionInfo        func(childComplexity int, input model.UpdateCollectionInfoInput) int
-		UpdateCollectionNfts        func(childComplexity int, input model.UpdateCollectionNftsInput) int
-		UpdateGalleryCollections    func(childComplexity int, input *model.UpdateGalleryCollectionsInput) int
-		UpdateUserInfo              func(childComplexity int, input *model.UpdateUserInfoInput) int
+		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
+		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
+		DeleteCollection         func(childComplexity int, collectionID *int) int
+		GetAuthNonce             func(childComplexity int, address string) int
+		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
+		RefreshOpenSeaNfts       func(childComplexity int) int
+		RemoveUserAddress        func(childComplexity int, address string) int
+		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
+		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
+		UpdateGalleryCollections func(childComplexity int, input *model.UpdateGalleryCollectionsInput) int
+		UpdateUserInfo           func(childComplexity int, input *model.UpdateUserInfoInput) int
 	}
 
 	Query struct {
@@ -230,10 +227,8 @@ type MutationResolver interface {
 	UpdateUserInfo(ctx context.Context, input *model.UpdateUserInfoInput) (*model.UpdateUserInfoPayload, error)
 	RefreshOpenSeaNfts(ctx context.Context) (*model.RefreshOpenSeaNftsPayload, error)
 	GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayload, error)
-	CreateUserWithEoa(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error)
-	CreateUserWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error)
-	LoginWithEoa(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error)
-	LoginWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error)
+	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error)
 }
 type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerPayload, error)
@@ -529,13 +524,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ImageNft.TokenCollectionName(childComplexity), true
 
-	case "LoginResult.address":
-		if e.complexity.LoginResult.Address == nil {
-			break
-		}
-
-		return e.complexity.LoginResult.Address(childComplexity), true
-
 	case "LoginResult.jwtToken":
 		if e.complexity.LoginResult.JwtToken == nil {
 			break
@@ -618,29 +606,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.CreateCollection(childComplexity, args["input"].(model.CreateCollectionInput)), true
 
-	case "Mutation.createUserWithEOA":
-		if e.complexity.Mutation.CreateUserWithEoa == nil {
+	case "Mutation.createUser":
+		if e.complexity.Mutation.CreateUser == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_createUserWithEOA_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_createUser_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUserWithEoa(childComplexity, args["address"].(string), args["nonce"].(string), args["signature"].(string)), true
-
-	case "Mutation.createUserWithSmartContract":
-		if e.complexity.Mutation.CreateUserWithSmartContract == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_createUserWithSmartContract_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.CreateUserWithSmartContract(childComplexity, args["address"].(string), args["nonce"].(string), args["signature"].(string)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.deleteCollection":
 		if e.complexity.Mutation.DeleteCollection == nil {
@@ -666,29 +642,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["address"].(string)), true
 
-	case "Mutation.loginWithEOA":
-		if e.complexity.Mutation.LoginWithEoa == nil {
+	case "Mutation.login":
+		if e.complexity.Mutation.Login == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_loginWithEOA_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_login_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.LoginWithEoa(childComplexity, args["address"].(string), args["nonce"].(string), args["signature"].(string)), true
-
-	case "Mutation.loginWithSmartContract":
-		if e.complexity.Mutation.LoginWithSmartContract == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_loginWithSmartContract_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.LoginWithSmartContract(childComplexity, args["address"].(string), args["nonce"].(string), args["signature"].(string)), true
+		return e.complexity.Mutation.Login(childComplexity, args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.refreshOpenSeaNfts":
 		if e.complexity.Mutation.RefreshOpenSeaNfts == nil {
@@ -1179,10 +1143,26 @@ type ErrUserNotFound implements Error {
   message: String!
 }
 
+input AuthMechanism {
+  ethereumEoa: EthereumEoaAuth
+  gnosisSafe: GnosisSafeAuth
+}
+
+input EthereumEoaAuth {
+  address: String!
+  nonce: String!
+  signature: String!
+}
+
+input GnosisSafeAuth {
+  address: String!
+  nonce: String!
+  signature: String!
+}
+
 type LoginResult {
   jwtToken: String # probably not needed anymore?
   userId: ID
-  address: String
 }
 
 type CreateUserResult {
@@ -1214,17 +1194,8 @@ type Mutation {
 
   getAuthNonce(address: String!): GetAuthNoncePayload
 
-  # Create user with wallet type 0
-  createUserWithEOA(address: String!, nonce: String!, signature: String!): CreateUserPayload
-
-  # Create user with wallet type 1
-  createUserWithSmartContract(address: String!, nonce: String!, signature: String!): CreateUserPayload
-
-  # Login with wallet type 0
-  loginWithEOA(address: String!, nonce: String!, signature: String!): LoginPayload
-
-  # Login with wallet type 1
-  loginWithSmartContract(address: String!, nonce: String!, signature: String!): LoginPayload
+  createUser(authMechanism: AuthMechanism!): CreateUserPayload
+  login(authMechanism: AuthMechanism!): LoginPayload
 }
 `, BuiltIn: false},
 }
@@ -1249,69 +1220,18 @@ func (ec *executionContext) field_Mutation_createCollection_args(ctx context.Con
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_createUserWithEOA_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg0 model.AuthMechanism
+	if tmp, ok := rawArgs["authMechanism"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
+		arg0, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["nonce"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["nonce"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["signature"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["signature"] = arg2
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_createUserWithSmartContract_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["address"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["nonce"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["nonce"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["signature"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["signature"] = arg2
+	args["authMechanism"] = arg0
 	return args, nil
 }
 
@@ -1345,69 +1265,18 @@ func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_loginWithEOA_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg0 model.AuthMechanism
+	if tmp, ok := rawArgs["authMechanism"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
+		arg0, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["nonce"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["nonce"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["signature"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["signature"] = arg2
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_loginWithSmartContract_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["address"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["nonce"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["nonce"] = arg1
-	var arg2 string
-	if tmp, ok := rawArgs["signature"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-		arg2, err = ec.unmarshalNString2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["signature"] = arg2
+	args["authMechanism"] = arg0
 	return args, nil
 }
 
@@ -2899,38 +2768,6 @@ func (ec *executionContext) _LoginResult_userId(ctx context.Context, field graph
 	return ec.marshalOID2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _LoginResult_address(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "LoginResult",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _MembershipTier_id(ctx context.Context, field graphql.CollectedField, obj *model.MembershipTier) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -3537,7 +3374,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	return ec.marshalOGetAuthNoncePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_createUserWithEOA(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_createUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3554,7 +3391,7 @@ func (ec *executionContext) _Mutation_createUserWithEOA(ctx context.Context, fie
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_createUserWithEOA_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_createUser_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -3562,7 +3399,7 @@ func (ec *executionContext) _Mutation_createUserWithEOA(ctx context.Context, fie
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUserWithEoa(rctx, args["address"].(string), args["nonce"].(string), args["signature"].(string))
+		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3576,7 +3413,7 @@ func (ec *executionContext) _Mutation_createUserWithEOA(ctx context.Context, fie
 	return ec.marshalOCreateUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_createUserWithSmartContract(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3593,7 +3430,7 @@ func (ec *executionContext) _Mutation_createUserWithSmartContract(ctx context.Co
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_createUserWithSmartContract_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_login_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -3601,85 +3438,7 @@ func (ec *executionContext) _Mutation_createUserWithSmartContract(ctx context.Co
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUserWithSmartContract(rctx, args["address"].(string), args["nonce"].(string), args["signature"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.CreateUserPayload)
-	fc.Result = res
-	return ec.marshalOCreateUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayload(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_loginWithEOA(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_loginWithEOA_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().LoginWithEoa(rctx, args["address"].(string), args["nonce"].(string), args["signature"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.LoginPayload)
-	fc.Result = res
-	return ec.marshalOLoginPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayload(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_loginWithSmartContract(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_loginWithSmartContract_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().LoginWithSmartContract(rctx, args["address"].(string), args["nonce"].(string), args["signature"].(string))
+		return ec.resolvers.Mutation().Login(rctx, args["authMechanism"].(model.AuthMechanism))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5539,6 +5298,37 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj interface{}) (model.AuthMechanism, error) {
+	var it model.AuthMechanism
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "ethereumEoa":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ethereumEoa"))
+			it.EthereumEoa, err = ec.unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "gnosisSafe":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gnosisSafe"))
+			it.GnosisSafe, err = ec.unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGnosisSafeAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Context, obj interface{}) (model.CreateCollectionInput, error) {
 	var it model.CreateCollectionInput
 	asMap := map[string]interface{}{}
@@ -5594,6 +5384,45 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, obj interface{}) (model.EthereumEoaAuth, error) {
+	var it model.EthereumEoaAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "address":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			it.Address, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "nonce":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
+			it.Nonce, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "signature":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			it.Signature, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputGalleryCollectionLayoutInput(ctx context.Context, obj interface{}) (model.GalleryCollectionLayoutInput, error) {
 	var it model.GalleryCollectionLayoutInput
 	asMap := map[string]interface{}{}
@@ -5608,6 +5437,45 @@ func (ec *executionContext) unmarshalInputGalleryCollectionLayoutInput(ctx conte
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("columns"))
 			it.Columns, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, obj interface{}) (model.GnosisSafeAuth, error) {
+	var it model.GnosisSafeAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "address":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			it.Address, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "nonce":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
+			it.Nonce, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "signature":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			it.Signature, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -6781,13 +6649,6 @@ func (ec *executionContext) _LoginResult(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "address":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LoginResult_address(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6985,30 +6846,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "createUserWithEOA":
+		case "createUser":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createUserWithEOA(ctx, field)
+				return ec._Mutation_createUser(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "createUserWithSmartContract":
+		case "login":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createUserWithSmartContract(ctx, field)
-			}
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		case "loginWithEOA":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_loginWithEOA(ctx, field)
-			}
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		case "loginWithSmartContract":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_loginWithSmartContract(ctx, field)
+				return ec._Mutation_login(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -7872,6 +7719,11 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
+	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8276,6 +8128,14 @@ func (ec *executionContext) marshalODeleteCollectionPayload2ᚖgithubᚗcomᚋmi
 	return ec._DeleteCollectionPayload(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx context.Context, v interface{}) (*model.EthereumEoaAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputEthereumEoaAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v *model.Gallery) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -8405,6 +8265,14 @@ func (ec *executionContext) marshalOGetAuthNoncePayload2githubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._GetAuthNoncePayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGnosisSafeAuth(ctx context.Context, v interface{}) (*model.GnosisSafeAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputGnosisSafeAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

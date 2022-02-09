@@ -56,7 +56,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 
 	if err != nil {
 		// Map known errors to GraphQL return types
-		if errorType, ok := r.ErrorToGraphqlType(err); ok {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.GetAuthNoncePayload); ok {
 				return returnType, nil
 			}
@@ -69,20 +69,37 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUserWithEoa(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error) {
-	return r.CreateUserWithEthereum(ctx, address, nonce, signature, auth.WalletTypeEOA)
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) CreateUserWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.CreateUserPayload, error) {
-	return r.CreateUserWithEthereum(ctx, address, nonce, signature, auth.WalletTypeGnosis)
-}
+func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error) {
+	gc := GinContextFromContext(ctx)
 
-func (r *mutationResolver) LoginWithEoa(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error) {
-	return r.LoginWithEthereum(ctx, address, nonce, signature, auth.WalletTypeEOA)
-}
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.LoginPayload, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.LoginPayload); ok {
+				return returnType, nil
+			}
+		}
 
-func (r *mutationResolver) LoginWithSmartContract(ctx context.Context, address string, nonce string, signature string) (model.LoginPayload, error) {
-	return r.LoginWithEthereum(ctx, address, nonce, signature, auth.WalletTypeGnosis)
+		gc.Error(err)
+		return nil, err
+	}
+
+	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	if err != nil {
+		return remapError(err)
+	}
+
+	output, err := auth.Login(ctx, authenticator)
+	if err != nil {
+		return remapError(err)
+	}
+
+	auth.SetJWTCookie(gc, *output.JwtToken)
+	return output, nil
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error) {
