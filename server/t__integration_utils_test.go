@@ -1,21 +1,39 @@
 package server
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/asottile/dockerfile"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/user"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v2"
 )
+
+type TestAddressFile struct {
+	Wallet1     string `json:"wallet_1"`
+	PrivateKey1 string `json:"pk_1"`
+}
 
 // N.B. This isn't the entire Docker Compose spec...
 type ComposeFile struct {
@@ -160,4 +178,173 @@ func initRedis(pool *dockertest.Pool) *dockertest.Resource {
 	}
 
 	return rd
+}
+
+func loadWallet(f string) *TestWallet {
+	dat, err := os.ReadFile(f)
+	if err != nil {
+		log.Fatalf("could not load wallet file: %s", err)
+	}
+
+	var wallets TestAddressFile
+	err = json.Unmarshal(dat, &wallets)
+	if err != nil {
+		log.Fatalf("wallet file is an unexpected format: %s", err)
+	}
+
+	pk, err := crypto.HexToECDSA(wallets.PrivateKey1)
+	if err != nil {
+		log.Fatalf("private key is malformed: %s", err)
+	}
+
+	return &TestWallet{pk, persist.Address(wallets.Wallet1)}
+}
+
+func newClient() *http.Client {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		log.Fatalf("could not create cookie jar: %s", err)
+	}
+	return &http.Client{Jar: jar}
+}
+
+func getCookieByName(n string, cookies []*http.Cookie) *http.Cookie {
+	for _, c := range cookies {
+		if c.Name == n {
+			return c
+		}
+	}
+	return nil
+}
+
+func fetchUser(s suite.Suite, serverURL string, userID persist.DBID) *user.GetUserOutput {
+	resp, err := http.Get(fmt.Sprintf("%s/users/get?user_id=%s", serverURL, userID))
+	s.NoError(err)
+	defer resp.Body.Close()
+
+	assertValidResponse(s.Assertions, resp)
+
+	output := &user.GetUserOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func fetchUserResponse(s suite.Suite, serverURL string, client *http.Client, jwt string) *http.Response {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/get/current", serverURL), nil)
+	s.NoError(err)
+
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	resp, err := client.Do(req)
+	s.NoError(err)
+
+	return resp
+}
+
+func fetchCurrentUserIsValid(s suite.Suite, serverURL string, client *http.Client, jwt string) *user.GetUserOutput {
+	resp := fetchUserResponse(s, serverURL, client, jwt)
+
+	assertValidResponse(s.Assertions, resp)
+
+	output := &user.GetUserOutput{}
+	err := util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func fetchNonce(s suite.Suite, serverURL string, address persist.Address) string {
+	resp, err := http.Get(
+		fmt.Sprintf("%s/auth/get_preflight?address=%s", serverURL, address),
+	)
+	s.NoError(err)
+	defer resp.Body.Close()
+
+	assertValidResponse(s.Assertions, resp)
+
+	type PreflightResp struct {
+		auth.GetPreflightOutput
+		Error string `json:"error"`
+	}
+	output := &PreflightResp{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+	s.Empty(output.Error)
+
+	return output.Nonce
+}
+
+func signNonce(s suite.Suite, n string, pk *ecdsa.PrivateKey) []byte {
+	hash := crypto.Keccak256Hash([]byte(n))
+	sig, err := crypto.Sign(hash.Bytes(), pk)
+	s.NoError(err)
+
+	return sig
+}
+
+func createNewUser(s suite.Suite, serverURL, nonce string, account *TestWallet) *user.CreateUserOutput {
+	sig := signNonce(s, nonce, account.pk)
+	data, err := json.Marshal(map[string]interface{}{
+		"address":     account.address,
+		"nonce":       nonce,
+		"wallet_type": 0,
+		"signature":   "0x" + hex.EncodeToString(sig),
+	})
+	s.NoError(err)
+
+	resp, err := http.Post(
+		fmt.Sprintf("%s/users/create", serverURL),
+		"application/json",
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err, "failed to create user")
+	defer resp.Body.Close()
+
+	assertValidResponse(s.Assertions, resp)
+
+	output := &user.CreateUserOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func loginUser(s suite.Suite, serverURL, nonce string, wallet *TestWallet) *auth.LoginOutput {
+	sig := signNonce(s, nonce, wallet.pk)
+	data, err := json.Marshal(map[string]interface{}{
+		"address":     wallet.address,
+		"nonce":       nonce,
+		"wallet_type": 0,
+		"signature":   "0x" + hex.EncodeToString(sig),
+	})
+	s.NoError(err)
+
+	resp, err := http.Post(
+		fmt.Sprintf("%s/users/login", serverURL),
+		"application/json",
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err, "failed to login user")
+	defer resp.Body.Close()
+
+	assertValidResponse(s.Assertions, resp)
+
+	output := &auth.LoginOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func logoutUser(s suite.Suite, serverURL string, client *http.Client) *http.Response {
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/auth/logout", serverURL), nil)
+	s.NoError(err)
+
+	resp, err := client.Do(req)
+	s.NoError(err)
+
+	assertValidResponse(s.Assertions, resp)
+
+	return resp
 }
