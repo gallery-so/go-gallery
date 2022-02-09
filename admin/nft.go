@@ -8,6 +8,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 var errGetNFTsInput = errors.New("address or user_id must be provided")
@@ -55,10 +56,15 @@ func getNFTs(nftRepo persist.NFTRepository) gin.HandlerFunc {
 func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input refreshNFTsInput
-		if err := c.ShouldBindQuery(&input); err != nil {
+		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
+		if len(input.UserIDs) == 0 && len(input.Addresses) == 0 {
+			util.ErrResponse(c, http.StatusBadRequest, errGetNFTsInput)
+			return
+		}
+		logrus.Debugf("refreshOpensea input: %+v", input)
 		if input.UserIDs != nil && len(input.UserIDs) > 0 {
 			for _, userID := range input.UserIDs {
 				user, err := userRepo.GetByID(c, userID)
@@ -72,7 +78,8 @@ func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserReposito
 					return
 				}
 			}
-		} else if input.Addresses != nil && len(input.Addresses) > 0 {
+		}
+		if input.Addresses != nil && len(input.Addresses) > 0 {
 			for _, address := range input.Addresses {
 				if _, err := opensea.UpdateAssetsForWallet(c, []persist.Address{address}, nftRepo); err != nil {
 					util.ErrResponse(c, http.StatusInternalServerError, err)

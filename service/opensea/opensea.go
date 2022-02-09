@@ -129,11 +129,13 @@ func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch assets for wallets %v: %w", pOwnerWalletAddresses, err)
 	}
+	logrus.Debugf("found %d assets for wallets %v", len(asDBNfts), pOwnerWalletAddresses)
 
 	ids, err := nftRepo.BulkUpsert(pCtx, asDBNfts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bulk upsert NFTs: %w", err)
 	}
+	logrus.Debugf("bulk upserted %d NFTs", len(ids))
 	return ids, nil
 }
 
