@@ -167,7 +167,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 					errChan <- fmt.Errorf("failed to get token URI: %v", err)
 					return
 				}
-				uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.String()))
+				uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.ToUint256String()))
 			}
 
 			if metadata == nil || len(metadata) == 0 {
@@ -221,14 +221,14 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			return
 		}
 
-		msg := ""
+		output := ValidateUsersNFTsOutput{Success: true}
 
 		newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		msg += newMsg
+		output.Message += newMsg
 
 		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 		for _, address := range user.Addresses {
@@ -260,8 +260,6 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			}
 		}
 
-		output := ValidateUsersNFTsOutput{Success: true}
-
 		if len(unaccountedFor) > 0 {
 			unaccountedForKeys := make([]string, 0, len(unaccountedFor))
 			for k := range unaccountedFor {
@@ -283,9 +281,8 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 				return
 			}
 			output.Success = false
-			msg += fmt.Sprintf("user %s has unaccounted for NFTs: %v | accounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
+			output.Message += fmt.Sprintf("user %s has unaccounted for NFTs: %v | accounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
 		}
-		output.Message = msg
 		c.JSON(http.StatusOK, output)
 
 	}
@@ -302,7 +299,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown {
 			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
 			if err == nil {
-				token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.String()))
+				token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
 				needsUpdate = true
 			} else {
 				logrus.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
@@ -310,6 +307,10 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 				continue
 			}
 
+		}
+		if strings.Contains(token.TokenURI.String(), "{id}") {
+			token.TokenURI = persist.TokenURI(strings.ReplaceAll(token.TokenURI.String(), "{id}", token.TokenID.ToUint256String()))
+			needsUpdate = true
 		}
 
 		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {

@@ -533,12 +533,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				}
 				cancel()
 
-				id, err := util.HexToBigInt(string(tokenID))
-				if err != nil {
-					panic(fmt.Sprintf("error converting tokenID to bigint: %s", err))
-				}
-
-				uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", id.Text(16))))
+				uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", tokenID.ToUint256String())))
 
 				go func() {
 					defer wg.Done()

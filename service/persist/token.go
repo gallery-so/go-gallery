@@ -402,6 +402,11 @@ func (id TokenID) BigInt() *big.Int {
 	return i
 }
 
+// ToUint256String returns the uint256 hex string representation of the token id
+func (id TokenID) ToUint256String() string {
+	return fmt.Sprintf("%064s", id.String())
+}
+
 // Base10String returns the token ID as a base 10 string
 func (id TokenID) Base10String() string {
 	return id.BigInt().String()

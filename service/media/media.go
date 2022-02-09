@@ -48,7 +48,7 @@ func MakePreviewsForToken(pCtx context.Context, contractAddress persist.Address,
 	if err != nil {
 		return persist.Media{}, err
 	}
-	if len(tokens) < 1 {
+	if len(tokens) == 0 {
 		return persist.Media{}, fmt.Errorf("no tokens found for tokenID %s and contractAddress %s", tokenID, contractAddress)
 	}
 
@@ -68,23 +68,28 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	res := persist.Media{}
 
-	thumbnailURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 	if err == nil {
-		res.ThumbnailURL = persist.NullString(thumbnailURL + "=256")
-		res.PreviewURL = persist.NullString(thumbnailURL + "=512")
-		res.MediaURL = persist.NullString(thumbnailURL + "=s1024")
+		res.ThumbnailURL = persist.NullString(imageURL + "=256")
+		res.PreviewURL = persist.NullString(imageURL + "=512")
+		res.MediaURL = persist.NullString(imageURL + "=s1024")
 		res.MediaType = persist.MediaTypeImage
 		return res, nil
 	}
 
-	thumbnail, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	videoURL, err := getVideoURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
 	if err == nil {
-		videoURL, err := getVideoURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
-		if err != nil {
-			return persist.Media{}, err
+		if imageURL != "" {
+			res.ThumbnailURL = persist.NullString(imageURL + "=256")
+			res.PreviewURL = persist.NullString(imageURL + "=512")
+		} else {
+			thumbnail, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+			if err == nil {
+				res.ThumbnailURL = persist.NullString(thumbnail + "=256")
+				res.PreviewURL = persist.NullString(thumbnail + "=512")
+			}
 		}
-		res.ThumbnailURL = persist.NullString(thumbnail + "=256")
-		res.PreviewURL = persist.NullString(thumbnail + "=512")
+
 		res.MediaURL = persist.NullString(videoURL)
 		res.MediaType = persist.MediaTypeVideo
 	}
@@ -165,27 +170,29 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	switch mediaType {
 	case persist.MediaTypeImage:
-		thumbnailURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
-			res.ThumbnailURL = persist.NullString(thumbnailURL + "=s256")
-			res.PreviewURL = persist.NullString(thumbnailURL + "=s512")
-			res.MediaURL = persist.NullString(thumbnailURL + "=s1024")
+			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
+			res.PreviewURL = persist.NullString(imageURL + "=s512")
+			res.MediaURL = persist.NullString(imageURL + "=s1024")
 		} else {
 			logrus.WithError(err).Error("could not get image serving URL")
 		}
 	case persist.MediaTypeVideo:
-		thumbnailURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
-			res.ThumbnailURL = persist.NullString(thumbnailURL + "=s256")
-			res.PreviewURL = persist.NullString(thumbnailURL + "=s512")
+			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
+			res.PreviewURL = persist.NullString(imageURL + "=s512")
 		} else {
-			logrus.WithError(err).Error("could not get image serving URL")
+			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+			if err == nil {
+				res.ThumbnailURL = persist.NullString(imageURL + "=s256")
+				res.PreviewURL = persist.NullString(imageURL + "=s512")
+			} else {
+				logrus.WithError(err).Error("could not get image serving URL")
+			}
 		}
-		videoURL, err := getVideoURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
-		if err != nil {
-			return persist.Media{}, err
-		}
-		res.MediaURL = persist.NullString(videoURL)
+		res.MediaURL = persist.NullString(vURL)
 	default:
 		res.MediaURL = persist.NullString(imgURL)
 		res.ThumbnailURL = persist.NullString(imgURL)
@@ -266,10 +273,6 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	switch mediaType {
 	case persist.MediaTypeVideo:
-		err = cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name))
-		if err != nil {
-			return mediaType, fmt.Errorf("error caching video: %s", err)
-		}
 
 		jp, err := thumbnailVideo(pCtx, bs)
 		if err != nil {
@@ -279,9 +282,9 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		if err != nil {
 			return mediaType, fmt.Errorf("error decoding thumbnail as jpeg: %s", err)
 		}
-		jpg = resize.Thumbnail(1024, 1024, jpg, resize.NearestNeighbor)
+		jpg = resize.Thumbnail(1024, 1024, jpg, resize.Lanczos3)
 		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, jpg, nil)
+		err = png.Encode(buf, jpg)
 		if err != nil {
 			return mediaType, fmt.Errorf("error encoding thumbnail as jpeg: %s", err)
 		}
@@ -293,7 +296,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return mediaType, fmt.Errorf("error decoding gif: %s", err)
 		}
 		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
+		err = png.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.Lanczos3))
 		if err != nil {
 			return mediaType, fmt.Errorf("error encoding gif thumbnail as jpeg: %s", err)
 		}
@@ -310,9 +313,10 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 				return mediaType, fmt.Errorf("could not decode image as jpg or png %s", err.Error())
 			}
 		}
-		img = resize.Thumbnail(1024, 1024, img, resize.NearestNeighbor)
+
+		img = resize.Thumbnail(2048, 2048, img, resize.Lanczos3)
 		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, img, nil)
+		err = png.Encode(buf, img)
 		if err != nil {
 			return mediaType, fmt.Errorf("could not encode image as jpeg: %s", err.Error())
 		}
