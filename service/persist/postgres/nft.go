@@ -305,7 +305,7 @@ func (n *NFTRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID,
 }
 
 // BulkUpsert inserts or updates multiple NFTs
-func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFT) ([]persist.DBID, error) {
+func (n *NFTRepository) BulkUpsert(pCtx context.Context, pNFTs []persist.NFT) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
 
 	resultIDs := make([]persist.DBID, len(pNFTs))
@@ -319,7 +319,7 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 	if len(pNFTs) > rowsPerQuery {
 		next := pNFTs[rowsPerQuery:]
 		current := pNFTs[:rowsPerQuery]
-		ids, err := n.BulkUpsert(pCtx, pUserID, next)
+		ids, err := n.BulkUpsert(pCtx, next)
 		if err != nil {
 			return nil, err
 		}

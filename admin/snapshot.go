@@ -43,7 +43,7 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 		defer rwMutex.Unlock()
 		w := getSnapshotWriter(c, stg)
 		defer w.Close()
-		if err := json.NewEncoder(w).Encode(input); err != nil {
+		if err := json.NewEncoder(w).Encode(input.Snapshot); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
