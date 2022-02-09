@@ -139,7 +139,11 @@ func TestDeleteCollection_Failure_Unauthenticated_Token(t *testing.T) {
 	collID := createCollectionInDbForUserIDToken(assert, "COLLECTION NAME", tc.user1.id)
 	verifyCollectionExistsInDbForIDToken(assert, collID)
 
-	resp := sendCollDeleteRequestToken(assert, collectionDeleteInputToken{ID: collID}, &TestUser{address: tc.user1.address, id: tc.user1.id, client: &http.Client{}})
+	resp := sendCollDeleteRequestToken(
+		assert,
+		collectionDeleteInputToken{ID: collID},
+		&TestUser{TestWallet: &TestWallet{address: tc.user1.address}, id: tc.user1.id, client: &http.Client{}},
+	)
 
 	assert.Equal(401, resp.StatusCode)
 }
