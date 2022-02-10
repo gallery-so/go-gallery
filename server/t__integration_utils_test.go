@@ -310,7 +310,7 @@ func createNewUser(s suite.Suite, serverURL, nonce string, account *TestWallet) 
 	return output
 }
 
-func loginUser(s suite.Suite, serverURL, nonce string, wallet *TestWallet) *auth.LoginOutput {
+func loginUser(s suite.Suite, serverURL, nonce string, wallet *TestWallet) (*auth.LoginOutput, *http.Cookie) {
 	sig := signNonce(s, nonce, wallet.pk)
 	data, err := json.Marshal(map[string]interface{}{
 		"address":     wallet.address,
@@ -334,7 +334,10 @@ func loginUser(s suite.Suite, serverURL, nonce string, wallet *TestWallet) *auth
 	err = util.UnmarshallBody(output, resp.Body)
 	s.NoError(err)
 
-	return output
+	jwtCookie := getCookieByName(auth.JWTCookieKey, resp.Cookies())
+	s.NotEmpty(jwtCookie)
+
+	return output, jwtCookie
 }
 
 func logoutUser(s suite.Suite, serverURL string, client *http.Client) *http.Response {

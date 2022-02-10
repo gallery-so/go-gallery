@@ -79,10 +79,8 @@ type LoginInput struct {
 
 // LoginOutput is the output of the login pipeline
 type LoginOutput struct {
-	SignatureValid bool            `json:"signature_valid"`
-	JWTtoken       string          `json:"jwt_token"`
-	UserID         persist.DBID    `json:"user_id"`
-	Address        persist.Address `json:"address"`
+	SignatureValid bool         `json:"signature_valid"`
+	UserID         persist.DBID `json:"user_id"`
 }
 
 // GetPreflightInput is the input to the preflight pipeline
