@@ -44,7 +44,11 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 		rwMutex.Lock()
 		defer rwMutex.Unlock()
 
-		writeSnapshot(c, stg, input.Snapshot)
+		err := writeSnapshot(c, stg, input.Snapshot)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
