@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -181,35 +179,5 @@ func newGCPPubSub() pubsub.PubSub {
 	}
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
-	return client
-}
-
-func newGCPStorageClient() *storage.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
-	defer cancel()
-
-	if viper.GetString("ENV") != "local" {
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			panic(err)
-		}
-		return client
-	}
-
-	appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
-	_, err := os.Stat(appCredentials)
-	if err != nil {
-		_, err = os.Stat(filepath.Join("..", appCredentials))
-		if err != nil {
-			logrus.Info("credentials file doesn't exist locally")
-			return nil
-		}
-		appCredentials = filepath.Join("..", appCredentials)
-		viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
-	}
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
-	if err != nil {
-		panic(err)
-	}
 	return client
 }
