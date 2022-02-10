@@ -856,7 +856,6 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 	for {
 		select {
 		case log := <-subscriptions:
-			logrus.Infof("Got log at: %d", log.BlockNumber)
 			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
 			ts := logsToTransfers([]types.Log{log}, i.ethClient)
 			transfers <- transfersToTransfersAtBlock(ts)

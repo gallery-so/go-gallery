@@ -123,8 +123,8 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return decoded, nil
 	case persist.URITypeIPFS:
-		path := strings.TrimPrefix(asString, "ipfs://")
-		pathMinusExtra := strings.TrimPrefix(path, "ipfs/")
+		path := strings.ReplaceAll(asString, "ipfs://", "")
+		pathMinusExtra := strings.ReplaceAll(path, "ipfs/", "")
 
 		it, err := ipfsClient.Cat(pathMinusExtra)
 		if err != nil {

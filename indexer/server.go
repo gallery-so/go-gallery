@@ -22,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/appengine"
 )
 
 var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
@@ -104,7 +105,9 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 		}
 		updateByID := input.OwnerAddress != ""
 
-		updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, storageClient)
+		appCtx := appengine.WithContext(c, c.Request)
+
+		updates, errChan := updateMediaForTokens(appCtx, tokens, ethClient, ipfsClient, storageClient)
 		for i := 0; i < len(tokens); i++ {
 			select {
 			case update := <-updates:
@@ -143,6 +146,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 			metadata := token.TokenMetadata
 
 			if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || token.Media.MediaType == persist.MediaTypeInvalid {
+				logrus.Debugf("skipping token %s-%s", token.ContractAddress, token.TokenID)
 				errChan <- nil
 				return
 			}
