@@ -177,10 +177,9 @@ type Token struct {
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL NullString `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
-	PreviewURL   NullString `bson:"preview_url,omitempty" json:"preview_url"`
-	MediaURL     NullString `bson:"media_url,omitempty" json:"media_url"`
-	MediaType    MediaType  `bson:"media_type,omitempty" json:"media_type"`
+	ThumbnailURL NullString `json:"thumbnail_url,omitempty"`
+	MediaURL     NullString `json:"media_url,omitempty"`
+	MediaType    MediaType  `json:"media_type"`
 }
 
 // TokenInCollection represents a token within a collection

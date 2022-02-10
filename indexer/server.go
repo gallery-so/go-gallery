@@ -349,8 +349,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 			if mediaType != persist.MediaTypeUnknown {
 				media = persist.Media{
 					MediaURL:     persist.NullString(a.ImageURL),
-					ThumbnailURL: persist.NullString(a.ImageThumbnailURL),
-					PreviewURL:   persist.NullString(a.ImagePreviewURL),
+					ThumbnailURL: persist.NullString(a.ImagePreviewURL),
 					MediaType:    mediaType,
 				}
 			}

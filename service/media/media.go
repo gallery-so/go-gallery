@@ -27,8 +27,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/appengine/blobstore"
-	appimage "google.golang.org/appengine/image"
 )
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
@@ -82,13 +80,11 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			return persist.Media{}, fmt.Errorf("error getting data from base64 svg uri %s: %s", asURI, err)
 		}
 		res.MediaURL = persist.NullString(data)
-		res.PreviewURL = res.MediaURL
 		res.ThumbnailURL = res.MediaURL
 		return res, nil
 	case persist.URITypeSVG:
 		res.MediaType = persist.MediaTypeSVG
 		res.MediaURL = persist.NullString(asURI.String())
-		res.PreviewURL = res.MediaURL
 		res.ThumbnailURL = res.MediaURL
 
 		return res, nil
@@ -148,24 +144,20 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
 			logrus.Infof("found imageURL for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
-			res.PreviewURL = persist.NullString(imageURL + "=s512")
-			res.MediaURL = persist.NullString(imageURL + "=s1024")
+			res.MediaURL = persist.NullString(imageURL)
 		} else {
-			logrus.WithError(err).Error("could not get image serving URL")
+			res.MediaURL = persist.NullString(imgURL)
 		}
 	case persist.MediaTypeVideo:
 		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
 			logrus.Infof("found imageURL for video for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
-			res.PreviewURL = persist.NullString(imageURL + "=s512")
+			res.ThumbnailURL = persist.NullString(imageURL)
 		} else {
 			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 			if err == nil {
 				logrus.Infof("found thumbnailURL for video for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL + "=s256")
-				res.PreviewURL = persist.NullString(imageURL + "=s512")
+				res.ThumbnailURL = persist.NullString(imageURL)
 			} else {
 				logrus.WithError(err).Error("could not get image serving URL")
 			}
@@ -184,15 +176,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		if err == nil {
 			logrus.Infof("found imageURL for audio/html for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL + "=s256")
-			res.PreviewURL = persist.NullString(imageURL + "=s512")
+			res.ThumbnailURL = persist.NullString(imageURL)
 		} else {
 			logrus.Infof("could not get image serving URL for audio/htm for %s", name)
 			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 			if err == nil {
 				logrus.Infof("found thumbnailURL for audio/html for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL + "=s256")
-				res.PreviewURL = persist.NullString(imageURL + "=s512")
+				res.ThumbnailURL = persist.NullString(imageURL)
 			} else {
 				logrus.WithError(err).Error("could not get image serving URL")
 			}
@@ -233,11 +223,10 @@ func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) er
 	client.Bucket(bucket).Object(fileName).Delete(ctx)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	n, err := sw.Write(img)
+	_, err = sw.Write(img)
 	if err != nil {
 		return err
 	}
-	logrus.Infof("wrote %d bytes to %s", n, fileName)
 
 	if err := sw.Close(); err != nil {
 		return err
@@ -252,15 +241,16 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	if err != nil {
 		return "", fmt.Errorf("error getting attrs for %s: %s", objectName, err)
 	}
-	key, err := blobstore.BlobKeyForFile(pCtx, objectName)
-	if err != nil {
-		return "", fmt.Errorf("error getting blob key for %s: %s", objectName, err)
-	}
-	res, err := appimage.ServingURL(pCtx, key, &appimage.ServingURLOptions{Secure: true})
-	if err != nil {
-		return "", fmt.Errorf("error getting serving url for %s: %s", objectName, err)
-	}
-	return res.String(), nil
+	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
+	// key, err := blobstore.BlobKeyForFile(pCtx, objectName)
+	// if err != nil {
+	// 	return "", fmt.Errorf("error getting blob key for %s: %s", objectName, err)
+	// }
+	// res, err := appimage.ServingURL(pCtx, key, &appimage.ServingURLOptions{Secure: true})
+	// if err != nil {
+	// 	return "", fmt.Errorf("error getting serving url for %s: %s", objectName, err)
+	// }
+	// return res.String(), nil
 }
 
 func getVideoURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
@@ -346,13 +336,18 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			}
 		}
 
-		img = resize.Thumbnail(2048, 2048, img, resize.NearestNeighbor)
-		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, img, nil)
-		if err != nil {
-			return mediaType, fmt.Errorf("could not encode image as png: %s", err.Error())
+		switch asURI.Type() {
+		case persist.URITypeIPFS, persist.URITypeArweave:
+			img = resize.Thumbnail(2048, 2048, img, resize.NearestNeighbor)
+			buf = &bytes.Buffer{}
+			err = jpeg.Encode(buf, img, nil)
+			if err != nil {
+				return mediaType, fmt.Errorf("could not encode image as png: %s", err.Error())
+			}
+			return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+		default:
+			return persist.MediaTypeImage, nil
 		}
-		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 	}
 }
 
