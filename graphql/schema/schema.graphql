@@ -229,12 +229,10 @@ input GnosisSafeAuth {
 }
 
 type LoginResult {
-  jwtToken: String # probably not needed anymore?
   userId: ID
 }
 
 type CreateUserResult {
-  jwtToken: String # probably not needed anymore?
   userId: ID
   galleryId: String
 }

@@ -71,7 +71,6 @@ type CreateCollectionPayload struct {
 }
 
 type CreateUserResult struct {
-	JwtToken  *string `json:"jwtToken"`
 	UserID    *string `json:"userId"`
 	GalleryID *string `json:"galleryId"`
 }
@@ -203,8 +202,7 @@ func (ImageNft) IsNode()         {}
 func (ImageNft) IsNft()          {}
 
 type LoginResult struct {
-	JwtToken *string `json:"jwtToken"`
-	UserID   *string `json:"userId"`
+	UserID *string `json:"userId"`
 }
 
 func (LoginResult) IsLoginPayload() {}

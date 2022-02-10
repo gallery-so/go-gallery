@@ -29,8 +29,6 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 			return
 		}
 
-		auth.SetJWTCookie(c, output.JWTtoken)
-
 		c.JSON(http.StatusOK, output)
 
 	}

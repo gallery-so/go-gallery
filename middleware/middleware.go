@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -181,7 +180,7 @@ func ErrLogger() gin.HandlerFunc {
 // See: https://gqlgen.com/recipes/gin/
 func GinContextToContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.WithValue(c.Request.Context(), graphql.GinContextKey, c)
+		ctx := context.WithValue(c.Request.Context(), util.GinContextKey, c)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}

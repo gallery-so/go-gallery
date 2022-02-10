@@ -240,15 +240,15 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 
 	output := LoginOutput{
 		SignatureValid: true,
-		JWTtoken:       *gqlOutput.JwtToken,
 		UserID:         persist.DBID(*gqlOutput.UserID),
 	}
 
 	return output, nil
 }
 
-// Login logs in a user by validating their signed nonce
+// Login logs in a user with a given authentication scheme
 func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResult, error) {
+	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
@@ -267,9 +267,10 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResul
 		return nil, err
 	}
 
+	SetJWTCookie(gc, jwtTokenStr)
+
 	output := model.LoginResult{
-		JwtToken: &jwtTokenStr,
-		UserID:   util.StringToPointer(authResult.UserID.String()),
+		UserID: util.StringToPointer(authResult.UserID.String()),
 	}
 
 	return &output, nil

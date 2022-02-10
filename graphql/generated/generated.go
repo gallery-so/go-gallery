@@ -54,7 +54,6 @@ type ComplexityRoot struct {
 
 	CreateUserResult struct {
 		GalleryID func(childComplexity int) int
-		JwtToken  func(childComplexity int) int
 		UserID    func(childComplexity int) int
 	}
 
@@ -131,8 +130,7 @@ type ComplexityRoot struct {
 	}
 
 	LoginResult struct {
-		JwtToken func(childComplexity int) int
-		UserID   func(childComplexity int) int
+		UserID func(childComplexity int) int
 	}
 
 	MembershipTier struct {
@@ -278,13 +276,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CreateUserResult.GalleryID(childComplexity), true
-
-	case "CreateUserResult.jwtToken":
-		if e.complexity.CreateUserResult.JwtToken == nil {
-			break
-		}
-
-		return e.complexity.CreateUserResult.JwtToken(childComplexity), true
 
 	case "CreateUserResult.userId":
 		if e.complexity.CreateUserResult.UserID == nil {
@@ -523,13 +514,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ImageNft.TokenCollectionName(childComplexity), true
-
-	case "LoginResult.jwtToken":
-		if e.complexity.LoginResult.JwtToken == nil {
-			break
-		}
-
-		return e.complexity.LoginResult.JwtToken(childComplexity), true
 
 	case "LoginResult.userId":
 		if e.complexity.LoginResult.UserID == nil {
@@ -1161,12 +1145,10 @@ input GnosisSafeAuth {
 }
 
 type LoginResult {
-  jwtToken: String # probably not needed anymore?
   userId: ID
 }
 
 type CreateUserResult {
-  jwtToken: String # probably not needed anymore?
   userId: ID
   galleryId: String
 }
@@ -1517,38 +1499,6 @@ func (ec *executionContext) _CreateCollectionPayload_gallery(ctx context.Context
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CreateUserResult_jwtToken(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserResult) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CreateUserResult",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.JwtToken, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateUserResult_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserResult) (ret graphql.Marshaler) {
@@ -2691,38 +2641,6 @@ func (ec *executionContext) _ImageNft_imageUrl(ctx context.Context, field graphq
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.ImageURL, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _LoginResult_jwtToken(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "LoginResult",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.JwtToken, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6056,13 +5974,6 @@ func (ec *executionContext) _CreateUserResult(ctx context.Context, sel ast.Selec
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("CreateUserResult")
-		case "jwtToken":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CreateUserResult_jwtToken(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "userId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._CreateUserResult_userId(ctx, field, obj)
@@ -6635,13 +6546,6 @@ func (ec *executionContext) _LoginResult(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("LoginResult")
-		case "jwtToken":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LoginResult_jwtToken(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "userId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._LoginResult_userId(ctx, field, obj)

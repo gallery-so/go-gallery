@@ -67,8 +67,6 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			return
 		}
 
-		auth.SetJWTCookie(c, output.JWTtoken)
-
 		c.JSON(http.StatusOK, output)
 	}
 }

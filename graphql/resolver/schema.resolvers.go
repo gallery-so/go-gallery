@@ -6,12 +6,13 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/user"
 
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/user"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error) {
@@ -47,7 +48,7 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context) (*model.Refre
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayload, error) {
-	gc := GinContextFromContext(ctx)
+	gc := util.GinContextFromContext(ctx)
 
 	// TODO: This currently gets its value from the AuthOptional middleware applied to the entire GraphQL endpoint,
 	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
@@ -71,7 +72,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error) {
-	gc := GinContextFromContext(ctx)
+	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.CreateUserPayload, error) {
@@ -95,12 +96,11 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		return remapError(err)
 	}
 
-	auth.SetJWTCookie(gc, *output.JwtToken)
 	return output, nil
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error) {
-	gc := GinContextFromContext(ctx)
+	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.LoginPayload, error) {
@@ -124,7 +124,6 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 		return remapError(err)
 	}
 
-	auth.SetJWTCookie(gc, *output.JwtToken)
 	return output, nil
 }
 
