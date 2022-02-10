@@ -72,10 +72,10 @@ func TestUpdateCollectionCollectorsNoteByID_Failure_TooLong(t *testing.T) {
 		OwnerAddress:   tc.user1.address,
 		CollectorsNote: "asd",
 	}
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 	assert.Nil(err)
 	// seed DB with collection
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), persist.CollectionDB{
+	collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
 		Name:        "very cool collection",
 		OwnerUserID: tc.user1.id,
 		NFTs:        []persist.DBID{nftID},
