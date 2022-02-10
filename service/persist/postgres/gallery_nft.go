@@ -225,6 +225,9 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			galleries[gallery.ID] = gallery
 		}
 
+		if collection.ID == "" {
+			continue
+		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
@@ -232,16 +235,17 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 
 		if lastCollID != collection.ID {
-			logrus.Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
+			logrus.Debugf("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
-				logrus.Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
+				logrus.Debugf("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
 			} else {
 				collection.NFTs = []persist.CollectionNFT{}
-				logrus.Infof("No NFTs found for collection %s", collection.ID)
+				logrus.Debugf("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
 		} else {
+			logrus.Debugf("Already seen: Adding NFT %s to collection at end of current colls len %d", nft.ID, len(colls))
 			lastColl := colls[len(colls)-1]
 			lastColl.NFTs = append(lastColl.NFTs, nft)
 			colls[len(colls)-1] = lastColl
@@ -318,6 +322,10 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		}
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
+		}
+
+		if collection.ID == "" {
+			continue
 		}
 
 		colls, ok := collections[gallery.ID]

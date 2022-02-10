@@ -43,6 +43,7 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 		logrus.Infof("updating snapshot: %d", len(input.Snapshot))
 		rwMutex.Lock()
 		defer rwMutex.Unlock()
+
 		writeSnapshot(c, stg, input.Snapshot)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

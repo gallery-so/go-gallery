@@ -42,10 +42,14 @@ type TestConfig struct {
 var tc *TestConfig
 var ts *httptest.Server
 
+type TestWallet struct {
+	pk      *ecdsa.PrivateKey
+	address persist.Address
+}
+
 type TestUser struct {
+	*TestWallet
 	id       persist.DBID
-	pk       *ecdsa.PrivateKey
-	address  persist.Address
 	jwt      string
 	username string
 	client   *http.Client
@@ -60,12 +64,12 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 	a.NoError(err)
 
 	pub := crypto.PubkeyToAddress(pk.PublicKey).String()
-	address := persist.Address(strings.ToLower(pub))
+	wallet := TestWallet{pk, persist.Address(strings.ToLower(pub))}
 
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
-		Addresses:          []persist.Address{address},
+		Addresses:          []persist.Address{wallet.address},
 	}
 	id, err := repos.userRepository.Create(ctx, user)
 	a.NoError(err)
@@ -79,9 +83,9 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 	}
 
 	getFakeCookie(a, jwt, c)
-	auth.NonceRotate(ctx, address, id, repos.nonceRepository)
+	auth.NonceRotate(ctx, wallet.address, id, repos.nonceRepository)
 	log.Info(id, username)
-	return &TestUser{id, pk, address, jwt, username, c}
+	return &TestUser{&wallet, id, jwt, username, c}
 }
 
 // Should be called at the beginning of every integration test

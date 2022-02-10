@@ -69,3 +69,15 @@ go test -run {testName}
 ```
 
 Add `-v` for detailed logs.
+
+Skip longer running tests with the `-short` flag:
+```bash
+go test -short
+```
+
+### Integration Testing
+
+Run integration tests against ethereum mainnet:
+```bash
+go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+```
