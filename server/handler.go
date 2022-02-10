@@ -109,6 +109,9 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.userRepository, ethClient), getUnassignedTokensForUser(repos.collectionTokenRepository, repos.tokenRepository, ipfsClient, ethClient))
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
+	proxy := parent.Group("/proxy")
+	proxy.GET("/snapshot", proxySnapshot())
+
 	parent.GET("/health", healthcheck())
 
 }
@@ -151,6 +154,9 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.userRepository, ethClient), updateNftByID(repos.nftRepository))
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.userRepository, ethClient), getUnassignedNftsForUser(repos.collectionRepository))
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedNftsForUser(repos.collectionRepository))
+
+	proxy := parent.Group("/proxy")
+	proxy.GET("/snapshot", proxySnapshot())
 
 	parent.GET("/health", healthcheck())
 
