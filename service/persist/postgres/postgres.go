@@ -19,18 +19,15 @@ func NewClient() *sql.DB {
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
-	var psqlInfo string
-	if viper.GetString("ENV") != "local" {
-		psqlInfo = fmt.Sprintf("user=%s password=%s dbname=%s host=%s", dbUser, dbPwd, dbName, dbHost)
-	} else {
-		psqlInfo = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", dbHost, dbPort, dbUser, dbPwd, dbName)
-	}
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
 
 	db, err := sql.Open("pgx", psqlInfo)
 	if err != nil {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
+
+	db.SetMaxOpenConns(100)
 
 	err = db.Ping()
 	if err != nil {

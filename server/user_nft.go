@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -35,7 +36,7 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 	}
 }
 
-func removeAddresses(userRepository persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
+func removeAddresses(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.RemoveUserAddressesInput{}
@@ -51,13 +52,34 @@ func removeAddresses(userRepository persist.UserRepository, collRepo persist.Col
 			return
 		}
 
-		err := user.RemoveAddressesFromUser(c, userID, input, userRepository, collRepo)
+		err := user.RemoveAddressesFromUser(c, userID, input, userRepository)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+
+	}
+}
+
+func getNFTPreviews(galleryRepository persist.GalleryRepository, userRepository persist.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := nft.GetPreviewsForUserInput{}
+
+		if err := c.ShouldBindQuery(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		output, err := nft.GetPreviewsForUser(c, galleryRepository, userRepository, input)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, getPreviewsForUserOutput{Previews: output})
 
 	}
 }

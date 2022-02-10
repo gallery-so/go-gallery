@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -40,9 +42,14 @@ type TestConfig struct {
 var tc *TestConfig
 var ts *httptest.Server
 
+type TestWallet struct {
+	pk      *ecdsa.PrivateKey
+	address persist.Address
+}
+
 type TestUser struct {
+	*TestWallet
 	id       persist.DBID
-	address  persist.Address
 	jwt      string
 	username string
 	client   *http.Client
@@ -53,11 +60,16 @@ func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt str
 
 	username := util.RandStringBytes(40)
 
-	address := persist.Address(strings.ToLower(fmt.Sprintf("0x%s", util.RandHexString(40))))
+	pk, err := crypto.GenerateKey()
+	a.NoError(err)
+
+	pub := crypto.PubkeyToAddress(pk.PublicKey).String()
+	wallet := TestWallet{pk, persist.Address(strings.ToLower(pub))}
+
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
-		Addresses:          []persist.Address{address},
+		Addresses:          []persist.Address{wallet.address},
 	}
 	id, err := repos.UserRepository.Create(ctx, user)
 	a.NoError(err)
@@ -71,13 +83,13 @@ func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt str
 	}
 
 	getFakeCookie(a, jwt, c)
-	auth.NonceRotate(ctx, address, id, repos.NonceRepository)
+	auth.NonceRotate(ctx, wallet.address, id, repos.NonceRepository)
 	log.Info(id, username)
-	return &TestUser{id, address, jwt, username, c}
+	return &TestUser{&wallet, id, jwt, username, c}
 }
 
 // Should be called at the beginning of every integration test
-// Initializes the runtime, connects to mongodb, and starts a test server
+// Initializes the runtime and starts a test server
 func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 	setDefaults()
 
@@ -85,11 +97,15 @@ func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 		db = postgres.NewClient()
 	}
 
-	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
+	return initializeTestServer(db, a, v)
+}
+
+func initializeTestServer(db *sql.DB, a *assert.Assertions, v int) *TestConfig {
 	router := CoreInit(db)
 	router.POST("/fake-cookie", fakeCookie)
 	ts = httptest.NewServer(router)
 
+	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	repos := newRepos(db)
 	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
 	log.Infof("test server connected at %s ✅", ts.URL)

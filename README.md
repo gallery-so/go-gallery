@@ -26,15 +26,15 @@ This will generate a binary within `./bin/main`. To run the binary, simply:
 $ ./bin/main
 ```
 
-### Mongo and Redis and Postgres
+### Redis and Postgres
 
-The app will connect to a local mongo instance, local redis, and local postgres instance by default. To spin it up, you can use the official docker containers:
+The app will connect to a local redis and local postgres instance by default. To spin it up, you can use the official docker containers:
 
 ```bash
 $ docker-compose up -d
 ```
 
-To remove running mongo and redis instance:
+To remove running redis and postgres instance:
 
 ```bash
 $ docker-compose down
@@ -45,7 +45,7 @@ $ docker-compose down
 Verify that the server is running by calling the `/v1/health` endpoint.
 
 ```bash
-$ curl localhost:4000/v1/health
+$ curl localhost:4000/glry/v1/health
 ```
 
 ## Testing
@@ -68,4 +68,16 @@ Run a specific test by passing the name as an option:
 go test -run {testName}
 ```
 
-Add `-v` for detailed logs
+Add `-v` for detailed logs.
+
+Skip longer running tests with the `-short` flag:
+```bash
+go test -short
+```
+
+### Integration Testing
+
+Run integration tests against ethereum mainnet:
+```bash
+go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+```

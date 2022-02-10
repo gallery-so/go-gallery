@@ -29,7 +29,7 @@ var errMustResolveENS = errors.New("ENS username must resolve to owner address")
 // UpdateUserInput is the input for the user update pipeline
 type UpdateUserInput struct {
 	UserName string `json:"username" binding:"username"`
-	BioStr   string `json:"bio"`
+	BioStr   string `json:"bio" binding:"medium"`
 }
 
 // GetUserInput is the input for the user get pipeline
@@ -82,6 +82,16 @@ type AddAddressPubSubInput struct {
 	UserID  persist.DBID    `json:"user_id"`
 	Address persist.Address `json:"address"`
 }
+
+// MergeUsersInput is the input for the user merge pipeline
+type MergeUsersInput struct {
+	SecondUserID persist.DBID    `json:"second_user_id" binding:"required"`
+	Signature    string          `json:"signature" binding:"signature"`
+	Nonce        string          `json:"nonce"`
+	Address      persist.Address `json:"address"   binding:"required,eth_addr"`
+	WalletType   auth.WalletType `json:"wallet_type"`
+}
+
 type errUserNotFound struct {
 	userID   persist.DBID
 	address  persist.Address
@@ -294,7 +304,7 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
+	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -305,15 +315,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return errUserCannotRemoveAllAddresses
 	}
 
-	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	err = collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	return nil
+	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
@@ -392,7 +394,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository) error {
+	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -403,11 +405,8 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 		return errUserCannotRemoveAllAddresses
 	}
 
-	err = userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
-	if err != nil {
-		return err
-	}
-	return collRepo.RemoveNFTsOfAddresses(pCtx, pUserID, pInput.Addresses)
+	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
+
 }
 
 // GetUser returns a user by ID or address or username
@@ -485,6 +484,37 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		return err
 	}
 	return nil
+}
+
+// MergeUsers merges two users together
+func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, pUserID persist.DBID, pInput MergeUsersInput, ethClient *ethclient.Client) error {
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+	if nonce == "" {
+		return errNonceNotFound{address: pInput.Address}
+	}
+	if id != pInput.SecondUserID {
+		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
+	}
+
+	if pInput.WalletType != auth.WalletTypeEOA {
+		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
+			return auth.ErrNonceMismatch
+		}
+	}
+
+	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
+		nonce,
+		pInput.Address, pInput.WalletType, ethClient)
+	if err != nil {
+		return err
+	}
+
+	if !sigValidBool {
+		return fmt.Errorf("signature is invalid for address %s", pInput.Address)
+	}
+
+	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
+
 }
 
 func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID) error {

@@ -28,7 +28,7 @@ import (
 )
 
 // Init initializes the server
-func init() {
+func Init() {
 	setDefaults()
 
 	router := CoreInit(postgres.NewClient())
@@ -53,8 +53,8 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
-		v.RegisterValidation("short_string", validate.ShortStringValidator)
-		v.RegisterValidation("medium_string", validate.MediumStringValidator)
+		v.RegisterValidation("medium", validate.MediumStringValidator)
+		v.RegisterValidation("collectors_note", validate.CollectorsNoteValidator)
 		v.RegisterValidation("eth_addr", validate.EthValidator)
 		v.RegisterValidation("nonce", validate.NonceValidator)
 		v.RegisterValidation("signature", validate.SignatureValidator)
@@ -83,7 +83,7 @@ func setDefaults() {
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
-	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "deploy/service-key.json")
+	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("REQUIRE_NFTS", false)

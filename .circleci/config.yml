@@ -3,19 +3,23 @@ workflows:
   main:
     jobs:
       - build
+      - integration-tests
+      - unit-tests:
+          requires:
+            - build
       - deploy:
           filters:
             branches:
               only:
                 - "main"
+      - post-deploy:
+          requires:
+            - deploy
 jobs:
   build:
     working_directory: ~/go-gallery
     docker:
       - image: cimg/go:1.16
-      - image: mongo:latest
-      - image: redis:latest
-      - image: bcgallery/gallery-postgres:circle
     steps:
       - checkout
       - restore_cache:
@@ -28,11 +32,82 @@ jobs:
           key: go-mod-v5-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+  unit-tests:
+    working_directory: ~/go-gallery
+    docker:
+      - image: cimg/go:1.16
+      - image: redis:6
+      - image: bcgallery/gallery-postgres:circle
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v5-{{ checksum "go.sum" }}
       - run:
           name: Run tests
           command: |
             mkdir -p /tmp/test-reports
-            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
+      - store_test_results:
+          path: /tmp/test-reports
+  # using a machine executor to run docker, which in turn installs postgres + redis and runs underlying tests
+  # https://circleci.com/docs/2.0/executor-types/#using-machine
+  integration-tests:
+    working_directory: ~/go-gallery
+    machine:
+      image: ubuntu-2004:202111-02
+      docker_layer_caching: false  # can enable when on performance plan
+    environment:
+      GO_VERSION: 1.16.13
+      GOTESTSUM_VERSION: 1.7.0
+    steps:
+      - checkout
+      - run:
+          name: Install Go
+          command: |
+            mkdir -p ~/bin ~/go
+            curl -L --output - https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz | tar xz -C ~/bin
+            echo 'export GOROOT=~/bin/go' >> $BASH_ENV
+            echo 'export GOPATH=~/go' >> $BASH_ENV
+            echo 'export PATH=$GOROOT/bin:$GOPATH/bin:$PATH' >> $BASH_ENV
+      - restore_cache:
+          keys:
+            - go-mod-v1-usr-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: |
+            go mod download
+            go get gotest.tools/gotestsum@v$GOTESTSUM_VERSION
+      - save_cache:
+          key: go-mod-v1-usr-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
+      - run:
+          name: "Update apt"
+          command: sudo apt-get update
+      - run:
+          name: "Install Keybase"
+          command: |
+            curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+            sudo apt install ./keybase_amd64.deb
+            run_keybase -g
+      - run:
+          name: "Oneshot Keybase"
+          command: "keybase oneshot"
+      - run:
+          name: "Decrypt secrets"
+          command: keybase decrypt -i _encrypted_internal -o _internal.zip
+      - run:
+          name: "Install cli dependencies"
+          command: sudo apt-get -y install unzip
+      - run:
+          name: "Unzip secrets file"
+          command: echo "A" | unzip _internal.zip
+      - run:
+          name: Run integration-tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
       - store_test_results:
           path: /tmp/test-reports
   deploy:
@@ -46,7 +121,7 @@ jobs:
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: keybase decrypt -i secrits -o deploy.zip
+          command: keybase decrypt -i _encrypted_deploy -o _deploy.zip
       - run:
           name: "Update apt"
           command: apt-get update
@@ -55,7 +130,7 @@ jobs:
           command: apt-get -y install unzip curl sudo python3
       - run:
           name: "Unzip secrets file"
-          command: echo "A" | unzip deploy.zip
+          command: echo "A" | unzip _deploy.zip
       - run:
           name: "Copy Backend app.yaml"
           command: cp -R dev/app-dev-backend.yaml ./app-backend.yaml
@@ -110,3 +185,39 @@ jobs:
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
+  post-deploy:
+    working_directory: ~/go-gallery
+    docker:
+      - image: cimg/base:stable
+    environment:
+      - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
+      - GRACE: 20
+      - TIMES: 5
+      - INTERVAL: 10
+    steps:
+      - run:
+          name: "Ping Backend"
+          command: |
+            echo "-------------------------------"
+            echo " INFO: letting backend startup "
+            echo "-------------------------------"
+            sleep $GRACE
+
+            for ((i=0; i<$TIMES; i++)); do
+            if [[ -z $(curl -XGET -Is $HEALTH_URL | head -n1 | grep 200) ]]; then
+              echo "-------------------------------"
+              echo " INFO: [attempt $i] waiting... "
+              echo "-------------------------------"
+              sleep $INTERVAL
+            else
+              echo "-------------------------------"
+              echo " INFO: backend is operational! "
+              echo "-------------------------------"
+              exit 0
+            fi
+            done
+
+            echo "-------------------------------"
+            echo " ERROR: failed to hit backend! "
+            echo "-------------------------------"
+            exit 1

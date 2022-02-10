@@ -1,15 +1,18 @@
 package admin
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/api/option"
 )
 
 // Init initializes the server
@@ -36,7 +39,18 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	router := gin.Default()
 	router.Use(middleware.ErrLogger())
 
-	return handlersInit(router, pqClient, newStatements(pqClient), newEthClient())
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	return handlersInit(router, pqClient, newStatements(pqClient), newEthClient(), s)
 }
 
 func setDefaults() {
@@ -48,11 +62,12 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "deploy/service-key.json")
+	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
+	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 
 	viper.AutomaticEnv()
 

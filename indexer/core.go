@@ -34,15 +34,13 @@ func coreInit() (*gin.Engine, *Indexer) {
 
 	setDefaults()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-
 	tokenRepo, contractRepo, userRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./deploy/service-key.json"))
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
 		panic(err)
@@ -50,11 +48,13 @@ func coreInit() (*gin.Engine, *Indexer) {
 	ipfsClient := newIPFSShell()
 	ethClient := newEthClient()
 	tq := task.NewQueue()
+
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 	i := NewIndexer(ethClient, ipfsClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
-	if viper.GetString("ENV") == "local" {
+	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}

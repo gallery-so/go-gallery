@@ -3,11 +3,12 @@ package admin
 import (
 	"database/sql"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 )
 
-func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethclient.Client) *gin.Engine {
+func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethclient.Client, stg *storage.Client) *gin.Engine {
 	api := router.Group("/admin/v1")
 
 	users := api.Group("/users")
@@ -22,9 +23,19 @@ func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethc
 
 	nfts := api.Group("/nfts")
 	nfts.GET("/get", getNFTs(stmts.nftRepo))
+	nfts.POST("/opensea", refreshOpensea(stmts.nftRepo, stmts.userRepo, stmts.collRepo))
 
 	galleries := api.Group("/galleries")
 	galleries.GET("/get", getGalleries(stmts.galleryRepo))
+
+	snapshot := api.Group("/snapshot")
+	snapshot.GET("/get", getSnapshot(stg))
+	snapshot.POST("/update", updateSnapshot(stg))
+
+	collections := api.Group("/collections")
+	collections.GET("/get", getCollections(stmts.getCollectionsStmt))
+	collections.POST("/update", updateCollection(stmts.updateCollectionStmt))
+	collections.POST("/delete", deleteCollection(stmts.deleteCollectionStmt))
 
 	return router
 }

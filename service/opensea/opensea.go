@@ -106,14 +106,9 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 		pOwnerWalletAddresses = user.Addresses
 	}
 
-	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
+	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
-		return fmt.Errorf("failed to fetch assets for user %s: %w", pUserID, err)
-	}
-
-	ids, err := nftRepo.BulkUpsert(pCtx, pUserID, asDBNfts)
-	if err != nil {
-		return fmt.Errorf("failed to bulk upsert NFTs: %w", err)
+		return err
 	}
 
 	// update other user's collections and this user's collection so that they and ONLY they can display these
@@ -121,8 +116,27 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
 		return fmt.Errorf("failed to claim NFTs: %w", err)
 	}
+	if err := collRepo.RemoveNFTsOfOldAddresses(pCtx, pUserID); err != nil {
+		return fmt.Errorf("failed to remove NFTs of old addresses: %w", err)
+	}
 
 	return nil
+}
+
+// UpdateAssetsForWallet is a pipeline for getting assets for a wallet
+func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.DBID, error) {
+	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch assets for wallets %v: %w", pOwnerWalletAddresses, err)
+	}
+	logrus.Debugf("found %d assets for wallets %v", len(asDBNfts), pOwnerWalletAddresses)
+
+	ids, err := nftRepo.BulkUpsert(pCtx, asDBNfts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bulk upsert NFTs: %w", err)
+	}
+	logrus.Debugf("bulk upserted %d NFTs", len(ids))
+	return ids, nil
 }
 
 func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {

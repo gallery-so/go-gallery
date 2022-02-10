@@ -37,7 +37,10 @@ func TestAuthPreflightUserExists_Success(t *testing.T) {
 func TestAuthPreflightUserNotExists_Success(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	resp := getPreflightRequest(assert, &TestUser{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", client: &http.Client{}})
+	resp := getPreflightRequest(assert, &TestUser{
+		TestWallet: &TestWallet{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
+		client:     &http.Client{}},
+	)
 	assertValidResponse(assert, resp)
 
 	type PreflightResp struct {
@@ -57,7 +60,11 @@ func TestAuthPreflightUserNotExistWithJWT_Success(t *testing.T) {
 	j, err := cookiejar.New(nil)
 	assert.Nil(err)
 	client := &http.Client{Jar: j}
-	tu := &TestUser{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5", client: client, jwt: tc.user1.jwt}
+	tu := &TestUser{
+		TestWallet: &TestWallet{address: "0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"},
+		client:     client,
+		jwt:        tc.user1.jwt,
+	}
 	getFakeCookie(assert, tu.jwt, tu.client)
 	resp := getPreflightRequest(assert, tu)
 	assertValidResponse(assert, resp)

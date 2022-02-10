@@ -243,8 +243,7 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 	var collection persist.CollectionToken
 	nfts := make([]persist.TokenInCollection, 0, 10)
 
-	i := 0
-	for ; res.Next(); i++ {
+	for res.Next() {
 		colID := collection.ID
 		var nft persist.TokenInCollection
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
@@ -437,6 +436,32 @@ func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, 
 		_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft, pID)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveNFTsOfOldAddresses removes nfts of addresses that a user no longer has
+func (c *CollectionTokenRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pUserID persist.DBID) error {
+	colls, err := c.GetByUserID(pCtx, pUserID, true)
+	if err != nil {
+		return err
+	}
+
+	var addresses []persist.Address
+	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses)); err != nil {
+		return err
+	}
+
+	for _, coll := range colls {
+		for _, nft := range coll.NFTs {
+			if !containsAddress(addresses, nft.OwnerAddress) {
+				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 

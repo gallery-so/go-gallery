@@ -78,16 +78,22 @@ var NonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return len(nonce) >= 10 && len(nonce) <= 150
 }
 
-// ShortStringValidator validates short strings
-var ShortStringValidator validator.Func = func(fl validator.FieldLevel) bool {
-	s := fl.Field().String()
-	return len(s) > 4 && len(s) < 50
-}
-
-// MediumStringValidator validates medium strings
+// MediumStringValidator validates short strings
 var MediumStringValidator validator.Func = func(fl validator.FieldLevel) bool {
 	s := fl.Field().String()
-	return len(s) < 500
+	if s == "" {
+		return true
+	}
+	return len(s) < 600
+}
+
+// CollectorsNoteValidator validates medium strings
+var CollectorsNoteValidator validator.Func = func(fl validator.FieldLevel) bool {
+	s := fl.Field().String()
+	if s == "" {
+		return true
+	}
+	return len(s) < 1200
 }
 
 // UsernameValidator ensures that usernames are not reserved, are alphanumeric with the exception of underscores and periods, and do not contain consecutive periods or underscores

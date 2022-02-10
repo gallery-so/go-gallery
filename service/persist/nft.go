@@ -69,6 +69,7 @@ type CollectionNFT struct {
 	ImageThumbnailURL    NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
 	ImagePreviewURL      NullString `bson:"image_preview_url"   json:"image_preview_url"`
 	AnimationOriginalURL NullString `bson:"animation_original_url" json:"animation_original_url"`
+	AnimationURL         NullString `bson:"animation_url" json:"animation_url"`
 }
 
 // NFTContract represents a smart contract's information for a given NFT
@@ -92,9 +93,16 @@ type ContractCollectionNFT struct {
 // NFTUpdateInfoInput represents a MongoDB input to update the user defined info
 // associated with a given NFT in the DB
 type NFTUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note"`
+	CollectorsNote NullString `json:"collectors_note"`
+}
+
+// NFTUpdateOwnerAddressInput represents an update to an NFTs owner address
+type NFTUpdateOwnerAddressInput struct {
+	LastUpdated LastUpdatedTime `json:"last_updated"`
+
+	OwnerAddress Address `json:"owner_address"`
 }
 
 // NFTRepository represents the interface for interacting with persisted NFTs
@@ -107,7 +115,8 @@ type NFTRepository interface {
 	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
 	GetByOpenseaID(context.Context, NullInt64, Address) ([]NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	BulkUpsert(context.Context, DBID, []NFT) ([]DBID, error)
+	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
+	BulkUpsert(context.Context, []NFT) ([]DBID, error)
 	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
 	OpenseaCacheSet(context.Context, []Address, []NFT) error
 	OpenseaCacheDelete(context.Context, []Address) error

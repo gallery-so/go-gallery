@@ -18,14 +18,16 @@ var insertNFTsSQL = `INSERT INTO nfts (ID, DELETED, VERSION, NAME, DESCRIPTION, 
 
 // NFTRepository is a repository that stores collections in a postgres database
 type NFTRepository struct {
-	db                    *sql.DB
-	createStmt            *sql.Stmt
-	getByAddressesStmt    *sql.Stmt
-	getByIDStmt           *sql.Stmt
-	getByContractDataStmt *sql.Stmt
-	getByOpenseaIDStmt    *sql.Stmt
-	getUserAddressesStmt  *sql.Stmt
-	updateInfoStmt        *sql.Stmt
+	db                           *sql.DB
+	createStmt                   *sql.Stmt
+	getByAddressesStmt           *sql.Stmt
+	getByIDStmt                  *sql.Stmt
+	getByContractDataStmt        *sql.Stmt
+	getByOpenseaIDStmt           *sql.Stmt
+	getUserAddressesStmt         *sql.Stmt
+	updateInfoStmt               *sql.Stmt
+	updateOwnerAddressStmt       *sql.Stmt
+	updateOwnerAddressUnsafeStmt *sql.Stmt
 
 	openseaCache         memstore.Cache
 	nftsCache            memstore.Cache
@@ -55,21 +57,29 @@ func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstor
 	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET LAST_UPDATED = $1, COLLECTORS_NOTE = $3 WHERE ID = $2 AND OWNER_ADDRESS = ANY($4);`)
+	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET LAST_UPDATED = $1, COLLECTORS_NOTE = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4);`)
+	checkNoErr(err)
+
+	updateOwnerAddressStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET OWNER_ADDRESS = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_ADDRESS = ANY($4);`)
+	checkNoErr(err)
+
+	updateOwnerAddressUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET OWNER_ADDRESS = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
 	checkNoErr(err)
 
 	return &NFTRepository{
-		db:                    db,
-		createStmt:            createStmt,
-		getByAddressesStmt:    getByAddressesStmt,
-		getByIDStmt:           getByIDStmt,
-		getByContractDataStmt: getByContractDataStmt,
-		getByOpenseaIDStmt:    getByOpenseaStmt,
-		getUserAddressesStmt:  getUserAddressesStmt,
-		updateInfoStmt:        updateInfoStmt,
-		openseaCache:          openseaCache,
-		nftsCache:             nftsCache,
-		nftsCacheUpdateQueue:  memstore.NewUpdateQueue(nftsCache),
+		db:                           db,
+		createStmt:                   createStmt,
+		getByAddressesStmt:           getByAddressesStmt,
+		getByIDStmt:                  getByIDStmt,
+		getByContractDataStmt:        getByContractDataStmt,
+		getByOpenseaIDStmt:           getByOpenseaStmt,
+		getUserAddressesStmt:         getUserAddressesStmt,
+		updateInfoStmt:               updateInfoStmt,
+		updateOwnerAddressStmt:       updateOwnerAddressStmt,
+		updateOwnerAddressUnsafeStmt: updateOwnerAddressUnsafeStmt,
+		openseaCache:                 openseaCache,
+		nftsCache:                    nftsCache,
+		nftsCacheUpdateQueue:         memstore.NewUpdateQueue(nftsCache),
 	}
 }
 
@@ -237,7 +247,7 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 	switch pUpdate.(type) {
 	case persist.NFTUpdateInfoInput:
 		update := pUpdate.(persist.NFTUpdateInfoInput)
-		it, err := n.updateInfoStmt.ExecContext(pCtx, time.Now(), pID, update.CollectorsNote, pq.Array(userAddresses))
+		it, err := n.updateInfoStmt.ExecContext(pCtx, time.Now(), update.CollectorsNote, pID, pq.Array(userAddresses))
 		if err != nil {
 			return err
 		}
@@ -248,6 +258,45 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 		if rows == 0 {
 			return persist.ErrNFTNotFoundByID{ID: pID}
 		}
+	case persist.NFTUpdateOwnerAddressInput:
+		update := pUpdate.(persist.NFTUpdateOwnerAddressInput)
+		it, err := n.updateOwnerAddressStmt.ExecContext(pCtx, update.OwnerAddress, time.Now(), pID, pq.Array(userAddresses))
+		if err != nil {
+			return err
+		}
+		rows, err := it.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return persist.ErrNFTNotFoundByID{ID: pID}
+		}
+
+	default:
+		return fmt.Errorf("unsupported update type: %T", pUpdate)
+	}
+
+	return nil
+}
+
+// UpdateByIDUnsafe updates a NFT by its ID without ensure the NFT is owned by the user
+func (n *NFTRepository) UpdateByIDUnsafe(pCtx context.Context, pID persist.DBID, pUpdate interface{}) error {
+
+	switch pUpdate.(type) {
+	case persist.NFTUpdateOwnerAddressInput:
+		update := pUpdate.(persist.NFTUpdateOwnerAddressInput)
+		it, err := n.updateOwnerAddressUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, time.Now(), pID)
+		if err != nil {
+			return err
+		}
+		rows, err := it.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return persist.ErrNFTNotFoundByID{ID: pID}
+		}
+
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -256,7 +305,7 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 }
 
 // BulkUpsert inserts or updates multiple NFTs
-func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, pNFTs []persist.NFT) ([]persist.DBID, error) {
+func (n *NFTRepository) BulkUpsert(pCtx context.Context, pNFTs []persist.NFT) ([]persist.DBID, error) {
 	sqlStr := insertNFTsSQL
 
 	resultIDs := make([]persist.DBID, len(pNFTs))
@@ -270,7 +319,7 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pUserID persist.DBID, p
 	if len(pNFTs) > rowsPerQuery {
 		next := pNFTs[rowsPerQuery:]
 		current := pNFTs[:rowsPerQuery]
-		ids, err := n.BulkUpsert(pCtx, pUserID, next)
+		ids, err := n.BulkUpsert(pCtx, next)
 		if err != nil {
 			return nil, err
 		}
