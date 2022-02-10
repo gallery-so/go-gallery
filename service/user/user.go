@@ -490,7 +490,7 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, pUserID persist.DBID, pInput MergeUsersInput, ethClient *ethclient.Client) error {
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return errNonceNotFound{address: pInput.Address}
+		return auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != pInput.SecondUserID {
 		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
