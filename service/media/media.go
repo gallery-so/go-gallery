@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"net"
@@ -50,26 +49,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	res := persist.Media{}
 
-	imgURL := ""
-	vURL := ""
-
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
-		logrus.Infof("found initial animation url for %s: %s", name, it)
-		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
-		logrus.Infof("found initial video url for %s: %s", name, it)
-		vURL = it
-	}
-
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
-		logrus.Infof("found initial image url for %s: %s", name, it)
-		imgURL = it
-	}
-
-	if imgURL == "" {
-		logrus.Infof("no image url found for %s - using token URI %s", name, turi)
-		imgURL = turi.String()
-	}
+	imgURL, vURL := findInitialURLs(metadata, name, turi)
 
 	asURI := persist.TokenURI(imgURL)
 	switch asURI.Type() {
@@ -125,7 +105,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 	}
-	res.MediaType = mediaType
 
 	vURLAsURI := persist.TokenURI(vURL)
 	imgURLAsURI := persist.TokenURI(imgURL)
@@ -141,66 +120,16 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	switch mediaType {
 	case persist.MediaTypeImage:
-		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
-		if err == nil {
-			logrus.Infof("found imageURL for %s: %s", name, imageURL)
-			res.MediaURL = persist.NullString(imageURL)
-		} else {
-			res.MediaURL = persist.NullString(imgURL)
-		}
-	case persist.MediaTypeVideo:
-		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
-		if err == nil {
-			logrus.Infof("found imageURL for video for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else {
-			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-			if err == nil {
-				logrus.Infof("found thumbnailURL for video for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL)
-			} else {
-				logrus.WithError(err).Error("could not get image serving URL")
-			}
-		}
-		if vURL != "" {
-			logrus.Infof("using videoURL for videofor %s: %s", name, vURL)
-			res.MediaURL = persist.NullString(vURL)
-		} else if imageURL != "" {
-			logrus.Infof("using imageURL for video for %s: %s", name, imageURL)
-			res.MediaURL = persist.NullString(imageURL)
-		} else if imgURL != "" {
-			logrus.Infof("using imgURL for video for %s: %s", name, imgURL)
-			res.MediaURL = persist.NullString(imgURL)
-		}
-	case persist.MediaTypeAudio, persist.MediaTypeHTML:
-		imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
-		if err == nil {
-			logrus.Infof("found imageURL for audio/html for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else {
-			logrus.Infof("could not get image serving URL for audio/htm for %s", name)
-			imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-			if err == nil {
-				logrus.Infof("found thumbnailURL for audio/html for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL)
-			} else {
-				logrus.WithError(err).Error("could not get image serving URL")
-			}
-		}
-		if vURL != "" {
-			logrus.Infof("using vURL for audio/html for %s: %s", name, vURL)
-			res.MediaURL = persist.NullString(vURL)
-		} else if imageURL != "" {
-			logrus.Infof("using imageURL for audio/htmlfor %s: %s", name, imageURL)
-			res.MediaURL = persist.NullString(imageURL)
-		} else if imgURL != "" {
-			logrus.Infof("using imgURL for audio/html for %s: %s", name, imgURL)
-			res.MediaURL = persist.NullString(imgURL)
-		}
+		res = getImageMedia(pCtx, name, storageClient, vURL, imgURL)
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML:
+		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
 	default:
 		if vURL != "" {
 			logrus.Infof("using vURL for %s: %s", name, vURL)
 			res.MediaURL = persist.NullString(vURL)
+			if imgURL != "" {
+				res.ThumbnailURL = persist.NullString(imgURL)
+			}
 		} else if imgURL != "" {
 			logrus.Infof("using imgURL for %s: %s", name, imgURL)
 			res.MediaURL = persist.NullString(imgURL)
@@ -210,6 +139,88 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	logrus.Infof("media for %s of type %s: %+v", name, mediaType, res)
 
 	return res, nil
+}
+
+func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL string, imgURL string, mediaType persist.MediaType) persist.Media {
+	res := persist.Media{
+		MediaType: mediaType,
+	}
+	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+	if err == nil {
+		logrus.Infof("found imageURL for %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else {
+		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+		if err == nil {
+			logrus.Infof("found thumbnailURL for %s: %s", name, imageURL)
+			res.ThumbnailURL = persist.NullString(imageURL)
+		} else {
+			logrus.WithError(err).Error("could not get image serving URL")
+		}
+	}
+	if vURL != "" {
+		logrus.Infof("using vURL %s: %s", name, vURL)
+		res.MediaURL = persist.NullString(vURL)
+		if imageURL != "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		} else if imgURL != "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		}
+	} else if imageURL != "" {
+		logrus.Infof("using imageURL for %s: %s", name, imageURL)
+		res.MediaURL = persist.NullString(imageURL)
+	} else if imgURL != "" {
+		logrus.Infof("using imgURL for %s: %s", name, imgURL)
+		res.MediaURL = persist.NullString(imgURL)
+	}
+	return res
+}
+
+func getImageMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL string, imgURL string) persist.Media {
+	res := persist.Media{
+		MediaType: persist.MediaTypeImage,
+	}
+	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+	if err == nil {
+		logrus.Infof("found imageURL for %s: %s", name, imageURL)
+		res.MediaURL = persist.NullString(imageURL)
+	} else {
+		if vURL != "" {
+			logrus.Infof("using vURL for %s: %s", name, vURL)
+			res.MediaURL = persist.NullString(vURL)
+			if imgURL != "" {
+				res.ThumbnailURL = persist.NullString(imgURL)
+			}
+		} else if imgURL != "" {
+			logrus.Infof("using imgURL for %s: %s", name, imgURL)
+			res.MediaURL = persist.NullString(imgURL)
+		}
+	}
+	return res
+}
+
+func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (string, string) {
+	imgURL := ""
+	vURL := ""
+
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
+		logrus.Infof("found initial animation url for %s: %s", name, it)
+		vURL = it
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
+		logrus.Infof("found initial video url for %s: %s", name, it)
+		vURL = it
+	}
+
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
+		logrus.Infof("found initial image url for %s: %s", name, it)
+		imgURL = it
+	}
+
+	if imgURL == "" {
+		logrus.Infof("no image url found for %s - using token URI %s", name, turi)
+		imgURL = turi.String()
+	}
+	return imgURL, vURL
 }
 
 func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) error {
@@ -308,42 +319,23 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name))
 	case persist.MediaTypeGIF:
-		// thumbnails a gif, do we need to store the whole gif?
-		asGif, err := gif.DecodeAll(bytes.NewReader(buf.Bytes()))
-		if err != nil {
-			return mediaType, fmt.Errorf("error decoding gif: %s", err)
-		}
-		buf = &bytes.Buffer{}
-		err = jpeg.Encode(buf, resize.Thumbnail(1024, 1024, asGif.Image[0], resize.NearestNeighbor), nil)
-		if err != nil {
-			return mediaType, fmt.Errorf("error encoding gif thumbnail as jpeg: %s", err)
-		}
-		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+		return persist.MediaTypeGIF, nil
 	case persist.MediaTypeHTML:
 		return persist.MediaTypeHTML, nil
 	case persist.MediaTypeAudio:
 		return persist.MediaTypeAudio, nil
 	default:
-		img, _, err := image.Decode(buf)
+		_, _, err := image.Decode(buf)
 		if err != nil {
-			logrus.WithError(err).Error("could not decode image")
-			if png, err := png.Decode(buf); err == nil {
-				img = png
-			} else if jpg, err := jpeg.Decode(buf); err == nil {
-				img = jpg
-			} else {
+			_, pngErr := png.Decode(buf)
+			_, jpgErr := jpeg.Decode(buf)
+			if pngErr != nil && jpgErr != nil {
 				return mediaType, fmt.Errorf("could not decode image as jpg or png %s", err.Error())
 			}
 		}
 
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
-			img = resize.Thumbnail(2048, 2048, img, resize.NearestNeighbor)
-			buf = &bytes.Buffer{}
-			err = jpeg.Encode(buf, img, nil)
-			if err != nil {
-				return mediaType, fmt.Errorf("could not encode image as png: %s", err.Error())
-			}
 			return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
 		default:
 			return persist.MediaTypeImage, nil
