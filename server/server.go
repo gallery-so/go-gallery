@@ -81,7 +81,23 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub())
+	s := newStorageClient()
+
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), s, newGCPPubSub())
+}
+
+func newStorageClient() *storage.Client {
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		logrus.Errorf("error creating storage client: %v", err)
+	}
+	return s
 }
 
 func setDefaults() {
@@ -110,6 +126,7 @@ func setDefaults() {
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
+	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 
 	viper.AutomaticEnv()
 
