@@ -6,6 +6,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/user"
 
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -70,7 +71,32 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	gc := GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.CreateUserPayload, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.CreateUserPayload); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
+
+	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	if err != nil {
+		return remapError(err)
+	}
+
+	output, err := user.CreateUser(ctx, authenticator, r.Repos.UserRepository, r.Repos.GalleryRepository)
+	if err != nil {
+		return remapError(err)
+	}
+
+	auth.SetJWTCookie(gc, *output.JwtToken)
+	return output, nil
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error) {

@@ -5,7 +5,6 @@ package graphql
 // helper functions without interfering with code generation.
 
 import (
-	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -63,24 +62,4 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	}
 
 	return nil, errNoAuthMechanismFound
-}
-
-func (r *mutationResolver) CreateUserWithEthereum(ctx context.Context, address string, nonce string, signature string, walletType auth.WalletType) (model.CreateUserPayload, error) {
-	gc := GinContextFromContext(ctx)
-
-	output, err := user.CreateUser(ctx, address, nonce, signature, walletType, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.GalleryRepository, r.EthClient)
-	if err != nil {
-		// Map known errors to GraphQL return types
-		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.CreateUserPayload); ok {
-				return returnType, nil
-			}
-		}
-
-		gc.Error(err)
-		return nil, err
-	}
-
-	auth.SetJWTCookie(gc, *output.JwtToken)
-	return output, nil
 }

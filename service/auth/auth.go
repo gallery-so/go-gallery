@@ -96,6 +96,15 @@ type GetPreflightOutput struct {
 	UserExists bool   `json:"user_exists"`
 }
 
+type Authenticator interface {
+	Authenticate(context.Context) (*AuthResult, error)
+}
+
+type AuthResult struct {
+	UserID    persist.DBID
+	Addresses []persist.Address
+}
+
 type ErrSignatureVerificationFailed struct {
 	WrappedErr error
 }
@@ -114,6 +123,14 @@ type ErrAddressDoesNotOwnRequiredNFT struct {
 
 func (e ErrAddressDoesNotOwnRequiredNFT) Error() string {
 	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
+}
+
+type ErrNonceNotFound struct {
+	Address persist.Address
+}
+
+func (e ErrNonceNotFound) Error() string {
+	return fmt.Sprintf("nonce not found for address: %s", e.Address)
 }
 
 // ErrUserNotFound is returned when a user is not found
@@ -135,35 +152,6 @@ func GenerateNonce() string {
 	return nonceStr
 }
 
-// LoginREST will run the login pipeline and memorize the result
-func LoginREST(pCtx context.Context, pInput LoginInput,
-	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
-
-	authenticator := EthereumNonceAuthenticator{
-		Address:    pInput.Address.String(),
-		Nonce:      pInput.Nonce,
-		Signature:  pInput.Signature,
-		WalletType: pInput.WalletType,
-		UserRepo:   userRepo,
-		NonceRepo:  nonceRepo,
-		EthClient:  ec,
-	}
-
-	gqlOutput, err := Login(pCtx, authenticator)
-	if err != nil {
-		return LoginOutput{}, err
-	}
-
-	output := LoginOutput{
-		SignatureValid: true,
-		JWTtoken:       *gqlOutput.JwtToken,
-		UserID:         persist.DBID(*gqlOutput.UserID),
-	}
-
-	return output, nil
-}
-
 type EthereumNonceAuthenticator struct {
 	Address    string
 	Nonce      string
@@ -174,22 +162,12 @@ type EthereumNonceAuthenticator struct {
 	EthClient  *ethclient.Client
 }
 
-type AuthResult struct {
-	userID    persist.DBID
-	addresses []persist.Address
-}
-
-type Authenticator interface {
-	Authenticate(context.Context) (*AuthResult, error)
-}
-
 func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 
 	address := persist.Address(e.Address)
 	nonce, userID, _ := GetUserWithNonce(pCtx, address, e.UserRepo, e.NonceRepo)
 	if nonce == "" {
-		// TODO: Move ErrNonceNotFound into this namespace. All existing uses are by things that will eventually use the new auth handling.
-		return nil, fmt.Errorf("NonceNotFoundForAddress -- TODO") // user.ErrNonceNotFound{Address: address}
+		return nil, ErrNonceNotFound{Address: address}
 	}
 
 	if e.WalletType != WalletTypeEOA {
@@ -224,7 +202,6 @@ func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthRes
 		addresses = make([]persist.Address, len(user.Addresses), len(user.Addresses)+1)
 		copy(addresses, user.Addresses)
 
-		// TODO: Test this, probably with the "add address to account" method
 		if !containsAddress(addresses, address) {
 			addresses = addresses[:cap(addresses)]
 			addresses[cap(addresses)-1] = address
@@ -234,11 +211,40 @@ func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthRes
 	}
 
 	authResult := AuthResult{
-		addresses: addresses,
-		userID:    userID,
+		Addresses: addresses,
+		UserID:    userID,
 	}
 
 	return &authResult, nil
+}
+
+// LoginREST will run the login pipeline and memorize the result
+func LoginREST(pCtx context.Context, pInput LoginInput,
+	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
+	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
+
+	authenticator := EthereumNonceAuthenticator{
+		Address:    pInput.Address.String(),
+		Nonce:      pInput.Nonce,
+		Signature:  pInput.Signature,
+		WalletType: pInput.WalletType,
+		UserRepo:   userRepo,
+		NonceRepo:  nonceRepo,
+		EthClient:  ec,
+	}
+
+	gqlOutput, err := Login(pCtx, authenticator)
+	if err != nil {
+		return LoginOutput{}, err
+	}
+
+	output := LoginOutput{
+		SignatureValid: true,
+		JWTtoken:       *gqlOutput.JwtToken,
+		UserID:         persist.DBID(*gqlOutput.UserID),
+	}
+
+	return output, nil
 }
 
 // Login logs in a user by validating their signed nonce
@@ -250,20 +256,20 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResul
 	}
 
 	// TODO: ErrUserNotFound accepts an address parameter, but we don't have one to supply here
-	// Might be worthwhile for an authenticator interface to have a method for some sort of credential/ID/info-dump string
-	// that we can use in situations like this
-	if authResult.userID == "" {
+	// Might be worthwhile for an authenticator interface to have a method for some sort of
+	//credential/ID/info-dump string that we can use in situations like this
+	if authResult.UserID == "" {
 		return nil, ErrUserNotFound{}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.userID)
+	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := model.LoginResult{
 		JwtToken: &jwtTokenStr,
-		UserID:   util.StringToPointer(authResult.userID.String()),
+		UserID:   util.StringToPointer(authResult.UserID.String()),
 	}
 
 	return &output, nil
@@ -539,7 +545,7 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 	return res
 }
 
-// ContainsAddress checks whether an address exists in a slice
+// containsAddress checks whether an address exists in a slice
 func containsAddress(a []persist.Address, b persist.Address) bool {
 	for _, v := range a {
 		if v == b {
