@@ -161,11 +161,6 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	if vURL != "" {
 		logrus.Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
-		if imageURL != "" {
-			res.ThumbnailURL = persist.NullString(imgURL)
-		} else if imgURL != "" {
-			res.ThumbnailURL = persist.NullString(imgURL)
-		}
 	} else if imageURL != "" {
 		logrus.Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
@@ -284,6 +279,8 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	} else if asURI.Type() == persist.URITypeSVG {
 		return persist.MediaTypeSVG, nil
 	}
+
+	// TODO function that checks url for file extension is img and protocol is https
 
 	downloadLock.Lock()
 	defer downloadLock.Unlock()

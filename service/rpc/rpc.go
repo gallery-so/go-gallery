@@ -88,7 +88,6 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 
 	var metadata persist.TokenMetadata
 	switch turi.Type() {
-
 	case persist.URITypeBase64SVG, persist.URITypeSVG:
 		metadata = persist.TokenMetadata{"image": string(bs)}
 	default:
