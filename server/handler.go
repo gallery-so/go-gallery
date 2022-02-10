@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -10,13 +11,13 @@ import (
 	"github.com/mikeydub/go-gallery/service/pubsub"
 )
 
-func handlersInit(router *gin.Engine, repos *repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, psub pubsub.PubSub) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 
-	nftHandlersInit(apiGroupV1, repos, ethClient, psub)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, psub)
+	nftHandlersInit(apiGroupV1, repos, ethClient, stg, psub)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, stg, psub)
 
 	return router
 }
@@ -74,7 +75,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *repositories, ethClient
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, psub pubsub.PubSub) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
@@ -110,13 +111,13 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedTokensForUser(repos.collectionTokenRepository))
 
 	proxy := parent.Group("/proxy")
-	proxy.GET("/snapshot", proxySnapshot())
+	proxy.GET("/snapshot", proxySnapshot(stg))
 
 	parent.GET("/health", healthcheck())
 
 }
 
-func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *ethclient.Client, psub pubsub.PubSub) {
+func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *ethclient.Client, stg *storage.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
@@ -156,7 +157,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *repositories, ethClient *et
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.userRepository, ethClient), refreshUnassignedNftsForUser(repos.collectionRepository))
 
 	proxy := parent.Group("/proxy")
-	proxy.GET("/snapshot", proxySnapshot())
+	proxy.GET("/snapshot", proxySnapshot(stg))
 
 	parent.GET("/health", healthcheck())
 

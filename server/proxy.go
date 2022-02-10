@@ -3,18 +3,21 @@ package server
 import (
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
-func proxySnapshot() gin.HandlerFunc {
+func proxySnapshot(stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		jsn, err := http.Get(viper.GetString("SNAPSHOT_LINK"))
+		obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
+		r, err := obj.NewReader(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		c.DataFromReader(http.StatusOK, jsn.ContentLength, "application/json", jsn.Body, nil)
+		defer r.Close()
+		c.DataFromReader(http.StatusOK, int64(r.Size()), "application/json", r, nil)
 	}
 }
