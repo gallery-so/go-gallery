@@ -95,6 +95,12 @@ func StringToPointer(str string) *string {
 // GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
 // or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
 func GinContextFromContext(ctx context.Context) *gin.Context {
+	// If the current context is already a gin context, return it
+	if gc, ok := ctx.(*gin.Context); ok {
+		return gc
+	}
+
+	// Otherwise, find the gin context that was stored via middleware
 	ginContext := ctx.Value(GinContextKey)
 	if ginContext == nil {
 		panic("gin.Context not found in current context")
