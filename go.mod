@@ -16,6 +16,7 @@ require (
 	github.com/containerd/continuity v0.2.2 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.15
+	github.com/everFinance/goar v1.3.9
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-playground/validator/v10 v10.10.0

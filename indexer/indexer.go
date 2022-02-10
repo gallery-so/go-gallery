@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -94,6 +95,7 @@ type balanceAtBlock struct {
 type Indexer struct {
 	ethClient     *ethclient.Client
 	ipfsClient    *shell.Shell
+	arweaveClient *goar.Client
 	storageClient *storage.Client
 	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
@@ -113,7 +115,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
 	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -123,6 +125,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, storageCli
 
 		ethClient:     ethClient,
 		ipfsClient:    ipfsClient,
+		arweaveClient: arweaveClient,
 		storageClient: storageClient,
 		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
@@ -549,7 +552,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				} else {
 					if uriReplaced != "" && uriReplaced != persist.InvalidTokenURI {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient)
+						metadata, err = rpc.GetMetadataFromURI(ctx, uriReplaced, i.ipfsClient, i.arweaveClient)
 						if err != nil {
 							switch err.(type) {
 							case rpc.ErrHTTP:

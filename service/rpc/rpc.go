@@ -2,10 +2,12 @@ package rpc
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -16,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -73,9 +76,9 @@ func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
-func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) (persist.TokenMetadata, error) {
+func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
-	bs, err := GetDataFromURI(ctx, turi, ipfsClient)
+	bs, err := GetDataFromURI(ctx, turi, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.TokenMetadata{}, err
 	}
@@ -101,7 +104,7 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 }
 
 // GetDataFromURI calls URI and returns the data
-func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell) ([]byte, error) {
+func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
 	client := &http.Client{}
 	deadline, ok := ctx.Deadline()
@@ -139,6 +142,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 
 		return buf.Bytes(), nil
+	case persist.URITypeArweave:
+		path := strings.ReplaceAll(asString, "arweave://", "")
+		path = strings.ReplaceAll(path, "ar://", "")
+		return getArweaveData(arweaveClient, path)
 	case persist.URITypeHTTP:
 
 		resp, err := client.Get(asString)
@@ -301,6 +308,48 @@ func GetContractCreator(ctx context.Context, contractAddress persist.Address, et
 		}
 	}
 	return "", fmt.Errorf("could not find contract creator")
+}
+
+func getArweaveData(client *goar.Client, id string) ([]byte, error) {
+	tx, err := client.GetTransactionByID(id)
+	if err != nil {
+		return nil, err
+	}
+	data, err := client.GetTransactionData(id)
+	if err != nil {
+		return nil, err
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(string(data))
+	if err == nil {
+		data = decoded
+	}
+
+	for _, tag := range tx.Tags {
+		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
+		if err != nil {
+			return nil, err
+		}
+		if strings.EqualFold(string(decodedName), "Content-Encoding") {
+			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
+			if err != nil {
+				return nil, err
+			}
+			if strings.EqualFold(string(decodedValue), "gzip") {
+				zipped, err := gzip.NewReader(bytes.NewReader(data))
+				if err != nil {
+					return nil, err
+				}
+				buf := new(bytes.Buffer)
+				_, err = io.Copy(buf, zipped)
+				if err != nil {
+					return nil, err
+				}
+				data = buf.Bytes()
+			}
+		}
+	}
+	return data, nil
 }
 
 func padHex(pHex string, pLength int) string {

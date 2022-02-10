@@ -11,6 +11,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -46,11 +47,12 @@ func coreInit() (*gin.Engine, *Indexer) {
 		panic(err)
 	}
 	ipfsClient := newIPFSShell()
+	arweaveClient := newArweaveClient()
 	ethClient := newEthClient()
 	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-	i := NewIndexer(ethClient, ipfsClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
@@ -60,7 +62,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func setDefaults() {
@@ -111,4 +113,8 @@ func redirectStderr(f *os.File) {
 	if err != nil {
 		log.Fatalf("Failed to redirect stderr to file: %v", err)
 	}
+}
+
+func newArweaveClient() *goar.Client {
+	return goar.NewClient("https://arweave.net")
 }

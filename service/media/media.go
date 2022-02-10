@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -43,7 +44,7 @@ type errUnsupportedMediaType struct {
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, ipfsClient *shell.Shell, storageClient *storage.Client) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
@@ -76,7 +77,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch asURI.Type() {
 	case persist.URITypeBase64SVG:
 		res.MediaType = persist.MediaTypeSVG
-		data, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient)
+		data, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 		if err != nil {
 			return persist.Media{}, fmt.Errorf("error getting data from base64 svg uri %s: %s", asURI, err)
 		}
@@ -93,7 +94,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		return res, nil
 	}
 
-	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient)
+	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient, arweaveClient)
 	if err != nil {
 		switch err.(type) {
 		case rpc.ErrHTTP:
@@ -111,7 +112,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	}
 	if vURL != "" {
 		logrus.Infof("video url for %s: %s", name, vURL)
-		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient)
+		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient, arweaveClient)
 		if err != nil {
 			switch err.(type) {
 			case rpc.ErrHTTP:
@@ -273,7 +274,7 @@ func getVideoURL(pCtx context.Context, bucketID, objectID string, client *storag
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell) (mediaType persist.MediaType, err error) {
+func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell, arweaveClient *goar.Client) (mediaType persist.MediaType, err error) {
 
 	asURI := persist.TokenURI(url)
 
@@ -285,7 +286,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	downloadLock.Lock()
 	defer downloadLock.Unlock()
-	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient)
+	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return mediaType, err
 	}

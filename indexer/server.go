@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -81,7 +82,7 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 	}
 }
 
-func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client) gin.HandlerFunc {
+func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -107,7 +108,7 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 
 		appCtx := appengine.WithContext(c, c.Request)
 
-		updates, errChan := updateMediaForTokens(appCtx, tokens, ethClient, ipfsClient, storageClient)
+		updates, errChan := updateMediaForTokens(appCtx, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
 		for i := 0; i < len(tokens); i++ {
 			select {
 			case update := <-updates:
@@ -136,7 +137,7 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 }
 
 // updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
-func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
+func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
 	updateChan := make(chan tokenUpdateMedia)
 	errChan := make(chan error)
 	for _, t := range tokens {
@@ -161,7 +162,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 			}
 
 			if metadata == nil || len(metadata) == 0 {
-				md, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient)
+				md, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
 					return
@@ -169,7 +170,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 				metadata = md
 			}
 
-			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, storageClient)
+			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to make media for token %s: %v", token.TokenID, err)
 				return
@@ -190,7 +191,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 	return updateChan, errChan
 }
 
-func validateUsersNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) gin.HandlerFunc {
+func validateUsersNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ValidateUsersNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -210,7 +211,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 
 		output := ValidateUsersNFTsOutput{Success: true}
 
-		newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient)
+		newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient, arweaveClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -262,7 +263,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 				allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
 			}
 
-			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, stg); err != nil {
+			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
 				logrus.WithError(err).Error("failed to process unaccounted for NFTs")
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
@@ -275,7 +276,7 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 	}
 }
 
-func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell) (string, error) {
+func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (string, error) {
 	msgToAdd := ""
 	for _, token := range tokens {
 		uriType := token.TokenURI.Type()
@@ -301,7 +302,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 		}
 
 		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {
-			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient)
+			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
 			if err == nil {
 				token.TokenMetadata = metadata
 				needsUpdate = true
@@ -328,7 +329,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 	}
 	return msgToAdd, nil
 }
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addresses []persist.Address, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client) error {
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addresses []persist.Address, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 	allTokens := make([]persist.Token, 0, len(assets))
 	cntracts := make([]persist.Contract, 0, len(assets))
 	block, err := ethcl.BlockNumber(ctx)
@@ -342,7 +343,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 		asURI := persist.TokenURI(a.ImageURL)
 		media := persist.Media{}
 
-		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient)
+		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient, arweaveClient)
 		if err == nil {
 			mediaType := persist.SniffMediaType(bs)
 			if mediaType != persist.MediaTypeUnknown {
@@ -357,7 +358,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 
 		logrus.Debugf("media: %+v", media)
 
-		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient)
+		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient, arweaveClient)
 
 		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{

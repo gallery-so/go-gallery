@@ -66,6 +66,8 @@ const (
 const (
 	// URITypeIPFS represents an IPFS URI
 	URITypeIPFS URIType = "ipfs"
+	// URITypeArweave represents an Arweave URI
+	URITypeArweave URIType = "arweave"
 	// URITypeHTTP represents an HTTP URI
 	URITypeHTTP URIType = "http"
 	// URITypeIPFSAPI represents an IPFS API URI
@@ -347,6 +349,8 @@ func (uri TokenURI) Type() URIType {
 	switch {
 	case strings.HasPrefix(asString, "ipfs"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
+	case strings.HasPrefix(asString, "ar://"), strings.HasPrefix(asString, "arweave://"):
+		return URITypeArweave
 	case strings.HasPrefix(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
 	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"):
