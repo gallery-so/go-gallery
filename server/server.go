@@ -110,6 +110,7 @@ func setDefaults() {
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
+	viper.SetDefault("SNAPSHOT_LINK", "https://storage.googleapis.com/gallery-dev-322005.appspot.com/snapshot.json")
 
 	viper.AutomaticEnv()
 
