@@ -270,7 +270,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	initialType := predictMediaType(url)
 
 	switch initialType {
-	case persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
 		return initialType, nil
 	}
 
@@ -334,6 +334,7 @@ func predictMediaType(url string) (mediaType persist.MediaType) {
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
+		ext = strings.Split(ext, "?")[0]
 		if t, ok := postfixesToMediaTypes[ext]; ok {
 			return t
 		}
