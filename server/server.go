@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -66,7 +64,23 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub())
+	s := newStorageClient()
+
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), s, newGCPPubSub())
+}
+
+func newStorageClient() *storage.Client {
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		logrus.Errorf("error creating storage client: %v", err)
+	}
+	return s
 }
 
 func setDefaults() {
@@ -95,6 +109,7 @@ func setDefaults() {
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
+	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 
 	viper.AutomaticEnv()
 
@@ -147,35 +162,5 @@ func newGCPPubSub() pubsub.PubSub {
 	}
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
-	return client
-}
-
-func newGCPStorageClient() *storage.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
-	defer cancel()
-
-	if viper.GetString("ENV") != "local" {
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			panic(err)
-		}
-		return client
-	}
-
-	appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
-	_, err := os.Stat(appCredentials)
-	if err != nil {
-		_, err = os.Stat(filepath.Join("..", appCredentials))
-		if err != nil {
-			logrus.Info("credentials file doesn't exist locally")
-			return nil
-		}
-		appCredentials = filepath.Join("..", appCredentials)
-		viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
-	}
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
-	if err != nil {
-		panic(err)
-	}
 	return client
 }
