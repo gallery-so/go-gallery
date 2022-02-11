@@ -253,6 +253,11 @@ type ErrTokenNotFoundByID struct {
 func SniffMediaType(buf []byte) MediaType {
 
 	contentType := http.DetectContentType(buf)
+	return MediaFromContentType(contentType)
+}
+
+// MediaFromContentType will attempt to convert a content type to a media type
+func MediaFromContentType(contentType string) MediaType {
 	whereCharset := strings.IndexByte(contentType, ';')
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
@@ -283,7 +288,6 @@ func SniffMediaType(buf []byte) MediaType {
 	default:
 		return MediaTypeUnknown
 	}
-
 }
 
 func (e ErrTokenNotFoundByID) Error() string {

@@ -10,7 +10,6 @@ import (
 	"image/png"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -38,6 +37,16 @@ type errUnsupportedURL struct {
 
 type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
+}
+
+var postfixesToMediaTypes = map[string]persist.MediaType{
+	".jpg":  persist.MediaTypeImage,
+	".jpeg": persist.MediaTypeImage,
+	".png":  persist.MediaTypeImage,
+	".webp": persist.MediaTypeImage,
+	".gif":  persist.MediaTypeGIF,
+	".mp4":  persist.MediaTypeVideo,
+	".webm": persist.MediaTypeVideo,
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
@@ -70,7 +79,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		return res, nil
 	}
 
-	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient, arweaveClient)
+	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient, arweaveClient, storageClient)
 	if err != nil {
 		switch err.(type) {
 		case rpc.ErrHTTP:
@@ -88,7 +97,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	}
 	if vURL != "" {
 		logrus.Infof("video url for %s: %s", name, vURL)
-		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient, arweaveClient)
+		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			switch err.(type) {
 			case rpc.ErrHTTP:
@@ -104,16 +113,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 				return persist.Media{}, fmt.Errorf("error downloading video %s of type %s: %s", vURL, asURI.Type(), err)
 			}
 		}
-	}
-
-	vURLAsURI := persist.TokenURI(vURL)
-	imgURLAsURI := persist.TokenURI(imgURL)
-
-	if vURLAsURI.Type() == persist.URITypeIPFS {
-		vURL = strings.ReplaceAll(vURL, "ipfs://", "https://ipfs.io/ipfs/")
-	}
-	if imgURLAsURI.Type() == persist.URITypeIPFS {
-		imgURL = strings.ReplaceAll(imgURL, "ipfs://", "https://ipfs.io/ipfs/")
 	}
 
 	logrus.Infof("media type for %s: %s", name, mediaType)
@@ -145,6 +144,10 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	res := persist.Media{
 		MediaType: mediaType,
 	}
+	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+	if err == nil {
+		vURL = videoURL
+	}
 	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 	if err == nil {
 		logrus.Infof("found imageURL for %s: %s", name, imageURL)
@@ -171,7 +174,7 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	return res
 }
 
-func getImageMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL string, imgURL string) persist.Media {
+func getImageMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
 	res := persist.Media{
 		MediaType: persist.MediaTypeImage,
 	}
@@ -194,9 +197,7 @@ func getImageMedia(pCtx context.Context, name string, storageClient *storage.Cli
 	return res
 }
 
-func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (string, string) {
-	imgURL := ""
-	vURL := ""
+func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
 
 	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
 		logrus.Infof("found initial animation url for %s: %s", name, it)
@@ -218,20 +219,17 @@ func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.T
 	return imgURL, vURL
 }
 
-func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string) error {
+func cacheRawMedia(pCtx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
 
 	ctx, cancel := context.WithTimeout(pCtx, 5*time.Second)
 	defer cancel()
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return err
-	}
+
 	client.Bucket(bucket).Object(fileName).Delete(ctx)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	_, err = sw.Write(img)
+	_, err := sw.Write(img)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
 
 	if err := sw.Close(); err != nil {
@@ -259,18 +257,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 	// return res.String(), nil
 }
 
-func getVideoURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
-	objectName := fmt.Sprintf("/gs/%s/%s", bucketID, objectID)
-
-	_, err := client.Bucket(bucketID).Object(objectID).Attrs(pCtx)
-	if err != nil {
-		return "", fmt.Errorf("error getting attrs for %s: %s", objectName, err)
-	}
-
-	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
-}
-
-func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell, arweaveClient *goar.Client) (mediaType persist.MediaType, err error) {
+func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.MediaType, error) {
 
 	asURI := persist.TokenURI(url)
 
@@ -280,25 +267,32 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	// TODO function that checks url for file extension is img and protocol is https
+	initialType := predictMediaType(url)
+
+	switch initialType {
+	case persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
+		return initialType, nil
+	}
 
 	downloadLock.Lock()
 	defer downloadLock.Unlock()
 	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return mediaType, err
+		return persist.MediaTypeUnknown, err
 	}
 
 	logrus.Infof("downloaded %b MB from %s", float64(len(bs))/1024/1024, url)
 
 	buf := bytes.NewBuffer(bs)
-	mediaType = persist.SniffMediaType(bs)
+	mediaType := persist.SniffMediaType(bs)
 
 	logrus.Infof("sniffed media type for %s: %s", url, mediaType)
 	switch mediaType {
 	case persist.MediaTypeVideo:
 
-		jp, err := thumbnailVideo(pCtx, bs)
+		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+
+		jp, err := thumbnailVideo(bs)
 		if err != nil {
 			logrus.Infof("error generating thumbnail for %s: %s", url, err)
 			return mediaType, fmt.Errorf("error generating thumbnail: %s", err)
@@ -314,105 +308,75 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 			return mediaType, fmt.Errorf("error encoding thumbnail as jpeg: %s", err)
 		}
 
-		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name))
-	case persist.MediaTypeGIF:
-		return persist.MediaTypeGIF, nil
-	case persist.MediaTypeHTML:
-		return persist.MediaTypeHTML, nil
-	case persist.MediaTypeAudio:
-		return persist.MediaTypeAudio, nil
+		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	case persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
+		return mediaType, nil
 	default:
 		_, _, err := image.Decode(buf)
 		if err != nil {
 			_, pngErr := png.Decode(buf)
 			_, jpgErr := jpeg.Decode(buf)
 			if pngErr != nil && jpgErr != nil {
-				return mediaType, fmt.Errorf("could not decode image as jpg or png %s", err.Error())
+				return mediaType, fmt.Errorf("could not decode image as jpg or png for %s: %s", name, err.Error())
 			}
 		}
 
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
-			return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name))
+			return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		default:
 			return persist.MediaTypeImage, nil
 		}
 	}
 }
 
-func thumbnailVideo(pCtx context.Context, vid []byte) ([]byte, error) {
+func predictMediaType(url string) (mediaType persist.MediaType) {
+	spl := strings.Split(url, ".")
+	if len(spl) > 1 {
+		ext := spl[len(spl)-1]
+		if t, ok := postfixesToMediaTypes[ext]; ok {
+			return t
+		}
+	}
+	asURI := persist.TokenURI(url)
+	uriType := asURI.Type()
+	if uriType == persist.URITypeHTTP {
+		headers, err := http.Head(url)
+		if err != nil {
+			return persist.MediaTypeUnknown
+		}
+		contentType := headers.Header.Get("Content-Type")
+		if contentType == "" {
+			return persist.MediaTypeUnknown
+		}
+		return persist.MediaFromContentType(contentType)
+	}
+	return persist.MediaTypeUnknown
+}
+
+func thumbnailVideo(vid []byte) ([]byte, error) {
 	c := exec.Command("ffmpeg", "-i", "pipe:0", "-ss", "00:00:01.000", "-vframes", "1", "-f", "singlejpeg", "pipe:1")
-	in := bytes.NewReader(vid)
-	c.Stdin = in
-	out := &bytes.Buffer{}
-	c.Stdout = out
-	err := c.Run()
+	res, err := pipeIOForCmd(c, vid)
 	if err != nil {
 		return nil, err
 	}
-	return out.Bytes(), nil
+	return res, nil
 
 }
 
 func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 5*1024*1024))
-	c.Stdout = buf
-	c.Stderr = os.Stderr
 
 	stdin, err := c.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
-	err = c.Start()
-	if err != nil {
-		return nil, err
-	}
 
-	stdin.Write(input)
+	go func() {
+		defer stdin.Close()
+		stdin.Write(input)
+	}()
 
-	err = stdin.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	err = c.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func pipeIOForCmdNoOut(c *exec.Cmd, input []byte) error {
-
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-
-	stdin, err := c.StdinPipe()
-	if err != nil {
-		return err
-	}
-	err = c.Start()
-	if err != nil {
-		return err
-	}
-
-	_, err = stdin.Write(input)
-	if err != nil {
-		return err
-	}
-
-	err = stdin.Close()
-	if err != nil {
-		return err
-	}
-
-	err = c.Wait()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.Output()
 }
 
 func (e errUnsupportedURL) Error() string {

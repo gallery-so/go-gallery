@@ -263,16 +263,16 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		}
 	}
 
-	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
+	logrus.Debugf("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
 	transfers := logsToTransfers(logsTo, i.ethClient)
 
-	logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+	logrus.Debugf("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
 	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
 	if len(transfersAtBlocks) > 0 && transfersAtBlocks != nil {
-		logrus.Infof("Sending %d total transfers to transfers channel", len(transfers))
+		logrus.Debugf("Sending %d total transfers to transfers channel", len(transfers))
 		interval := len(transfersAtBlocks) / 4
 		if interval == 0 {
 			interval = 1
@@ -286,7 +286,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		}
 
 	}
-	logrus.Info("Finished processing logs, closing transfers channel...")
+	logrus.Debug("Finished processing logs, closing transfers channel...")
 }
 
 func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Transfer {
@@ -397,7 +397,7 @@ func (i *Indexer) listenForNewBlocks() {
 			panic(fmt.Sprintf("error getting block number: %s", err))
 		}
 		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
-		logrus.Infof("final block number: %v", finalBlockUint)
+		logrus.Debugf("final block number: %v", finalBlockUint)
 		time.Sleep(time.Minute)
 	}
 }
@@ -417,7 +417,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 			continue
 		}
 
-		logrus.Infof("Processing %d transfers", len(transfers))
+		logrus.Debugf("Processing %d transfers", len(transfers))
 		it := make([]transfersAtBlock, len(transfers))
 		copy(it, transfers)
 		wp.Submit(func() {
@@ -787,11 +787,11 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		tokenMu.Lock()
 		defer tokenMu.Unlock()
 		now := time.Now()
-		logrus.Infof("Upserting %d tokens", len(t))
+		logrus.Debugf("Upserting %d tokens", len(t))
 		if err := tokenRepo.BulkUpsert(ctx, t); err != nil {
 			return fmt.Errorf("err upserting %d tokens: %s", len(t), err.Error())
 		}
-		logrus.Infof("Upserted %d tokens in %v time", len(t), time.Since(now))
+		logrus.Debugf("Upserted %d tokens in %v time", len(t), time.Since(now))
 		return nil
 	}()
 	if err != nil {
@@ -808,13 +808,13 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 			continue
 		}
 		contract := handleContract(ethClient, token.ContractAddress, token.BlockNumber)
-		logrus.Infof("Processing contract %s", contract.Address)
+		logrus.Debugf("Processing contract %s", contract.Address)
 		toUpsert = append(toUpsert, contract)
 
 		contracts[token.ContractAddress] = true
 	}
 
-	logrus.Infof("Processed %d contracts in %v time", len(toUpsert), time.Since(nextNow))
+	logrus.Debugf("Processed %d contracts in %v time", len(toUpsert), time.Since(nextNow))
 
 	finalNow := time.Now()
 	return func() error {
@@ -824,7 +824,7 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		if err != nil {
 			return fmt.Errorf("err upserting contracts: %s", err.Error())
 		}
-		logrus.Infof("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
+		logrus.Debugf("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
 		return nil
 	}()
 }
