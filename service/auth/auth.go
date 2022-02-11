@@ -95,6 +95,11 @@ type GetPreflightOutput struct {
 }
 
 type Authenticator interface {
+	// GetDescriptor returns information about the authenticator for error and logging purposes.
+	// NOTE: GetDescriptor should NOT include any sensitive data (passwords, auth tokens, etc)
+	// that we wouldn't want showing up in logs!
+	GetDescriptor() AuthDescriptor
+
 	Authenticate(context.Context) (*AuthResult, error)
 }
 
@@ -102,6 +107,8 @@ type AuthResult struct {
 	UserID    persist.DBID
 	Addresses []persist.Address
 }
+
+type AuthDescriptor string
 
 type ErrSignatureVerificationFailed struct {
 	WrappedErr error
@@ -133,13 +140,14 @@ func (e ErrNonceNotFound) Error() string {
 
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
-	UserID   persist.DBID
-	Address  persist.Address
-	Username string
+	UserID         persist.DBID
+	Address        persist.Address
+	Username       string
+	AuthDescriptor AuthDescriptor
 }
 
 func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.Address, e.UserID, e.Username)
+	return fmt.Sprintf("user not found: address: %s, ID: %s, username: %s, authenticator: %s", e.Address, e.UserID, e.Username, e.AuthDescriptor)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -158,6 +166,10 @@ type EthereumNonceAuthenticator struct {
 	UserRepo   persist.UserRepository
 	NonceRepo  persist.NonceRepository
 	EthClient  *ethclient.Client
+}
+
+func (e EthereumNonceAuthenticator) GetDescriptor() AuthDescriptor {
+	return AuthDescriptor(fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType))
 }
 
 func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
@@ -253,11 +265,8 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResul
 		return nil, err
 	}
 
-	// TODO: ErrUserNotFound accepts an address parameter, but we don't have one to supply here
-	// Might be worthwhile for an authenticator interface to have a method for some sort of
-	//credential/ID/info-dump string that we can use in situations like this
 	if authResult.UserID == "" {
-		return nil, ErrUserNotFound{}
+		return nil, ErrUserNotFound{AuthDescriptor: authenticator.GetDescriptor()}
 	}
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)

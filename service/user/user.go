@@ -98,8 +98,9 @@ type errUserNotFound struct {
 	username string
 }
 
-type ErrUserExistsWithAddress struct {
-	Address persist.Address
+type ErrUserAlreadyExists struct {
+	Address        persist.Address
+	AuthDescriptor auth.AuthDescriptor
 }
 
 type errCouldNotEnsureMediaForAddress struct {
@@ -116,7 +117,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserExistsWithAddress{Address: pInput.Address}
+		return CreateUserOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -211,11 +212,8 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		return nil, err
 	}
 
-	// TODO: ErrUserExistsWithAddress accepts an address parameter, but we don't have one to supply here
-	// Might be worthwhile for an authenticator interface to have a method for some sort of credential/ID/info-dump string
-	// that we can use in situations like this
 	if authResult.UserID != "" {
-		return nil, ErrUserExistsWithAddress{}
+		return nil, ErrUserAlreadyExists{AuthDescriptor: authenticator.GetDescriptor()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -327,10 +325,10 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 
 	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return AddUserAddressOutput{}, auth.ErrNonceNotFound{pInput.Address}
+		return AddUserAddressOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if userID != "" {
-		return AddUserAddressOutput{}, ErrUserExistsWithAddress{pInput.Address}
+		return AddUserAddressOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -632,8 +630,8 @@ func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress 
 	return nil
 }
 
-func (e ErrUserExistsWithAddress) Error() string {
-	return fmt.Sprintf("user already exists with address: %s", e.Address)
+func (e ErrUserAlreadyExists) Error() string {
+	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.AuthDescriptor)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {
