@@ -102,7 +102,7 @@ jobs:
           command: sudo apt-get -y install unzip
       - run:
           name: "Unzip secrets file"
-          command: echo "A" | unzip _internal.zip
+          command: echo "A" | unzip _internal.zip -d _internal
       - run:
           name: Run integration-tests
           command: |
