@@ -164,6 +164,11 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	if vURL != "" {
 		logrus.Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
+		if imageURL != "" {
+			res.ThumbnailURL = persist.NullString(imageURL)
+		} else if imgURL != "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		}
 	} else if imageURL != "" {
 		logrus.Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
@@ -246,15 +251,6 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 		return "", fmt.Errorf("error getting attrs for %s: %s", objectName, err)
 	}
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
-	// key, err := blobstore.BlobKeyForFile(pCtx, objectName)
-	// if err != nil {
-	// 	return "", fmt.Errorf("error getting blob key for %s: %s", objectName, err)
-	// }
-	// res, err := appimage.ServingURL(pCtx, key, &appimage.ServingURLOptions{Secure: true})
-	// if err != nil {
-	// 	return "", fmt.Errorf("error getting serving url for %s: %s", objectName, err)
-	// }
-	// return res.String(), nil
 }
 
 func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.MediaType, error) {

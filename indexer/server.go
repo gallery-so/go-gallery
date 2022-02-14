@@ -280,11 +280,9 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 	msgToAdd := ""
 	for _, token := range tokens {
 		uriType := token.TokenURI.Type()
-		if uriType == persist.URITypeInvalid {
-			continue
-		}
+
 		needsUpdate := false
-		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown {
+		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown || uriType == persist.URITypeInvalid {
 			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
 			if err == nil {
 				token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
@@ -294,7 +292,6 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 				msgToAdd += fmt.Sprintf("failed to get token URI for token %s-%s: %v\n", token.ContractAddress, token.TokenID, err)
 				continue
 			}
-
 		}
 		if strings.Contains(token.TokenURI.String(), "{id}") {
 			token.TokenURI = persist.TokenURI(strings.ReplaceAll(token.TokenURI.String(), "{id}", token.TokenID.ToUint256String()))
