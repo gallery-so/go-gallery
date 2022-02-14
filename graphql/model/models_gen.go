@@ -14,14 +14,6 @@ type Error interface {
 	IsError()
 }
 
-type GalleryByUserPayload interface {
-	IsGalleryByUserPayload()
-}
-
-type GalleryByUsernamePayload interface {
-	IsGalleryByUsernamePayload()
-}
-
 type GetAuthNoncePayload interface {
 	IsGetAuthNoncePayload()
 }
@@ -40,6 +32,10 @@ type NftInterface interface {
 
 type Node interface {
 	IsNode()
+}
+
+type UserByUsernamePayload interface {
+	IsUserByUsernamePayload()
 }
 
 type ViewerPayload interface {
@@ -112,21 +108,20 @@ func (ErrSignatureVerificationFailed) IsError()             {}
 func (ErrSignatureVerificationFailed) IsLoginPayload()      {}
 func (ErrSignatureVerificationFailed) IsCreateUserPayload() {}
 
-type ErrUserExistsWithAddress struct {
+type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserExistsWithAddress) IsError()             {}
-func (ErrUserExistsWithAddress) IsCreateUserPayload() {}
+func (ErrUserAlreadyExists) IsError()             {}
+func (ErrUserAlreadyExists) IsCreateUserPayload() {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsGalleryByUsernamePayload() {}
-func (ErrUserNotFound) IsGalleryByUserPayload()     {}
-func (ErrUserNotFound) IsError()                    {}
-func (ErrUserNotFound) IsLoginPayload()             {}
+func (ErrUserNotFound) IsUserByUsernamePayload() {}
+func (ErrUserNotFound) IsError()                 {}
+func (ErrUserNotFound) IsLoginPayload()          {}
 
 type EthereumEoaAuth struct {
 	Address   string `json:"address"`
@@ -140,8 +135,7 @@ type Gallery struct {
 	Collections []*GalleryCollection `json:"collections"`
 }
 
-func (Gallery) IsNode()                     {}
-func (Gallery) IsGalleryByUsernamePayload() {}
+func (Gallery) IsNode() {}
 
 type GalleryCollection struct {
 	ID             string                   `json:"id"`
@@ -179,9 +173,9 @@ type GalleryUser struct {
 	IsAuthenticatedUser *bool     `json:"isAuthenticatedUser"`
 }
 
-func (GalleryUser) IsNode()                 {}
-func (GalleryUser) IsAddressOrGalleryUser() {}
-func (GalleryUser) IsGalleryByUserPayload() {}
+func (GalleryUser) IsNode()                  {}
+func (GalleryUser) IsAddressOrGalleryUser()  {}
+func (GalleryUser) IsUserByUsernamePayload() {}
 
 type GnosisSafeAuth struct {
 	Address   string `json:"address"`

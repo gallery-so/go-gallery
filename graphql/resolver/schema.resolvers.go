@@ -131,7 +131,7 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error)
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *queryResolver) UserByUsername(ctx context.Context, username *string) (model.GalleryByUserPayload, error) {
+func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 

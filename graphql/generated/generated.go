@@ -77,7 +77,7 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrUserExistsWithAddress struct {
+	ErrUserAlreadyExists struct {
 		Message func(childComplexity int) int
 	}
 
@@ -163,7 +163,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		MembershipTiers func(childComplexity int) int
-		UserByUsername  func(childComplexity int, username *string) int
+		UserByUsername  func(childComplexity int, username string) int
 		Viewer          func(childComplexity int) int
 	}
 
@@ -230,7 +230,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerPayload, error)
-	UserByUsername(ctx context.Context, username *string) (model.GalleryByUserPayload, error)
+	UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error)
 	MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error)
 }
 
@@ -319,12 +319,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrSignatureVerificationFailed.Message(childComplexity), true
 
-	case "ErrUserExistsWithAddress.message":
-		if e.complexity.ErrUserExistsWithAddress.Message == nil {
+	case "ErrUserAlreadyExists.message":
+		if e.complexity.ErrUserAlreadyExists.Message == nil {
 			break
 		}
 
-		return e.complexity.ErrUserExistsWithAddress.Message(childComplexity), true
+		return e.complexity.ErrUserAlreadyExists.Message(childComplexity), true
 
 	case "ErrUserNotFound.message":
 		if e.complexity.ErrUserNotFound.Message == nil {
@@ -722,7 +722,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.UserByUsername(childComplexity, args["username"].(*string)), true
+		return e.complexity.Query.UserByUsername(childComplexity, args["username"].(string)), true
 
 	case "Query.viewer":
 		if e.complexity.Query.Viewer == nil {
@@ -993,8 +993,6 @@ type Gallery implements Node {
   collections: [GalleryCollection]
 }
 
-union GalleryByUsernamePayload = Gallery | ErrUserNotFound
-
 type MembershipTierOwner implements Node {
   id: ID!
 
@@ -1021,13 +1019,13 @@ type Viewer {
   wallets: [Wallet]
   viewerGallery: ViewerGallery
 }
-union GalleryByUserPayload = GalleryUser | ErrUserNotFound
+union UserByUsernamePayload = GalleryUser | ErrUserNotFound
 
 union ViewerPayload = Viewer | ErrMissingCookie | ErrSessionExpired
 
 type Query {
   viewer: ViewerPayload
-  userByUsername(username: String): GalleryByUserPayload
+  userByUsername(username: String!): UserByUsernamePayload
   membershipTiers: [MembershipTier]
 }
 
@@ -1111,7 +1109,7 @@ type ErrSignatureVerificationFailed implements Error {
   message: String!
 }
 
-type ErrUserExistsWithAddress implements Error {
+type ErrUserAlreadyExists implements Error {
   message: String!
 }
 
@@ -1154,7 +1152,8 @@ type CreateUserResult {
 }
 
 union LoginPayload = LoginResult | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
-union CreateUserPayload = CreateUserResult | ErrUserExistsWithAddress | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union CreateUserPayload = CreateUserResult | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+
 
 type Mutation {
   # Collection Mutations
@@ -1355,10 +1354,10 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
+	var arg0 string
 	if tmp, ok := rawArgs["username"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1737,7 +1736,7 @@ func (ec *executionContext) _ErrSignatureVerificationFailed_message(ctx context.
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrUserExistsWithAddress_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrUserExistsWithAddress) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrUserAlreadyExists_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrUserAlreadyExists) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1745,7 +1744,7 @@ func (ec *executionContext) _ErrUserExistsWithAddress_message(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrUserExistsWithAddress",
+		Object:     "ErrUserAlreadyExists",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3427,7 +3426,7 @@ func (ec *executionContext) _Query_userByUsername(ctx context.Context, field gra
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UserByUsername(rctx, args["username"].(*string))
+		return ec.resolvers.Query().UserByUsername(rctx, args["username"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3436,9 +3435,9 @@ func (ec *executionContext) _Query_userByUsername(ctx context.Context, field gra
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.GalleryByUserPayload)
+	res := resTmp.(model.UserByUsernamePayload)
 	fc.Result = res
-	return ec.marshalOGalleryByUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByUserPayload(ctx, field.Selections, res)
+	return ec.marshalOUserByUsernamePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernamePayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_membershipTiers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -5573,13 +5572,13 @@ func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.Sele
 			return graphql.Null
 		}
 		return ec._CreateUserResult(ctx, sel, obj)
-	case model.ErrUserExistsWithAddress:
-		return ec._ErrUserExistsWithAddress(ctx, sel, &obj)
-	case *model.ErrUserExistsWithAddress:
+	case model.ErrUserAlreadyExists:
+		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
+	case *model.ErrUserAlreadyExists:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrUserExistsWithAddress(ctx, sel, obj)
+		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	case model.ErrSignatureVerificationFailed:
 		return ec._ErrSignatureVerificationFailed(ctx, sel, &obj)
 	case *model.ErrSignatureVerificationFailed:
@@ -5617,13 +5616,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrSignatureVerificationFailed(ctx, sel, obj)
-	case model.ErrUserExistsWithAddress:
-		return ec._ErrUserExistsWithAddress(ctx, sel, &obj)
-	case *model.ErrUserExistsWithAddress:
+	case model.ErrUserAlreadyExists:
+		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
+	case *model.ErrUserAlreadyExists:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrUserExistsWithAddress(ctx, sel, obj)
+		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	case model.ErrSessionExpired:
 		return ec._ErrSessionExpired(ctx, sel, &obj)
 	case *model.ErrSessionExpired:
@@ -5638,52 +5637,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrMissingCookie(ctx, sel, obj)
-	case model.ErrUserNotFound:
-		return ec._ErrUserNotFound(ctx, sel, &obj)
-	case *model.ErrUserNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUserNotFound(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
-func (ec *executionContext) _GalleryByUserPayload(ctx context.Context, sel ast.SelectionSet, obj model.GalleryByUserPayload) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.GalleryUser:
-		return ec._GalleryUser(ctx, sel, &obj)
-	case *model.GalleryUser:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._GalleryUser(ctx, sel, obj)
-	case model.ErrUserNotFound:
-		return ec._ErrUserNotFound(ctx, sel, &obj)
-	case *model.ErrUserNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUserNotFound(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
-func (ec *executionContext) _GalleryByUsernamePayload(ctx context.Context, sel ast.SelectionSet, obj model.GalleryByUsernamePayload) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.Gallery:
-		return ec._Gallery(ctx, sel, &obj)
-	case *model.Gallery:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._Gallery(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -5862,6 +5815,29 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._MembershipTier(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UserByUsernamePayload(ctx context.Context, sel ast.SelectionSet, obj model.UserByUsernamePayload) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -6151,19 +6127,19 @@ func (ec *executionContext) _ErrSignatureVerificationFailed(ctx context.Context,
 	return out
 }
 
-var errUserExistsWithAddressImplementors = []string{"ErrUserExistsWithAddress", "Error", "CreateUserPayload"}
+var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayload"}
 
-func (ec *executionContext) _ErrUserExistsWithAddress(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserExistsWithAddress) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errUserExistsWithAddressImplementors)
+func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserAlreadyExists) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errUserAlreadyExistsImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrUserExistsWithAddress")
+			out.Values[i] = graphql.MarshalString("ErrUserAlreadyExists")
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrUserExistsWithAddress_message(ctx, field, obj)
+				return ec._ErrUserAlreadyExists_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -6182,7 +6158,7 @@ func (ec *executionContext) _ErrUserExistsWithAddress(ctx context.Context, sel a
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "GalleryByUsernamePayload", "GalleryByUserPayload", "Error", "LoginPayload"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernamePayload", "Error", "LoginPayload"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -6213,7 +6189,7 @@ func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.Select
 	return out
 }
 
-var galleryImplementors = []string{"Gallery", "Node", "GalleryByUsernamePayload"}
+var galleryImplementors = []string{"Gallery", "Node"}
 
 func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, obj *model.Gallery) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryImplementors)
@@ -6411,7 +6387,7 @@ func (ec *executionContext) _GalleryNft(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "AddressOrGalleryUser", "GalleryByUserPayload"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "AddressOrGalleryUser", "UserByUsernamePayload"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -8047,13 +8023,6 @@ func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 	return ec._Gallery(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOGalleryByUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByUserPayload(ctx context.Context, sel ast.SelectionSet, v model.GalleryByUserPayload) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryByUserPayload(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOGalleryCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryCollection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -8476,6 +8445,13 @@ func (ec *executionContext) marshalOUpdateUserInfoPayload2ᚖgithubᚗcomᚋmike
 		return graphql.Null
 	}
 	return ec._UpdateUserInfoPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserByUsernamePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernamePayload(ctx context.Context, sel ast.SelectionSet, v model.UserByUsernamePayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserByUsernamePayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx context.Context, sel ast.SelectionSet, v *model.Viewer) graphql.Marshaler {

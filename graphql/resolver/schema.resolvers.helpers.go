@@ -27,7 +27,7 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 	case auth.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case user.ErrUserAlreadyExists:
-		mappedErr = model.ErrUserExistsWithAddress{Message: message}
+		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	}
 
 	if mappedErr != nil {

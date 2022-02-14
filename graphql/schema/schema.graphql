@@ -77,8 +77,6 @@ type Gallery implements Node {
   collections: [GalleryCollection]
 }
 
-union GalleryByUsernamePayload = Gallery | ErrUserNotFound
-
 type MembershipTierOwner implements Node {
   id: ID!
 
@@ -105,13 +103,13 @@ type Viewer {
   wallets: [Wallet]
   viewerGallery: ViewerGallery
 }
-union GalleryByUserPayload = GalleryUser | ErrUserNotFound
+union UserByUsernamePayload = GalleryUser | ErrUserNotFound
 
 union ViewerPayload = Viewer | ErrMissingCookie | ErrSessionExpired
 
 type Query {
   viewer: ViewerPayload
-  userByUsername(username: String): GalleryByUserPayload
+  userByUsername(username: String!): UserByUsernamePayload
   membershipTiers: [MembershipTier]
 }
 
@@ -195,7 +193,7 @@ type ErrSignatureVerificationFailed implements Error {
   message: String!
 }
 
-type ErrUserExistsWithAddress implements Error {
+type ErrUserAlreadyExists implements Error {
   message: String!
 }
 
@@ -238,7 +236,8 @@ type CreateUserResult {
 }
 
 union LoginPayload = LoginResult | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
-union CreateUserPayload = CreateUserResult | ErrUserExistsWithAddress | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union CreateUserPayload = CreateUserResult | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+
 
 type Mutation {
   # Collection Mutations
