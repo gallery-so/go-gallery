@@ -30,7 +30,7 @@ var db *sql.DB
 type TestConfig struct {
 	server              *httptest.Server
 	serverURL           string
-	repos               *repositories
+	repos               *persist.Repositories
 	user1               *TestUser
 	user2               *TestUser
 	openseaCache        memstore.Cache
@@ -55,7 +55,7 @@ type TestUser struct {
 	client   *http.Client
 }
 
-func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *TestUser {
+func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt string) *TestUser {
 	ctx := context.Background()
 
 	username := util.RandStringBytes(40)
@@ -71,7 +71,7 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
 		Addresses:          []persist.Address{wallet.address},
 	}
-	id, err := repos.userRepository.Create(ctx, user)
+	id, err := repos.UserRepository.Create(ctx, user)
 	a.NoError(err)
 	j, err := cookiejar.New(nil)
 	a.NoError(err)
@@ -83,7 +83,7 @@ func generateTestUser(a *assert.Assertions, repos *repositories, jwt string) *Te
 	}
 
 	getFakeCookie(a, jwt, c)
-	auth.NonceRotate(ctx, wallet.address, id, repos.nonceRepository)
+	auth.NonceRotate(ctx, wallet.address, id, repos.NonceRepository)
 	log.Info(id, username)
 	return &TestUser{&wallet, id, jwt, username, c}
 }

@@ -1,13 +1,16 @@
 package util
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"io"
 	"strings"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
 const DefaultSearchDepth = 5
+const GinContextKey string = "GinContextKey"
 
 // Contains checks whether an item exists in a slice
 func Contains(s []string, str string) bool {
@@ -81,4 +84,32 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 		}
 	}
 	return nil
+}
+
+// StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
+// a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
+func StringToPointer(str string) *string {
+	return &str
+}
+
+// GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
+// or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
+func GinContextFromContext(ctx context.Context) *gin.Context {
+	// If the current context is already a gin context, return it
+	if gc, ok := ctx.(*gin.Context); ok {
+		return gc
+	}
+
+	// Otherwise, find the gin context that was stored via middleware
+	ginContext := ctx.Value(GinContextKey)
+	if ginContext == nil {
+		panic("gin.Context not found in current context")
+	}
+
+	gc, ok := ginContext.(*gin.Context)
+	if !ok {
+		panic("gin.Context has wrong type")
+	}
+
+	return gc
 }

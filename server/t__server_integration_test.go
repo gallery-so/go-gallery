@@ -124,20 +124,20 @@ func (s *UserTestSuite) TestEligibleWalletCanBecomeMember() {
 
 	// login
 	nonce = fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
-	loginOutput := loginUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
+	loginOutput, loginCookie := loginUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
 
 	// get current user
 	client := newClient()
-	currentUserOutput := fetchCurrentUserIsValid(s.Suite, s.serverURL, client, loginOutput.JWTtoken)
+	currentUserOutput := fetchCurrentUserIsValid(s.Suite, s.serverURL, client, loginCookie.Value)
 	userOutput := fetchUser(s.Suite, s.serverURL, loginOutput.UserID)
 
 	// logout
 	resp := logoutUser(s.Suite, s.serverURL, client)
-	jwtCookie := getCookieByName(auth.JWTCookieKey, resp.Cookies())
-	s.NotEmpty(jwtCookie)
+	logoutCookie := getCookieByName(auth.JWTCookieKey, resp.Cookies())
+	s.NotEmpty(logoutCookie)
 
 	// get current user
-	afterLogout := fetchCurrentUserResponse(s.Suite, s.serverURL, client, jwtCookie.Value)
+	afterLogout := fetchCurrentUserResponse(s.Suite, s.serverURL, client, logoutCookie.Value)
 
 	s.Equal(loginOutput.UserID, currentUserOutput.UserID)
 	s.Equal(loginOutput.UserID, userOutput.UserID)
