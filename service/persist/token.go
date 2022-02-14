@@ -319,11 +319,14 @@ func (uri TokenURI) URL() (*url.URL, error) {
 }
 
 func (uri TokenURI) String() string {
-	url, err := url.QueryUnescape(string(uri))
-	if err == nil && url != string(uri) {
-		return url
+	asString := string(uri)
+	if strings.HasPrefix(asString, "http") || strings.HasPrefix(asString, "ipfs") || strings.HasPrefix(asString, "ar") {
+		url, err := url.QueryUnescape(string(uri))
+		if err == nil && url != string(uri) {
+			return url
+		}
 	}
-	return string(uri)
+	return asString
 }
 
 // Value implements the driver.Valuer interface for token URIs
@@ -356,7 +359,7 @@ func (uri TokenURI) Type() URIType {
 		return URITypeArweave
 	case strings.HasPrefix(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
-	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"):
+	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):
 		return URITypeBase64SVG
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI

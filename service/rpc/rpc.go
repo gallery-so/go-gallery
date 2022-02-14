@@ -26,6 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var client = &http.Client{
+	Timeout: time.Second * 30,
+}
+
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
 	BlockNumber     persist.BlockNumber
@@ -83,9 +87,6 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 		return persist.TokenMetadata{}, err
 	}
 
-	// remove BOM https://en.wikipedia.org/wiki/Byte_order_mark
-	bs = bytes.TrimPrefix(bs, []byte("\xef\xbb\xbf"))
-
 	var metadata persist.TokenMetadata
 	switch turi.Type() {
 	case persist.URITypeBase64SVG, persist.URITypeSVG:
@@ -105,14 +106,9 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 // GetDataFromURI calls URI and returns the data
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
-	client := &http.Client{}
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(time.Second * 10)
-	}
-	client.Timeout = time.Until(deadline)
-
 	asString := turi.String()
+
+	logrus.Infof("Getting data from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
@@ -123,14 +119,20 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
 		}
 
-		return decoded, nil
+		return removeBOM(decoded), nil
 	case persist.URITypeIPFS:
 		path := strings.ReplaceAll(asString, "ipfs://", "")
-		pathMinusExtra := strings.ReplaceAll(path, "ipfs/", "")
+		path = strings.ReplaceAll(path, "ipfs/", "")
+		path = strings.Split(path, "?")[0]
 
-		it, err := ipfsClient.Cat(pathMinusExtra)
+		it, err := ipfsClient.Cat(path)
 		if err != nil {
-			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, pathMinusExtra)
+			bs, nextErr := getIPFSPI(ctx, path)
+			if nextErr == nil {
+				return bs, nil
+			}
+
+			return nil, fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
 		}
 		defer it.Close()
 
@@ -140,7 +142,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 
-		return buf.Bytes(), nil
+		return removeBOM(buf.Bytes()), nil
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
@@ -151,7 +153,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
-		if resp.StatusCode > 299 || resp.StatusCode < 200 {
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
 		defer resp.Body.Close()
@@ -162,7 +164,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 
-		return buf.Bytes(), nil
+		return removeBOM(buf.Bytes()), nil
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
@@ -180,18 +182,46 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 
-		return buf.Bytes(), nil
+		return removeBOM(buf.Bytes()), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
 		idx := strings.IndexByte(asString, '{')
 		if idx == -1 {
 			return []byte(asString), nil
 		}
-		return []byte(asString[idx:]), nil
+		return removeBOM([]byte(asString[idx:])), nil
 
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
 
+}
+
+func removeBOM(bs []byte) []byte {
+	if len(bs) > 3 && bs[0] == 0xEF && bs[1] == 0xBB && bs[2] == 0xBF {
+		return bs[3:]
+	}
+	return bs
+}
+
+func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
+	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", hash)
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data from http: %s", err)
+	}
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+	}
+	defer resp.Body.Close()
+
+	buf := &bytes.Buffer{}
+	err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
 // GetTokenURI returns metadata URI for a given token address.
@@ -348,7 +378,7 @@ func getArweaveData(client *goar.Client, id string) ([]byte, error) {
 			}
 		}
 	}
-	return data, nil
+	return removeBOM(data), nil
 }
 
 func padHex(pHex string, pLength int) string {

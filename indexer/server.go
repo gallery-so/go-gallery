@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -38,6 +39,7 @@ type UpdateMediaInput struct {
 	OwnerAddress    persist.Address `json:"owner_address"`
 	TokenID         persist.TokenID `json:"token_id"`
 	ContractAddress persist.Address `json:"contract_address"`
+	UpdateAll       bool            `json:"update_all"`
 }
 
 // ValidateUsersNFTsInput is the input for the validate users NFTs endpoint that will return
@@ -104,6 +106,24 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
+		if !input.UpdateAll {
+			for i, token := range tokens {
+				switch token.Media.MediaType {
+				case persist.MediaTypeVideo:
+					if token.Media.MediaURL != "" && token.Media.ThumbnailURL != "" {
+						tokens = append(tokens[:i], tokens[i+1:]...)
+					}
+				default:
+					if token.Media.MediaURL != "" && token.Media.MediaType != "" {
+						tokens = append(tokens[:i], tokens[i+1:]...)
+					}
+				}
+			}
+		}
+
+		logrus.Infof("Updating %d tokens", len(tokens))
+
 		updateByID := input.OwnerAddress != ""
 
 		appCtx := appengine.WithContext(c, c.Request)
@@ -140,9 +160,10 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
 	updateChan := make(chan tokenUpdateMedia)
 	errChan := make(chan error)
+	wp := workerpool.New(10)
 	for _, t := range tokens {
-		go func(token persist.Token) {
-
+		token := t
+		wp.Submit(func() {
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
 
@@ -172,7 +193,7 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 
 			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
-				errChan <- fmt.Errorf("failed to make media for token %s: %v", token.TokenID, err)
+				errChan <- fmt.Errorf("failed to make media for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
 				return
 			}
 
@@ -186,7 +207,8 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 					Media:    med,
 				},
 			}
-		}(t)
+
+		})
 	}
 	return updateChan, errChan
 }
@@ -279,36 +301,27 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (string, error) {
 	msgToAdd := ""
 	for _, token := range tokens {
-		uriType := token.TokenURI.Type()
 
 		needsUpdate := false
-		if uriType == persist.URITypeNone || uriType == persist.URITypeUnknown || uriType == persist.URITypeInvalid {
-			uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
-			if err == nil {
-				token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
-				needsUpdate = true
-			} else {
-				logrus.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
-				msgToAdd += fmt.Sprintf("failed to get token URI for token %s-%s: %v\n", token.ContractAddress, token.TokenID, err)
-				continue
-			}
-		}
-		if strings.Contains(token.TokenURI.String(), "{id}") {
-			token.TokenURI = persist.TokenURI(strings.ReplaceAll(token.TokenURI.String(), "{id}", token.TokenID.ToUint256String()))
+
+		uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
+		if err == nil {
+			token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
 			needsUpdate = true
+		} else {
+			logrus.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
+			msgToAdd += fmt.Sprintf("failed to get token URI for token %s-%s: %v\n", token.ContractAddress, token.TokenID, err)
+			continue
 		}
 
-		if token.TokenMetadata == nil || len(token.TokenMetadata) == 0 {
-			metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
-			if err == nil {
-				token.TokenMetadata = metadata
-				needsUpdate = true
-			} else {
-				logrus.Errorf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
-				msgToAdd += fmt.Sprintf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
-				continue
-			}
-
+		metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
+		if err == nil {
+			token.TokenMetadata = metadata
+			needsUpdate = true
+		} else {
+			logrus.Errorf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
+			msgToAdd += fmt.Sprintf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
+			continue
 		}
 
 		if needsUpdate {
