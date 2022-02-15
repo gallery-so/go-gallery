@@ -149,7 +149,11 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return getArweaveData(arweaveClient, path)
 	case persist.URITypeHTTP:
 
-		resp, err := client.Get(asString)
+		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %s", err)
+		}
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
@@ -206,7 +210,11 @@ func removeBOM(bs []byte) []byte {
 func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
 	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", hash)
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %s", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error getting data from http: %s", err)
 	}

@@ -108,18 +108,20 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 		}
 
 		if !input.UpdateAll {
-			for i, token := range tokens {
+			res := make([]persist.Token, 0, len(tokens))
+			for _, token := range tokens {
 				switch token.Media.MediaType {
 				case persist.MediaTypeVideo:
-					if token.Media.MediaURL != "" && token.Media.ThumbnailURL != "" {
-						tokens = append(tokens[:i], tokens[i+1:]...)
+					if token.Media.MediaURL == "" || token.Media.ThumbnailURL == "" {
+						res = append(res, token)
 					}
 				default:
-					if token.Media.MediaURL != "" && token.Media.MediaType != "" {
-						tokens = append(tokens[:i], tokens[i+1:]...)
+					if token.Media.MediaURL == "" || token.Media.MediaType == "" {
+						res = append(res, token)
 					}
 				}
 			}
+			tokens = res
 		}
 
 		logrus.Infof("Updating %d tokens", len(tokens))
@@ -165,10 +167,13 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
 
 			if handler, ok := uniqueHandlers[persist.Address(token.ContractAddress.String())]; ok {
+				logrus.Infof("Using %v metadata handler for %s", handler, token.ContractAddress)
 				u, md, err := handler(token.TokenURI, token.ContractAddress, token.TokenID)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to get unique metadata for token %s: %s", token.TokenURI, err)
