@@ -241,6 +241,10 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
 		}
+
+		if collection.ID == "" {
+			continue
+		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			colls = make([]persist.CollectionToken, 0, 10)
@@ -329,6 +333,10 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		}
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
+		}
+
+		if collection.ID == "" {
+			continue
 		}
 		colls, ok := collections[gallery.ID]
 		if !ok {

@@ -82,7 +82,7 @@ func TestUpdateUserAuthenticated_Success(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.UserName, user.Username.String())
 }
@@ -98,7 +98,7 @@ func TestUpdateUserAuthenticated_NoChange_Success(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1)
 	assertValidJSONResponse(assert, resp)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.UserName, user.Username.String())
 }
@@ -116,7 +116,7 @@ func TestUpdateUserUnauthenticated_Failure(t *testing.T) {
 func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	assert := setupTest(t, 1)
 
-	user2, err := tc.repos.userRepository.GetByID(context.Background(), tc.user2.id)
+	user2, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user2.id)
 	assert.Nil(err)
 	log.Println(user2.Username)
 
@@ -126,7 +126,7 @@ func TestUpdateUserAuthenticated_UsernameTaken_Failure(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.NotEqual(update.UserName, user.Username)
 }
@@ -139,7 +139,7 @@ func TestUpdateUserAuthenticated_UsernameInvalid_Failure(t *testing.T) {
 	resp := updateUserInfoRequest(assert, update, tc.user1)
 	assertErrorResponse(assert, resp)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.NotEqual(update.UserName, user.Username)
 }
@@ -151,7 +151,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := user.AddUserAddressesInput{
@@ -166,7 +166,7 @@ func TestUserAddAddresses_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Empty(errResp.Error)
 
-	updatedUser, err := tc.repos.userRepository.GetByID(context.Background(), tc.user1.id)
+	updatedUser, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 	assert.Nil(err)
 	assert.Equal(update.Address, updatedUser.Addresses[1])
 }
@@ -178,7 +178,7 @@ func TestUserAddAddresses_WrongNonce_Failure(t *testing.T) {
 		Value:   "Wrong Nonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err := tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := user.AddUserAddressesInput{
@@ -195,13 +195,13 @@ func TestUserAddAddresses_OtherUserOwnsAddress_Failure(t *testing.T) {
 	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
-	_, err := tc.repos.userRepository.Create(context.Background(), u)
+	_, err := tc.repos.UserRepository.Create(context.Background(), u)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	update := user.AddUserAddressesInput{
@@ -220,27 +220,27 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 		Username:           "TestUser",
 		UsernameIdempotent: "testuser",
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	nft := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		Name:         "test",
 	}
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 
 	nft2 := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 		Name:         "blah",
 	}
-	nftID2, err := tc.repos.nftRepository.Create(context.Background(), nft2)
+	nftID2, err := tc.repos.NftRepository.Create(context.Background(), nft2)
 
 	coll := persist.CollectionDB{
 		NFTs:        []persist.DBID{nftID, nftID2},
 		Name:        "test-coll",
 		OwnerUserID: userID,
 	}
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	collID, err := tc.repos.CollectionRepository.Create(context.Background(), coll)
 
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	assert.Nil(err)
@@ -264,15 +264,15 @@ func TestUserRemoveAddresses_Success(t *testing.T) {
 	util.UnmarshallBody(errResp, resp.Body)
 	assert.Empty(errResp.Error)
 
-	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
+	nfts, err := tc.repos.NftRepository.GetByUserID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Len(nfts, 1)
 
-	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	res, err := tc.repos.CollectionRepository.GetByID(context.Background(), collID, true)
 	assert.Nil(err)
 	assert.Len(res.NFTs, 2)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Len(user.Addresses, 1)
 
@@ -286,7 +286,7 @@ func TestUserRemoveAddresses_MoveNFTs_Success(t *testing.T) {
 		Username:           "TestUser",
 		UsernameIdempotent: "testuser",
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.NoError(err)
 
 	nft := persist.NFT{
@@ -294,21 +294,21 @@ func TestUserRemoveAddresses_MoveNFTs_Success(t *testing.T) {
 		Name:         "test",
 		OpenseaID:    2,
 	}
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 
 	nft2 := persist.NFT{
 		OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 		Name:         "blah",
 		OpenseaID:    1,
 	}
-	nftID2, err := tc.repos.nftRepository.Create(context.Background(), nft2)
+	nftID2, err := tc.repos.NftRepository.Create(context.Background(), nft2)
 
 	coll := persist.CollectionDB{
 		NFTs:        []persist.DBID{nftID, nftID2},
 		Name:        "test-coll",
 		OwnerUserID: userID,
 	}
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	collID, err := tc.repos.CollectionRepository.Create(context.Background(), coll)
 
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	assert.NoError(err)
@@ -332,32 +332,32 @@ func TestUserRemoveAddresses_MoveNFTs_Success(t *testing.T) {
 	util.UnmarshallBody(errResp, resp.Body)
 	assert.Empty(errResp.Error)
 
-	nfts, err := tc.repos.nftRepository.GetByUserID(context.Background(), userID)
+	nfts, err := tc.repos.NftRepository.GetByUserID(context.Background(), userID)
 	assert.NoError(err)
 	assert.Len(nfts, 1)
 
-	res, err := tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	res, err := tc.repos.CollectionRepository.GetByID(context.Background(), collID, true)
 	assert.NoError(err)
 	assert.Len(res.NFTs, 2)
 
-	user, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	user, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 	assert.NoError(err)
 	assert.Len(user.Addresses, 1)
 
-	err = tc.repos.nftRepository.UpdateByIDUnsafe(context.Background(), nftID2, persist.NFTUpdateOwnerAddressInput{
+	err = tc.repos.NftRepository.UpdateByIDUnsafe(context.Background(), nftID2, persist.NFTUpdateOwnerAddressInput{
 		OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 	})
 	assert.NoError(err)
 
-	newNFT2, err := tc.repos.nftRepository.GetByID(context.Background(), nftID2)
+	newNFT2, err := tc.repos.NftRepository.GetByID(context.Background(), nftID2)
 	assert.NoError(err)
 	assert.Equal(newNFT2.OwnerAddress, persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")))
 
 	// This would happen in an opensea refresh
-	err = tc.repos.collectionRepository.RemoveNFTsOfOldAddresses(context.Background(), userID)
+	err = tc.repos.CollectionRepository.RemoveNFTsOfOldAddresses(context.Background(), userID)
 	assert.NoError(err)
 
-	res, err = tc.repos.collectionRepository.GetByID(context.Background(), collID, true)
+	res, err = tc.repos.CollectionRepository.GetByID(context.Background(), collID, true)
 	assert.NoError(err)
 	assert.Len(res.NFTs, 0)
 }
@@ -368,7 +368,7 @@ func TestUserRemoveAddresses_NotOwnAddress_Failure(t *testing.T) {
 	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
@@ -398,7 +398,7 @@ func TestUserRemoveAddresses_AllAddresses_Failure(t *testing.T) {
 	u := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
@@ -454,7 +454,7 @@ func TestGetUserPreviews_Success(t *testing.T) {
 			ImageThumbnailURL: "https://example.com/test.png",
 		},
 	}
-	nftIDs, err := tc.repos.nftRepository.CreateBulk(context.Background(), nfts)
+	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
 	assert.Nil(err)
 
 	coll := persist.CollectionDB{
@@ -463,14 +463,14 @@ func TestGetUserPreviews_Success(t *testing.T) {
 		NFTs:           nftIDs,
 		OwnerUserID:    tc.user1.id,
 	}
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	collID, err := tc.repos.CollectionRepository.Create(context.Background(), coll)
 	assert.Nil(err)
 
 	gallery := persist.GalleryDB{
 		OwnerUserID: tc.user1.id,
 		Collections: []persist.DBID{collID},
 	}
-	_, err = tc.repos.galleryRepository.Create(context.Background(), gallery)
+	_, err = tc.repos.GalleryRepository.Create(context.Background(), gallery)
 	assert.Nil(err)
 
 	resp, err := http.Get(fmt.Sprintf("%s/users/previews?user_id=%s", tc.serverURL, tc.user1.id))
@@ -491,7 +491,7 @@ func TestMergeUsers_Success(t *testing.T) {
 	u := persist.User{
 		Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	nft := persist.NFT{
@@ -508,7 +508,7 @@ func TestMergeUsers_Success(t *testing.T) {
 	u2 := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
-	userID2, err := tc.repos.userRepository.Create(context.Background(), u2)
+	userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 	assert.Nil(err)
 
 	nft2 := persist.NFT{
@@ -521,7 +521,7 @@ func TestMergeUsers_Success(t *testing.T) {
 		Value:   "TestNonce",
 		Address: u2.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	mergeInput := user.MergeUsersInput{
@@ -541,18 +541,18 @@ func TestMergeUsers_Success(t *testing.T) {
 	assert.Nil(err)
 	assert.Empty(errResp.Error)
 
-	newInitialUser, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	newInitialUser, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Len(newInitialUser.Addresses, 2)
 
-	newGallery, err := tc.repos.galleryRepository.GetByID(context.Background(), galleryID)
+	newGallery, err := tc.repos.GalleryRepository.GetByID(context.Background(), galleryID)
 	assert.Nil(err)
 	assert.Len(newGallery.Collections, 2)
 
-	_, err = tc.repos.galleryRepository.GetByID(context.Background(), deletedGallery)
+	_, err = tc.repos.GalleryRepository.GetByID(context.Background(), deletedGallery)
 	assert.NotNil(err)
 
-	_, err = tc.repos.userRepository.GetByID(context.Background(), userID2)
+	_, err = tc.repos.UserRepository.GetByID(context.Background(), userID2)
 	assert.NotNil(err)
 
 }
@@ -564,7 +564,7 @@ func TestMergeUsers_NoGalleries_Success(t *testing.T) {
 	u := persist.User{
 		Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 	}
-	userID, err := tc.repos.userRepository.Create(context.Background(), u)
+	userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 	assert.Nil(err)
 
 	// Set up cookie to make an authenticated request
@@ -575,14 +575,14 @@ func TestMergeUsers_NoGalleries_Success(t *testing.T) {
 	u2 := persist.User{
 		Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 	}
-	userID2, err := tc.repos.userRepository.Create(context.Background(), u2)
+	userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 	assert.Nil(err)
 
 	nonce := persist.UserNonce{
 		Value:   "TestNonce",
 		Address: u2.Addresses[0],
 	}
-	err = tc.repos.nonceRepository.Create(context.Background(), nonce)
+	err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 	assert.Nil(err)
 
 	mergeInput := user.MergeUsersInput{
@@ -597,17 +597,17 @@ func TestMergeUsers_NoGalleries_Success(t *testing.T) {
 	defer resp.Body.Close()
 	assertValidResponse(assert, resp)
 
-	newInitialUser, err := tc.repos.userRepository.GetByID(context.Background(), userID)
+	newInitialUser, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 	assert.Nil(err)
 	assert.Len(newInitialUser.Addresses, 2)
 
-	_, err = tc.repos.userRepository.GetByID(context.Background(), userID2)
+	_, err = tc.repos.UserRepository.GetByID(context.Background(), userID2)
 	assert.NotNil(err)
 
 }
 
 func fillGallery(assert *assert.Assertions, nft persist.NFT, userID persist.DBID) persist.DBID {
-	nftID, err := tc.repos.nftRepository.Create(context.Background(), nft)
+	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 	assert.Nil(err)
 
 	coll := persist.CollectionDB{
@@ -615,14 +615,14 @@ func fillGallery(assert *assert.Assertions, nft persist.NFT, userID persist.DBID
 		NFTs:        []persist.DBID{nftID},
 		Name:        "test-coll",
 	}
-	collID, err := tc.repos.collectionRepository.Create(context.Background(), coll)
+	collID, err := tc.repos.CollectionRepository.Create(context.Background(), coll)
 	assert.Nil(err)
 
 	gallery := persist.GalleryDB{
 		OwnerUserID: userID,
 		Collections: []persist.DBID{collID},
 	}
-	galleryID, err := tc.repos.galleryRepository.Create(context.Background(), gallery)
+	galleryID, err := tc.repos.GalleryRepository.Create(context.Background(), gallery)
 	assert.Nil(err)
 	return galleryID
 }

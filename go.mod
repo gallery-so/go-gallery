@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/pubsub v1.17.1
 	cloud.google.com/go/secretmanager v1.1.0
 	cloud.google.com/go/storage v1.20.0
+	github.com/99designs/gqlgen v0.15.1
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
@@ -38,6 +39,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.6 // indirect
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
+	github.com/vektah/gqlparser/v2 v2.2.0
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11

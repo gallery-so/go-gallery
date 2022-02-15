@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -26,21 +24,6 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
-
-type repositories struct {
-	userRepository            persist.UserRepository
-	nonceRepository           persist.NonceRepository
-	loginRepository           persist.LoginAttemptRepository
-	nftRepository             persist.NFTRepository
-	tokenRepository           persist.TokenRepository
-	collectionRepository      persist.CollectionRepository
-	collectionTokenRepository persist.CollectionTokenRepository
-	galleryRepository         persist.GalleryRepository
-	galleryTokenRepository    persist.GalleryTokenRepository
-	contractRepository        persist.ContractRepository
-	backupRepository          persist.BackupRepository
-	membershipRepository      persist.MembershipRepository
-}
 
 // Init initializes the server
 func Init() {
@@ -64,7 +47,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -81,7 +64,23 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newGCPPubSub())
+	s := newStorageClient()
+
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), s, newGCPPubSub())
+}
+
+func newStorageClient() *storage.Client {
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		logrus.Errorf("error creating storage client: %v", err)
+	}
+	return s
 }
 
 func setDefaults() {
@@ -110,6 +109,7 @@ func setDefaults() {
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
+	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 
 	viper.AutomaticEnv()
 
@@ -118,27 +118,25 @@ func setDefaults() {
 	}
 }
 
-func newRepos(db *sql.DB) *repositories {
-
+func newRepos(db *sql.DB) *persist.Repositories {
 	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
 	galleriesCacheToken := redis.NewCache(2)
 	nftsCache := redis.NewCache(3)
 
-	return &repositories{
-		userRepository:            postgres.NewUserRepository(db),
-		nonceRepository:           postgres.NewNonceRepository(db),
-		loginRepository:           postgres.NewLoginRepository(db),
-		nftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
-		tokenRepository:           postgres.NewTokenRepository(db),
-		collectionRepository:      postgres.NewCollectionRepository(db),
-		collectionTokenRepository: postgres.NewCollectionTokenRepository(db),
-		galleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
-		galleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
-		contractRepository:        postgres.NewContractRepository(db),
-		backupRepository:          postgres.NewBackupRepository(db),
-		membershipRepository:      postgres.NewMembershipRepository(db),
+	return &persist.Repositories{
+		UserRepository:            postgres.NewUserRepository(db),
+		NonceRepository:           postgres.NewNonceRepository(db),
+		LoginRepository:           postgres.NewLoginRepository(db),
+		NftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+		TokenRepository:           postgres.NewTokenRepository(db),
+		CollectionRepository:      postgres.NewCollectionRepository(db),
+		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db),
+		GalleryRepository:         postgres.NewGalleryRepository(db, galleriesCache),
+		GalleryTokenRepository:    postgres.NewGalleryTokenRepository(db, galleriesCacheToken),
+		ContractRepository:        postgres.NewContractRepository(db),
+		BackupRepository:          postgres.NewBackupRepository(db),
+		MembershipRepository:      postgres.NewMembershipRepository(db),
 	}
-
 }
 
 func newEthClient() *ethclient.Client {
@@ -164,35 +162,5 @@ func newGCPPubSub() pubsub.PubSub {
 	}
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
-	return client
-}
-
-func newGCPStorageClient() *storage.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
-	defer cancel()
-
-	if viper.GetString("ENV") != "local" {
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			panic(err)
-		}
-		return client
-	}
-
-	appCredentials := viper.GetString("GOOGLE_APPLICATION_CREDENTIALS")
-	_, err := os.Stat(appCredentials)
-	if err != nil {
-		_, err = os.Stat(filepath.Join("..", appCredentials))
-		if err != nil {
-			logrus.Info("credentials file doesn't exist locally")
-			return nil
-		}
-		appCredentials = filepath.Join("..", appCredentials)
-		viper.Set("GOOGLE_APPLICATION_CREDENTIALS", appCredentials)
-	}
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(appCredentials))
-	if err != nil {
-		panic(err)
-	}
 	return client
 }

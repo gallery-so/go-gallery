@@ -16,7 +16,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 
 	mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
 
-	mikeUserID, err := tc.repos.userRepository.Create(ctx, mike)
+	mikeUserID, err := tc.repos.UserRepository.Create(ctx, mike)
 	assert.Nil(err)
 
 	nft1 := persist.NFT{
@@ -41,16 +41,16 @@ func TestOpenseaSync_Success(t *testing.T) {
 		OpenseaID:    61355517,
 	}
 
-	ids, err := tc.repos.nftRepository.CreateBulk(ctx, []persist.NFT{nft1, nft2, nft3, nft4})
+	ids, err := tc.repos.NftRepository.CreateBulk(ctx, []persist.NFT{nft1, nft2, nft3, nft4})
 	assert.Nil(err)
 
-	nft1DB, err := tc.repos.nftRepository.GetByID(ctx, ids[0])
+	nft1DB, err := tc.repos.NftRepository.GetByID(ctx, ids[0])
 	assert.Nil(err)
-	nft2DB, err := tc.repos.nftRepository.GetByID(ctx, ids[1])
+	nft2DB, err := tc.repos.NftRepository.GetByID(ctx, ids[1])
 	assert.Nil(err)
-	nft3DB, err := tc.repos.nftRepository.GetByID(ctx, ids[2])
+	nft3DB, err := tc.repos.NftRepository.GetByID(ctx, ids[2])
 	assert.Nil(err)
-	nft4DB, err := tc.repos.nftRepository.GetByID(ctx, ids[3])
+	nft4DB, err := tc.repos.NftRepository.GetByID(ctx, ids[3])
 	assert.Nil(err)
 
 	mikeCollNFTs := []persist.DBID{}
@@ -68,19 +68,19 @@ func TestOpenseaSync_Success(t *testing.T) {
 	}
 
 	coll := persist.CollectionDB{OwnerUserID: mikeUserID, Name: "mikey-coll", NFTs: mikeCollNFTs}
-	collID, err := tc.repos.collectionRepository.Create(ctx, coll)
+	collID, err := tc.repos.CollectionRepository.Create(ctx, coll)
 	assert.Nil(err)
 
-	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.nftRepository, tc.repos.userRepository, tc.repos.collectionRepository)
+	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository)
 	assert.Nil(err)
 
 	time.Sleep(time.Second * 3)
 
-	mikeColl, err := tc.repos.collectionRepository.GetByID(ctx, collID, true)
+	mikeColl, err := tc.repos.CollectionRepository.GetByID(ctx, collID, true)
 	assert.Nil(err)
 	assert.Len(mikeColl.NFTs, 1)
 
-	mikeNFTs, err := tc.repos.nftRepository.GetByUserID(ctx, mikeUserID)
+	mikeNFTs, err := tc.repos.NftRepository.GetByUserID(ctx, mikeUserID)
 	assert.Nil(err)
 
 	assert.Greater(len(mikeNFTs), 0)
