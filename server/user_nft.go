@@ -23,13 +23,11 @@ func createUser(userRepository persist.UserRepository, nonceRepository persist.N
 			return
 		}
 
-		output, err := user.CreateUser(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
+		output, err := user.CreateUserREST(c, input, userRepository, nonceRepository, galleryRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-
-		auth.SetJWTCookie(c, output.JWTtoken)
 
 		c.JSON(http.StatusOK, output)
 

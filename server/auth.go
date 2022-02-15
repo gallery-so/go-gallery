@@ -31,7 +31,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		authed := c.GetBool(auth.AuthContextKey)
 
-		output, err := auth.GetPreflight(c, input, authed, userRepository, authNonceRepository, ethClient)
+		output, err := auth.GetAuthNonceREST(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrNonceNotFoundForAddress); ok {
@@ -53,7 +53,7 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			return
 		}
 
-		output, err := auth.LoginAndMemorizeAttempt(
+		output, err := auth.LoginREST(
 			c,
 			input,
 			c.Request,
@@ -66,8 +66,6 @@ func login(userRepository persist.UserRepository, authNonceRepository persist.No
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-
-		auth.SetJWTCookie(c, output.JWTtoken)
 
 		c.JSON(http.StatusOK, output)
 	}

@@ -9,13 +9,14 @@ import (
 	storage "cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 var rwMutex = &sync.RWMutex{}
 
 type snapshot struct {
-	Snapshot []string `json:"snapshot"`
+	Snapshot []string `json:"snapshot" binding:"required"`
 }
 
 func getSnapshot(stg *storage.Client) gin.HandlerFunc {
@@ -39,14 +40,16 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
+		logrus.Infof("updating snapshot: %d", len(input.Snapshot))
 		rwMutex.Lock()
 		defer rwMutex.Unlock()
-		w := getSnapshotWriter(c, stg)
-		defer w.Close()
-		if err := json.NewEncoder(w).Encode(input); err != nil {
+
+		err := writeSnapshot(c, stg, input.Snapshot)
+		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
@@ -58,7 +61,18 @@ func getSnapshotReader(c context.Context, stg *storage.Client) (*storage.Reader,
 	}
 	return r, nil
 }
+func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) error {
+	obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
+	obj.Delete(c)
+	w := obj.NewWriter(c)
 
-func getSnapshotWriter(c context.Context, stg *storage.Client) *storage.Writer {
-	return stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json").NewWriter(c)
+	err := json.NewEncoder(w).Encode(snapshot)
+	if err != nil {
+		return err
+	}
+	if err = w.Close(); err != nil {
+		return err
+	}
+
+	return obj.ACL().Set(c, storage.AllUsers, storage.RoleReader)
 }

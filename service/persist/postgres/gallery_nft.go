@@ -50,7 +50,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
 	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
@@ -61,7 +61,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
-	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.CREATED_AT 
+	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
 	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
@@ -217,7 +217,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
-			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
+			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.AnimationURL, &nft.CreationTime)
 		if err != nil {
 			return nil, err
 		}
@@ -225,6 +225,9 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			galleries[gallery.ID] = gallery
 		}
 
+		if collection.ID == "" {
+			continue
+		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
 			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
@@ -232,16 +235,17 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 
 		if lastCollID != collection.ID {
-			logrus.Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
+			logrus.Debugf("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
-				logrus.Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
+				logrus.Debugf("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
 			} else {
 				collection.NFTs = []persist.CollectionNFT{}
-				logrus.Infof("No NFTs found for collection %s", collection.ID)
+				logrus.Debugf("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
 		} else {
+			logrus.Debugf("Already seen: Adding NFT %s to collection at end of current colls len %d", nft.ID, len(colls))
 			lastColl := colls[len(colls)-1]
 			lastColl.NFTs = append(lastColl.NFTs, nft)
 			colls[len(colls)-1] = lastColl
@@ -312,12 +316,16 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.MultipleOwners, &nft.Name, &nft.Contract, &nft.TokenCollectionName, &nft.CreatorAddress, &nft.CreatorName,
-			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.CreationTime)
+			&nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.AnimationOriginalURL, &nft.AnimationURL, &nft.CreationTime)
 		if err != nil {
 			return persist.Gallery{}, err
 		}
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
+		}
+
+		if collection.ID == "" {
+			continue
 		}
 
 		colls, ok := collections[gallery.ID]
