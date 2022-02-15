@@ -38,8 +38,8 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.6 // indirect
-	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
 	github.com/vektah/gqlparser/v2 v2.2.0
+	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
