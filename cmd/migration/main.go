@@ -50,7 +50,7 @@ func updateCollections(ctx context.Context, pgClient *sql.DB, usersToNewCollecti
 		logrus.Infof("Updating %d collections for user %s", len(newCollections), userID)
 		for coll, nfts := range newCollections {
 			logrus.Infof("Updating collection %s with %d nfts for user %s", coll, len(nfts), userID)
-			_, err := pgClient.ExecContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
+			_, err := pgClient.ExecContext(ctx, `UPDATE collections_v2 SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
 			if err != nil {
 				panic(err)
 			}
@@ -75,6 +75,9 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 				panic(err)
 			}
 			collsToNFTs[collID] = nftIDs
+		}
+		if err := res.Err(); err != nil {
+			panic(err)
 		}
 		newCollsToNFTs := map[persist.DBID][]persist.DBID{}
 		for coll, nftIDs := range collsToNFTs {
