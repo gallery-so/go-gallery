@@ -74,10 +74,6 @@ type transfersAtBlock struct {
 	transfers []rpc.Transfer
 }
 
-type uniqueMetadataHandler func(*Indexer, persist.TokenURI, persist.Address, persist.TokenID) (persist.TokenMetadata, error)
-
-type uniqueMetadatas map[persist.Address]uniqueMetadataHandler
-
 type ownerAtBlock struct {
 	ti    tokenIdentifiers
 	owner persist.Address
@@ -438,7 +434,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 			func() {
 
 				wg := &sync.WaitGroup{}
-				contractAddress := transfer.ContractAddress
+				contractAddress := persist.Address(transfer.ContractAddress.String())
 				from := transfer.From
 				to := transfer.To
 				tokenID := transfer.TokenID
@@ -538,13 +534,9 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 				uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", tokenID.ToUint256String())))
 
-				go func() {
-					defer wg.Done()
-					uris <- tokenURI{key, uriReplaced}
-				}()
 				var metadata persist.TokenMetadata
 				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
-					metadata, err = handler(i, uriReplaced, contractAddress, tokenID)
+					uriReplaced, metadata, err = handler(uriReplaced, contractAddress, tokenID)
 					if err != nil {
 						logrus.WithError(err).WithField("uri", uriReplaced).Error("error getting metadata for token")
 						atomic.AddUint64(&i.badURIs, 1)
@@ -568,6 +560,10 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 						cancel()
 					}
 				}
+				go func() {
+					defer wg.Done()
+					uris <- tokenURI{key, uriReplaced}
+				}()
 				if len(metadata) > 0 {
 					go func() {
 						defer wg.Done()
@@ -870,9 +866,9 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
-		persist.Address("0xd4e4078ca3495DE5B1d4dB434BEbc5a986197782"): autoglyphs,
-		persist.Address("0x60F3680350F65Beb2752788cB48aBFCE84a4759E"): colorglyphs,
-		persist.Address("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"): ens,
+		persist.Address("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
+		persist.Address("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
+		persist.Address("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
 	}
 }
 

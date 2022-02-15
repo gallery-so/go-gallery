@@ -80,6 +80,8 @@ const (
 	URITypeBase64SVG URIType = "base64svg"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
+	// URITypeENS represents an ENS domain
+	URITypeENS URIType = "ens"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
 	// URITypeInvalid represents an invalid URI type
@@ -369,6 +371,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeJSON
 	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml"):
 		return URITypeSVG
+	case strings.HasSuffix(asString, ".ens"):
+		return URITypeENS
 	case asString == InvalidTokenURI.String():
 		return URITypeInvalid
 	case asString == "":

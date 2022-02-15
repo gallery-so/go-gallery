@@ -161,34 +161,45 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 	updateChan := make(chan tokenUpdateMedia)
 	errChan := make(chan error)
 	wp := workerpool.New(10)
+	uniqueHandlers := getUniqueMetadataHandlers()
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
 
-			if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || token.Media.MediaType == persist.MediaTypeInvalid {
-				logrus.Debugf("skipping token %s-%s", token.ContractAddress, token.TokenID)
-				errChan <- nil
-				return
-			}
-
-			if uri.Type() == persist.URITypeNone {
-				u, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
+			if handler, ok := uniqueHandlers[persist.Address(token.ContractAddress.String())]; ok {
+				u, md, err := handler(token.TokenURI, token.ContractAddress, token.TokenID)
 				if err != nil {
-					errChan <- fmt.Errorf("failed to get token URI: %v", err)
-					return
-				}
-				uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.ToUint256String()))
-			}
-
-			if metadata == nil || len(metadata) == 0 {
-				md, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
-				if err != nil {
-					errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
+					errChan <- fmt.Errorf("failed to get unique metadata for token %s: %s", token.TokenURI, err)
 					return
 				}
 				metadata = md
+				uri = u
+			} else {
+				if _, ok := metadata["error"]; ok || uri == persist.InvalidTokenURI || token.Media.MediaType == persist.MediaTypeInvalid {
+					logrus.Debugf("skipping token %s-%s", token.ContractAddress, token.TokenID)
+					errChan <- nil
+					return
+				}
+
+				if uri.Type() == persist.URITypeNone {
+					u, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
+					if err != nil {
+						errChan <- fmt.Errorf("failed to get token URI: %v", err)
+						return
+					}
+					uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.ToUint256String()))
+				}
+
+				if metadata == nil || len(metadata) == 0 {
+					md, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
+					if err != nil {
+						errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
+						return
+					}
+					metadata = md
+				}
 			}
 
 			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
