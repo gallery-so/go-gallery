@@ -221,7 +221,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 {
 			if retry < 3 {
-				time.Sleep(time.Second * 2 * time.Duration(retry+1))
+				time.Sleep(time.Second * 3 * time.Duration(retry+1))
 				return FetchAssetsForWallet(pWalletAddress, pOffset, retry+1, alreadyReceived)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")

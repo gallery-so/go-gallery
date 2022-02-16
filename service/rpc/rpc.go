@@ -108,7 +108,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 	asString := turi.String()
 
-	logrus.Infof("Getting data from %s with type %s", asString, turi.Type())
+	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:

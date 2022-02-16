@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -20,10 +23,16 @@ type successOrError struct {
 }
 
 func main() {
+	setDefaults()
 	client := &http.Client{
-		Timeout: time.Minute,
+		Timeout: time.Minute * 20,
 	}
 	pc := postgres.NewClient()
+
+	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE;`)
+	if err != nil {
+		panic(err)
+	}
 	validateURL, err := url.Parse("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/validate")
 	if err != nil {
 		panic(err)
@@ -36,7 +45,7 @@ func main() {
 
 	users := map[persist.DBID][]persist.Address{}
 
-	res, err := pc.Query(`SELECT id, address FROM users`)
+	res, err := stmt.Query()
 	if err != nil {
 		panic(err)
 	}
@@ -56,57 +65,82 @@ func main() {
 		panic(err)
 	}
 
-	for userID, addresses := range users {
-		func() {
+	wp := workerpool.New(8)
+	for u, addrs := range users {
+		userID := u
+		addresses := addrs
+		wp.Submit(func() {
 			logrus.Infof("Processing user %s with addresses %v", userID, addresses)
 			url := validateURL
-			url.Query().Set("user_id", userID.String())
+			input := indexer.ValidateUsersNFTsInput{
+				UserID: userID,
+				All:    true,
+			}
 
-			resp, err := client.Get(url.String())
+			b, err := json.Marshal(input)
+			if err != nil {
+				panic(err)
+			}
+			resp, err := client.Post(url.String(), "application/json", bytes.NewReader(b))
 			if err != nil {
 				panic(err)
 			}
 			defer resp.Body.Close()
 
-			res := indexer.ValidateUsersNFTsOutput{}
-			if err = json.NewDecoder(resp.Body).Decode(&res); err != nil {
-				panic(err)
+			if resp.StatusCode != http.StatusOK {
+				bs, err := io.ReadAll(resp.Body)
+				if err != nil {
+					panic(err)
+				}
+				logrus.Errorf("Error validating user %s: %s - %s", userID, string(bs), resp.Status)
 			}
-
-			if !res.Success {
-				logrus.Errorf("User %s failed validation: ", userID, res.Message)
-			}
-
 			for _, addr := range addresses {
 				url = mediaURL
-				url.Query().Set("address", addr.String())
+				input := indexer.UpdateMediaInput{
+					OwnerAddress: addr,
+				}
 
-				resp, err := client.Get(url.String())
+				b, err := json.Marshal(input)
+				if err != nil {
+					panic(err)
+				}
+
+				resp, err := client.Post(url.String(), "application/json", bytes.NewReader(b))
 				if err != nil {
 					panic(err)
 				}
 				defer resp.Body.Close()
 
-				res := successOrError{}
-				if err = json.NewDecoder(resp.Body).Decode(&res); err != nil {
-					panic(err)
-				}
-				if !res.Success || res.Error != "" {
-					logrus.Errorf("User %s failed media update with address %s: %s", userID, addr, res.Error)
+				if resp.StatusCode != http.StatusOK {
+					bs, err := io.ReadAll(resp.Body)
+					if err != nil {
+						panic(err)
+					}
+					logrus.Errorf("User %s failed media update with address %s: %s", userID, addr, string(bs))
 				}
 			}
-		}()
+		})
 	}
+
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			logrus.Infof("Workerpool queue size: %d", wp.WaitingQueueSize())
+		}
+	}()
+	wp.StopWait()
+
+	logrus.Info("Done")
 
 }
 
 func setDefaults() {
-	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("OPENSEA_API_KEY", "")
 
 	viper.AutomaticEnv()
 }

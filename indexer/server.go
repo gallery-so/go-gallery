@@ -36,16 +36,17 @@ var bigZero = big.NewInt(0)
 // UpdateMediaInput is the input for the update media endpoint that will find all of the media content
 // for an addresses NFTs and cache it in a storage bucket
 type UpdateMediaInput struct {
-	OwnerAddress    persist.Address `json:"owner_address"`
-	TokenID         persist.TokenID `json:"token_id"`
-	ContractAddress persist.Address `json:"contract_address"`
+	OwnerAddress    persist.Address `json:"owner_address,omitempty"`
+	TokenID         persist.TokenID `json:"token_id,omitempty"`
+	ContractAddress persist.Address `json:"contract_address,omitempty"`
 	UpdateAll       bool            `json:"update_all"`
 }
 
 // ValidateUsersNFTsInput is the input for the validate users NFTs endpoint that will return
 // whether what opensea has on a user is the same as what we have in our database
 type ValidateUsersNFTsInput struct {
-	UserID persist.DBID `json:"user_id"`
+	UserID persist.DBID `json:"user_id,omitempty" binding:"required"`
+	All    bool         `json:"all"`
 }
 
 // ValidateUsersNFTsOutput is the output of the validate users NFTs endpoint that will return
@@ -249,12 +250,14 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 
 		output := ValidateUsersNFTsOutput{Success: true}
 
-		newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient, arweaveClient)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+		if input.All {
+			newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient, arweaveClient)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			output.Message += newMsg
 		}
-		output.Message += newMsg
 
 		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 		for _, address := range user.Addresses {
@@ -397,7 +400,14 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 			ExternalURL:     persist.NullString(a.ExternalURL),
 			TokenMetadata:   metadata,
 			Media:           media,
+			Quantity:        "1",
 			BlockNumber:     persist.BlockNumber(block),
+			OwnershipHistory: []persist.AddressAtBlock{
+				{
+					Address: persist.ZeroAddress,
+					Block:   persist.BlockNumber(block - 1),
+				},
+			},
 		}
 		switch a.Contract.ContractSchemaName {
 		case "ERC721":
@@ -439,6 +449,8 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	if err := contractRepository.BulkUpsert(ctx, cntracts); err != nil {
 		return err
 	}
+
+	logrus.Infof("found %d new tokens: %+v", len(allTokens), allTokens)
 
 	if err := tokenRepository.BulkUpsert(ctx, allTokens); err != nil {
 		return err
