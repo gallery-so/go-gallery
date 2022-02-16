@@ -7,6 +7,13 @@ import (
 	"fmt"
 )
 
+const (
+	MIN_COLUMNS     = 0
+	MAX_COLUMNS     = 6
+	DEFAULT_COLUMNS = 3
+	MAX_WHITESPACE  = 1000
+)
+
 // CollectionTokenDB is the struct that represents a collection of NFTs in the database
 // CollectionTokenDB will not store the NFTs by value but instead by ID creating a join relationship
 // between collections and NFTS
@@ -53,9 +60,9 @@ type CollectionToken struct {
 
 // TokenLayout defines the layout of a collection of tokens
 type TokenLayout struct {
-	Columns NullInt64 `bson:"columns" json:"columns"`
+	Columns    NullInt64 `bson:"columns" json:"columns"`
+	Whitespace []int     `bson:"whitespace" json:"whitespace"`
 	// Padding         int   `bson:"padding" json:"padding"`
-	// WhitespaceAfter []int `bson:"whitespace_after" json:"whitespace_after"`
 }
 
 // CollectionTokenUpdateInfoInput represents the data that will be changed when updating a collection's metadata
@@ -125,13 +132,33 @@ func (e ErrInvalidLayout) Error() string {
 }
 
 // ValidateLayout ensures a layout is within constraints and if has unset properties, sets their defaults
-func ValidateLayout(layout TokenLayout) (TokenLayout, error) {
-	if layout.Columns < 0 || layout.Columns > 6 {
-		return TokenLayout{}, ErrInvalidLayout{Layout: layout, Reason: "columns must be between 0-6"}
+func ValidateLayout(layout TokenLayout, nfts []DBID) (TokenLayout, error) {
+	if layout.Columns < MIN_COLUMNS || layout.Columns > MAX_COLUMNS {
+		return TokenLayout{}, ErrInvalidLayout{
+			Layout: layout,
+			Reason: fmt.Sprintf("columns must be between %d-%d", MIN_COLUMNS, MAX_COLUMNS),
+		}
 	}
 	if layout.Columns == 0 {
-		layout.Columns = 3
+		layout.Columns = DEFAULT_COLUMNS
 	}
+
+	if ws := len(layout.Whitespace); ws > MAX_WHITESPACE {
+		return TokenLayout{}, ErrInvalidLayout{
+			Layout: layout,
+			Reason: fmt.Sprintf("up to %d whitespace blocks permitted", MAX_WHITESPACE),
+		}
+	}
+
+	for i, idx := range layout.Whitespace {
+		if idx > len(nfts) {
+			return TokenLayout{}, ErrInvalidLayout{
+				Layout: layout,
+				Reason: fmt.Sprintf("position of whitespace at %d is invalid: %d", i, idx),
+			}
+		}
+	}
+
 	return layout, nil
 }
 

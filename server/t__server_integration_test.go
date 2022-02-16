@@ -2,14 +2,17 @@ package server
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/ory/dockertest"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -54,8 +57,32 @@ type TestTarget struct {
 	chainID    int
 }
 
-type UserTestSuite struct {
+type IntegrationTest struct{}
+
+// Tests related to user auth
+type UserAuthSuite struct {
 	suite.Suite
+	*IntegrationTest
+	*IntegrationTestConfig
+	target      TestTarget
+	version     int
+	liveWallets []*TestWallet
+}
+
+// Test related to NFT collections (v1)
+type NFTCollectionsSuite struct {
+	suite.Suite
+	*IntegrationTest
+	*IntegrationTestConfig
+	target      TestTarget
+	version     int
+	liveWallets []*TestWallet
+}
+
+// Test related to Token collections (v2)
+type TokenCollectionsSuite struct {
+	suite.Suite
+	*IntegrationTest
 	*IntegrationTestConfig
 	target      TestTarget
 	version     int
@@ -80,10 +107,7 @@ func setBlockchainContext(t TestTarget) {
 	}
 }
 
-func (s *UserTestSuite) SetupTest() {
-	setDefaults()
-	setBlockchainContext(s.target)
-
+func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *IntegrationTestConfig {
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		log.Fatalf("could not connect to docker: %s", err)
@@ -91,8 +115,8 @@ func (s *UserTestSuite) SetupTest() {
 	pg, pgClient := initPostgres(pool)
 	rd := initRedis(pool)
 
-	s.IntegrationTestConfig = &IntegrationTestConfig{
-		TestConfig:    initializeTestServer(pgClient, s.Assertions, s.version),
+	return &IntegrationTestConfig{
+		TestConfig:    initializeTestServer(pgClient, a, version),
 		pool:          pool,
 		pgResource:    pg,
 		redisResource: rd,
@@ -100,24 +124,34 @@ func (s *UserTestSuite) SetupTest() {
 	}
 }
 
-func (s *UserTestSuite) TearDownTest() {
+func (i *IntegrationTest) TearDownTest(tc *IntegrationTestConfig) {
 	// Kill containers
-	for _, r := range []*dockertest.Resource{s.pgResource, s.redisResource} {
-		if err := s.pool.Purge(r); err != nil {
+	for _, r := range []*dockertest.Resource{tc.pgResource, tc.redisResource} {
+		if err := tc.pool.Purge(r); err != nil {
 			log.Fatalf("could not purge resource: %s", err)
 		}
 	}
 
-	s.db.Close()
-	s.server.Close()
+	tc.db.Close()
+	tc.server.Close()
 }
 
-func (s *UserTestSuite) TestExistingUserCanLogin() {
+func (s *UserAuthSuite) SetupTest() {
+	setDefaults()
+	setBlockchainContext(s.target)
+	s.IntegrationTestConfig = s.setupTest(s.Assertions, s.version)
+}
+
+func (s *UserAuthSuite) TearDownTest() {
+	s.IntegrationTest.TearDownTest(s.IntegrationTestConfig)
+}
+
+func (s *UserAuthSuite) TestExistingUserCanLogin() {
 	nonce := fetchNonce(s.Suite, s.serverURL, s.user1.address)
 	loginUser(s.Suite, s.serverURL, nonce, s.user1.TestWallet)
 }
 
-func (s *UserTestSuite) TestEligibleWalletCanBecomeMember() {
+func (s *UserAuthSuite) TestEligibleWalletCanBecomeMember() {
 	// create user
 	nonce := fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
 	createNewUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
@@ -144,15 +178,170 @@ func (s *UserTestSuite) TestEligibleWalletCanBecomeMember() {
 	s.Equal(204, afterLogout.StatusCode)
 }
 
-func TestIntegrationTestUserTestSuite(t *testing.T) {
+func (s *NFTCollectionsSuite) SetupTest() {
+	setDefaults()
+	setBlockchainContext(s.target)
+	s.IntegrationTestConfig = s.IntegrationTest.setupTest(s.Assertions, s.version)
+}
+
+func (s *NFTCollectionsSuite) TearDownTest() {
+	s.IntegrationTest.TearDownTest(s.IntegrationTestConfig)
+}
+
+func (s *NFTCollectionsSuite) TestUserCanUpdateNFTCollection() {
+	client := newClient()
+
+	nonce := fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
+	userOutput := createNewUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
+	nonce = fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
+	_, loginCookie := loginUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
+	nftIDs := addNFTsToNFTsRepo(s.Suite, s.repos.NftRepository, s.liveWallets[0])
+
+	// Create new collection
+	data, err := json.Marshal(map[string]interface{}{"gallery_id": userOutput.GalleryID, "nfts": nftIDs})
+	s.NoError(err)
+	createOutput := createNewNFTCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	collectionOutput := fetchNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(createOutput.ID, collectionOutput.Collection.ID)
+
+	// Change nothing
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": nftIDs})
+	s.NoError(err)
+	resp := updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput := fetchNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(collectionOutput.Collection.Layout, changeOutput.Collection.Layout)
+
+	// Add a layout
+	layout := persist.TokenLayout{Columns: 5}
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": nftIDs, "layout": layout})
+	s.NoError(err)
+	resp = updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput = fetchNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(changeOutput.Collection.Layout, layout)
+
+	// Add whitespace to layout
+	layout = persist.TokenLayout{Columns: 5, Whitespace: []int{0, 1, 2, 3}}
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": nftIDs, "layout": layout})
+	s.NoError(err)
+	resp = updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput = fetchNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(changeOutput.Collection.Layout, layout)
+
+	// Delete collection
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID})
+	s.NoError(err)
+	deleteOutput := removeCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+	s.True(deleteOutput.Success)
+}
+
+func (s *TokenCollectionsSuite) SetupTest() {
+	setDefaults()
+	setBlockchainContext(s.target)
+	s.IntegrationTestConfig = s.setupTest(s.Assertions, s.version)
+}
+
+func (s *TokenCollectionsSuite) TearDownTest() {
+	s.IntegrationTest.TearDownTest(s.IntegrationTestConfig)
+}
+
+func (s *TokenCollectionsSuite) TestUserCanUpdateTokenCollection() {
+	client := newClient()
+
+	nonce := fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
+	userOutput := createNewUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
+	nonce = fetchNonce(s.Suite, s.serverURL, s.liveWallets[0].address)
+	_, loginCookie := loginUser(s.Suite, s.serverURL, nonce, s.liveWallets[0])
+	tokenIDs := addTokensToTokensRepo(s.Suite, s.repos.TokenRepository, s.liveWallets[0])
+
+	// Create new collection
+	data, err := json.Marshal(map[string]interface{}{"gallery_id": userOutput.GalleryID, "nfts": tokenIDs})
+	s.NoError(err)
+	createOutput := createNewTokenCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	collectionOutput := fetchTokenCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(createOutput.ID, collectionOutput.Collection.ID)
+
+	// Change nothing
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": tokenIDs})
+	s.NoError(err)
+	resp := updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput := fetchTokenCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(collectionOutput.Collection.Layout, changeOutput.Collection.Layout)
+
+	// Add a layout
+	layout := persist.TokenLayout{Columns: 5}
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": tokenIDs, "layout": layout})
+	s.NoError(err)
+	resp = updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput = fetchTokenCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(changeOutput.Collection.Layout, layout)
+
+	// Add whitespace to layout
+	layout = persist.TokenLayout{Columns: 5, Whitespace: []int{0, 1, 2, 3}}
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID, "nfts": tokenIDs, "layout": layout})
+	s.NoError(err)
+	resp = updateCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+
+	changeOutput = fetchTokenCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(collectionOutput.Collection.ID, changeOutput.Collection.ID)
+	s.Equal(collectionOutput.Collection.OwnerUserID, changeOutput.Collection.OwnerUserID)
+	s.Equal(collectionOutput.Collection.NFTs, changeOutput.Collection.NFTs)
+	s.Equal(changeOutput.Collection.Layout, layout)
+
+	// Delete collection
+	data, err = json.Marshal(map[string]interface{}{"id": createOutput.ID})
+	s.NoError(err)
+	deleteOutput := removeCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
+	s.Equal(200, resp.StatusCode)
+	s.True(deleteOutput.Success)
+}
+
+func TestIntegrationTestTestSuite(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
 
 	log.Infof("running integration tests against [%s:%d]", *blockchain, *chainID)
-	suite.Run(t, &UserTestSuite{
+	wallet := loadWallet(*walletFile)
+	suite.Run(t, &UserAuthSuite{
 		version:     1,
-		liveWallets: []*TestWallet{loadWallet(*walletFile)},
+		liveWallets: []*TestWallet{wallet},
+		target:      TestTarget{*blockchain, *chainID},
+	})
+	suite.Run(t, &NFTCollectionsSuite{
+		version:     1,
+		liveWallets: []*TestWallet{wallet},
+		target:      TestTarget{*blockchain, *chainID},
+	})
+	suite.Run(t, &TokenCollectionsSuite{
+		version:     2,
+		liveWallets: []*TestWallet{wallet},
 		target:      TestTarget{*blockchain, *chainID},
 	})
 }
