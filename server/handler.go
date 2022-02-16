@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -45,6 +46,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client) gi
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}))
 
 	return func(c *gin.Context) {
+		dataloader.AddTo(c, repos)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

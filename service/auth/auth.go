@@ -527,6 +527,11 @@ func GetUserIDFromCtx(c *gin.Context) persist.DBID {
 	return c.MustGet(UserIDContextKey).(persist.DBID)
 }
 
+// GetUserAuthedFromCtx queries the context to determine whether the user is authenticated
+func GetUserAuthedFromCtx(c *gin.Context) bool {
+	return c.GetBool(AuthContextKey)
+}
+
 // GetAllowlistContracts returns the list of addresses we allowlist against
 func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 	addrs := viper.GetString("CONTRACT_ADDRESSES")

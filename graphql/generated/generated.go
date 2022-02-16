@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
@@ -35,8 +36,11 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Gallery() GalleryResolver
+	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Wallet() WalletResolver
 }
 
 type DirectiveRoot struct {
@@ -114,7 +118,7 @@ type ComplexityRoot struct {
 
 	GalleryUser struct {
 		Bio                 func(childComplexity int) int
-		Gallery             func(childComplexity int) int
+		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
 		Username            func(childComplexity int) int
@@ -215,6 +219,12 @@ type ComplexityRoot struct {
 	}
 }
 
+type GalleryResolver interface {
+	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
+}
+type GalleryUserResolver interface {
+	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
+}
 type MutationResolver interface {
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error)
 	DeleteCollection(ctx context.Context, collectionID *int) (*model.DeleteCollectionPayload, error)
@@ -232,6 +242,9 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerPayload, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error)
 	MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error)
+}
+type WalletResolver interface {
+	Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error)
 }
 
 type executableSchema struct {
@@ -445,12 +458,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Bio(childComplexity), true
 
-	case "GalleryUser.gallery":
-		if e.complexity.GalleryUser.Gallery == nil {
+	case "GalleryUser.galleries":
+		if e.complexity.GalleryUser.Galleries == nil {
 			break
 		}
 
-		return e.complexity.GalleryUser.Gallery(childComplexity), true
+		return e.complexity.GalleryUser.Galleries(childComplexity), true
 
 	case "GalleryUser.id":
 		if e.complexity.GalleryUser.ID == nil {
@@ -914,7 +927,10 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "graphql/schema/schema.graphql", Input: `scalar DateTime
+	{Name: "graphql/schema/schema.graphql", Input: `# Use "forceResolver" to lazily handle recursive fields that shouldn't be resolved unless the caller asks for them
+directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+scalar DateTime
 
 interface Node {
   id: ID!
@@ -929,7 +945,7 @@ type GalleryUser implements Node {
   username: String
   bio: String
   wallets: [Wallet]
-  gallery: Gallery
+  galleries: [Gallery] @goField(forceResolver: true)
   isAuthenticatedUser: Boolean
 }
 
@@ -937,7 +953,7 @@ type Wallet implements Node {
   id: ID!
   address: String
   # TODO: Do we paginate these currently?
-  nfts: [Nft]
+  nfts: [Nft] @goField(forceResolver: true)
 }
 
 union AddressOrGalleryUser = GalleryUser | Wallet
@@ -989,7 +1005,7 @@ type GalleryCollection implements Node {
 
 type Gallery implements Node {
   id: ID!
-  owner: GalleryUser
+  owner: GalleryUser @goField(forceResolver: true)
   collections: [GalleryCollection]
 }
 
@@ -1168,8 +1184,7 @@ type Mutation {
   # User Mutations
   removeUserAddress(address: String!): RemoveUserAddressPayload
   updateUserInfo(input: UpdateUserInfoInput): UpdateUserInfoPayload
-  # We don't know the auth situation until we speak to Kaito
-  # addUserAddress()
+  #addUserAddress()
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
@@ -1852,14 +1867,14 @@ func (ec *executionContext) _Gallery_owner(ctx context.Context, field graphql.Co
 		Object:     "Gallery",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Owner, nil
+		return ec.resolvers.Gallery().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2426,7 +2441,7 @@ func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field grap
 	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _GalleryUser_gallery(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+func (ec *executionContext) _GalleryUser_galleries(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2437,14 +2452,14 @@ func (ec *executionContext) _GalleryUser_gallery(ctx context.Context, field grap
 		Object:     "GalleryUser",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Gallery, nil
+		return ec.resolvers.GalleryUser().Galleries(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2453,9 +2468,9 @@ func (ec *executionContext) _GalleryUser_gallery(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Gallery)
+	res := resTmp.([]*model.Gallery)
 	fc.Result = res
-	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+	return ec.marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_isAuthenticatedUser(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -4072,14 +4087,14 @@ func (ec *executionContext) _Wallet_nfts(ctx context.Context, field graphql.Coll
 		Object:     "Wallet",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Nfts, nil
+		return ec.resolvers.Wallet().Nfts(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6207,15 +6222,25 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "owner":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Gallery_owner(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Gallery_owner(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "collections":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Gallery_collections(ctx, field, obj)
@@ -6405,7 +6430,7 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "username":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -6428,13 +6453,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "gallery":
+		case "galleries":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryUser_gallery(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_galleries(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "isAuthenticatedUser":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryUser_isAuthenticatedUser(ctx, field, obj)
@@ -7163,7 +7198,7 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "address":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -7173,12 +7208,22 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = innerFunc(ctx)
 
 		case "nfts":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Wallet_nfts(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Wallet_nfts(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8014,6 +8059,47 @@ func (ec *executionContext) unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydub
 	}
 	res, err := ec.unmarshalInputEthereumEoaAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v []*model.Gallery) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v *model.Gallery) graphql.Marshaler {

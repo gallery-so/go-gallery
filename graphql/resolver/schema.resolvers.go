@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -14,6 +15,40 @@ import (
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
+	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveGalleryUserByUserId(ctx, r.Resolver, gallery.OwnerUserID.String())
+}
+
+func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
+	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(obj.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Oof, more remapping, huh?
+	//if err != nil {
+	//	return remapError(err)
+	//}
+
+	var output = make([]*model.Gallery, len(galleries))
+	for i, gallery := range galleries {
+		output[i] = &model.Gallery{
+			ID:          gallery.ID.String(),
+			Owner:       nil, // Handled by resolver
+			Collections: nil, // TODO, should also be handled by a resolver
+		}
+	}
+
+	return output, nil
+}
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error) {
 	panic(fmt.Errorf("not implemented"))
@@ -52,7 +87,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 
 	// TODO: This currently gets its value from the AuthOptional middleware applied to the entire GraphQL endpoint,
 	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
-	authed := gc.GetBool(auth.AuthContextKey)
+	authed := auth.GetUserAuthedFromCtx(gc)
 
 	output, err := auth.GetAuthNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
 
@@ -128,16 +163,74 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.ViewerPayload, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.ViewerPayload); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
+
+	userID := auth.GetUserIDFromCtx(gc).String() // TODO: Is there a case where a user has an ID but isn't authed?
+	user, err := resolveGalleryUserByUserId(ctx, r.Resolver, userID)
+
+	if err != nil {
+		return remapError(err)
+	}
+
+	// TODO: Check auth first!
+	viewer := &model.Viewer{
+		User:          user,
+		Wallets:       user.Wallets, // TODO: Is this field necessary?
+		ViewerGallery: nil,
+	}
+
+	return viewer, nil
 }
 
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.UserByUsernamePayload, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.UserByUsernamePayload); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
+
+	user, err := resolveGalleryUserByUsername(ctx, r.Resolver, username)
+
+	if err != nil {
+		return remapError(err)
+	}
+
+	return user, nil
 }
 
 func (r *queryResolver) MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error) {
 	panic(fmt.Errorf("not implemented"))
 }
+
+func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
+	return []model.Nft{model.ImageNft{ID: "abcdef"}}, nil
+}
+
+// Gallery returns generated.GalleryResolver implementation.
+func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
+
+// GalleryUser returns generated.GalleryUserResolver implementation.
+func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
@@ -145,5 +238,11 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Wallet returns generated.WalletResolver implementation.
+func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
+
+type galleryResolver struct{ *Resolver }
+type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type walletResolver struct{ *Resolver }

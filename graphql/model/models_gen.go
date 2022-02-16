@@ -165,12 +165,12 @@ type GalleryNft struct {
 }
 
 type GalleryUser struct {
-	ID                  string    `json:"id"`
-	Username            *string   `json:"username"`
-	Bio                 *string   `json:"bio"`
-	Wallets             []*Wallet `json:"wallets"`
-	Gallery             *Gallery  `json:"gallery"`
-	IsAuthenticatedUser *bool     `json:"isAuthenticatedUser"`
+	ID                  string     `json:"id"`
+	Username            *string    `json:"username"`
+	Bio                 *string    `json:"bio"`
+	Wallets             []*Wallet  `json:"wallets"`
+	Galleries           []*Gallery `json:"galleries"`
+	IsAuthenticatedUser *bool      `json:"isAuthenticatedUser"`
 }
 
 func (GalleryUser) IsNode()                  {}

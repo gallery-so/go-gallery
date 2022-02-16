@@ -1,3 +1,6 @@
+# Use "forceResolver" to lazily handle recursive fields that shouldn't be resolved unless the caller asks for them
+directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
 scalar DateTime
 
 interface Node {
@@ -13,7 +16,7 @@ type GalleryUser implements Node {
   username: String
   bio: String
   wallets: [Wallet]
-  gallery: Gallery
+  galleries: [Gallery] @goField(forceResolver: true)
   isAuthenticatedUser: Boolean
 }
 
@@ -21,7 +24,7 @@ type Wallet implements Node {
   id: ID!
   address: String
   # TODO: Do we paginate these currently?
-  nfts: [Nft]
+  nfts: [Nft] @goField(forceResolver: true)
 }
 
 union AddressOrGalleryUser = GalleryUser | Wallet
@@ -73,7 +76,7 @@ type GalleryCollection implements Node {
 
 type Gallery implements Node {
   id: ID!
-  owner: GalleryUser
+  owner: GalleryUser @goField(forceResolver: true)
   collections: [GalleryCollection]
 }
 
@@ -252,8 +255,7 @@ type Mutation {
   # User Mutations
   removeUserAddress(address: String!): RemoveUserAddressPayload
   updateUserInfo(input: UpdateUserInfoInput): UpdateUserInfoPayload
-  # We don't know the auth situation until we speak to Kaito
-  # addUserAddress()
+  #addUserAddress()
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
