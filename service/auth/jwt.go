@@ -45,11 +45,7 @@ func JWTParse(pJWTtokenStr string, pJWTsecretKeyStr string) (persist.DBID, error
 			return []byte(pJWTsecretKeyStr), nil
 		})
 
-	if err != nil {
-		return "", err
-	}
-
-	if !JWTtoken.Valid {
+	if err != nil || !JWTtoken.Valid {
 		return "", ErrInvalidJWT
 	}
 
@@ -68,9 +64,7 @@ func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 	return jwtTokenStr, nil
 }
 
-func jwtGenerate(
-	pIssuerStr string,
-	pUserID persist.DBID) (string, error) {
+func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
 
 	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
 

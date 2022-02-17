@@ -41,6 +41,10 @@ const (
 	authErrorContextKey  = "auth.auth_error"
 )
 
+// We don't want our cookies to expire, so their max age is arbitrarily set to 10 years.
+// Note that browsers can still cap this expiration time (e.g. Brave limits cookies to 6 months).
+const cookieMaxAge int = 60 * 60 * 24 * 365 * 10
+
 // NoncePrepend is what is prepended to every nonce
 const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
 
@@ -603,7 +607,7 @@ func SetJWTCookie(c *gin.Context, token string) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     JWTCookieKey,
 		Value:    token,
-		MaxAge:   viper.GetInt("JWT_TTL"),
+		MaxAge:   cookieMaxAge,
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: httpOnly,
