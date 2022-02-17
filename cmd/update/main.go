@@ -37,7 +37,7 @@ func main() {
 		panic(err)
 	}
 
-	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE ORDER BY ID DESC;`)
+	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE ORDER BY CREATED_AT DESC;`)
 	if err != nil {
 		panic(err)
 	}
@@ -63,11 +63,17 @@ func main() {
 	if err := res.Err(); err != nil {
 		panic(err)
 	}
-	wp := workerpool.New(10)
+	wp := workerpool.New(5)
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			logrus.Warnf("Workerpool queue size: %d", wp.WaitingQueueSize())
+		}
+	}()
 	for u, addrs := range users {
 		userID := u
 		addresses := addrs
-		wp.Submit(func() {
+		f := func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
 			go func() {
 				defer cancel()
@@ -97,15 +103,14 @@ func main() {
 			if ctx.Err() != context.Canceled {
 				logrus.Errorf("Error processing user %s: %s", userID, ctx.Err())
 			}
-		})
+		}
+		if wp.WaitingQueueSize() > 20 {
+			wp.SubmitWait(f)
+		} else {
+			wp.Submit(f)
+		}
 	}
 
-	go func() {
-		for {
-			time.Sleep(time.Minute)
-			logrus.Warnf("Workerpool queue size: %d", wp.WaitingQueueSize())
-		}
-	}()
 	wp.StopWait()
 
 	logrus.Info("Done")
