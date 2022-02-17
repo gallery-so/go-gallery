@@ -24,7 +24,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/appengine"
 )
 
 var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
@@ -93,82 +92,89 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 			return
 		}
 
-		var tokens []persist.Token
-		var err error
-		if input.OwnerAddress != "" {
-			tokens, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
-		} else if input.TokenID != "" && input.ContractAddress != "" {
-			tokens, err = tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
-		} else {
-			util.ErrResponse(c, http.StatusBadRequest, errInvalidUpdateMediaInput)
-			return
-		}
+		err := UpdateMedia(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
-		}
-
-		if !input.UpdateAll {
-			res := make([]persist.Token, 0, len(tokens))
-			for _, token := range tokens {
-				switch token.Media.MediaType {
-				case persist.MediaTypeVideo:
-					if token.Media.MediaURL == "" || token.Media.ThumbnailURL == "" {
-						res = append(res, token)
-					}
-				default:
-					if token.Media.MediaURL == "" || token.Media.MediaType == "" {
-						res = append(res, token)
-					}
-				}
-			}
-			tokens = res
-		}
-
-		logrus.Infof("Updating %d tokens", len(tokens))
-
-		updateByID := input.OwnerAddress != ""
-
-		appCtx := appengine.WithContext(c, c.Request)
-
-		updates, errChan := updateMediaForTokens(appCtx, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
-		for i := 0; i < len(tokens); i++ {
-			select {
-			case update := <-updates:
-				if updateByID {
-					if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
-						logrus.WithError(err).Error("failed to update token in database")
-						util.ErrResponse(c, http.StatusInternalServerError, err)
-						return
-					}
-				} else {
-					if err := tokenRepository.UpdateByTokenIdentifiersUnsafe(c, update.TokenID, update.ContractAddress, update.Update); err != nil {
-						logrus.WithError(err).Error("failed to update token in database")
-						util.ErrResponse(c, http.StatusInternalServerError, err)
-						return
-					}
-				}
-			case err := <-errChan:
-				if err != nil {
-					logrus.WithError(err).Error("failed to update media for token")
-				}
-			}
 		}
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 
 	}
 }
 
+// UpdateMedia will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
+func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) error {
+	var tokens []persist.Token
+	var err error
+	if input.OwnerAddress != "" {
+		tokens, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
+	} else if input.TokenID != "" && input.ContractAddress != "" {
+		tokens, err = tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
+	} else {
+		return errInvalidUpdateMediaInput
+	}
+	if err != nil {
+		return err
+	}
+
+	if !input.UpdateAll {
+		res := make([]persist.Token, 0, len(tokens))
+		for _, token := range tokens {
+			switch token.Media.MediaType {
+			case persist.MediaTypeVideo:
+				if token.Media.MediaURL == "" || token.Media.ThumbnailURL == "" {
+					res = append(res, token)
+				}
+			default:
+				if token.Media.MediaURL == "" || token.Media.MediaType == "" {
+					res = append(res, token)
+				}
+			}
+		}
+		tokens = res
+	}
+
+	logrus.Infof("Updating %d tokens", len(tokens))
+
+	updateByID := input.OwnerAddress != ""
+
+	updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
+	for i := 0; i < len(tokens); i++ {
+		select {
+		case update := <-updates:
+			if updateByID {
+				if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
+					logrus.WithError(err).Error("failed to update token in database")
+
+					return err
+				}
+			} else {
+				if err := tokenRepository.UpdateByTokenIdentifiersUnsafe(c, update.TokenID, update.ContractAddress, update.Update); err != nil {
+					logrus.WithError(err).Error("failed to update token in database")
+
+					return err
+				}
+			}
+		case err := <-errChan:
+			if err != nil {
+				logrus.WithError(err).Error("failed to update media for token")
+			}
+		}
+	}
+	return nil
+}
+
 // updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
-func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
+func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
 	updateChan := make(chan tokenUpdateMedia)
 	errChan := make(chan error)
 	wp := workerpool.New(10)
+
 	uniqueHandlers := getUniqueMetadataHandlers()
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			ctx, cancel := context.WithTimeout(pCtx, time.Minute*10)
 			defer cancel()
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
@@ -195,11 +201,13 @@ func updateMediaForTokens(ctx context.Context, tokens []persist.Token, ethClient
 						errChan <- fmt.Errorf("failed to get token URI: %v", err)
 						return
 					}
-					uri = persist.TokenURI(strings.ReplaceAll(u.String(), "{id}", token.TokenID.ToUint256String()))
+					uri = u
 				}
 
+				uri = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
+
 				if metadata == nil || len(metadata) == 0 {
-					md, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
+					md, err := rpc.GetMetadataFromURI(ctx, uri, ipfsClient, arweaveClient)
 					if err != nil {
 						errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
 						return
@@ -237,84 +245,88 @@ func validateUsersNFTs(tokenRepository persist.TokenRepository, contractReposito
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		user, err := userRepository.GetByID(c, input.UserID)
+		output, err := ValidateNFTs(c, input, userRepository, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		currentNFTs, err := tokenRepository.GetByUserID(c, input.UserID, -1, 0)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		output := ValidateUsersNFTsOutput{Success: true}
-
-		if input.All {
-			newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient, arweaveClient)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			output.Message += newMsg
-		}
-
-		openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
-		for _, address := range user.Addresses {
-			assets, err := opensea.FetchAssetsForWallet(address, 0, 0, nil)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			openseaAssets = append(openseaAssets, assets...)
-		}
-
-		accountedFor := make(map[persist.DBID]bool)
-		unaccountedFor := make(map[string]opensea.Asset)
-
-		for _, asset := range openseaAssets {
-			af := false
-			for _, nft := range currentNFTs {
-				if accountedFor[nft.ID] {
-					continue
-				}
-				if asset.Contract.ContractAddress == nft.ContractAddress && asset.TokenID.String() == nft.TokenID.Base10String() {
-					accountedFor[nft.ID] = true
-					af = true
-					break
-				}
-			}
-			if !af {
-				unaccountedFor[asset.Contract.ContractAddress.String()+" -- "+asset.TokenID.String()] = asset
-			}
-		}
-
-		if len(unaccountedFor) > 0 {
-			unaccountedForKeys := make([]string, 0, len(unaccountedFor))
-			for k := range unaccountedFor {
-				unaccountedForKeys = append(unaccountedForKeys, k)
-			}
-			accountedForKeys := make([]string, 0, len(accountedFor))
-			for k := range accountedFor {
-				accountedForKeys = append(accountedForKeys, k.String())
-			}
-
-			allUnaccountedForAssets := make([]opensea.Asset, 0, len(unaccountedFor))
-			for _, asset := range unaccountedFor {
-				allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
-			}
-
-			if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
-				logrus.WithError(err).Error("failed to process unaccounted for NFTs")
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			output.Success = false
-			output.Message += fmt.Sprintf("user %s has unaccounted for NFTs: %v | accounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
 		}
 		c.JSON(http.StatusOK, output)
 
 	}
+}
+
+// ValidateNFTs will validate the NFTs for the user passed in when being compared with opensea
+func ValidateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepository persist.UserRepository, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
+	user, err := userRepository.GetByID(c, input.UserID)
+	if err != nil {
+		return ValidateUsersNFTsOutput{}, err
+	}
+	currentNFTs, err := tokenRepository.GetByUserID(c, input.UserID, -1, 0)
+	if err != nil {
+		return ValidateUsersNFTsOutput{}, err
+	}
+
+	output := ValidateUsersNFTsOutput{Success: true}
+
+	if input.All {
+		newMsg, err := processAccountedForNFTs(c, currentNFTs, tokenRepository, ethcl, ipfsClient, arweaveClient)
+		if err != nil {
+			return ValidateUsersNFTsOutput{}, err
+		}
+		output.Message += newMsg
+	}
+
+	openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
+	for _, address := range user.Addresses {
+		assets, err := opensea.FetchAssetsForWallet(c, address, 0, 0, nil)
+		if err != nil {
+			return ValidateUsersNFTsOutput{}, err
+		}
+		openseaAssets = append(openseaAssets, assets...)
+	}
+
+	accountedFor := make(map[persist.DBID]bool)
+	unaccountedFor := make(map[string]opensea.Asset)
+
+	for _, asset := range openseaAssets {
+		af := false
+		for _, nft := range currentNFTs {
+			if accountedFor[nft.ID] {
+				continue
+			}
+			if asset.Contract.ContractAddress == nft.ContractAddress && asset.TokenID.String() == nft.TokenID.Base10String() {
+				accountedFor[nft.ID] = true
+				af = true
+				break
+			}
+		}
+		if !af {
+			unaccountedFor[asset.Contract.ContractAddress.String()+" -- "+asset.TokenID.String()] = asset
+		}
+	}
+
+	if len(unaccountedFor) > 0 {
+		unaccountedForKeys := make([]string, 0, len(unaccountedFor))
+		for k := range unaccountedFor {
+			unaccountedForKeys = append(unaccountedForKeys, k)
+		}
+		accountedForKeys := make([]string, 0, len(accountedFor))
+		for k := range accountedFor {
+			accountedForKeys = append(accountedForKeys, k.String())
+		}
+
+		allUnaccountedForAssets := make([]opensea.Asset, 0, len(unaccountedFor))
+		for _, asset := range unaccountedFor {
+			allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
+		}
+
+		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, user.Addresses, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
+			logrus.WithError(err).Error("failed to process unaccounted for NFTs")
+			return ValidateUsersNFTsOutput{}, err
+		}
+		output.Success = false
+		output.Message += fmt.Sprintf("user %s has unaccounted for NFTs: %v | accounted for NFTs: %v", input.UserID, unaccountedForKeys, accountedForKeys)
+	}
+	return output, nil
 }
 
 func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (string, error) {
@@ -410,7 +422,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 			},
 		}
 		switch a.Contract.ContractSchemaName {
-		case "ERC721":
+		case "ERC721", "CRYPTOPUNKS":
 			t.TokenType = persist.TokenTypeERC721
 			allTokens = append(allTokens, t)
 		case "ERC1155":

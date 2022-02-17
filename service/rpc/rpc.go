@@ -82,6 +82,8 @@ func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Clie
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
 	bs, err := GetDataFromURI(ctx, turi, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.TokenMetadata{}, err
@@ -235,6 +237,8 @@ func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
 // GetTokenURI returns metadata URI for a given token address.
 func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
 	contract := common.HexToAddress(string(pContractAddress))
 	switch pTokenType {
 	case persist.TokenTypeERC721:

@@ -2,10 +2,7 @@ package indexer
 
 import (
 	"context"
-	"log"
 	"net/http"
-	"os"
-	"syscall"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -81,6 +78,12 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
+func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
+	pgClient := postgres.NewClient()
+
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+}
+
 func newEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -100,19 +103,6 @@ func newIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
 	sh.SetTimeout(time.Second * 15)
 	return sh
-}
-
-func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
-	pgClient := postgres.NewClient()
-
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-}
-
-func redirectStderr(f *os.File) {
-	err := syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
-	if err != nil {
-		log.Fatalf("Failed to redirect stderr to file: %v", err)
-	}
 }
 
 func newArweaveClient() *goar.Client {

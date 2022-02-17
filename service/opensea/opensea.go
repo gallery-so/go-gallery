@@ -145,14 +145,14 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
 		go func(wa persist.Address) {
-			assets, err := FetchAssetsForWallet(wa, 0, 0, nil)
+			assets, err := FetchAssetsForWallet(pCtx, wa, 0, 0, nil)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 				return
 			}
 			if len(assets) == 0 {
 				time.Sleep(time.Second)
-				assets, err = FetchAssetsForWallet(wa, 0, 0, nil)
+				assets, err = FetchAssetsForWallet(pCtx, wa, 0, 0, nil)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 					return
@@ -184,7 +184,7 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 }
 
 // FetchAssetsForWallet recursively fetches all assets for a wallet
-func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -207,7 +207,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&offset=%d&limit=%d", pWalletAddress, dir, offset, 50)
 
-	req, err := http.NewRequest("GET", urlStr, nil)
+	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssetsForWallet(pWalletAddress, pOffset, retry+1, alreadyReceived)
+				return FetchAssetsForWallet(pCtx, pWalletAddress, pOffset, retry+1, alreadyReceived)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")
 		}
@@ -253,7 +253,7 @@ func FetchAssetsForWallet(pWalletAddress persist.Address, pOffset int, retry int
 		return result, nil
 	}
 	if len(response.Assets) == 50 {
-		next, err := FetchAssetsForWallet(pWalletAddress, pOffset+50, 0, alreadyReceived)
+		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, pOffset+50, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}

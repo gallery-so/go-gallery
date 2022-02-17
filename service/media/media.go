@@ -55,6 +55,8 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Media, error) {
 
+	pCtx, cancel := context.WithTimeout(pCtx, time.Minute*8)
+	defer cancel()
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
 	logrus.Infof("Making previews for %s", name)
@@ -292,7 +294,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	initialType := predictMediaType(url)
+	initialType := predictMediaType(pCtx, url)
 
 	logrus.Infof("predicting media type for %s: %s", name, initialType)
 
@@ -354,7 +356,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	}
 }
 
-func predictMediaType(url string) (mediaType persist.MediaType) {
+func predictMediaType(pCtx context.Context, url string) (mediaType persist.MediaType) {
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
@@ -366,7 +368,11 @@ func predictMediaType(url string) (mediaType persist.MediaType) {
 	asURI := persist.TokenURI(url)
 	uriType := asURI.Type()
 	if uriType == persist.URITypeHTTP {
-		headers, err := http.Head(url)
+		req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
+		if err != nil {
+			return persist.MediaTypeUnknown
+		}
+		headers, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return persist.MediaTypeUnknown
 		}
