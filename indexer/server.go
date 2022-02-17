@@ -398,7 +398,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 
 		logrus.Debugf("media: %+v", media)
 
-		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL), ipfsClient, arweaveClient)
+		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(strings.ReplaceAll(a.TokenMetadataURL, "{id}", persist.TokenID(a.TokenID.ToBase16()).ToUint256String())), ipfsClient, arweaveClient)
 
 		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{

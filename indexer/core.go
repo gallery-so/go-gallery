@@ -3,17 +3,12 @@ package indexer
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -43,9 +38,9 @@ func coreInit() (*gin.Engine, *Indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ipfsClient := newIPFSShell()
-	arweaveClient := newArweaveClient()
-	ethClient := newEthClient()
+	ethClient := rpc.NewEthClient()
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
 	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
@@ -82,29 +77,4 @@ func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.Us
 	pgClient := postgres.NewClient()
 
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-}
-
-func newEthClient() *ethclient.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	dialer := *websocket.DefaultDialer
-	dialer.ReadBufferSize = 1024 * 20
-	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
-	if err != nil {
-		panic(err)
-	}
-
-	return ethclient.NewClient(rpcClient)
-
-}
-
-func newIPFSShell() *shell.Shell {
-	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 15)
-	return sh
-}
-
-func newArweaveClient() *goar.Client {
-	return goar.NewClient("https://arweave.net")
 }

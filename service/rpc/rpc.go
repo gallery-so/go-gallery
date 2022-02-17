@@ -18,12 +18,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
+	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 var client = &http.Client{
@@ -51,6 +54,34 @@ type TokenContractMetadata struct {
 type ErrHTTP struct {
 	URL    string
 	Status int
+}
+
+// NewEthClient returns an ethclient.Client
+func NewEthClient() *ethclient.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	dialer := *websocket.DefaultDialer
+	dialer.ReadBufferSize = 1024 * 20
+	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
+	if err != nil {
+		panic(err)
+	}
+
+	return ethclient.NewClient(rpcClient)
+
+}
+
+// NewIPFSShell returns an IPFS shell
+func NewIPFSShell() *shell.Shell {
+	sh := shell.NewShell(viper.GetString("IPFS_URL"))
+	sh.SetTimeout(time.Second * 15)
+	return sh
+}
+
+// NewArweaveClient returns an Arweave client
+func NewArweaveClient() *goar.Client {
+	return goar.NewClient("https://arweave.net")
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
