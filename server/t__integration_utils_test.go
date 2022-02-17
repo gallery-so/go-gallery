@@ -446,14 +446,19 @@ func updateCollection(s suite.Suite, serverURL string, client *http.Client, jwt 
 	return resp
 }
 
-func fetchNFTCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *collectionGetByIDOutput {
+func getNFTCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *http.Response {
 	resp, err := http.Get(fmt.Sprintf("%s/collections/get?id=%s", serverURL, collectionID))
 	s.NoError(err)
 
+	return resp
+}
+
+func fetchNFTCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *collectionGetByIDOutput {
+	resp := getNFTCollection(s, serverURL, collectionID)
+
 	output := &collectionGetByIDOutput{}
-	err = util.UnmarshallBody(output, resp.Body)
+	err := util.UnmarshallBody(output, resp.Body)
 	s.NoError(err)
-	assertValidResponse(s.Assertions, resp)
 
 	return output
 }

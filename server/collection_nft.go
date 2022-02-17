@@ -105,8 +105,6 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 		}
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
-		return
-
 	}
 }
 

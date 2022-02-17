@@ -248,6 +248,9 @@ func (s *NFTCollectionsSuite) TestUserCanUpdateNFTCollection() {
 	deleteOutput := removeCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
 	s.Equal(200, resp.StatusCode)
 	s.True(deleteOutput.Success)
+
+	resp = getNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(404, resp.StatusCode)
 }
 
 func (s *TokenCollectionsSuite) SetupTest() {
@@ -320,6 +323,9 @@ func (s *TokenCollectionsSuite) TestUserCanUpdateTokenCollection() {
 	deleteOutput := removeCollection(s.Suite, s.serverURL, client, loginCookie.Value, data)
 	s.Equal(200, resp.StatusCode)
 	s.True(deleteOutput.Success)
+
+	resp = getNFTCollection(s.Suite, s.serverURL, createOutput.ID)
+	s.Equal(404, resp.StatusCode)
 }
 
 func TestIntegrationTestTestSuite(t *testing.T) {

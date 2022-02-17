@@ -264,6 +264,9 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		collection.NFTs = []persist.TokenInCollection{}
 		err := rawStmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
+			}
 			return persist.CollectionToken{}, err
 		}
 		if collection.ID != pID {

@@ -116,8 +116,6 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 		}
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
-		return
-
 	}
 }
 
