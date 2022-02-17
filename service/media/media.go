@@ -55,7 +55,7 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Media, error) {
 
-	pCtx, cancel := context.WithTimeout(pCtx, time.Minute*8)
+	pCtx, cancel := context.WithTimeout(pCtx, time.Minute*5)
 	defer cancel()
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 

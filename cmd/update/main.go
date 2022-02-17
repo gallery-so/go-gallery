@@ -68,7 +68,7 @@ func main() {
 		userID := u
 		addresses := addrs
 		wp.Submit(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Hour/2)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
 			go func() {
 				defer cancel()
 				logrus.Warnf("Processing user %s with addresses %v", userID, addresses)

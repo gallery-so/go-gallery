@@ -173,8 +173,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			ctx, cancel := context.WithTimeout(pCtx, time.Minute*10)
-			defer cancel()
+
 			uri := token.TokenURI
 			metadata := token.TokenMetadata
 
@@ -195,7 +194,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 				}
 
 				if uri.Type() == persist.URITypeNone {
-					u, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
+					u, err := rpc.GetTokenURI(pCtx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
 					if err != nil {
 						errChan <- fmt.Errorf("failed to get token URI: %v", err)
 						return
@@ -206,7 +205,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 				uri = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
 
 				if metadata == nil || len(metadata) == 0 {
-					md, err := rpc.GetMetadataFromURI(ctx, uri, ipfsClient, arweaveClient)
+					md, err := rpc.GetMetadataFromURI(pCtx, uri, ipfsClient, arweaveClient)
 					if err != nil {
 						errChan <- fmt.Errorf("failed to get metadata for token %s: %v", token.TokenID, err)
 						return
@@ -215,7 +214,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 				}
 			}
 
-			med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
+			med, err := media.MakePreviewsForMetadata(pCtx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to make media for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
 				return
