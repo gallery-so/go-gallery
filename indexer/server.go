@@ -145,7 +145,6 @@ func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository pers
 			if updateByID {
 				if err := tokenRepository.UpdateByIDUnsafe(c, update.TokenDBID, update.Update); err != nil {
 					logrus.WithError(err).Error("failed to update token in database")
-
 					return err
 				}
 			} else {
@@ -462,7 +461,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 		return err
 	}
 
-	logrus.Infof("found %d new tokens: %+v", len(allTokens), allTokens)
+	logrus.Infof("found %d new tokens", len(allTokens))
 
 	if err := tokenRepository.BulkUpsert(ctx, allTokens); err != nil {
 		return err

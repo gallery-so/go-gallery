@@ -133,6 +133,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML:
 		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
 	default:
+		res.MediaType = mediaType
 		if vURL != "" {
 			logrus.Infof("using vURL for %s: %s", name, vURL)
 			res.MediaURL = persist.NullString(vURL)

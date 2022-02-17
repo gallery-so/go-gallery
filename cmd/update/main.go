@@ -37,7 +37,7 @@ func main() {
 		panic(err)
 	}
 
-	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE;`)
+	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE ORDER BY ID DESC;`)
 	if err != nil {
 		panic(err)
 	}
@@ -68,28 +68,34 @@ func main() {
 		userID := u
 		addresses := addrs
 		wp.Submit(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-			defer cancel()
-			logrus.Warnf("Processing user %s with addresses %v", userID, addresses)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour/2)
+			go func() {
+				defer cancel()
+				logrus.Warnf("Processing user %s with addresses %v", userID, addresses)
 
-			input := indexer.ValidateUsersNFTsInput{
-				UserID: userID,
-			}
-
-			_, err := indexer.ValidateNFTs(ctx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logrus.Errorf("Error processing user %s: %s", userID, err)
-			}
-			for _, addr := range addresses {
-
-				input := indexer.UpdateMediaInput{
-					OwnerAddress: addr,
+				input := indexer.ValidateUsersNFTsInput{
+					UserID: userID,
 				}
 
-				err = indexer.UpdateMedia(ctx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+				_, err := indexer.ValidateNFTs(ctx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 				if err != nil {
 					logrus.Errorf("Error processing user %s: %s", userID, err)
 				}
+				for _, addr := range addresses {
+
+					input := indexer.UpdateMediaInput{
+						OwnerAddress: addr,
+					}
+
+					err = indexer.UpdateMedia(ctx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+					if err != nil {
+						logrus.Errorf("Error processing user %s: %s", userID, err)
+					}
+				}
+			}()
+			<-ctx.Done()
+			if ctx.Err() != context.Canceled {
+				logrus.Errorf("Error processing user %s: %s", userID, ctx.Err())
 			}
 		})
 	}
