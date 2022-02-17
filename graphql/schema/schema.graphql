@@ -1,5 +1,13 @@
-# Use "forceResolver" to lazily handle recursive fields that shouldn't be resolved unless the caller asks for them
+# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
+# resolved unless the caller asks for them
 directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+# Add @authRequired to any field that requires a user to be logged in. The field MUST be a union
+# type that includes ErrNotAuthorized as a possible return value.
+#
+# If we need more control over auth in the future, this directive can be updated to take
+# arguments that specify the level of access required.
+directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 scalar DateTime
 
@@ -106,13 +114,13 @@ type Viewer {
   wallets: [Wallet]
   viewerGallery: ViewerGallery
 }
-union UserByUsernamePayload = GalleryUser | ErrUserNotFound
+union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
-union ViewerPayload = Viewer | ErrMissingCookie | ErrSessionExpired
+union ViewerOrError = Viewer | ErrNotAuthorized
 
 type Query {
-  viewer: ViewerPayload
-  userByUsername(username: String!): UserByUsernamePayload
+  viewer: ViewerOrError @authRequired
+  userByUsername(username: String!): UserByUsernameOrError
   membershipTiers: [MembershipTier]
 }
 
@@ -186,7 +194,16 @@ type AuthNonce {
   userExists: Boolean
 }
 
-union GetAuthNoncePayload = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
+union GetAuthNoncePayloadOrError = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
+
+# InternalError means that something unexpected happened. The error message may give more detail,
+# but it isn't an error type that is expected or requires specific handling.
+enum AuthFailureType { NoCookie, InvalidToken, DoesNotOwnRequiredNFT, InternalError }
+
+type ErrNotAuthorized implements Error {
+  message: String!
+  errorType: AuthFailureType!
+}
 
 type ErrAddressDoesNotOwnRequiredNFT implements Error {
   message: String!
@@ -197,14 +214,6 @@ type ErrSignatureVerificationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
-  message: String!
-}
-
-type ErrSessionExpired implements Error {
-  message: String!
-}
-
-type ErrMissingCookie implements Error {
   message: String!
 }
 
@@ -229,17 +238,17 @@ input GnosisSafeAuth {
   signature: String!
 }
 
-type LoginResult {
+type LoginPayload {
   userId: ID
 }
 
-type CreateUserResult {
+type CreateUserPayload {
   userId: ID
   galleryId: String
 }
 
-union LoginPayload = LoginResult | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
-union CreateUserPayload = CreateUserResult | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union LoginPayloadOrError = LoginPayload | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union CreateUserPayloadOrError = CreateUserPayload | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
 
 
 type Mutation {
@@ -259,8 +268,8 @@ type Mutation {
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
-  getAuthNonce(address: String!): GetAuthNoncePayload
+  getAuthNonce(address: String!): GetAuthNoncePayloadOrError
 
-  createUser(authMechanism: AuthMechanism!): CreateUserPayload
-  login(authMechanism: AuthMechanism!): LoginPayload
+  createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+  login(authMechanism: AuthMechanism!): LoginPayloadOrError
 }

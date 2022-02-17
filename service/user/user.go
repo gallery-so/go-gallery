@@ -204,7 +204,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (*model.CreateUserResult, error) {
+	galleryRepo persist.GalleryRepository) (*model.CreateUserPayload, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -266,7 +266,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.CreateUserResult{
+	output := model.CreateUserPayload{
 		UserID:    util.StringToPointer(userID.String()),
 		GalleryID: util.StringToPointer(galleryID.String()),
 	}

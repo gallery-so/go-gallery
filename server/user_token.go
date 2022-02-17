@@ -78,7 +78,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 
 func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authed := c.GetBool(auth.AuthContextKey)
+		authed := auth.GetUserAuthedFromCtx(c)
 		if !authed {
 			c.JSON(http.StatusNoContent, util.SuccessResponse{Success: false})
 			return

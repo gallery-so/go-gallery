@@ -35,10 +35,10 @@ const (
 )
 
 const (
-	// UserIDContextKey is the key for the user id in the context
-	UserIDContextKey = "user_id"
-	// AuthContextKey is the key for the auth status in the context
-	AuthContextKey = "authenticated"
+	// Context keys for auth data
+	userIDContextKey     = "auth.user_id"
+	userAuthedContextKey = "auth.authenticated"
+	authErrorContextKey  = "auth.auth_error"
 )
 
 // NoncePrepend is what is prepended to every nonce
@@ -58,8 +58,8 @@ var ErrNonceMismatch = errors.New("incorrect nonce input")
 // ErrInvalidJWT is returned when the JWT is invalid
 var ErrInvalidJWT = errors.New("invalid or expired auth token")
 
-// ErrNoJWT is returned when there is no JWT in the request
-var ErrNoJWT = errors.New("no jwt passed as cookie")
+// ErrNoCookie is returned when there is no JWT in the request
+var ErrNoCookie = errors.New("no jwt passed as cookie")
 
 // ErrInvalidAuthHeader is returned when the auth header is invalid
 var ErrInvalidAuthHeader = errors.New("invalid auth header format")
@@ -257,7 +257,7 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResult, error) {
+func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPayload, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -276,7 +276,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResul
 
 	SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.LoginResult{
+	output := model.LoginPayload{
 		UserID: util.StringToPointer(authResult.UserID.String()),
 	}
 
@@ -524,12 +524,28 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 
 // GetUserIDFromCtx returns the user ID from the context
 func GetUserIDFromCtx(c *gin.Context) persist.DBID {
-	return c.MustGet(UserIDContextKey).(persist.DBID)
+	return c.MustGet(userIDContextKey).(persist.DBID)
 }
 
 // GetUserAuthedFromCtx queries the context to determine whether the user is authenticated
 func GetUserAuthedFromCtx(c *gin.Context) bool {
-	return c.GetBool(AuthContextKey)
+	return c.GetBool(userAuthedContextKey)
+}
+
+func GetAuthErrorFromCtx(c *gin.Context) error {
+	err := c.MustGet(authErrorContextKey)
+
+	if err == nil {
+		return nil
+	}
+
+	return err.(error)
+}
+
+func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
+	c.Set(userIDContextKey, userID)
+	c.Set(authErrorContextKey, err)
+	c.Set(userAuthedContextKey, userID != "" && err == nil)
 }
 
 // GetAllowlistContracts returns the list of addresses we allowlist against

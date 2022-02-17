@@ -104,7 +104,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		auth := c.GetBool(auth.AuthContextKey)
+		auth := auth.GetUserAuthedFromCtx(c)
 		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
 		if err != nil {
 			status := http.StatusInternalServerError

@@ -44,6 +44,7 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
+	AuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -56,7 +57,7 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
-	CreateUserResult struct {
+	CreateUserPayload struct {
 		GalleryID func(childComplexity int) int
 		UserID    func(childComplexity int) int
 	}
@@ -69,12 +70,9 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrMissingCookie struct {
-		Message func(childComplexity int) int
-	}
-
-	ErrSessionExpired struct {
-		Message func(childComplexity int) int
+	ErrNotAuthorized struct {
+		ErrorType func(childComplexity int) int
+		Message   func(childComplexity int) int
 	}
 
 	ErrSignatureVerificationFailed struct {
@@ -133,7 +131,7 @@ type ComplexityRoot struct {
 		TokenCollectionName func(childComplexity int) int
 	}
 
-	LoginResult struct {
+	LoginPayload struct {
 		UserID func(childComplexity int) int
 	}
 
@@ -234,13 +232,13 @@ type MutationResolver interface {
 	RemoveUserAddress(ctx context.Context, address string) (*model.RemoveUserAddressPayload, error)
 	UpdateUserInfo(ctx context.Context, input *model.UpdateUserInfoInput) (*model.UpdateUserInfoPayload, error)
 	RefreshOpenSeaNfts(ctx context.Context) (*model.RefreshOpenSeaNftsPayload, error)
-	GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayload, error)
-	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error)
-	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error)
+	GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayloadOrError, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
+	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 }
 type QueryResolver interface {
-	Viewer(ctx context.Context) (model.ViewerPayload, error)
-	UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error)
+	Viewer(ctx context.Context) (model.ViewerOrError, error)
+	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error)
 }
 type WalletResolver interface {
@@ -283,19 +281,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateCollectionPayload.Gallery(childComplexity), true
 
-	case "CreateUserResult.galleryId":
-		if e.complexity.CreateUserResult.GalleryID == nil {
+	case "CreateUserPayload.galleryId":
+		if e.complexity.CreateUserPayload.GalleryID == nil {
 			break
 		}
 
-		return e.complexity.CreateUserResult.GalleryID(childComplexity), true
+		return e.complexity.CreateUserPayload.GalleryID(childComplexity), true
 
-	case "CreateUserResult.userId":
-		if e.complexity.CreateUserResult.UserID == nil {
+	case "CreateUserPayload.userId":
+		if e.complexity.CreateUserPayload.UserID == nil {
 			break
 		}
 
-		return e.complexity.CreateUserResult.UserID(childComplexity), true
+		return e.complexity.CreateUserPayload.UserID(childComplexity), true
 
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
@@ -311,19 +309,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrAddressDoesNotOwnRequiredNFT.Message(childComplexity), true
 
-	case "ErrMissingCookie.message":
-		if e.complexity.ErrMissingCookie.Message == nil {
+	case "ErrNotAuthorized.errorType":
+		if e.complexity.ErrNotAuthorized.ErrorType == nil {
 			break
 		}
 
-		return e.complexity.ErrMissingCookie.Message(childComplexity), true
+		return e.complexity.ErrNotAuthorized.ErrorType(childComplexity), true
 
-	case "ErrSessionExpired.message":
-		if e.complexity.ErrSessionExpired.Message == nil {
+	case "ErrNotAuthorized.message":
+		if e.complexity.ErrNotAuthorized.Message == nil {
 			break
 		}
 
-		return e.complexity.ErrSessionExpired.Message(childComplexity), true
+		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
 
 	case "ErrSignatureVerificationFailed.message":
 		if e.complexity.ErrSignatureVerificationFailed.Message == nil {
@@ -528,12 +526,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ImageNft.TokenCollectionName(childComplexity), true
 
-	case "LoginResult.userId":
-		if e.complexity.LoginResult.UserID == nil {
+	case "LoginPayload.userId":
+		if e.complexity.LoginPayload.UserID == nil {
 			break
 		}
 
-		return e.complexity.LoginResult.UserID(childComplexity), true
+		return e.complexity.LoginPayload.UserID(childComplexity), true
 
 	case "MembershipTier.assetUrl":
 		if e.complexity.MembershipTier.AssetURL == nil {
@@ -927,8 +925,16 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "graphql/schema/schema.graphql", Input: `# Use "forceResolver" to lazily handle recursive fields that shouldn't be resolved unless the caller asks for them
+	{Name: "graphql/schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
+# resolved unless the caller asks for them
 directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+# Add @authRequired to any field that requires a user to be logged in. The field MUST be a union
+# type that includes ErrNotAuthorized as a possible return value.
+#
+# If we need more control over auth in the future, this directive can be updated to take
+# arguments that specify the level of access required.
+directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 scalar DateTime
 
@@ -1035,13 +1041,13 @@ type Viewer {
   wallets: [Wallet]
   viewerGallery: ViewerGallery
 }
-union UserByUsernamePayload = GalleryUser | ErrUserNotFound
+union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
-union ViewerPayload = Viewer | ErrMissingCookie | ErrSessionExpired
+union ViewerOrError = Viewer | ErrNotAuthorized
 
 type Query {
-  viewer: ViewerPayload
-  userByUsername(username: String!): UserByUsernamePayload
+  viewer: ViewerOrError @authRequired
+  userByUsername(username: String!): UserByUsernameOrError
   membershipTiers: [MembershipTier]
 }
 
@@ -1115,7 +1121,14 @@ type AuthNonce {
   userExists: Boolean
 }
 
-union GetAuthNoncePayload = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
+union GetAuthNoncePayloadOrError = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
+
+enum AuthFailureType { NoCookie, InvalidToken, DoesNotOwnRequiredNFT, InternalError }
+
+type ErrNotAuthorized implements Error {
+  message: String!
+  errorType: AuthFailureType!
+}
 
 type ErrAddressDoesNotOwnRequiredNFT implements Error {
   message: String!
@@ -1126,14 +1139,6 @@ type ErrSignatureVerificationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
-  message: String!
-}
-
-type ErrSessionExpired implements Error {
-  message: String!
-}
-
-type ErrMissingCookie implements Error {
   message: String!
 }
 
@@ -1158,17 +1163,17 @@ input GnosisSafeAuth {
   signature: String!
 }
 
-type LoginResult {
+type LoginPayload {
   userId: ID
 }
 
-type CreateUserResult {
+type CreateUserPayload {
   userId: ID
   galleryId: String
 }
 
-union LoginPayload = LoginResult | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
-union CreateUserPayload = CreateUserResult | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union LoginPayloadOrError = LoginPayload | ErrUserNotFound | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
+union CreateUserPayloadOrError = CreateUserPayload | ErrUserAlreadyExists | ErrSignatureVerificationFailed | ErrAddressDoesNotOwnRequiredNFT
 
 
 type Mutation {
@@ -1188,10 +1193,10 @@ type Mutation {
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
-  getAuthNonce(address: String!): GetAuthNoncePayload
+  getAuthNonce(address: String!): GetAuthNoncePayloadOrError
 
-  createUser(authMechanism: AuthMechanism!): CreateUserPayload
-  login(authMechanism: AuthMechanism!): LoginPayload
+  createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+  login(authMechanism: AuthMechanism!): LoginPayloadOrError
 }
 `, BuiltIn: false},
 }
@@ -1515,7 +1520,7 @@ func (ec *executionContext) _CreateCollectionPayload_gallery(ctx context.Context
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CreateUserResult_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _CreateUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1523,7 +1528,7 @@ func (ec *executionContext) _CreateUserResult_userId(ctx context.Context, field 
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CreateUserResult",
+		Object:     "CreateUserPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1547,7 +1552,7 @@ func (ec *executionContext) _CreateUserResult_userId(ctx context.Context, field 
 	return ec.marshalOID2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CreateUserResult_galleryId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _CreateUserPayload_galleryId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1555,7 +1560,7 @@ func (ec *executionContext) _CreateUserResult_galleryId(ctx context.Context, fie
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CreateUserResult",
+		Object:     "CreateUserPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1646,7 +1651,7 @@ func (ec *executionContext) _ErrAddressDoesNotOwnRequiredNFT_message(ctx context
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrMissingCookie_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrMissingCookie) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrNotAuthorized_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNotAuthorized) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1654,7 +1659,7 @@ func (ec *executionContext) _ErrMissingCookie_message(ctx context.Context, field
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrMissingCookie",
+		Object:     "ErrNotAuthorized",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1681,7 +1686,7 @@ func (ec *executionContext) _ErrMissingCookie_message(ctx context.Context, field
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrSessionExpired_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSessionExpired) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrNotAuthorized_errorType(ctx context.Context, field graphql.CollectedField, obj *model.ErrNotAuthorized) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1689,7 +1694,7 @@ func (ec *executionContext) _ErrSessionExpired_message(ctx context.Context, fiel
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrSessionExpired",
+		Object:     "ErrNotAuthorized",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1699,7 +1704,7 @@ func (ec *executionContext) _ErrSessionExpired_message(ctx context.Context, fiel
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
+		return obj.ErrorType, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1711,9 +1716,9 @@ func (ec *executionContext) _ErrSessionExpired_message(ctx context.Context, fiel
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(model.AuthFailureType)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNAuthFailureType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthFailureType(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrSignatureVerificationFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSignatureVerificationFailed) (ret graphql.Marshaler) {
@@ -2668,7 +2673,7 @@ func (ec *executionContext) _ImageNft_imageUrl(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _LoginResult_userId(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.LoginPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2676,7 +2681,7 @@ func (ec *executionContext) _LoginResult_userId(ctx context.Context, field graph
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "LoginResult",
+		Object:     "LoginPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3301,9 +3306,9 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.GetAuthNoncePayload)
+	res := resTmp.(model.GetAuthNoncePayloadOrError)
 	fc.Result = res
-	return ec.marshalOGetAuthNoncePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayload(ctx, field.Selections, res)
+	return ec.marshalOGetAuthNoncePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_createUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3340,9 +3345,9 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.CreateUserPayload)
+	res := resTmp.(model.CreateUserPayloadOrError)
 	fc.Result = res
-	return ec.marshalOCreateUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayload(ctx, field.Selections, res)
+	return ec.marshalOCreateUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3379,9 +3384,9 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.LoginPayload)
+	res := resTmp.(model.LoginPayloadOrError)
 	fc.Result = res
-	return ec.marshalOLoginPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayload(ctx, field.Selections, res)
+	return ec.marshalOLoginPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3401,8 +3406,28 @@ func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.Col
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Viewer(rctx)
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().Viewer(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.ViewerOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ViewerOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3411,9 +3436,9 @@ func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.Col
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.ViewerPayload)
+	res := resTmp.(model.ViewerOrError)
 	fc.Result = res
-	return ec.marshalOViewerPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerPayload(ctx, field.Selections, res)
+	return ec.marshalOViewerOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_userByUsername(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3450,9 +3475,9 @@ func (ec *executionContext) _Query_userByUsername(ctx context.Context, field gra
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.UserByUsernamePayload)
+	res := resTmp.(model.UserByUsernameOrError)
 	fc.Result = res
-	return ec.marshalOUserByUsernamePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernamePayload(ctx, field.Selections, res)
+	return ec.marshalOUserByUsernameOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernameOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_membershipTiers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -5576,17 +5601,17 @@ func (ec *executionContext) _AddressOrGalleryUser(ctx context.Context, sel ast.S
 	}
 }
 
-func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.SelectionSet, obj model.CreateUserPayload) graphql.Marshaler {
+func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CreateUserPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.CreateUserResult:
-		return ec._CreateUserResult(ctx, sel, &obj)
-	case *model.CreateUserResult:
+	case model.CreateUserPayload:
+		return ec._CreateUserPayload(ctx, sel, &obj)
+	case *model.CreateUserPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CreateUserResult(ctx, sel, obj)
+		return ec._CreateUserPayload(ctx, sel, obj)
 	case model.ErrUserAlreadyExists:
 		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
 	case *model.ErrUserAlreadyExists:
@@ -5617,6 +5642,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	case model.ErrAddressDoesNotOwnRequiredNft:
 		return ec._ErrAddressDoesNotOwnRequiredNFT(ctx, sel, &obj)
 	case *model.ErrAddressDoesNotOwnRequiredNft:
@@ -5638,20 +5670,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrUserAlreadyExists(ctx, sel, obj)
-	case model.ErrSessionExpired:
-		return ec._ErrSessionExpired(ctx, sel, &obj)
-	case *model.ErrSessionExpired:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrSessionExpired(ctx, sel, obj)
-	case model.ErrMissingCookie:
-		return ec._ErrMissingCookie(ctx, sel, &obj)
-	case *model.ErrMissingCookie:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrMissingCookie(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -5664,7 +5682,7 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	}
 }
 
-func (ec *executionContext) _GetAuthNoncePayload(ctx context.Context, sel ast.SelectionSet, obj model.GetAuthNoncePayload) graphql.Marshaler {
+func (ec *executionContext) _GetAuthNoncePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.GetAuthNoncePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
@@ -5687,17 +5705,17 @@ func (ec *executionContext) _GetAuthNoncePayload(ctx context.Context, sel ast.Se
 	}
 }
 
-func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.SelectionSet, obj model.LoginPayload) graphql.Marshaler {
+func (ec *executionContext) _LoginPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.LoginPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.LoginResult:
-		return ec._LoginResult(ctx, sel, &obj)
-	case *model.LoginResult:
+	case model.LoginPayload:
+		return ec._LoginPayload(ctx, sel, &obj)
+	case *model.LoginPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._LoginResult(ctx, sel, obj)
+		return ec._LoginPayload(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -5835,7 +5853,7 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	}
 }
 
-func (ec *executionContext) _UserByUsernamePayload(ctx context.Context, sel ast.SelectionSet, obj model.UserByUsernamePayload) graphql.Marshaler {
+func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.SelectionSet, obj model.UserByUsernameOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
@@ -5858,7 +5876,7 @@ func (ec *executionContext) _UserByUsernamePayload(ctx context.Context, sel ast.
 	}
 }
 
-func (ec *executionContext) _ViewerPayload(ctx context.Context, sel ast.SelectionSet, obj model.ViewerPayload) graphql.Marshaler {
+func (ec *executionContext) _ViewerOrError(ctx context.Context, sel ast.SelectionSet, obj model.ViewerOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
@@ -5869,20 +5887,13 @@ func (ec *executionContext) _ViewerPayload(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._Viewer(ctx, sel, obj)
-	case model.ErrMissingCookie:
-		return ec._ErrMissingCookie(ctx, sel, &obj)
-	case *model.ErrMissingCookie:
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrMissingCookie(ctx, sel, obj)
-	case model.ErrSessionExpired:
-		return ec._ErrSessionExpired(ctx, sel, &obj)
-	case *model.ErrSessionExpired:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrSessionExpired(ctx, sel, obj)
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -5892,7 +5903,7 @@ func (ec *executionContext) _ViewerPayload(ctx context.Context, sel ast.Selectio
 
 // region    **************************** object.gotpl ****************************
 
-var authNonceImplementors = []string{"AuthNonce", "GetAuthNoncePayload"}
+var authNonceImplementors = []string{"AuthNonce", "GetAuthNoncePayloadOrError"}
 
 func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet, obj *model.AuthNonce) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, authNonceImplementors)
@@ -5955,26 +5966,26 @@ func (ec *executionContext) _CreateCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
-var createUserResultImplementors = []string{"CreateUserResult", "CreateUserPayload"}
+var createUserPayloadImplementors = []string{"CreateUserPayload", "CreateUserPayloadOrError"}
 
-func (ec *executionContext) _CreateUserResult(ctx context.Context, sel ast.SelectionSet, obj *model.CreateUserResult) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, createUserResultImplementors)
+func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CreateUserPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, createUserPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("CreateUserResult")
+			out.Values[i] = graphql.MarshalString("CreateUserPayload")
 		case "userId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CreateUserResult_userId(ctx, field, obj)
+				return ec._CreateUserPayload_userId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "galleryId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CreateUserResult_galleryId(ctx, field, obj)
+				return ec._CreateUserPayload_galleryId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -6018,7 +6029,7 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
-var errAddressDoesNotOwnRequiredNFTImplementors = []string{"ErrAddressDoesNotOwnRequiredNFT", "GetAuthNoncePayload", "Error", "LoginPayload", "CreateUserPayload"}
+var errAddressDoesNotOwnRequiredNFTImplementors = []string{"ErrAddressDoesNotOwnRequiredNFT", "GetAuthNoncePayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrAddressDoesNotOwnRequiredNFT(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressDoesNotOwnRequiredNft) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressDoesNotOwnRequiredNFTImplementors)
@@ -6049,19 +6060,29 @@ func (ec *executionContext) _ErrAddressDoesNotOwnRequiredNFT(ctx context.Context
 	return out
 }
 
-var errMissingCookieImplementors = []string{"ErrMissingCookie", "ViewerPayload", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "Error"}
 
-func (ec *executionContext) _ErrMissingCookie(ctx context.Context, sel ast.SelectionSet, obj *model.ErrMissingCookie) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errMissingCookieImplementors)
+func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrMissingCookie")
+			out.Values[i] = graphql.MarshalString("ErrNotAuthorized")
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrMissingCookie_message(ctx, field, obj)
+				return ec._ErrNotAuthorized_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "errorType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrNotAuthorized_errorType(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -6080,38 +6101,7 @@ func (ec *executionContext) _ErrMissingCookie(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errSessionExpiredImplementors = []string{"ErrSessionExpired", "ViewerPayload", "Error"}
-
-func (ec *executionContext) _ErrSessionExpired(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSessionExpired) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errSessionExpiredImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrSessionExpired")
-		case "message":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrSessionExpired_message(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errSignatureVerificationFailedImplementors = []string{"ErrSignatureVerificationFailed", "Error", "LoginPayload", "CreateUserPayload"}
+var errSignatureVerificationFailedImplementors = []string{"ErrSignatureVerificationFailed", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrSignatureVerificationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSignatureVerificationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errSignatureVerificationFailedImplementors)
@@ -6142,7 +6132,7 @@ func (ec *executionContext) _ErrSignatureVerificationFailed(ctx context.Context,
 	return out
 }
 
-var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayload"}
+var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserAlreadyExists) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserAlreadyExistsImplementors)
@@ -6173,7 +6163,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernamePayload", "Error", "LoginPayload"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "Error", "LoginPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -6412,7 +6402,7 @@ func (ec *executionContext) _GalleryNft(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "AddressOrGalleryUser", "UserByUsernamePayload"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "AddressOrGalleryUser", "UserByUsernameOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -6547,19 +6537,19 @@ func (ec *executionContext) _ImageNft(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var loginResultImplementors = []string{"LoginResult", "LoginPayload"}
+var loginPayloadImplementors = []string{"LoginPayload", "LoginPayloadOrError"}
 
-func (ec *executionContext) _LoginResult(ctx context.Context, sel ast.SelectionSet, obj *model.LoginResult) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, loginResultImplementors)
+func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.SelectionSet, obj *model.LoginPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, loginPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("LoginResult")
+			out.Values[i] = graphql.MarshalString("LoginPayload")
 		case "userId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LoginResult_userId(ctx, field, obj)
+				return ec._LoginPayload_userId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -7110,7 +7100,7 @@ func (ec *executionContext) _VideoNft(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var viewerImplementors = []string{"Viewer", "ViewerPayload"}
+var viewerImplementors = []string{"Viewer", "ViewerOrError"}
 
 func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, obj *model.Viewer) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, viewerImplementors)
@@ -7644,6 +7634,16 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) unmarshalNAuthFailureType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthFailureType(ctx context.Context, v interface{}) (model.AuthFailureType, error) {
+	var res model.AuthFailureType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNAuthFailureType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthFailureType(ctx context.Context, sel ast.SelectionSet, v model.AuthFailureType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8039,11 +8039,11 @@ func (ec *executionContext) marshalOCreateCollectionPayload2ᚖgithubᚗcomᚋmi
 	return ec._CreateCollectionPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCreateUserPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayload(ctx context.Context, sel ast.SelectionSet, v model.CreateUserPayload) graphql.Marshaler {
+func (ec *executionContext) marshalOCreateUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateUserPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._CreateUserPayload(ctx, sel, v)
+	return ec._CreateUserPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalODeleteCollectionPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayload(ctx context.Context, sel ast.SelectionSet, v *model.DeleteCollectionPayload) graphql.Marshaler {
@@ -8219,11 +8219,11 @@ func (ec *executionContext) marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgo�
 	return ec._GalleryUser(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOGetAuthNoncePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayload(ctx context.Context, sel ast.SelectionSet, v model.GetAuthNoncePayload) graphql.Marshaler {
+func (ec *executionContext) marshalOGetAuthNoncePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GetAuthNoncePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._GetAuthNoncePayload(ctx, sel, v)
+	return ec._GetAuthNoncePayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGnosisSafeAuth(ctx context.Context, v interface{}) (*model.GnosisSafeAuth, error) {
@@ -8266,11 +8266,11 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return res
 }
 
-func (ec *executionContext) marshalOLoginPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayload(ctx context.Context, sel ast.SelectionSet, v model.LoginPayload) graphql.Marshaler {
+func (ec *executionContext) marshalOLoginPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.LoginPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._LoginPayload(ctx, sel, v)
+	return ec._LoginPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMembershipTier2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipTier(ctx context.Context, sel ast.SelectionSet, v []*model.MembershipTier) graphql.Marshaler {
@@ -8533,11 +8533,11 @@ func (ec *executionContext) marshalOUpdateUserInfoPayload2ᚖgithubᚗcomᚋmike
 	return ec._UpdateUserInfoPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOUserByUsernamePayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernamePayload(ctx context.Context, sel ast.SelectionSet, v model.UserByUsernamePayload) graphql.Marshaler {
+func (ec *executionContext) marshalOUserByUsernameOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByUsernameOrError(ctx context.Context, sel ast.SelectionSet, v model.UserByUsernameOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._UserByUsernamePayload(ctx, sel, v)
+	return ec._UserByUsernameOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx context.Context, sel ast.SelectionSet, v *model.Viewer) graphql.Marshaler {
@@ -8554,11 +8554,11 @@ func (ec *executionContext) marshalOViewerGallery2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._ViewerGallery(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOViewerPayload2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerPayload(ctx context.Context, sel ast.SelectionSet, v model.ViewerPayload) graphql.Marshaler {
+func (ec *executionContext) marshalOViewerOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerOrError(ctx context.Context, sel ast.SelectionSet, v model.ViewerOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._ViewerPayload(ctx, sel, v)
+	return ec._ViewerOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx context.Context, sel ast.SelectionSet, v []*model.Wallet) graphql.Marshaler {

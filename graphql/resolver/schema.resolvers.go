@@ -82,19 +82,16 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context) (*model.Refre
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayload, error) {
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
-	// TODO: This currently gets its value from the AuthOptional middleware applied to the entire GraphQL endpoint,
-	// but that won't suffice when we transition auth-only endpoints to GraphQL too.
 	authed := auth.GetUserAuthedFromCtx(gc)
-
 	output, err := auth.GetAuthNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
 
 	if err != nil {
 		// Map known errors to GraphQL return types
 		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.GetAuthNoncePayload); ok {
+			if returnType, ok := errorType.(model.GetAuthNoncePayloadOrError); ok {
 				return returnType, nil
 			}
 		}
@@ -106,13 +103,13 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (mo
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayload, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
-	remapError := func(err error) (model.CreateUserPayload, error) {
+	remapError := func(err error) (model.CreateUserPayloadOrError, error) {
 		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.CreateUserPayload); ok {
+			if returnType, ok := errorType.(model.CreateUserPayloadOrError); ok {
 				return returnType, nil
 			}
 		}
@@ -134,13 +131,13 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 	return output, nil
 }
 
-func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayload, error) {
+func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
-	remapError := func(err error) (model.LoginPayload, error) {
+	remapError := func(err error) (model.LoginPayloadOrError, error) {
 		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.LoginPayload); ok {
+			if returnType, ok := errorType.(model.LoginPayloadOrError); ok {
 				return returnType, nil
 			}
 		}
@@ -162,13 +159,13 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 	return output, nil
 }
 
-func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error) {
+func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
-	remapError := func(err error) (model.ViewerPayload, error) {
+	remapError := func(err error) (model.ViewerOrError, error) {
 		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.ViewerPayload); ok {
+			if returnType, ok := errorType.(model.ViewerOrError); ok {
 				return returnType, nil
 			}
 		}
@@ -194,13 +191,13 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerPayload, error)
 	return viewer, nil
 }
 
-func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernamePayload, error) {
+func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	// Map known errors to GraphQL return types
-	remapError := func(err error) (model.UserByUsernamePayload, error) {
+	remapError := func(err error) (model.UserByUsernameOrError, error) {
 		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.UserByUsernamePayload); ok {
+			if returnType, ok := errorType.(model.UserByUsernameOrError); ok {
 				return returnType, nil
 			}
 		}

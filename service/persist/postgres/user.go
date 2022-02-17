@@ -211,6 +211,7 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 
 	if err = res.Err(); err != nil {
 		if err == sql.ErrNoRows {
+			// TODO: Switch to auth.ErrUserNotFound{Username: pUsername}
 			return persist.User{}, persist.ErrUserNotFoundByUsername{Username: pUsername}
 		}
 		return persist.User{}, err
