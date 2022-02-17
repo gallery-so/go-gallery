@@ -32,7 +32,7 @@ const (
 	blockchainEth = "ethereum"
 
 	// live wallets
-	testWalletFileEthMainnet = "../test-wallet.json"
+	testWalletFileEthMainnet = "../_internal/test-wallet.json"
 )
 
 var (
