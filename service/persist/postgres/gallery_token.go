@@ -227,10 +227,11 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 	galleries := make(map[persist.DBID]persist.GalleryToken)
 	collections := make(map[persist.DBID][]persist.CollectionToken)
 	var gallery persist.GalleryToken
-	var collection persist.CollectionToken
+	var lastCollID persist.DBID
 	for rows.Next() {
+		var collection persist.CollectionToken
 		var nft persist.TokenInCollection
-		lastCollID := collection.ID
+
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
@@ -265,6 +266,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		}
 
 		collections[gallery.ID] = colls
+		lastCollID = collection.ID
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -319,10 +321,10 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 	galleries := make(map[persist.DBID]persist.GalleryToken)
 	collections := make(map[persist.DBID][]persist.CollectionToken)
 	var gallery persist.GalleryToken
-	var collection persist.CollectionToken
-	var nft persist.TokenInCollection
+	var lastCollID persist.DBID
 	for rows.Next() {
-		lastCollID := collection.ID
+		var collection persist.CollectionToken
+		var nft persist.TokenInCollection
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
