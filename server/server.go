@@ -64,9 +64,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	s := newStorageClient()
-
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), s, newGCPPubSub())
+	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newStorageClient(), newGCPPubSub())
 }
 
 func newStorageClient() *storage.Client {
