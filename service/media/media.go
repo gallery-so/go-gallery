@@ -309,8 +309,10 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 	}
 
-	downloadLock.Lock()
-	defer downloadLock.Unlock()
+	if viper.GetString("ENV") == "development" || viper.GetString("ENV") == "production" {
+		downloadLock.Lock()
+		defer downloadLock.Unlock()
+	}
 	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", url, err)

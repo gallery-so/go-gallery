@@ -16,7 +16,7 @@ import (
 )
 
 // Init initializes the server
-func init() {
+func Init() {
 	setDefaults()
 
 	router := CoreInit(postgres.NewClient())

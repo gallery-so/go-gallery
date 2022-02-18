@@ -63,7 +63,7 @@ func main() {
 	if err := res.Err(); err != nil {
 		panic(err)
 	}
-	wp := workerpool.New(5)
+	wp := workerpool.New(6)
 	go func() {
 		for {
 			time.Sleep(time.Minute)
@@ -104,11 +104,7 @@ func main() {
 				logrus.Errorf("Error processing user %s: %s", userID, ctx.Err())
 			}
 		}
-		if wp.WaitingQueueSize() > 20 {
-			wp.SubmitWait(f)
-		} else {
-			wp.Submit(f)
-		}
+		wp.Submit(f)
 	}
 
 	wp.StopWait()
