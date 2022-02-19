@@ -23,31 +23,15 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 		return nil, err
 	}
 
-	return resolveGalleryUserByUserId(ctx, r.Resolver, gallery.OwnerUserID.String())
+	return resolveGalleryUserByUserID(ctx, r.Resolver, gallery.OwnerUserID.String())
+}
+
+func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
+	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.ID)
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
-	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(obj.ID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Oof, more remapping, huh?
-	//if err != nil {
-	//	return remapError(err)
-	//}
-
-	var output = make([]*model.Gallery, len(galleries))
-	for i, gallery := range galleries {
-		output[i] = &model.Gallery{
-			ID:          gallery.ID.String(),
-			Owner:       nil, // Handled by resolver
-			Collections: nil, // TODO, should also be handled by a resolver
-		}
-	}
-
-	return output, nil
+	return resolveGalleriesByUserID(ctx, r.Resolver, obj.ID)
 }
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error) {
@@ -174,18 +158,17 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 		return nil, err
 	}
 
-	userID := auth.GetUserIDFromCtx(gc).String() // TODO: Is there a case where a user has an ID but isn't authed?
-	user, err := resolveGalleryUserByUserId(ctx, r.Resolver, userID)
+	userID := auth.GetUserIDFromCtx(gc).String()
+	user, err := resolveGalleryUserByUserID(ctx, r.Resolver, userID)
 
 	if err != nil {
 		return remapError(err)
 	}
 
-	// TODO: Check auth first!
 	viewer := &model.Viewer{
-		User:          user,
-		Wallets:       user.Wallets, // TODO: Is this field necessary?
-		ViewerGallery: nil,
+		User:            user,
+		Wallets:         user.Wallets,
+		ViewerGalleries: nil, // handled by dedicated resolver
 	}
 
 	return viewer, nil
@@ -219,8 +202,26 @@ func (r *queryResolver) MembershipTiers(ctx context.Context) ([]*model.Membershi
 	panic(fmt.Errorf("not implemented"))
 }
 
+func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
+	galleries, err := resolveGalleriesByUserID(ctx, r.Resolver, obj.User.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.ViewerGallery, len(galleries))
+	for i, gallery := range galleries {
+		output[i] = &model.ViewerGallery{
+			Gallery: gallery,
+		}
+	}
+
+	return output, nil
+}
+
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
-	return []model.Nft{model.ImageNft{ID: "abcdef"}}, nil
+	//return []model.Nft{model.ImageNft{ID: "abcdef"}}, nil
+	panic(fmt.Errorf("not implemented"))
 }
 
 // Gallery returns generated.GalleryResolver implementation.
@@ -235,6 +236,9 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Viewer returns generated.ViewerResolver implementation.
+func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
+
 // Wallet returns generated.WalletResolver implementation.
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
@@ -242,4 +246,5 @@ type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }

@@ -276,9 +276,9 @@ func (VideoNft) IsNode()         {}
 func (VideoNft) IsNft()          {}
 
 type Viewer struct {
-	User          *GalleryUser   `json:"user"`
-	Wallets       []*Wallet      `json:"wallets"`
-	ViewerGallery *ViewerGallery `json:"viewerGallery"`
+	User            *GalleryUser     `json:"user"`
+	Wallets         []*Wallet        `json:"wallets"`
+	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 }
 
 func (Viewer) IsViewerOrError() {}

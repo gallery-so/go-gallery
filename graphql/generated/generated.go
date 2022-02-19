@@ -40,6 +40,7 @@ type ResolverRoot interface {
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Viewer() ViewerResolver
 	Wallet() WalletResolver
 }
 
@@ -201,9 +202,9 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
-		User          func(childComplexity int) int
-		ViewerGallery func(childComplexity int) int
-		Wallets       func(childComplexity int) int
+		User            func(childComplexity int) int
+		ViewerGalleries func(childComplexity int) int
+		Wallets         func(childComplexity int) int
 	}
 
 	ViewerGallery struct {
@@ -219,6 +220,7 @@ type ComplexityRoot struct {
 
 type GalleryResolver interface {
 	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
+	Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error)
 }
 type GalleryUserResolver interface {
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
@@ -240,6 +242,9 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error)
+}
+type ViewerResolver interface {
+	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
 }
 type WalletResolver interface {
 	Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error)
@@ -819,12 +824,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.User(childComplexity), true
 
-	case "Viewer.viewerGallery":
-		if e.complexity.Viewer.ViewerGallery == nil {
+	case "Viewer.viewerGalleries":
+		if e.complexity.Viewer.ViewerGalleries == nil {
 			break
 		}
 
-		return e.complexity.Viewer.ViewerGallery(childComplexity), true
+		return e.complexity.Viewer.ViewerGalleries(childComplexity), true
 
 	case "Viewer.wallets":
 		if e.complexity.Viewer.Wallets == nil {
@@ -1012,7 +1017,7 @@ type GalleryCollection implements Node {
 type Gallery implements Node {
   id: ID!
   owner: GalleryUser @goField(forceResolver: true)
-  collections: [GalleryCollection]
+  collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
 type MembershipTierOwner implements Node {
@@ -1038,8 +1043,8 @@ type ViewerGallery {
 
 type Viewer {
   user: GalleryUser
-  wallets: [Wallet]
-  viewerGallery: ViewerGallery
+  wallets: [Wallet] # TODO: Is this field necessary?
+  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
@@ -1123,6 +1128,8 @@ type AuthNonce {
 
 union GetAuthNoncePayloadOrError = AuthNonce | ErrAddressDoesNotOwnRequiredNFT
 
+# InternalError means that something unexpected happened. The error message may give more detail,
+# but it isn't an error type that is expected or requires specific handling.
 enum AuthFailureType { NoCookie, InvalidToken, DoesNotOwnRequiredNFT, InternalError }
 
 type ErrNotAuthorized implements Error {
@@ -1904,14 +1911,14 @@ func (ec *executionContext) _Gallery_collections(ctx context.Context, field grap
 		Object:     "Gallery",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Collections, nil
+		return ec.resolvers.Gallery().Collections(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3970,7 +3977,7 @@ func (ec *executionContext) _Viewer_wallets(ctx context.Context, field graphql.C
 	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Viewer_viewerGallery(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+func (ec *executionContext) _Viewer_viewerGalleries(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3981,14 +3988,14 @@ func (ec *executionContext) _Viewer_viewerGallery(ctx context.Context, field gra
 		Object:     "Viewer",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ViewerGallery, nil
+		return ec.resolvers.Viewer().ViewerGalleries(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3997,9 +4004,9 @@ func (ec *executionContext) _Viewer_viewerGallery(ctx context.Context, field gra
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.ViewerGallery)
+	res := resTmp.([]*model.ViewerGallery)
 	fc.Result = res
-	return ec.marshalOViewerGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx, field.Selections, res)
+	return ec.marshalOViewerGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ViewerGallery_gallery(ctx context.Context, field graphql.CollectedField, obj *model.ViewerGallery) (ret graphql.Marshaler) {
@@ -6232,12 +6239,22 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 
 			})
 		case "collections":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Gallery_collections(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Gallery_collections(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7124,13 +7141,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "viewerGallery":
+		case "viewerGalleries":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Viewer_viewerGallery(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_viewerGalleries(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8545,6 +8572,47 @@ func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgal
 		return graphql.Null
 	}
 	return ec._Viewer(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOViewerGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx context.Context, sel ast.SelectionSet, v []*model.ViewerGallery) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOViewerGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) marshalOViewerGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx context.Context, sel ast.SelectionSet, v *model.ViewerGallery) graphql.Marshaler {

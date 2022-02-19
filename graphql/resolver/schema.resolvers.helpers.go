@@ -68,7 +68,7 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	return nil, errNoAuthMechanismFound
 }
 
-func resolveGalleryUserByUserId(ctx context.Context, r *Resolver, userID string) (*model.GalleryUser, error) {
+func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID string) (*model.GalleryUser, error) {
 	user, err := dataloader.For(ctx).UserByUserId.Load(userID)
 
 	if err != nil {
@@ -96,6 +96,80 @@ func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address strin
 	}
 
 	return userToUserModel(ctx, r, user)
+}
+
+func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID string) ([]*model.Gallery, error) {
+	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.Gallery, len(galleries))
+	for i, gallery := range galleries {
+		output[i] = galleryToGalleryModel(gallery)
+	}
+
+	return output, nil
+}
+
+func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID string) ([]*model.GalleryCollection, error) {
+	// TODO: Update this to query for collections by gallery ID, instead of querying for a user and returning
+	// all of their collections. The result is the same right now, since a user only has one gallery.
+
+	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryCollection, len(collections))
+	for i, collection := range collections {
+		// TODO: Do we store any 64-bit types (e.g. NFT Opensea token ID) that need special handling?
+		version := int(collection.Version.Int64())
+		hidden := collection.Hidden.Bool()
+
+		output[i] = &model.GalleryCollection{
+			ID:             collection.ID.String(),
+			Version:        &version,
+			Name:           util.StringToPointer(collection.Name.String()),
+			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
+			Gallery:        galleryIDToGalleryModel(galleryID),
+			Layout:         layoutToLayoutModel(ctx, r, collection.Layout),
+			Hidden:         &hidden,
+			Nfts:           nil, // TODO: Delegate to a resolver
+		}
+	}
+
+	return output, nil
+}
+
+func galleryToGalleryModel(gallery persist.Gallery) *model.Gallery {
+	return galleryIDToGalleryModel(gallery.ID.String())
+}
+
+func galleryIDToGalleryModel(galleryID string) *model.Gallery {
+	gallery := model.Gallery{
+		ID:          galleryID,
+		Owner:       nil, // handled by dedicated resolver
+		Collections: nil, // handled by dedicated resolver
+	}
+
+	return &gallery
+}
+
+func layoutToLayoutModel(ctx context.Context, r *Resolver, layout persist.TokenLayout) *model.GalleryCollectionLayout {
+	columns := int(layout.Columns.Int64())
+
+	output := model.GalleryCollectionLayout{
+		Columns: &columns,
+	}
+
+	return &output
 }
 
 // userToUserModel converts a persist.User to a model.User

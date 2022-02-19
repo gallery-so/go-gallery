@@ -85,7 +85,7 @@ type GalleryCollection implements Node {
 type Gallery implements Node {
   id: ID!
   owner: GalleryUser @goField(forceResolver: true)
-  collections: [GalleryCollection]
+  collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
 type MembershipTierOwner implements Node {
@@ -111,8 +111,8 @@ type ViewerGallery {
 
 type Viewer {
   user: GalleryUser
-  wallets: [Wallet]
-  viewerGallery: ViewerGallery
+  wallets: [Wallet] # TODO: Is this field necessary?
+  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
