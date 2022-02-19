@@ -75,7 +75,7 @@ func NewEthClient() *ethclient.Client {
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 15)
+	sh.SetTimeout(time.Second * 30)
 	return sh
 }
 
@@ -139,6 +139,8 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 // GetDataFromURI calls URI and returns the data
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
+	d, _ := ctx.Deadline()
+	logrus.Infof("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
 	asString := turi.String()
 
 	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())

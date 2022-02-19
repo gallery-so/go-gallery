@@ -74,7 +74,7 @@ func main() {
 		userID := u
 		addresses := addrs
 		f := func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour/2)
 			go func() {
 				defer cancel()
 				logrus.Warnf("Processing user %s with addresses %v", userID, addresses)
