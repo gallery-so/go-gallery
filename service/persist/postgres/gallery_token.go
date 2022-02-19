@@ -360,6 +360,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		}
 
 		collections[gallery.ID] = colls
+		lastCollID = collection.ID
 	}
 	if err := rows.Err(); err != nil {
 		return persist.GalleryToken{}, err
