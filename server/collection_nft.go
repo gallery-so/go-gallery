@@ -105,8 +105,6 @@ func getCollectionByID(collectionsRepository persist.CollectionRepository) gin.H
 		}
 
 		c.JSON(http.StatusOK, collectionGetByIDOutput{Collection: coll})
-		return
-
 	}
 }
 
@@ -211,7 +209,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 
 		// ensure that there are no repeat NFTs
 		withNoRepeats := uniqueDBID(input.Nfts)
-		layout, err := persist.ValidateLayout(input.Layout)
+		layout, err := persist.ValidateLayout(input.Layout, input.Nfts)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -267,7 +265,7 @@ func collectionCreateDb(pCtx context.Context, pInput collectionCreateInput,
 	pUserID persist.DBID,
 	collectionsRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) (persist.DBID, error) {
 
-	layout, err := persist.ValidateLayout(pInput.Layout)
+	layout, err := persist.ValidateLayout(pInput.Layout, pInput.Nfts)
 	if err != nil {
 		return "", err
 	}
