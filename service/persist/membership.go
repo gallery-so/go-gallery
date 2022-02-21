@@ -8,24 +8,23 @@ import (
 
 // MembershipTier represents the membership tier of a user
 type MembershipTier struct {
-	Version      NullInt64       `bson:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
-
-	Name     NullString        `bson:"name" json:"name"`
-	TokenID  TokenID           `bson:"token_id" json:"token_id"`
-	AssetURL NullString        `bson:"asset_url" json:"asset_url"`
-	Owners   []MembershipOwner `bson:"owners" json:"owners"`
+	Version      NullInt64         `json:"version"` // schema version for this model
+	ID           DBID              `json:"id" binding:"required"`
+	CreationTime CreationTime      `json:"created_at"`
+	Deleted      NullBool          `json:"-"`
+	LastUpdated  LastUpdatedTime   `json:"last_updated"`
+	Name         NullString        `json:"name"`
+	TokenID      TokenID           `json:"token_id"`
+	AssetURL     NullString        `json:"asset_url"`
+	Owners       []MembershipOwner `json:"owners"`
 }
 
 // MembershipOwner represents a user who owns a membership card
 type MembershipOwner struct {
-	UserID      DBID         `bson:"user_id" json:"user_id"`
-	Address     Address      `bson:"address" json:"address"`
-	Username    NullString   `bson:"username" json:"username"`
-	PreviewNFTs []NullString `bson:"preview_nfts" json:"preview_nfts"`
+	UserID      DBID         `json:"user_id"`
+	Address     Address      `json:"address"`
+	Username    NullString   `json:"username"`
+	PreviewNFTs []NullString `json:"preview_nfts"`
 }
 
 // MembershipRepository represents the interface for interacting with the persisted state of users

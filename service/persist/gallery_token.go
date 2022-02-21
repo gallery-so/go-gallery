@@ -10,14 +10,14 @@ import (
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryTokenDB struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	OwnerUserID DBID   `bson:"owner_user_id" json:"owner_user_id"`
-	Collections []DBID `bson:"collections"          json:"collections"`
+	OwnerUserID DBID   `json:"owner_user_id"`
+	Collections []DBID `json:"collections"`
 }
 
 // GalleryToken represents a group of collections of NFTS in the application.
@@ -25,21 +25,21 @@ type GalleryTokenDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type GalleryToken struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	OwnerUserID DBID              `bson:"owner_user_id" json:"owner_user_id"`
-	Collections []CollectionToken `bson:"collections"          json:"collections"`
+	OwnerUserID DBID              `json:"owner_user_id"`
+	Collections []CollectionToken `json:"collections"`
 }
 
 // GalleryTokenUpdateInput represents a struct that is used to update a gallery's list of collections in the databse
 type GalleryTokenUpdateInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Collections []DBID `bson:"collections" json:"collections"`
+	Collections []DBID `json:"collections"`
 }
 
 // GalleryTokenRepository is an interface for interacting with the gallery persistence layer

@@ -19,21 +19,21 @@ const (
 // between collections and NFTS
 // This struct will only be used when updating or querying the database
 type CollectionTokenDB struct {
-	Version      NullInt64       `bson:"version" json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id" json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Layout TokenLayout `bson:"layout" json:"layout"`
+	Layout TokenLayout `json:"layout"`
 
-	Name           NullString `bson:"name"          json:"name"`
-	CollectorsNote NullString `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    DBID       `bson:"owner_user_id" json:"owner_user_id"`
-	NFTs           []DBID     `bson:"nfts"          json:"nfts"`
+	Name           NullString `json:"name"`
+	CollectorsNote NullString `json:"collectors_note"`
+	OwnerUserID    DBID       `json:"owner_user_id"`
+	NFTs           []DBID     `json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	Hidden NullBool `bson:"hidden" json:"hidden"`
+	Hidden NullBool `json:"hidden"`
 }
 
 // CollectionToken represents a collection of NFTs in the application. CollectionToken will contain
@@ -41,58 +41,58 @@ type CollectionTokenDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type CollectionToken struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Layout TokenLayout `bson:"layout" json:"layout"`
+	Layout TokenLayout `json:"layout"`
 
-	Name           NullString          `bson:"name"          json:"name"`
-	CollectorsNote NullString          `bson:"collectors_note"   json:"collectors_note"`
-	OwnerUserID    DBID                `bson:"owner_user_id" json:"owner_user_id"`
-	NFTs           []TokenInCollection `bson:"nfts"          json:"nfts"`
+	Name           NullString          `json:"name"`
+	CollectorsNote NullString          `json:"collectors_note"`
+	OwnerUserID    DBID                `json:"owner_user_id"`
+	NFTs           []TokenInCollection `json:"nfts"`
 
 	// collections can be hidden from public-viewing
-	Hidden NullBool `bson:"hidden" json:"hidden"`
+	Hidden NullBool `json:"hidden"`
 }
 
 // TokenLayout defines the layout of a collection of tokens
 type TokenLayout struct {
-	Columns    NullInt64 `bson:"columns" json:"columns"`
-	Whitespace []int     `bson:"whitespace" json:"whitespace"`
+	Columns    NullInt64 `json:"columns"`
+	Whitespace []int     `json:"whitespace"`
 	// Padding         int   `bson:"padding" json:"padding"`
 }
 
 // CollectionTokenUpdateInfoInput represents the data that will be changed when updating a collection's metadata
 type CollectionTokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Name           NullString `bson:"name" json:"name"`
-	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
+	Name           NullString `json:"name"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 // CollectionTokenUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
 type CollectionTokenUpdateNftsInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	NFTs   []DBID      `bson:"nfts" json:"nfts"`
-	Layout TokenLayout `bson:"layout" json:"layout"`
+	NFTs   []DBID      `json:"nfts"`
+	Layout TokenLayout `json:"layout"`
 }
 
 // CollectionTokenUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
 type CollectionTokenUpdateHiddenInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Hidden NullBool `bson:"hidden" json:"hidden"`
+	Hidden NullBool `json:"hidden"`
 }
 
 // CollectionTokenUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
 type CollectionTokenUpdateDeletedInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Deleted NullBool `bson:"deleted" json:"-"`
+	Deleted NullBool `json:"-"`
 }
 
 // CollectionTokenRepository represents the interface for interacting with the collection persistence layer

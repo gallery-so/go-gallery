@@ -7,17 +7,17 @@ import (
 
 // Contract represents an ethereum contract in the database
 type Contract struct {
-	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address Address    `bson:"address" json:"address"`
-	Symbol  NullString `bson:"symbol" json:"symbol"`
-	Name    NullString `bson:"name" json:"name"`
+	Address Address    `json:"address"`
+	Symbol  NullString `json:"symbol"`
+	Name    NullString `json:"name"`
 
-	LatestBlock BlockNumber `bson:"latest_block" json:"latest_block"`
+	LatestBlock BlockNumber `json:"latest_block"`
 }
 
 // ContractRepository represents a repository for interacting with persisted contracts

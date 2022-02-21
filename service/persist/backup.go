@@ -6,14 +6,14 @@ import (
 
 // Backup represents a backup of a gallery in the database.
 type Backup struct {
-	Version      NullInt64       `bson:"version" json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id" json:"id"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	GalleryID DBID    `bson:"gallery_id" json:"gallery_id" `
-	Gallery   Gallery `bson:"gallery" json:"gallery"`
+	GalleryID DBID    `json:"gallery_id" `
+	Gallery   Gallery `json:"gallery"`
 }
 
 // BackupRepository is the interface for interacting with backed up versions of galleries

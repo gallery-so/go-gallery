@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/graphql/model"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/indexer"
