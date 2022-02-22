@@ -42,7 +42,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	updateStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
 	checkNoErr(err)
 
-	addCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = COLLECTIONS || $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`)
+	addCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $1 || COLLECTIONS WHERE ID = $2 AND OWNER_USER_ID = $3;`)
 	checkNoErr(err)
 
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
@@ -163,7 +163,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		if err != nil {
 			return err
 		}
-		galleryCollIDs = append(galleryCollIDs, pCollections...)
+		galleryCollIDs = append(pCollections, galleryCollIDs...)
 
 		allColls, err := addUnaccountedForCollections(pCtx, g, pUserID, galleryCollIDs)
 		if err != nil {
