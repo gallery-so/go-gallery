@@ -15,7 +15,7 @@ func proxySnapshot(stg *storage.Client) gin.HandlerFunc {
 		snpBucket := viper.GetString("SNAPSHOT_BUCKET")
 		logrus.Infof("Proxying snapshot from bucket %s", snpBucket)
 
-		obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snap.json")
+		obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
 		r, err := obj.NewReader(c)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
