@@ -340,6 +340,11 @@ func (uri TokenURI) Value() (driver.Value, error) {
 	return strings.ToValidUTF8(result, ""), nil
 }
 
+// ReplaceID replaces the token's ID with the given ID
+func (uri TokenURI) ReplaceID(id TokenID) TokenURI {
+	return TokenURI(strings.TrimSpace(strings.ReplaceAll(uri.String(), "{id}", id.ToUint256String())))
+}
+
 // Scan implements the sql.Scanner interface for token URIs
 func (uri *TokenURI) Scan(src interface{}) error {
 	if src == nil {

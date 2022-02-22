@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -202,7 +201,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 					uri = u
 				}
 
-				uri = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
+				uri = uri.ReplaceID(token.TokenID)
 
 				if metadata == nil || len(metadata) == 0 {
 					md, err := rpc.GetMetadataFromURI(pCtx, uri, ipfsClient, arweaveClient)
@@ -335,7 +334,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 
 		uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
 		if err == nil {
-			token.TokenURI = persist.TokenURI(strings.ReplaceAll(uri.String(), "{id}", token.TokenID.ToUint256String()))
+			token.TokenURI = uri.ReplaceID(token.TokenID)
 			needsUpdate = true
 		} else {
 			logrus.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
@@ -396,7 +395,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 
 		logrus.Debugf("media: %+v", media)
 
-		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(strings.ReplaceAll(a.TokenMetadataURL, "{id}", persist.TokenID(a.TokenID.ToBase16()).ToUint256String())), ipfsClient, arweaveClient)
+		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL).ReplaceID(persist.TokenID(a.TokenID.ToBase16())), ipfsClient, arweaveClient)
 
 		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{

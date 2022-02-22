@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -115,7 +114,7 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); !ok {
 						panic(err)
 					} else {
-						logrus.Infof("Token equi not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+						logrus.Infof("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
 						tokenEquivelents, err = nftToTokens(ctx, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
 						if err != nil {
 							logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
@@ -172,15 +171,13 @@ func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Addre
 	if err == nil {
 		mediaType := persist.SniffMediaType(bs)
 		if mediaType != persist.MediaTypeUnknown {
-			media = persist.Media{
-				MediaURL:     persist.NullString(nft.ImageURL),
-				ThumbnailURL: persist.NullString(nft.ImagePreviewURL),
-				MediaType:    mediaType,
-			}
+			media.MediaURL = persist.NullString(nft.ImageURL)
+			media.ThumbnailURL = persist.NullString(nft.ImagePreviewURL)
+			media.MediaType = mediaType
 		}
 	}
 
-	uri := persist.TokenURI(strings.ReplaceAll(nft.TokenMetadataURL.String(), "{id}", nft.OpenseaTokenID.ToUint256String()))
+	uri := persist.TokenURI(nft.TokenMetadataURL.String()).ReplaceID(nft.OpenseaTokenID)
 	metadata, _ := rpc.GetMetadataFromURI(ctx, uri, ipfsClient, arweaveClient)
 	t := persist.Token{
 		CollectorsNote:  nft.CollectorsNote,

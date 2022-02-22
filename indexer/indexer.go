@@ -532,7 +532,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				}
 				cancel()
 
-				uriReplaced := persist.TokenURI(strings.TrimSpace(strings.ReplaceAll(u.String(), "{id}", tokenID.ToUint256String())))
+				uriReplaced := u.ReplaceID(tokenID)
 
 				var metadata persist.TokenMetadata
 				if handler, ok := i.uniqueMetadatas[contractAddress]; ok {
