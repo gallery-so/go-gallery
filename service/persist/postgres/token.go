@@ -237,6 +237,9 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address
 func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, limit int64, page int64) ([]persist.Token, error) {
+	if pTokenID == "" || pContractAddress == "" {
+		return nil, fmt.Errorf("token ID and contract address must be provided - provided: %s, %s", pContractAddress, pTokenID)
+	}
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {

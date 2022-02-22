@@ -111,15 +111,15 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 
 				tokenEquivelents, err := tokenRepo.GetByTokenIdentifiers(ctx, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
 				if err != nil {
-					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); !ok {
-						panic(err)
-					} else {
+					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
 						logrus.Infof("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
 						tokenEquivelents, err = nftToTokens(ctx, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
 						if err != nil {
 							logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
 							continue
 						}
+					} else {
+						logrus.Errorf("Error getting tokens by identifiers for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
 					}
 				}
 				for _, token := range tokenEquivelents {

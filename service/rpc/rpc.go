@@ -140,7 +140,7 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
 	d, _ := ctx.Deadline()
-	logrus.Infof("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	logrus.Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
 	asString := turi.String()
 
 	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())
