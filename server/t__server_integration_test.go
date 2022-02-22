@@ -24,7 +24,7 @@ const (
 	ethRinkeby
 
 	// eligible contracts
-	contractAddressesEthMainnet = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698=[0,1,2,3,4,5,6,7,8]"
+	contractAddressesEthMainnet = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698=[0,1,2,3,4,5,6,7,8],0xe3d0fe9b7e0b951663267a3ed1e6577f6f79757e=[0]"
 	contractAddressesEthRinkeby = "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]"
 
 	// node providers
