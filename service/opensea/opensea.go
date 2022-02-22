@@ -350,7 +350,7 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 		return result, nil
 	}
 	if len(response.Assets) == 50 {
-		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, pOffset+50, 0, alreadyReceived)
+		next, err := FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pOffset+50, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}
