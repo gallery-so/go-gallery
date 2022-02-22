@@ -262,7 +262,6 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 			lastColl := colls[len(colls)-1]
 			lastColl.NFTs = append(lastColl.NFTs, nft)
 			colls[len(colls)-1] = lastColl
-
 		}
 
 		collections[gallery.ID] = colls
