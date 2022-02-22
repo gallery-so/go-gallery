@@ -9,7 +9,7 @@ import (
 // between collections and NFTS
 // This struct will only be used when updating or querying the database
 type CollectionDB struct {
-	Version      NullInt64       `bson:"version" json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version" json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id" json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`
@@ -31,7 +31,7 @@ type CollectionDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type Collection struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`

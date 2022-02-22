@@ -10,7 +10,7 @@ import (
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryTokenDB struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`
@@ -25,7 +25,7 @@ type GalleryTokenDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type GalleryToken struct {
-	Version      NullInt64       `bson:"version"       json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version"       json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`

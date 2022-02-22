@@ -6,7 +6,7 @@ import (
 
 // Backup represents a backup of a gallery in the database.
 type Backup struct {
-	Version      NullInt64       `bson:"version" json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version" json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id" json:"id"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`

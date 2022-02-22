@@ -14,7 +14,7 @@ type ReqHeaders map[string][]string
 // UserNonce represents a short lived nonce that holds a value to be signed
 // by a user cryptographically to prove they are the owner of a given address.
 type UserNonce struct {
-	Version NullInt64 `bson:"version" mapstructure:"version"`
+	Version NullInt32 `bson:"version" mapstructure:"version"`
 
 	ID           DBID            `bson:"_id"           json:"id"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
@@ -28,7 +28,7 @@ type UserNonce struct {
 // UserLoginAttempt represents a single attempt for a user to login despite the success
 // of the login. Can be used in debugging and logging purposes.
 type UserLoginAttempt struct {
-	Version      NullInt64    `bson:"version"`
+	Version      NullInt32    `bson:"version"`
 	ID           DBID         `bson:"_id"`
 	CreationTime CreationTime `bson:"created_at"`
 	Deleted      NullBool     `bson:"deleted"       json:"-"`

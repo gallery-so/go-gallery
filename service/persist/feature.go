@@ -9,7 +9,7 @@ import (
 
 // FeatureFlag represents a feature flag in the database
 type FeatureFlag struct {
-	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version"              json:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`

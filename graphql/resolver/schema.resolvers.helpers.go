@@ -129,8 +129,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 
 	var output = make([]*model.GalleryCollection, len(collections))
 	for i, collection := range collections {
-		// TODO: Do we store any 64-bit types (e.g. NFT Opensea token ID) that need special handling?
-		version := int(collection.Version.Int64())
+		version := collection.Version.Int()
 		hidden := collection.Hidden.Bool()
 
 		output[i] = &model.GalleryCollection{
@@ -163,7 +162,7 @@ func galleryIDToGalleryModel(galleryID string) *model.Gallery {
 }
 
 func layoutToLayoutModel(ctx context.Context, r *Resolver, layout persist.TokenLayout) *model.GalleryCollectionLayout {
-	columns := int(layout.Columns.Int64())
+	columns := int(layout.Columns.Int())
 
 	output := model.GalleryCollectionLayout{
 		Columns: &columns,

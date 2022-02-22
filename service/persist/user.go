@@ -7,7 +7,7 @@ import (
 
 // User represents a user in the datase and throughout the application
 type User struct {
-	Version      NullInt64       `bson:"version"` // schema version for this model
+	Version      NullInt32       `bson:"version"` // schema version for this model
 	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
 	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
 	Deleted      NullBool        `bson:"deleted" json:"-"`
