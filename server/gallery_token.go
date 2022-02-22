@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -52,6 +53,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
 		if len(galleries) == 0 || err != nil {
+			logrus.WithError(err).Errorf("no galleries found with user id: %s - %s", input.UserID, err)
 			galleries = []persist.GalleryToken{}
 		}
 

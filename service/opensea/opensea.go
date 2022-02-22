@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -13,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
 
 // TokenID represents a token ID from Opensea. It is separate from persist.TokenID becuase opensea returns token IDs in base 10 format instead of what we want, base 16
 type TokenID string
@@ -254,6 +258,99 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 	}
 	if len(response.Assets) == 50 {
 		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, pOffset+50, 0, alreadyReceived)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, next...)
+	}
+	return result, nil
+}
+
+// FetchAssets fetches assets by its token identifiers
+func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.Address, pTokenID TokenID, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+
+	if alreadyReceived == nil {
+		alreadyReceived = make(map[int]string)
+	}
+	result := []Asset{}
+
+	if pOffset > 20000 {
+		return result, fmt.Errorf("failed to fetch assets for wallet %s: too many results", pWalletAddress)
+	}
+
+	dir := "desc"
+	offset := pOffset
+	if pOffset > 10000 {
+		dir = "asc"
+		offset = pOffset - 10050
+	}
+
+	url := *openseaURL
+	query := url.Query()
+	if pTokenID != "" {
+		query.Set("token_ids", string(pTokenID))
+	}
+	if pContractAddress != "" {
+		query.Set("asset_contract_address", string(pContractAddress))
+	}
+	if pWalletAddress != "" {
+		query.Set("owner", string(pWalletAddress))
+	}
+	query.Set("order_direction", dir)
+	query.Set("offset", strconv.Itoa(offset))
+	query.Set("limit", "50")
+
+	url.RawQuery = query.Encode()
+
+	urlStr := url.String()
+
+	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		if resp.StatusCode == 429 {
+			if retry < 3 {
+				time.Sleep(time.Second * 3 * time.Duration(retry+1))
+				return FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pOffset, retry+1, alreadyReceived)
+			}
+			return nil, fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)
+		}
+		bs := new(bytes.Buffer)
+		_, err := bs.ReadFrom(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())
+	}
+	response := Assets{}
+	err = util.UnmarshallBody(&response, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	doneReceiving := false
+	for _, asset := range response.Assets {
+		if it, ok := alreadyReceived[asset.ID]; ok {
+			logrus.Debugf("response already received asset: %s", it)
+			doneReceiving = true
+			continue
+		}
+		result = append(result, asset)
+		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%d|len-%d|dir-%s", asset.ID, pOffset, len(result), dir)
+	}
+	if doneReceiving {
+		return result, nil
+	}
+	if len(response.Assets) == 50 {
+		next, err := FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pOffset+50, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}

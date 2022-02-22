@@ -37,7 +37,7 @@ func main() {
 		panic(err)
 	}
 
-	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE ORDER BY CREATED_AT DESC;`)
+	stmt, err := pc.Prepare(`SELECT id, addresses FROM users WHERE DELETED = FALSE ORDER BY CREATED_AT ASC;`)
 	if err != nil {
 		panic(err)
 	}
