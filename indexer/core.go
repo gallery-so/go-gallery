@@ -2,20 +2,13 @@ package indexer
 
 import (
 	"context"
-	"log"
 	"net/http"
-	"os"
-	"syscall"
-	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -45,12 +38,13 @@ func coreInit() (*gin.Engine, *Indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ipfsClient := newIPFSShell()
-	ethClient := newEthClient()
+	ethClient := rpc.NewEthClient()
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
 	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-	i := NewIndexer(ethClient, ipfsClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
@@ -60,7 +54,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func setDefaults() {
@@ -79,36 +73,8 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newEthClient() *ethclient.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	dialer := *websocket.DefaultDialer
-	dialer.ReadBufferSize = 1024 * 20
-	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
-	if err != nil {
-		panic(err)
-	}
-
-	return ethclient.NewClient(rpcClient)
-
-}
-
-func newIPFSShell() *shell.Shell {
-	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 15)
-	return sh
-}
-
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
 	pgClient := postgres.NewClient()
 
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
-}
-
-func redirectStderr(f *os.File) {
-	err := syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
-	if err != nil {
-		log.Fatalf("Failed to redirect stderr to file: %v", err)
-	}
 }

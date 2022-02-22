@@ -3,14 +3,24 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/lib/pq"
+	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+var bigZero = big.NewInt(0)
 
 func main() {
 	setDefaults()
@@ -27,20 +37,26 @@ func run() {
 	tokenRepo := postgres.NewTokenRepository(pgClient)
 	nftRepo := postgres.NewNFTRepository(pgClient, nil, nil)
 
+	ethClient := rpc.NewEthClient()
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
+
 	userIDs := getAllUsers(ctx, pgClient)
 
-	usersToNewCollections := getNewCollections(ctx, pgClient, userIDs, nftRepo, tokenRepo)
+	usersToNewCollections := getNewCollections(ctx, pgClient, userIDs, nftRepo, tokenRepo, ethClient, ipfsClient, arweaveClient)
 
 	updateCollections(ctx, pgClient, usersToNewCollections)
 }
 
 func setDefaults() {
-	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("OPENSEA_API_KEY", "")
+	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault("IPFS_URL", "https://ipfs.io")
 
 	viper.AutomaticEnv()
 }
@@ -50,7 +66,7 @@ func updateCollections(ctx context.Context, pgClient *sql.DB, usersToNewCollecti
 		logrus.Infof("Updating %d collections for user %s", len(newCollections), userID)
 		for coll, nfts := range newCollections {
 			logrus.Infof("Updating collection %s with %d nfts for user %s", coll, len(nfts), userID)
-			_, err := pgClient.ExecContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
+			_, err := pgClient.ExecContext(ctx, `UPDATE collections_v2 SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
 			if err != nil {
 				panic(err)
 			}
@@ -58,7 +74,7 @@ func updateCollections(ctx context.Context, pgClient *sql.DB, usersToNewCollecti
 	}
 }
 
-func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persist.DBID][]persist.Address, nftRepo *postgres.NFTRepository, tokenRepo *postgres.TokenRepository) map[persist.DBID]map[persist.DBID][]persist.DBID {
+func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persist.DBID][]persist.Address, nftRepo *postgres.NFTRepository, tokenRepo *postgres.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) map[persist.DBID]map[persist.DBID][]persist.DBID {
 	usersToNewCollections := map[persist.DBID]map[persist.DBID][]persist.DBID{}
 
 	for userID, addresses := range userIDs {
@@ -75,6 +91,9 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 				panic(err)
 			}
 			collsToNFTs[collID] = nftIDs
+		}
+		if err := res.Err(); err != nil {
+			panic(err)
 		}
 		newCollsToNFTs := map[persist.DBID][]persist.DBID{}
 		for coll, nftIDs := range collsToNFTs {
@@ -95,7 +114,12 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 					if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); !ok {
 						panic(err)
 					} else {
-						logrus.Infof("Token equi not found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+						logrus.Infof("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+						tokenEquivelents, err = nftToTokens(ctx, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
+						if err != nil {
+							logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
+							continue
+						}
 					}
 				}
 				for _, token := range tokenEquivelents {
@@ -131,6 +155,79 @@ func getAllUsers(ctx context.Context, pgClient *sql.DB) map[persist.DBID][]persi
 		result[id] = append(result[id], addresses...)
 	}
 	return result
+}
+
+func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Address, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]persist.Token, error) {
+
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+	allTokens := make([]persist.Token, 0, 5)
+	asURI := persist.TokenURI(nft.ImageURL)
+	media := persist.Media{}
+
+	bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient, arweaveClient)
+	if err == nil {
+		mediaType := persist.SniffMediaType(bs)
+		if mediaType != persist.MediaTypeUnknown {
+			media.MediaURL = persist.NullString(nft.ImageURL)
+			media.ThumbnailURL = persist.NullString(nft.ImagePreviewURL)
+			media.MediaType = mediaType
+		}
+	}
+
+	uri := persist.TokenURI(nft.TokenMetadataURL.String()).ReplaceID(nft.OpenseaTokenID)
+	metadata, _ := rpc.GetMetadataFromURI(ctx, uri, ipfsClient, arweaveClient)
+	t := persist.Token{
+		CollectorsNote:  nft.CollectorsNote,
+		TokenMetadata:   metadata,
+		Media:           media,
+		TokenURI:        uri,
+		Chain:           persist.ChainETH,
+		TokenID:         nft.OpenseaTokenID,
+		OwnerAddress:    nft.OwnerAddress,
+		ContractAddress: nft.Contract.ContractAddress,
+		BlockNumber:     persist.BlockNumber(block),
+		OwnershipHistory: []persist.AddressAtBlock{
+			{
+				Address: persist.ZeroAddress,
+				Block:   persist.BlockNumber(block - 1),
+			},
+		},
+		ExternalURL: nft.ExternalURL,
+		Description: nft.Description,
+		Name:        nft.Name,
+		Quantity:    "1",
+	}
+	switch nft.Contract.ContractSchemaName {
+	case "ERC721", "CRYPTOPUNKS":
+		t.TokenType = persist.TokenTypeERC721
+		allTokens = append(allTokens, t)
+	case "ERC1155":
+		t.TokenType = persist.TokenTypeERC1155
+		ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethClient)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, addr := range addresses {
+			new := t
+			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, addr.Address(), t.TokenID.BigInt())
+			if err != nil {
+				return nil, err
+			}
+			if bal.Cmp(bigZero) > 0 {
+				new.OwnerAddress = addr
+				new.Quantity = persist.HexString(bal.Text(16))
+
+				allTokens = append(allTokens, new)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported token type: %s", nft.Contract.ContractSchemaName)
+	}
+	return allTokens, nil
 }
 
 func containsAddress(addr persist.Address, addrs []persist.Address) bool {
