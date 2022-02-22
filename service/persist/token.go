@@ -597,6 +597,24 @@ func (m *MediaType) Scan(src interface{}) error {
 	return nil
 }
 
+func (t TokenType) String() string {
+	return string(t)
+}
+
+// Value implements the database/sql/driver Valuer interface for the TokenType type
+func (t TokenType) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenType type
+func (t *TokenType) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	*t = TokenType(src.(string))
+	return nil
+}
+
 func normalizeAddress(address string) string {
 	withoutPrefix := strings.TrimPrefix(address, "0x")
 	if len(withoutPrefix) < 40 {
