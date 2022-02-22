@@ -32,8 +32,8 @@ import (
 )
 
 type TestAddressFile struct {
-	Wallet1     string `json:"wallet_1"`
-	PrivateKey1 string `json:"pk_1"`
+	Wallet1     string `json:"automated_test_wallet"`
+	PrivateKey1 string `json:"pk_automated_test_wallet"`
 }
 
 // N.B. This isn't the entire Docker Compose spec...
