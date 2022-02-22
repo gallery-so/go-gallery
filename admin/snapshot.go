@@ -67,9 +67,6 @@ func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) er
 	w := obj.NewWriter(c)
 	w.CacheControl = "no-store"
 	w.ContentType = "application/json"
-	w.Metadata = map[string]string{
-		"Cache-Control": "no-store",
-	}
 
 	err := json.NewEncoder(w).Encode(snapshot)
 	if err != nil {
@@ -79,5 +76,5 @@ func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) er
 		return err
 	}
 
-	return obj.ACL().Set(c, storage.AllUsers, storage.RoleReader)
+	return nil
 }
