@@ -535,7 +535,7 @@ func processNewTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- t
 
 				findOptionalFields(i, key, to, from, tokenURI, metadata, medias)
 
-				runTransferSideEffects(i, key, to, from, bals)
+				runTransferSideEffects(i, contractAddress, tokenID, to, from, bals)
 
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
@@ -629,7 +629,7 @@ func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persi
 	return res
 }
 
-func runTransferSideEffects(i *Indexer, key persist.TokenIdentifiers, to, from persist.Address, bals tokenBalances) {
+func runTransferSideEffects(i *Indexer, contractAddress persist.Address, tokenID persist.TokenID, to, from persist.Address, bals tokenBalances) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	user, err := i.userRepo.GetByAddress(ctx, from)
@@ -641,22 +641,18 @@ func runTransferSideEffects(i *Indexer, key persist.TokenIdentifiers, to, from p
 			return
 		}
 	}
-	err = updateCollections(ctx, key, user.ID, i.collRepo)
+	err = updateCollections(ctx, contractAddress, tokenID, user.ID, i.collRepo)
 	if err != nil {
-		logrus.WithError(err).Errorf("error updating collections for %s: %s", key, err)
+		logrus.WithError(err).Errorf("error updating collections for %s: %s", persist.NewTokenIdentifiers(contractAddress, tokenID), err)
 		return
 	}
 }
 
-func updateCollections(ctx context.Context, key persist.TokenIdentifiers, userID persist.DBID, collRepo persist.CollectionTokenRepository) error {
+func updateCollections(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, userID persist.DBID, collRepo persist.CollectionTokenRepository) error {
 	colls, err := collRepo.GetByUserID(ctx, userID)
 	if err != nil {
 
 		return fmt.Errorf("error getting collections for %s", userID)
-	}
-	contractAddress, tokenID, err := key.GetParts()
-	if err != nil {
-		return fmt.Errorf("error getting parts of %s", key)
 	}
 
 	update := map[persist.DBID]persist.CollectionToken{}
