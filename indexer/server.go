@@ -65,20 +65,15 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c, 10*time.Second)
 		defer cancel()
-		total, _ := tokenRepository.Count(ctx, persist.CountTypeTotal)
+
 		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
-		noMetadata, _ := tokenRepository.Count(ctx, persist.CountTypeNoMetadata)
-		erc721, _ := tokenRepository.Count(ctx, persist.CountTypeERC721)
-		erc1155, _ := tokenRepository.Count(ctx, persist.CountTypeERC1155)
+		total, _ := tokenRepository.Count(ctx, persist.CountTypeTotal)
 
 		c.JSON(http.StatusOK, gin.H{
 			"total_tokens": total,
 			"recent_block": i.mostRecentBlock,
 			"most_recent":  mostRecent,
-			"bad_uris":     i.badURIs,
-			"no_metadata":  noMetadata,
-			"erc721":       erc721,
-			"erc1155":      erc1155,
+			"is_listening": i.isListening,
 		})
 	}
 }

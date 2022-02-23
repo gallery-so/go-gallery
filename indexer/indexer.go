@@ -110,7 +110,7 @@ type Indexer struct {
 
 	mostRecentBlock uint64
 
-	badURIs uint64
+	isListening bool
 
 	uniqueMetadatas uniqueMetadatas
 }
@@ -189,6 +189,7 @@ func (i *Indexer) Start() {
 }
 
 func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+	i.isListening = false
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalances)
@@ -201,6 +202,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	i.processTokens(uris, metadatas, owners, previousOwners, balances)
 }
 func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+	i.isListening = true
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalances)
