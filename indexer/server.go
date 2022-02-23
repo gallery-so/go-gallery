@@ -67,13 +67,12 @@ func getStatus(i *Indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 		defer cancel()
 
 		mostRecent, _ := tokenRepository.MostRecentBlock(ctx)
-		total, _ := tokenRepository.Count(ctx, persist.CountTypeTotal)
 
 		c.JSON(http.StatusOK, gin.H{
-			"total_tokens": total,
-			"recent_block": i.mostRecentBlock,
-			"most_recent":  mostRecent,
-			"is_listening": i.isListening,
+			"most_recent_indexed": i.mostRecentBlock,
+			"most_recent_db":      mostRecent,
+			"last_synced_block":   i.lastSyncedBlock,
+			"is_listening":        i.isListening,
 		})
 	}
 }

@@ -109,6 +109,7 @@ type Indexer struct {
 	eventHashes []eventHash
 
 	mostRecentBlock uint64
+	lastSyncedBlock uint64
 
 	isListening bool
 
@@ -155,9 +156,8 @@ func (i *Indexer) Start() {
 	}
 	cancel()
 
-	if remainder := lastSyncedBlock % blocksPerLogsCall; remainder != 0 {
-		lastSyncedBlock -= remainder
-	}
+	remainder := lastSyncedBlock % blocksPerLogsCall
+	lastSyncedBlock -= (remainder + (blocksPerLogsCall * 500))
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
@@ -426,6 +426,7 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 		select {
 		case log := <-subscriptions:
 			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
+			i.lastSyncedBlock = lastSyncedBlock.Uint64()
 			ts := logsToTransfers([]types.Log{log}, i.ethClient)
 			transfers <- transfersToTransfersAtBlock(ts)
 		case err := <-sub.Err():
