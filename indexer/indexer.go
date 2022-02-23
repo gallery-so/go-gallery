@@ -638,7 +638,7 @@ func runTransferSideEffects(i *Indexer, contractAddress persist.Address, tokenID
 	if err != nil {
 		return
 	}
-	if bals.from != "" {
+	if bals.fromAmt != nil {
 		if bals.fromAmt.Cmp(bigZero) != 0 {
 			return
 		}
