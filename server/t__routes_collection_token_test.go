@@ -183,37 +183,6 @@ func TestGetHiddenCollections_Success_Token(t *testing.T) {
 	assert.Empty(body.Error)
 }
 
-func TestGetNoHiddenCollections_Success_Token(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	nftIDs := seedTokens(assert)
-	_, err := tc.repos.CollectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[0:1],
-		Hidden:      false,
-	})
-	_, err = tc.repos.CollectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[1:],
-		Hidden:      true,
-	})
-	assert.Nil(err)
-
-	resp := sendCollUserGetRequestToken(assert, string(tc.user1.id), tc.user2)
-
-	type CollectionsResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
-	}
-
-	body := CollectionsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Empty(body.Error)
-}
-
 func TestUpdateCollectionNftsOrder_Success_Token(t *testing.T) {
 	assert := setupTest(t, 2)
 
