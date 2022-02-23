@@ -48,7 +48,7 @@ type ImageNft implements NftInterface & Node {
   id: ID!
   name: String
   tokenCollectionName: String
-  owner: AddressOrGalleryUser
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
   imageUrl: String
 }
 
@@ -56,10 +56,18 @@ type VideoNft implements NftInterface & Node {
   id: ID!
   name: String
   tokenCollectionName: String
-  owner: AddressOrGalleryUser
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
 }
 
-union Nft = ImageNft | VideoNft
+# Temporary NFT type until we support media types via indexer
+type GenericNft implements NftInterface & Node {
+  id: ID!
+  name: String
+  tokenCollectionName: String
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
+}
+
+union Nft = ImageNft | VideoNft | GenericNft
 
 type GalleryNft {
   id: ID!

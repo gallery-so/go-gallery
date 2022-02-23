@@ -201,3 +201,45 @@ func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persi
 
 	return wallets
 }
+
+func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId string) (model.AddressOrGalleryUser, error) {
+	nft, err := dataloader.For(ctx).NftByNftId.Load(nftId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveWalletOrGalleryUserByAddress(ctx, r, nft.OwnerAddress.String())
+}
+
+func resolveWalletOrGalleryUserByAddress(ctx context.Context, r *Resolver, address string) (model.AddressOrGalleryUser, error) {
+	owner, err := dataloader.For(ctx).UserByAddress.Load(address)
+
+	if err == nil {
+		return userToUserModel(ctx, r, owner)
+	}
+
+	// TODO: Change this error type once I change persist error types
+	if _, ok := err.(persist.ErrUserNotFoundByAddress); ok {
+		wallet := model.Wallet{
+			ID:      "", // TODO: What's a wallet's ID?
+			Address: util.StringToPointer(address),
+			Nfts:    nil, // handled by dedicated resolver
+		}
+
+		return wallet, nil
+	}
+
+	return nil, err
+}
+
+func nftToNftModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
+	output := model.GenericNft{
+		ID:                  nft.ID.String(),
+		Name:                util.StringToPointer(nft.Name.String()),
+		TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
+		Owner:               nil, // handled by dedicated resolver
+	}
+
+	return output
+}

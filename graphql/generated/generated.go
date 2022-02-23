@@ -38,8 +38,11 @@ type Config struct {
 type ResolverRoot interface {
 	Gallery() GalleryResolver
 	GalleryUser() GalleryUserResolver
+	GenericNft() GenericNftResolver
+	ImageNft() ImageNftResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	VideoNft() VideoNftResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 }
@@ -122,6 +125,13 @@ type ComplexityRoot struct {
 		IsAuthenticatedUser func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
+	}
+
+	GenericNft struct {
+		ID                  func(childComplexity int) int
+		Name                func(childComplexity int) int
+		Owner               func(childComplexity int) int
+		TokenCollectionName func(childComplexity int) int
 	}
 
 	ImageNft struct {
@@ -225,6 +235,12 @@ type GalleryResolver interface {
 type GalleryUserResolver interface {
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 }
+type GenericNftResolver interface {
+	Owner(ctx context.Context, obj *model.GenericNft) (model.AddressOrGalleryUser, error)
+}
+type ImageNftResolver interface {
+	Owner(ctx context.Context, obj *model.ImageNft) (model.AddressOrGalleryUser, error)
+}
 type MutationResolver interface {
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error)
 	DeleteCollection(ctx context.Context, collectionID *int) (*model.DeleteCollectionPayload, error)
@@ -242,6 +258,9 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error)
+}
+type VideoNftResolver interface {
+	Owner(ctx context.Context, obj *model.VideoNft) (model.AddressOrGalleryUser, error)
 }
 type ViewerResolver interface {
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
@@ -495,6 +514,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Wallets(childComplexity), true
+
+	case "GenericNft.id":
+		if e.complexity.GenericNft.ID == nil {
+			break
+		}
+
+		return e.complexity.GenericNft.ID(childComplexity), true
+
+	case "GenericNft.name":
+		if e.complexity.GenericNft.Name == nil {
+			break
+		}
+
+		return e.complexity.GenericNft.Name(childComplexity), true
+
+	case "GenericNft.owner":
+		if e.complexity.GenericNft.Owner == nil {
+			break
+		}
+
+		return e.complexity.GenericNft.Owner(childComplexity), true
+
+	case "GenericNft.tokenCollectionName":
+		if e.complexity.GenericNft.TokenCollectionName == nil {
+			break
+		}
+
+		return e.complexity.GenericNft.TokenCollectionName(childComplexity), true
 
 	case "ImageNft.id":
 		if e.complexity.ImageNft.ID == nil {
@@ -967,6 +1014,7 @@ type Wallet implements Node {
   nfts: [Nft] @goField(forceResolver: true)
 }
 
+# TODO: Probably "WalletOrGalleryUser", right? Is there a distinction between a wallet and an address? And which should we use?
 union AddressOrGalleryUser = GalleryUser | Wallet
 
 interface NftInterface {
@@ -980,7 +1028,7 @@ type ImageNft implements NftInterface & Node {
   id: ID!
   name: String
   tokenCollectionName: String
-  owner: AddressOrGalleryUser
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
   imageUrl: String
 }
 
@@ -988,10 +1036,18 @@ type VideoNft implements NftInterface & Node {
   id: ID!
   name: String
   tokenCollectionName: String
-  owner: AddressOrGalleryUser
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
 }
 
-union Nft = ImageNft | VideoNft
+# Temporary NFT type until we support media types via indexer
+type GenericNft implements NftInterface & Node {
+  id: ID!
+  name: String
+  tokenCollectionName: String
+  owner: AddressOrGalleryUser @goField(forceResolver: true)
+}
+
+union Nft = ImageNft | VideoNft | GenericNft
 
 type GalleryNft {
   id: ID!
@@ -2517,6 +2573,137 @@ func (ec *executionContext) _GalleryUser_isAuthenticatedUser(ctx context.Context
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GenericNft_id(ctx context.Context, field graphql.CollectedField, obj *model.GenericNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GenericNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GenericNft_name(ctx context.Context, field graphql.CollectedField, obj *model.GenericNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GenericNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GenericNft_tokenCollectionName(ctx context.Context, field graphql.CollectedField, obj *model.GenericNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GenericNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenCollectionName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GenericNft_owner(ctx context.Context, field graphql.CollectedField, obj *model.GenericNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GenericNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GenericNft().Owner(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AddressOrGalleryUser)
+	fc.Result = res
+	return ec.marshalOAddressOrGalleryUser2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddressOrGalleryUser(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ImageNft_id(ctx context.Context, field graphql.CollectedField, obj *model.ImageNft) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2627,14 +2814,14 @@ func (ec *executionContext) _ImageNft_owner(ctx context.Context, field graphql.C
 		Object:     "ImageNft",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Owner, nil
+		return ec.resolvers.ImageNft().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3892,14 +4079,14 @@ func (ec *executionContext) _VideoNft_owner(ctx context.Context, field graphql.C
 		Object:     "VideoNft",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Owner, nil
+		return ec.resolvers.VideoNft().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5767,6 +5954,13 @@ func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj 
 			return graphql.Null
 		}
 		return ec._VideoNft(ctx, sel, obj)
+	case model.GenericNft:
+		return ec._GenericNft(ctx, sel, &obj)
+	case *model.GenericNft:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericNft(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -5790,6 +5984,13 @@ func (ec *executionContext) _NftInterface(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._VideoNft(ctx, sel, obj)
+	case model.GenericNft:
+		return ec._GenericNft(ctx, sel, &obj)
+	case *model.GenericNft:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericNft(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -5827,6 +6028,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._VideoNft(ctx, sel, obj)
+	case model.GenericNft:
+		return ec._GenericNft(ctx, sel, &obj)
+	case *model.GenericNft:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericNft(ctx, sel, obj)
 	case model.GalleryCollection:
 		return ec._GalleryCollection(ctx, sel, &obj)
 	case *model.GalleryCollection:
@@ -6495,6 +6703,68 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var genericNftImplementors = []string{"GenericNft", "NftInterface", "Node", "Nft"}
+
+func (ec *executionContext) _GenericNft(ctx context.Context, sel ast.SelectionSet, obj *model.GenericNft) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, genericNftImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GenericNft")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GenericNft_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GenericNft_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenCollectionName":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GenericNft_tokenCollectionName(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "owner":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GenericNft_owner(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var imageNftImplementors = []string{"ImageNft", "NftInterface", "Node", "Nft"}
 
 func (ec *executionContext) _ImageNft(ctx context.Context, sel ast.SelectionSet, obj *model.ImageNft) graphql.Marshaler {
@@ -6513,7 +6783,7 @@ func (ec *executionContext) _ImageNft(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -6530,12 +6800,22 @@ func (ec *executionContext) _ImageNft(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = innerFunc(ctx)
 
 		case "owner":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageNft_owner(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ImageNft_owner(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "imageUrl":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ImageNft_imageUrl(ctx, field, obj)
@@ -7083,7 +7363,7 @@ func (ec *executionContext) _VideoNft(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -7100,12 +7380,22 @@ func (ec *executionContext) _VideoNft(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = innerFunc(ctx)
 
 		case "owner":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoNft_owner(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._VideoNft_owner(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

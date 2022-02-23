@@ -34,6 +34,14 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, r.Resolver, obj.ID)
 }
 
+func (r *genericNftResolver) Owner(ctx context.Context, obj *model.GenericNft) (model.AddressOrGalleryUser, error) {
+	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+}
+
+func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (model.AddressOrGalleryUser, error) {
+	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+}
+
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -202,6 +210,10 @@ func (r *queryResolver) MembershipTiers(ctx context.Context) ([]*model.Membershi
 	panic(fmt.Errorf("not implemented"))
 }
 
+func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (model.AddressOrGalleryUser, error) {
+	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+}
+
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
 	galleries, err := resolveGalleriesByUserID(ctx, r.Resolver, obj.User.ID)
 
@@ -209,7 +221,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 		return nil, err
 	}
 
-	var output = make([]*model.ViewerGallery, len(galleries))
+	output := make([]*model.ViewerGallery, len(galleries))
 	for i, gallery := range galleries {
 		output[i] = &model.ViewerGallery{
 			Gallery: gallery,
@@ -220,8 +232,18 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
-	//return []model.Nft{model.ImageNft{ID: "abcdef"}}, nil
-	panic(fmt.Errorf("not implemented"))
+	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]model.Nft, len(nfts))
+	for i, nft := range nfts {
+		output[i] = nftToNftModel(ctx, r.Resolver, nft)
+	}
+
+	return output, nil
 }
 
 // Gallery returns generated.GalleryResolver implementation.
@@ -230,11 +252,20 @@ func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
+// GenericNft returns generated.GenericNftResolver implementation.
+func (r *Resolver) GenericNft() generated.GenericNftResolver { return &genericNftResolver{r} }
+
+// ImageNft returns generated.ImageNftResolver implementation.
+func (r *Resolver) ImageNft() generated.ImageNftResolver { return &imageNftResolver{r} }
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+// VideoNft returns generated.VideoNftResolver implementation.
+func (r *Resolver) VideoNft() generated.VideoNftResolver { return &videoNftResolver{r} }
 
 // Viewer returns generated.ViewerResolver implementation.
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
@@ -244,7 +275,10 @@ func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r}
 
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
+type genericNftResolver struct{ *Resolver }
+type imageNftResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type videoNftResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }

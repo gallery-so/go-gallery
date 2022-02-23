@@ -177,6 +177,17 @@ func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsAddressOrGalleryUser()  {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
+type GenericNft struct {
+	ID                  string               `json:"id"`
+	Name                *string              `json:"name"`
+	TokenCollectionName *string              `json:"tokenCollectionName"`
+	Owner               AddressOrGalleryUser `json:"owner"`
+}
+
+func (GenericNft) IsNftInterface() {}
+func (GenericNft) IsNode()         {}
+func (GenericNft) IsNft()          {}
+
 type GnosisSafeAuth struct {
 	Address   string `json:"address"`
 	Nonce     string `json:"nonce"`
