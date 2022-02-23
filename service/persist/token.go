@@ -38,6 +38,8 @@ const (
 	MediaTypeBase64SVG MediaType = "base64svg"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
+	// MediaTypeHTML represents html
+	MediaTypeHTML MediaType = "html"
 	// MediaTypeBase64Text represents a base64 encoded plain text
 	MediaTypeBase64Text MediaType = "base64text"
 	// MediaTypeAudio represents audio
@@ -64,6 +66,8 @@ const (
 const (
 	// URITypeIPFS represents an IPFS URI
 	URITypeIPFS URIType = "ipfs"
+	// URITypeArweave represents an Arweave URI
+	URITypeArweave URIType = "arweave"
 	// URITypeHTTP represents an HTTP URI
 	URITypeHTTP URIType = "http"
 	// URITypeIPFSAPI represents an IPFS API URI
@@ -76,6 +80,8 @@ const (
 	URITypeBase64SVG URIType = "base64svg"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
+	// URITypeENS represents an ENS domain
+	URITypeENS URIType = "ens"
 	// URITypeUnknown represents an unknown URI type
 	URITypeUnknown URIType = "unknown"
 	// URITypeInvalid represents an invalid URI type
@@ -136,85 +142,84 @@ type HexString string
 
 // AddressAtBlock is an address connected to a block number
 type AddressAtBlock struct {
-	Address Address     `bson:"address" json:"address"`
-	Block   BlockNumber `bson:"block" json:"block"`
+	Address Address     `json:"address"`
+	Block   BlockNumber `json:"block"`
 }
 
 // Token represents an individual Token token
 type Token struct {
-	Version      NullInt32       `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	Version      NullInt32       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note,omitempty" json:"collectors_note"`
-	Media          Media      `bson:"media,omitempty" json:"media"`
+	CollectorsNote NullString `json:"collectors_note"`
+	Media          Media      `json:"media"`
 
-	TokenType TokenType `bson:"token_type,omitempty" json:"token_type"`
+	TokenType TokenType `json:"token_type"`
 
-	Chain Chain `bson:"chain,omitempty" json:"chain"`
+	Chain Chain `json:"chain"`
 
-	Name        NullString `bson:"name,omitempty" json:"name"`
-	Description NullString `bson:"description,omitempty" json:"description"`
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
 
-	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
-	TokenID          TokenID          `bson:"token_id" json:"token_id"`
-	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
-	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	OwnershipHistory []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
-	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
-	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
+	TokenURI         TokenURI         `json:"token_uri"`
+	TokenID          TokenID          `json:"token_id"`
+	Quantity         HexString        `json:"quantity"`
+	OwnerAddress     Address          `json:"owner_address"`
+	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
+	TokenMetadata    TokenMetadata    `json:"metadata"`
+	ContractAddress  Address          `json:"contract_address"`
 
-	ExternalURL NullString `bson:"external_url,omitempty" json:"external_url"`
+	ExternalURL NullString `json:"external_url"`
 
-	BlockNumber BlockNumber `bson:"block_number,omitempty" json:"block_number"`
+	BlockNumber BlockNumber `json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL NullString `bson:"thumbnail_url,omitempty" json:"thumbnail_url"`
-	PreviewURL   NullString `bson:"preview_url,omitempty" json:"preview_url"`
-	MediaURL     NullString `bson:"media_url,omitempty" json:"media_url"`
-	MediaType    MediaType  `bson:"media_type,omitempty" json:"media_type"`
+	ThumbnailURL NullString `json:"thumbnail_url,omitempty"`
+	MediaURL     NullString `json:"media_url,omitempty"`
+	MediaType    MediaType  `json:"media_type"`
 }
 
 // TokenInCollection represents a token within a collection
 type TokenInCollection struct {
-	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
+	ID           DBID         `json:"id" binding:"required"`
+	CreationTime CreationTime `json:"created_at"`
 
-	ContractAddress Address `bson:"contract_address"     json:"contract_address"`
+	ContractAddress Address `json:"contract_address"`
 
-	Chain Chain `bson:"chain" json:"chain"`
+	Chain Chain `json:"chain"`
 
-	Name        NullString `bson:"name" json:"name"`
-	Description NullString `bson:"description" json:"description"`
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
 
-	TokenType TokenType `bson:"token_type" json:"token_type"`
+	TokenType TokenType `json:"token_type"`
 
-	TokenURI     TokenURI `bson:"token_uri" json:"token_uri"`
-	TokenID      TokenID  `bson:"token_id" json:"token_id"`
-	OwnerAddress Address  `bson:"owner_address" json:"owner_address"`
+	TokenURI     TokenURI `json:"token_uri"`
+	TokenID      TokenID  `json:"token_id"`
+	OwnerAddress Address  `json:"owner_address"`
 
-	Media         Media         `bson:"media" json:"media"`
-	TokenMetadata TokenMetadata `bson:"metadata" json:"metadata"`
+	Media         Media         `json:"media"`
+	TokenMetadata TokenMetadata `json:"metadata"`
 }
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Media    Media         `bson:"media" json:"media"`
-	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
-	TokenURI TokenURI      `bson:"token_uri" json:"token_uri"`
+	Media    Media         `json:"media"`
+	Metadata TokenMetadata `json:"token_metadata"`
+	TokenURI TokenURI      `json:"token_uri"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
@@ -248,13 +253,17 @@ type ErrTokenNotFoundByID struct {
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
-	var slice []byte
-	if len(buf) > 512 {
-		slice = buf[:512]
-	} else {
-		slice = buf
+
+	contentType := http.DetectContentType(buf)
+	return MediaFromContentType(contentType)
+}
+
+// MediaFromContentType will attempt to convert a content type to a media type
+func MediaFromContentType(contentType string) MediaType {
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
 	}
-	contentType := http.DetectContentType(slice)
 	spl := strings.Split(contentType, "/")
 
 	switch spl[0] {
@@ -272,11 +281,15 @@ func SniffMediaType(buf []byte) MediaType {
 	case "audio":
 		return MediaTypeAudio
 	case "text":
-		return MediaTypeText
+		switch spl[1] {
+		case "html":
+			return MediaTypeHTML
+		default:
+			return MediaTypeText
+		}
 	default:
 		return MediaTypeUnknown
 	}
-
 }
 
 func (e ErrTokenNotFoundByID) Error() string {
@@ -308,11 +321,14 @@ func (uri TokenURI) URL() (*url.URL, error) {
 }
 
 func (uri TokenURI) String() string {
-	url, err := url.QueryUnescape(string(uri))
-	if err == nil && url != string(uri) {
-		return url
+	asString := string(uri)
+	if strings.HasPrefix(asString, "http") || strings.HasPrefix(asString, "ipfs") || strings.HasPrefix(asString, "ar") {
+		url, err := url.QueryUnescape(string(uri))
+		if err == nil && url != string(uri) {
+			return url
+		}
 	}
-	return string(uri)
+	return asString
 }
 
 // Value implements the driver.Valuer interface for token URIs
@@ -322,6 +338,11 @@ func (uri TokenURI) Value() (driver.Value, error) {
 		result = url.QueryEscape(result)
 	}
 	return strings.ToValidUTF8(result, ""), nil
+}
+
+// ReplaceID replaces the token's ID with the given ID
+func (uri TokenURI) ReplaceID(id TokenID) TokenURI {
+	return TokenURI(strings.TrimSpace(strings.ReplaceAll(uri.String(), "{id}", id.ToUint256String())))
 }
 
 // Scan implements the sql.Scanner interface for token URIs
@@ -341,20 +362,22 @@ func (uri TokenURI) Type() URIType {
 	switch {
 	case strings.HasPrefix(asString, "ipfs"), strings.HasPrefix(asString, "Qm"):
 		return URITypeIPFS
+	case strings.HasPrefix(asString, "ar://"), strings.HasPrefix(asString, "arweave://"):
+		return URITypeArweave
 	case strings.HasPrefix(asString, "data:application/json;base64,"):
 		return URITypeBase64JSON
-	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"):
+	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):
 		return URITypeBase64SVG
-	case strings.Contains(asString, "base64,"):
-		return URITypeBase64JSON
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
-	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json;utf8,"), strings.HasPrefix(asString, "data:text/plain,{"):
+	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
-	case strings.HasPrefix(asString, "<svg"):
+	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml"):
 		return URITypeSVG
+	case strings.HasSuffix(asString, ".ens"):
+		return URITypeENS
 	case asString == InvalidTokenURI.String():
 		return URITypeInvalid
 	case asString == "":
@@ -396,6 +419,11 @@ func (id TokenID) BigInt() *big.Int {
 	}
 
 	return i
+}
+
+// ToUint256String returns the uint256 hex string representation of the token id
+func (id TokenID) ToUint256String() string {
+	return fmt.Sprintf("%064s", id.String())
 }
 
 // Base10String returns the token ID as a base 10 string
@@ -462,6 +490,21 @@ func (a Address) Address() common.Address {
 // Value implements the database/sql/driver Valuer interface for the address type
 func (a Address) Value() (driver.Value, error) {
 	return a.String(), nil
+}
+
+// MarshallJSON implements the json.Marshaller interface for the address type
+func (a Address) MarshallJSON() ([]byte, error) {
+	return json.Marshal(a.String())
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for the address type
+func (a *Address) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*a = Address(normalizeAddress(strings.ToLower(s)))
+	return nil
 }
 
 // Scan implements the database/sql Scanner interface
@@ -551,6 +594,24 @@ func (m *MediaType) Scan(src interface{}) error {
 		return nil
 	}
 	*m = MediaType(src.(string))
+	return nil
+}
+
+func (t TokenType) String() string {
+	return string(t)
+}
+
+// Value implements the database/sql/driver Valuer interface for the TokenType type
+func (t TokenType) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenType type
+func (t *TokenType) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	*t = TokenType(src.(string))
 	return nil
 }
 

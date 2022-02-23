@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
@@ -31,8 +32,8 @@ import (
 )
 
 type TestAddressFile struct {
-	Wallet1     string `json:"wallet_1"`
-	PrivateKey1 string `json:"pk_1"`
+	Wallet1     string `json:"automated_test_wallet"`
+	PrivateKey1 string `json:"pk_automated_test_wallet"`
 }
 
 // N.B. This isn't the entire Docker Compose spec...
@@ -139,7 +140,7 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 
 	// Seed db
 	db = postgres.NewClient()
-	for _, f := range []string{"../scripts/initial_setup.sql", "../scripts/post_import.sql"} {
+	for _, f := range []string{"../docker/postgres/init.sql"} {
 		migration, err := os.ReadFile(f)
 		if err != nil {
 			panic(err)
@@ -350,4 +351,145 @@ func logoutUser(s suite.Suite, serverURL string, client *http.Client) *http.Resp
 	assertValidResponse(s.Assertions, resp)
 
 	return resp
+}
+
+func createNewNFTCollection(s suite.Suite, serverURL string, client *http.Client, jwt string, data []byte) *collectionCreateOutput {
+	req, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/collections/create", serverURL),
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err)
+
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	resp, err := client.Do(req)
+	s.NoError(err)
+
+	output := &collectionCreateOutput{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func createNewTokenCollection(s suite.Suite, serverURL string, client *http.Client, jwt string, data []byte) *collectionCreateOutputToken {
+	req, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/collections/create", serverURL),
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err)
+
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	resp, err := client.Do(req)
+	assertValidResponse(s.Assertions, resp)
+	s.NoError(err)
+
+	output := &collectionCreateOutputToken{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func addNFTsToNFTsRepo(s suite.Suite, nftRepo persist.NFTRepository, wallet *TestWallet) []persist.DBID {
+	nfts := []persist.NFT{
+		{OwnerAddress: wallet.address, Name: "NFT1", ID: "id1", OpenseaID: 1},
+		{OwnerAddress: wallet.address, Name: "NFT2", ID: "id2", OpenseaID: 2},
+		{OwnerAddress: wallet.address, Name: "NFT3", ID: "id3", OpenseaID: 3},
+	}
+	nftIDs, err := nftRepo.CreateBulk(context.Background(), nfts)
+	s.Nil(err)
+	return nftIDs
+}
+
+func addTokensToTokensRepo(s suite.Suite, tokenRepo persist.TokenRepository, wallet *TestWallet) []persist.DBID {
+	tokens := []persist.Token{
+		{
+			OwnerAddress:    wallet.address,
+			Name:            "NFT1",
+			ID:              "id1",
+			TokenID:         persist.TokenID(util.RandHexString(10)),
+			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+		},
+		{
+			OwnerAddress:    wallet.address,
+			Name:            "NFT2",
+			ID:              "id2",
+			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+		},
+		{
+			OwnerAddress:    wallet.address,
+			Name:            "NFT3",
+			ID:              "id3",
+			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+		},
+	}
+	tokenIDs, err := tokenRepo.CreateBulk(context.Background(), tokens)
+	s.Nil(err)
+	return tokenIDs
+}
+
+func updateCollection(s suite.Suite, serverURL string, client *http.Client, jwt string, data []byte) *http.Response {
+	req, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/collections/update/nfts", serverURL),
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err)
+
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	resp, err := client.Do(req)
+	assertValidResponse(s.Assertions, resp)
+	s.NoError(err)
+
+	return resp
+}
+
+func getNFTCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *http.Response {
+	resp, err := http.Get(fmt.Sprintf("%s/collections/get?id=%s", serverURL, collectionID))
+	s.NoError(err)
+
+	return resp
+}
+
+func fetchNFTCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *collectionGetByIDOutput {
+	resp := getNFTCollection(s, serverURL, collectionID)
+
+	output := &collectionGetByIDOutput{}
+	err := util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
+}
+
+func fetchTokenCollection(s suite.Suite, serverURL string, collectionID persist.DBID) *collectionGetByIDOutputToken {
+	resp, err := http.Get(fmt.Sprintf("%s/collections/get?id=%s", serverURL, collectionID))
+	s.NoError(err)
+
+	output := &collectionGetByIDOutputToken{}
+	err = util.UnmarshallBody(output, resp.Body)
+	assertValidResponse(s.Assertions, resp)
+	s.NoError(err)
+
+	return output
+}
+
+func removeCollection(s suite.Suite, serverURL string, client *http.Client, jwt string, data []byte) *util.SuccessResponse {
+	req, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/collections/delete", serverURL),
+		bytes.NewBuffer(data),
+	)
+	s.NoError(err)
+
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	resp, err := client.Do(req)
+	s.NoError(err)
+
+	output := &util.SuccessResponse{}
+	err = util.UnmarshallBody(output, resp.Body)
+	s.NoError(err)
+
+	return output
 }

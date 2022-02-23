@@ -9,85 +9,85 @@ import (
 
 // NFT represents an nft throughout the application
 type NFT struct {
-	Version         NullInt32       `bson:"version"              json:"version"` // schema version for this model
-	ID              DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime    CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted         NullBool        `bson:"deleted" json:"-"`
-	LastUpdatedTime LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version         NullInt32       `json:"version"` // schema version for this model
+	ID              DBID            `json:"id" binding:"required"`
+	CreationTime    CreationTime    `json:"created_at"`
+	Deleted         NullBool        `json:"-"`
+	LastUpdatedTime LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote NullString `json:"collectors_note"`
 
 	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddress Address `bson:"owner_address" json:"owner_address"`
+	OwnerAddress Address `json:"owner_address"`
 
-	MultipleOwners NullBool `bson:"multiple_owners" json:"multiple_owners"`
+	MultipleOwners NullBool `json:"multiple_owners"`
 
-	Name                NullString  `bson:"name"                 json:"name"`
-	Description         NullString  `bson:"description"          json:"description"`
-	ExternalURL         NullString  `bson:"external_url"         json:"external_url"`
-	TokenMetadataURL    NullString  `bson:"token_metadata_url" json:"token_metadata_url"`
-	CreatorAddress      Address     `bson:"creator_address"      json:"creator_address"`
-	CreatorName         NullString  `bson:"creator_name" json:"creator_name"`
-	Contract            NFTContract `bson:"contract"     json:"asset_contract"`
-	TokenCollectionName NullString  `bson:"token_collection_name" json:"token_collection_name"`
+	Name                NullString  `json:"name"`
+	Description         NullString  `json:"description"`
+	ExternalURL         NullString  `json:"external_url"`
+	TokenMetadataURL    NullString  `json:"token_metadata_url"`
+	CreatorAddress      Address     `json:"creator_address"`
+	CreatorName         NullString  `json:"creator_name"`
+	Contract            NFTContract `json:"asset_contract"`
+	TokenCollectionName NullString  `json:"token_collection_name"`
 
-	OpenseaID NullInt64 `bson:"opensea_id"       json:"opensea_id"`
+	OpenseaID NullInt64 `json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
 	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
 	// (/asset/:contract_address/:token_id)
-	OpenseaTokenID TokenID `bson:"opensea_token_id" json:"opensea_token_id"`
+	OpenseaTokenID TokenID `json:"opensea_token_id"`
 
 	// IMAGES - OPENSEA
-	ImageURL             NullString `bson:"image_url"           json:"image_url"`
-	ImageThumbnailURL    NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
-	ImagePreviewURL      NullString `bson:"image_preview_url"   json:"image_preview_url"`
-	ImageOriginalURL     NullString `bson:"image_original_url" json:"image_original_url"`
-	AnimationURL         NullString `bson:"animation_url" json:"animation_url"`
-	AnimationOriginalURL NullString `bson:"animation_original_url" json:"animation_original_url"`
+	ImageURL             NullString `json:"image_url"`
+	ImageThumbnailURL    NullString `json:"image_thumbnail_url"`
+	ImagePreviewURL      NullString `json:"image_preview_url"`
+	ImageOriginalURL     NullString `json:"image_original_url"`
+	AnimationURL         NullString `json:"animation_url"`
+	AnimationOriginalURL NullString `json:"animation_original_url"`
 
-	AcquisitionDateStr NullString `bson:"acquisition_date" json:"acquisition_date"`
+	AcquisitionDateStr NullString `json:"acquisition_date"`
 }
 
 // CollectionNFT represents and NFT in a collection of NFTs
 type CollectionNFT struct {
-	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
+	ID           DBID         `json:"id" binding:"required"`
+	CreationTime CreationTime `json:"created_at"`
 
-	OwnerAddress Address `bson:"owner_address" json:"owner_address"`
+	OwnerAddress Address `json:"owner_address"`
 
-	MultipleOwners NullBool `bson:"multiple_owners" json:"multiple_owners"`
+	MultipleOwners NullBool `json:"multiple_owners"`
 
-	Name NullString `bson:"name"                 json:"name"`
+	Name NullString `json:"name"`
 
-	Contract            ContractCollectionNFT `bson:"contract"     json:"asset_contract"`
-	TokenCollectionName NullString            `bson:"token_collection_name" json:"token_collection_name"`
-	CreatorAddress      Address               `bson:"creator_address"      json:"creator_address"`
-	CreatorName         NullString            `bson:"creator_name" json:"creator_name"`
+	Contract            ContractCollectionNFT `json:"asset_contract"`
+	TokenCollectionName NullString            `json:"token_collection_name"`
+	CreatorAddress      Address               `json:"creator_address"`
+	CreatorName         NullString            `json:"creator_name"`
 
 	// IMAGES - OPENSEA
-	ImageURL             NullString `bson:"image_url"           json:"image_url"`
-	ImageThumbnailURL    NullString `bson:"image_thumbnail_url" json:"image_thumbnail_url"`
-	ImagePreviewURL      NullString `bson:"image_preview_url"   json:"image_preview_url"`
-	AnimationOriginalURL NullString `bson:"animation_original_url" json:"animation_original_url"`
-	AnimationURL         NullString `bson:"animation_url" json:"animation_url"`
+	ImageURL             NullString `json:"image_url"`
+	ImageThumbnailURL    NullString `json:"image_thumbnail_url"`
+	ImagePreviewURL      NullString `json:"image_preview_url"`
+	AnimationOriginalURL NullString `json:"animation_original_url"`
+	AnimationURL         NullString `json:"animation_url"`
 }
 
 // NFTContract represents a smart contract's information for a given NFT
 type NFTContract struct {
-	ContractAddress      Address    `bson:"contract_address"     json:"address"`
-	ContractName         NullString `bson:"contract_name" json:"name"`
-	ContractImage        NullString `bson:"contract_image_url" json:"image_url"`
-	ContractDescription  NullString `bson:"contract_description" json:"description"`
-	ContractExternalLink NullString `bson:"contract_external_link" json:"external_link"`
-	ContractSchemaName   NullString `bson:"contract_schema_name" json:"schema_name"`
-	ContractSymbol       NullString `bson:"contract_symbol" json:"symbol"`
-	ContractTotalSupply  NullString `bson:"contract_total_supply" json:"total_supply"`
+	ContractAddress      Address    `json:"address"`
+	ContractName         NullString `json:"name"`
+	ContractImage        NullString `json:"image_url"`
+	ContractDescription  NullString `json:"description"`
+	ContractExternalLink NullString `json:"external_link"`
+	ContractSchemaName   NullString `json:"schema_name"`
+	ContractSymbol       NullString `json:"symbol"`
+	ContractTotalSupply  NullString `json:"total_supply"`
 }
 
 // ContractCollectionNFT represents a contract within a collection nft
 type ContractCollectionNFT struct {
-	ContractName  NullString `bson:"contract_name" json:"name"`
-	ContractImage NullString `bson:"contract_image_url" json:"image_url"`
+	ContractName  NullString `json:"name"`
+	ContractImage NullString `json:"image_url"`
 }
 
 // NFTUpdateInfoInput represents a MongoDB input to update the user defined info

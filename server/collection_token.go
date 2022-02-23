@@ -116,8 +116,6 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 		}
 
 		c.JSON(http.StatusOK, collectionGetByIDOutputToken{Collection: coll})
-		return
-
 	}
 }
 
@@ -224,7 +222,7 @@ func updateCollectionTokensToken(collectionsRepository persist.CollectionTokenRe
 		// ensure that there are no repeat NFTs
 		withNoRepeats := uniqueDBID(input.Nfts)
 
-		layout, err := persist.ValidateLayout(input.Layout)
+		layout, err := persist.ValidateLayout(input.Layout, input.Nfts)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -269,7 +267,7 @@ func deleteCollectionToken(collectionsRepository persist.CollectionTokenReposito
 // CREATE
 func collectionCreateDbToken(pCtx context.Context, pInput collectionCreateInputToken, pUserID persist.DBID, collectionsRepo persist.CollectionTokenRepository, galleryRepo persist.GalleryTokenRepository) (persist.DBID, error) {
 
-	layout, err := persist.ValidateLayout(pInput.Layout)
+	layout, err := persist.ValidateLayout(pInput.Layout, pInput.Nfts)
 	if err != nil {
 		return "", err
 	}

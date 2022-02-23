@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -18,7 +19,8 @@ type getNFTsInput struct {
 	UserID  persist.DBID    `form:"user_id"`
 }
 
-type refreshNFTsInput struct {
+// RefreshNFTsInput is the input for the refreshOpensea function
+type RefreshNFTsInput struct {
 	UserIDs   []persist.DBID    `json:"user_ids"`
 	Addresses []persist.Address `json:"addresses"`
 }
@@ -55,7 +57,7 @@ func getNFTs(nftRepo persist.NFTRepository) gin.HandlerFunc {
 
 func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input refreshNFTsInput
+		var input RefreshNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -64,30 +66,37 @@ func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserReposito
 			util.ErrResponse(c, http.StatusBadRequest, errGetNFTsInput)
 			return
 		}
-		logrus.Debugf("refreshOpensea input: %+v", input)
-		if input.UserIDs != nil && len(input.UserIDs) > 0 {
-			for _, userID := range input.UserIDs {
-				user, err := userRepo.GetByID(c, userID)
-				if err != nil {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-				err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo)
-				if err != nil {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-			}
-		}
-		if input.Addresses != nil && len(input.Addresses) > 0 {
-			for _, address := range input.Addresses {
-				if _, err := opensea.UpdateAssetsForWallet(c, []persist.Address{address}, nftRepo); err != nil {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-			}
+		err := RefreshOpensea(c, input, userRepo, nftRepo, collRepo)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+// RefreshOpensea refreshes the opensea data for the given user ids and addresses
+func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.UserRepository, nftRepo persist.NFTRepository, collRepo persist.CollectionRepository) error {
+	logrus.Debugf("refreshOpensea input: %+v", input)
+	if input.UserIDs != nil && len(input.UserIDs) > 0 {
+		for _, userID := range input.UserIDs {
+			user, err := userRepo.GetByID(c, userID)
+			if err != nil {
+				return err
+			}
+			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if input.Addresses != nil && len(input.Addresses) > 0 {
+		for _, address := range input.Addresses {
+			if _, err := opensea.UpdateAssetsForWallet(c, []persist.Address{address}, nftRepo); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

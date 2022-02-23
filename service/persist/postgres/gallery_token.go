@@ -47,14 +47,14 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	updateUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET LAST_UPDATED = $1, COLLECTIONS = $2 WHERE ID = $3;`)
 	checkNoErr(err)
 
-	addCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = COLLECTIONS || $1 WHERE ID = $2 AND OWNER_USER_ID = $3;`)
+	addCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $1 || COLLECTIONS WHERE ID = $2 AND OWNER_USER_ID = $3;`)
 	checkNoErr(err)
 
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED,
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
+	LEFT JOIN collections_v2 c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM tokens n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
 	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
 	checkNoErr(err)
@@ -63,7 +63,7 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
-	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
+	LEFT JOIN collections_v2 c ON c.ID = coll AND c.DELETED = false
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM tokens n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
 	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`)
 	checkNoErr(err)
@@ -74,19 +74,19 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.ID = $1 AND g.DELETED = false;`)
 	checkNoErr(err)
 
-	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
+	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections_v2 WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	countAllCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
+	countAllCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections_v2 WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	countCollsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false;`)
+	countCollsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections_v2 c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false;`)
 	checkNoErr(err)
 
-	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
+	getCollectionsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM collections_v2 WHERE OWNER_USER_ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT array_agg(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false GROUP BY coll_ord ORDER BY coll_ord;`)
+	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT array_agg(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections_v2 c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false GROUP BY coll_ord ORDER BY coll_ord;`)
 	checkNoErr(err)
 
 	return &GalleryTokenRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
@@ -182,7 +182,7 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 		if err != nil {
 			return err
 		}
-		galleryCollIDs = append(galleryCollIDs, pCollections...)
+		galleryCollIDs = append(pCollections, galleryCollIDs...)
 
 		allColls, err := addUnaccountedForCollectionsToken(pCtx, g, pUserID, galleryCollIDs)
 		if err != nil {
@@ -227,10 +227,11 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 	galleries := make(map[persist.DBID]persist.GalleryToken)
 	collections := make(map[persist.DBID][]persist.CollectionToken)
 	var gallery persist.GalleryToken
-	var collection persist.CollectionToken
+	var lastCollID persist.DBID
 	for rows.Next() {
+		var collection persist.CollectionToken
 		var nft persist.TokenInCollection
-		lastCollID := collection.ID
+
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
 			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
@@ -261,10 +262,10 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 			lastColl := colls[len(colls)-1]
 			lastColl.NFTs = append(lastColl.NFTs, nft)
 			colls[len(colls)-1] = lastColl
-
 		}
 
 		collections[gallery.ID] = colls
+		lastCollID = collection.ID
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -319,10 +320,10 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 	galleries := make(map[persist.DBID]persist.GalleryToken)
 	collections := make(map[persist.DBID][]persist.CollectionToken)
 	var gallery persist.GalleryToken
-	var collection persist.CollectionToken
-	var nft persist.TokenInCollection
+	var lastCollID persist.DBID
 	for rows.Next() {
-		lastCollID := collection.ID
+		var collection persist.CollectionToken
+		var nft persist.TokenInCollection
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
 			&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote,
@@ -358,6 +359,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		}
 
 		collections[gallery.ID] = colls
+		lastCollID = collection.ID
 	}
 	if err := rows.Err(); err != nil {
 		return persist.GalleryToken{}, err

@@ -46,66 +46,66 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO collections (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS, HIDDEN) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO collections_v2 (ID, VERSION, NAME, COLLECTORS_NOTE, OWNER_USER_ID, LAYOUT, NFTS, HIDDEN) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByUserIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-		FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+		FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 		JOIN tokens n ON n.ID = nft 
 		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
-	getByUserIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false;`)
+	getByUserIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+	FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 	JOIN tokens n ON n.ID = nft 
 	WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
-	getByUserIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
+	getByUserIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
 	checkNoErr(err)
 	getByIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
+	FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 	JOIN tokens n ON n.ID = nft
 	WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
-	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false;`)
+	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
+	FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
 	JOIN tokens n ON n.ID = nft
 	WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
-	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
+	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
 	checkNoErr(err)
 
-	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE collections SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
+	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
 	checkNoErr(err)
-	updateInfoUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
-	checkNoErr(err)
-
-	updateHiddenStmt, err := db.PrepareContext(ctx, `UPDATE collections SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
+	updateInfoUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET COLLECTORS_NOTE = $1, NAME = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
 	checkNoErr(err)
 
-	updateHiddenUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
+	updateHiddenStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
 	checkNoErr(err)
 
-	updateNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
+	updateHiddenUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
 	checkNoErr(err)
 
-	updateNFTsUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
+	updateNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
+	checkNoErr(err)
+
+	updateNFTsUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
 	checkNoErr(err)
 
 	nftsToRemoveStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`)
@@ -114,13 +114,13 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 	deleteNFTsStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE ID = ANY($1)`)
 	checkNoErr(err)
 
-	removeNFTFromCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`)
+	removeNFTFromCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
 	getNFTsForAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_ADDRESS = ANY($1);`)
 	checkNoErr(err)
 
-	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
+	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
 	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
@@ -128,7 +128,7 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 
 	getUnassignedNFTsStmt, err := db.PrepareContext(ctx, `SELECT n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 	FROM tokens n
-	JOIN collections c on n.ID <> ALL(c.NFTS)
+	JOIN collections_v2 c on n.ID <> ALL(c.NFTS)
 	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`)
 	checkNoErr(err)
 
@@ -264,6 +264,9 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		collection.NFTs = []persist.TokenInCollection{}
 		err := rawStmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
+			}
 			return persist.CollectionToken{}, err
 		}
 		if collection.ID != pID {

@@ -7,25 +7,23 @@ import (
 
 // User represents a user in the datase and throughout the application
 type User struct {
-	Version      NullInt32       `bson:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"           json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at" json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
-
-	Username           NullString `bson:"username,omitempty"         json:"username"` // mutable
-	UsernameIdempotent NullString `bson:"username_idempotent,omitempty" json:"username_idempotent"`
-	Addresses          []Address  `bson:"addresses"     json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
-	Bio                NullString `bson:"bio"  json:"bio"`
+	Version            NullInt32       `json:"version"` // schema version for this model
+	ID                 DBID            `json:"id" binding:"required"`
+	CreationTime       CreationTime    `json:"created_at"`
+	Deleted            NullBool        `json:"-"`
+	LastUpdated        LastUpdatedTime `json:"last_updated"`
+	Username           NullString      `json:"username"` // mutable
+	UsernameIdempotent NullString      `json:"username_idempotent"`
+	Addresses          []Address       `json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	Bio                NullString      `json:"bio"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
 type UserUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
-
-	Username           NullString `bson:"username"`
-	UsernameIdempotent NullString `bson:"username_idempotent"`
-	Bio                NullString `bson:"bio"`
+	LastUpdated        LastUpdatedTime `json:"last_updated"`
+	Username           NullString      `json:"username"`
+	UsernameIdempotent NullString      `json:"username_idempotent"`
+	Bio                NullString      `json:"bio"`
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users
