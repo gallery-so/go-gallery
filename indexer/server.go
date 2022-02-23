@@ -133,6 +133,10 @@ func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository pers
 		tokens = res
 	}
 
+	if len(tokens) == 0 {
+		return nil
+	}
+
 	logrus.Infof("Updating %d tokens", len(tokens))
 
 	updateByID := input.OwnerAddress != ""

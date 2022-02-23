@@ -27,7 +27,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 
 	setDefaults()
 
-	tokenRepo, contractRepo, userRepo := newRepos()
+	tokenRepo, contractRepo, userRepo, collRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -44,7 +44,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
 
 	router := gin.Default()
 
@@ -73,8 +73,8 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository) {
+func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
 	pgClient := postgres.NewClient()
 
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient)
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient)
 }

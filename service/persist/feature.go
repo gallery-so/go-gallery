@@ -62,10 +62,12 @@ func (t TokenIdentifiers) Valid() bool {
 }
 
 // GetParts returns the parts of the token identifiers
-func (t TokenIdentifiers) GetParts() (Address, TokenID) {
+func (t TokenIdentifiers) GetParts() (Address, TokenID, error) {
 	parts := strings.Split(t.String(), "+")
-
-	return Address(parts[0]), TokenID(parts[1])
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid token identifiers: %s", t)
+	}
+	return Address(Address(parts[0]).String()), TokenID(TokenID(parts[1]).String()), nil
 }
 
 // Value implements the driver.Valuer interface

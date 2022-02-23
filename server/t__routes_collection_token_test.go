@@ -128,7 +128,7 @@ func TestDeleteCollection_Success_Token(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// Assert that the collection was deleted
-	coll, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID, false)
+	coll, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID)
 	assert.NotNil(err)
 	assert.Empty(coll.ID)
 }
@@ -294,7 +294,7 @@ func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 }
 
 func verifyCollectionExistsInDbForIDToken(assert *assert.Assertions, collID persist.DBID) {
-	collectionsBeforeDelete, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID, false)
+	collectionsBeforeDelete, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID)
 	assert.Nil(err)
 	assert.Equal(collectionsBeforeDelete.ID, collID)
 }

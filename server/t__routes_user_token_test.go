@@ -327,7 +327,7 @@ func TestUserRemoveAddresses_Success_Token(t *testing.T) {
 	assert.Nil(err)
 	assert.Len(nfts, 1)
 
-	resultColl, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID, true)
+	resultColl, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID)
 	assert.Nil(err)
 	assert.Len(resultColl.NFTs, 2)
 
