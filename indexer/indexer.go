@@ -506,9 +506,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				key := persist.NewTokenIdentifiers(contractAddress, tokenID)
 				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-				_, _, bals, _, _ := findRequiredTokenFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners)
-
-				runTransferSideEffects(i, key, to, from, bals)
+				findRequiredTokenFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners)
 
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
