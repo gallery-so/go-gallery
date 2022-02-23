@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"io"
 	"strings"
@@ -86,6 +87,22 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 	return nil
 }
 
+var errDataTooLarge = errors.New("data too large")
+
+// CopyMax will copy until a certain point and error after that point
+func CopyMax(writer io.Writer, it io.Reader, max int64) error {
+	if _, err := io.CopyN(writer, it, max); err != nil {
+		if err != io.EOF {
+			return err
+		}
+		return nil
+	}
+	extra := make([]byte, 1)
+	if n, _ := io.ReadFull(it, extra); n > 0 {
+		return errDataTooLarge
+	}
+	return nil
+}
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {

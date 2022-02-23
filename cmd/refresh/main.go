@@ -17,6 +17,8 @@ import (
 func main() {
 	setDefaults()
 
+	logrus.SetLevel(logrus.DebugLevel)
+
 	refreshFile, err := os.Open("refresh.json")
 	if err != nil {
 		panic(err)

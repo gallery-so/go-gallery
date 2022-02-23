@@ -65,6 +65,8 @@ func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) er
 	obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
 	obj.Delete(c)
 	w := obj.NewWriter(c)
+	w.CacheControl = "no-store"
+	w.ContentType = "application/json"
 
 	err := json.NewEncoder(w).Encode(snapshot)
 	if err != nil {
@@ -74,5 +76,5 @@ func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) er
 		return err
 	}
 
-	return obj.ACL().Set(c, storage.AllUsers, storage.RoleReader)
+	return nil
 }

@@ -67,7 +67,7 @@ func trackFeatures(pCtx context.Context, userRepo persist.UserRepository, featur
 	for {
 		select {
 		case log := <-incomingLogs:
-			logrus.Infof("Got log at: %d", log.BlockNumber)
+			logrus.Debugf("Got log at: %d", log.BlockNumber)
 			go func() {
 				context, cancel := context.WithTimeout(pCtx, time.Minute*1)
 				defer cancel()
