@@ -142,39 +142,39 @@ type HexString string
 
 // AddressAtBlock is an address connected to a block number
 type AddressAtBlock struct {
-	Address Address     `bson:"address" json:"address"`
-	Block   BlockNumber `bson:"block" json:"block"`
+	Address Address     `json:"address"`
+	Block   BlockNumber `json:"block"`
 }
 
 // Token represents an individual Token token
 type Token struct {
-	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated,update_time" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note,omitempty" json:"collectors_note"`
-	Media          Media      `bson:"media,omitempty" json:"media"`
+	CollectorsNote NullString `json:"collectors_note"`
+	Media          Media      `json:"media"`
 
-	TokenType TokenType `bson:"token_type,omitempty" json:"token_type"`
+	TokenType TokenType `json:"token_type"`
 
-	Chain Chain `bson:"chain,omitempty" json:"chain"`
+	Chain Chain `json:"chain"`
 
-	Name        NullString `bson:"name,omitempty" json:"name"`
-	Description NullString `bson:"description,omitempty" json:"description"`
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
 
-	TokenURI         TokenURI         `bson:"token_uri,omitempty" json:"token_uri"`
-	TokenID          TokenID          `bson:"token_id" json:"token_id"`
-	Quantity         HexString        `bson:"quantity,omitempty" json:"quantity"`
-	OwnerAddress     Address          `bson:"owner_address,omitempty" json:"owner_address"`
-	OwnershipHistory []AddressAtBlock `bson:"ownership_history,omitempty" json:"previous_owners"`
-	TokenMetadata    TokenMetadata    `bson:"metadata,omitempty" json:"metadata"`
-	ContractAddress  Address          `bson:"contract_address" json:"contract_address"`
+	TokenURI         TokenURI         `json:"token_uri"`
+	TokenID          TokenID          `json:"token_id"`
+	Quantity         HexString        `json:"quantity"`
+	OwnerAddress     Address          `json:"owner_address"`
+	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
+	TokenMetadata    TokenMetadata    `json:"metadata"`
+	ContractAddress  Address          `json:"contract_address"`
 
-	ExternalURL NullString `bson:"external_url,omitempty" json:"external_url"`
+	ExternalURL NullString `json:"external_url"`
 
-	BlockNumber BlockNumber `bson:"block_number,omitempty" json:"block_number"`
+	BlockNumber BlockNumber `json:"block_number"`
 }
 
 // Media represents a token's media content with processed images from metadata
@@ -186,40 +186,40 @@ type Media struct {
 
 // TokenInCollection represents a token within a collection
 type TokenInCollection struct {
-	ID           DBID         `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime `bson:"created_at"        json:"created_at"`
+	ID           DBID         `json:"id" binding:"required"`
+	CreationTime CreationTime `json:"created_at"`
 
-	ContractAddress Address `bson:"contract_address"     json:"contract_address"`
+	ContractAddress Address `json:"contract_address"`
 
-	Chain Chain `bson:"chain" json:"chain"`
+	Chain Chain `json:"chain"`
 
-	Name        NullString `bson:"name" json:"name"`
-	Description NullString `bson:"description" json:"description"`
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
 
-	TokenType TokenType `bson:"token_type" json:"token_type"`
+	TokenType TokenType `json:"token_type"`
 
-	TokenURI     TokenURI `bson:"token_uri" json:"token_uri"`
-	TokenID      TokenID  `bson:"token_id" json:"token_id"`
-	OwnerAddress Address  `bson:"owner_address" json:"owner_address"`
+	TokenURI     TokenURI `json:"token_uri"`
+	TokenID      TokenID  `json:"token_id"`
+	OwnerAddress Address  `json:"owner_address"`
 
-	Media         Media         `bson:"media" json:"media"`
-	TokenMetadata TokenMetadata `bson:"metadata" json:"metadata"`
+	Media         Media         `json:"media"`
+	TokenMetadata TokenMetadata `json:"metadata"`
 }
 
 // TokenUpdateInfoInput represents a token update to update the token's user inputted info
 type TokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `bson:"collectors_note" json:"collectors_note"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 // TokenUpdateMediaInput represents an update to a tokens image properties
 type TokenUpdateMediaInput struct {
-	LastUpdated LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Media    Media         `bson:"media" json:"media"`
-	Metadata TokenMetadata `bson:"token_metadata" json:"token_metadata"`
-	TokenURI TokenURI      `bson:"token_uri" json:"token_uri"`
+	Media    Media         `json:"media"`
+	Metadata TokenMetadata `json:"token_metadata"`
+	TokenURI TokenURI      `json:"token_uri"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens

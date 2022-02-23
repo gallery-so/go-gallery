@@ -7,17 +7,17 @@ import (
 
 // Access represents a feature flag in the database
 type Access struct {
-	Version      int64           `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      bool            `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      int64           `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      bool            `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	UserID DBID `json:"user_id" bson:"user_id"`
+	UserID DBID `json:"user_id"`
 
-	RequiredTokensOwned map[TokenIdentifiers]uint64 `json:"required_tokens_owned" bson:"required_tokens_owned"`
-	IsAdmin             bool                        `json:"is_admin" bson:"is_admin"`
-	MostRecentBlock     BlockNumber                 `json:"most_recent_block" bson:"most_recent_block"`
+	RequiredTokensOwned map[TokenIdentifiers]uint64 `json:"required_tokens_owned"`
+	IsAdmin             bool                        `json:"is_admin"`
+	MostRecentBlock     BlockNumber                 `json:"most_recent_block"`
 }
 
 // ErrAccessNotFoundByUserID is an error type for when an access is not found by user id

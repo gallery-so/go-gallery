@@ -9,19 +9,19 @@ import (
 
 // FeatureFlag represents a feature flag in the database
 type FeatureFlag struct {
-	Version      NullInt64       `bson:"version"              json:"version"` // schema version for this model
-	ID           DBID            `bson:"_id"                  json:"id" binding:"required"`
-	CreationTime CreationTime    `bson:"created_at"        json:"created_at"`
-	Deleted      NullBool        `bson:"deleted" json:"-"`
-	LastUpdated  LastUpdatedTime `bson:"last_updated" json:"last_updated"`
+	Version      NullInt64       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	RequiredToken       TokenIdentifiers `json:"required_token" bson:"required_token"`
-	RequiredAmount      NullInt64        `json:"required_amount" bson:"required_amount"`
-	TokenType           TokenType        `json:"token_type" bson:"token_type"`
-	Name                NullString       `json:"name" bson:"name"`
-	IsEnabled           NullBool         `json:"is_enabled" bson:"is_enabled"`
-	AdminOnly           NullBool         `json:"admin_only" bson:"admin_only"`
-	ForceEnabledUserIDs []DBID           `json:"force_enabled_users" bson:"force_enabled_users"`
+	RequiredToken       TokenIdentifiers `json:"required_token"`
+	RequiredAmount      NullInt64        `json:"required_amount"`
+	TokenType           TokenType        `json:"token_type"`
+	Name                NullString       `json:"name"`
+	IsEnabled           NullBool         `json:"is_enabled"`
+	AdminOnly           NullBool         `json:"admin_only"`
+	ForceEnabledUserIDs []DBID           `json:"force_enabled_users"`
 }
 
 // TokenIdentifiers represents a unique identifier for a token
