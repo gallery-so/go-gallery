@@ -457,7 +457,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 		copy(it, transfers)
 		wp.Submit(func() {
 			submit := it
-			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances)
+			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, nil, false, false)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -486,7 +486,7 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 		copy(it, transfers)
 		wp.Submit(func() {
 			submit := it
-			processNewTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, medias)
+			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, medias, true, true)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -494,7 +494,7 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 	logrus.Info("Closing field channels...")
 }
 
-func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
 
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
@@ -509,7 +509,11 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				key := persist.NewTokenIdentifiers(contractAddress, tokenID)
 				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-				findRequiredTokenFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners)
+				if !key.Valid() {
+					panic(fmt.Sprintf("Invalid key %s", key))
+				}
+
+				findFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields, sideEffects)
 
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
@@ -519,67 +523,51 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 }
 
-func processNewTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia) {
-
-	for _, transferAtBlock := range transfers {
-		for _, transfer := range transferAtBlock.transfers {
-			initial := time.Now()
-			func() {
-
-				contractAddress := persist.Address(transfer.ContractAddress.String())
-				from := transfer.From
-				to := transfer.To
-				tokenID := transfer.TokenID
-
-				key := persist.NewTokenIdentifiers(contractAddress, tokenID)
-				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
-
-				_, _, bals, tokenURI, metadata := findRequiredTokenFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners)
-
-				findOptionalFields(i, key, to, from, tokenURI, metadata, medias)
-
-				runTransferSideEffects(i, contractAddress, tokenID, to, from, bals)
-
-				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
-			}()
-		}
-
-	}
-
-}
-
-func findRequiredTokenFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers, to persist.Address, from persist.Address, contractAddress persist.Address, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock) (ownerAtBlock, ownerAtBlock, tokenBalances, persist.TokenURI, persist.TokenMetadata) {
+func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers, to persist.Address, from persist.Address, contractAddress persist.Address, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
 	wg := &sync.WaitGroup{}
-	var curOwner, prevOwner ownerAtBlock
-	var bals tokenBalances
+	wg.Add(2)
+	if sideEffects {
+		wg.Add(1)
+	}
+	if optionalFields {
+		wg.Add(1)
+	}
 	switch persist.TokenType(transfer.TokenType) {
 	case persist.TokenTypeERC721:
 
-		wg.Add(4)
+		wg.Add(2)
 
-		curOwner := ownerAtBlock{key, to, transfer.BlockNumber}
 		go func() {
+			curOwner := ownerAtBlock{key, to, transfer.BlockNumber}
 			defer wg.Done()
 			owners <- curOwner
 		}()
 
-		prevOwner := ownerAtBlock{key, from, transfer.BlockNumber}
 		go func() {
+			prevOwner := ownerAtBlock{key, from, transfer.BlockNumber}
 			defer wg.Done()
 			previousOwners <- prevOwner
 		}()
 
 	case persist.TokenTypeERC1155:
-		wg.Add(3)
+		wg.Add(1)
 
-		b, err := getBalances(contractAddress, from, tokenID, key, transfer.BlockNumber, to, i.ethClient)
-		if err != nil {
-			logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
-			storeErr(err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
-		}
-		bals = b
 		go func() {
 			defer wg.Done()
+
+			bals, err := getBalances(contractAddress, from, tokenID, key, transfer.BlockNumber, to, i.ethClient)
+			if err != nil {
+				logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
+				storeErr(err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
+			}
+
+			if sideEffects {
+				go func() {
+					defer wg.Done()
+					runTransferSideEffects(i, contractAddress, tokenID, to, from, bals)
+				}()
+			}
+
 			balances <- bals
 		}()
 
@@ -587,49 +575,54 @@ func findRequiredTokenFields(i *Indexer, transfer rpc.Transfer, key persist.Toke
 		panic("unknown token type")
 	}
 
-	uriReplaced := getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
-
-	metadata, uriReplaced := getMetadata(contractAddress, uriReplaced, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
 	go func() {
-		defer wg.Done()
-		uris <- tokenURI{key, uriReplaced}
-	}()
-	if len(metadata) > 0 {
+		uriReplaced := getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
+
+		metadata, uriReplaced := getMetadata(contractAddress, uriReplaced, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
 		go func() {
 			defer wg.Done()
-			metadatas <- tokenMetadata{key, metadata}
+			uris <- tokenURI{key, uriReplaced}
 		}()
-	} else {
-		wg.Done()
-	}
+		go func() {
+			defer wg.Done()
+			if len(metadata) > 0 {
+				metadatas <- tokenMetadata{key, metadata}
+			}
+		}()
+		if optionalFields {
+			go func() {
+				defer wg.Done()
+				findOptionalFields(i, key, to, from, uriReplaced, metadata, medias)
+			}()
+		}
+	}()
+
 	wg.Wait()
-	return curOwner, prevOwner, bals, uriReplaced, metadata
 }
 
-func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persist.Address, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) tokenMedia {
+func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persist.Address, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	_, err := i.userRepo.GetByAddress(ctx, to)
 	if err != nil {
 		logrus.WithError(err).Errorf("error getting user for %s", to)
-		return tokenMedia{}
+		return
 	}
 
 	contractAddress, tokenID, err := key.GetParts()
 	if err != nil {
 		logrus.WithError(err).Errorf("error getting parts of %s", key)
-		return tokenMedia{}
+		return
 	}
 
 	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, i.ipfsClient, i.arweaveClient, i.storageClient)
 	if err != nil {
 		logrus.WithError(err).Errorf("error making previews for %s", key)
-		return tokenMedia{}
+		return
 	}
 
 	res := tokenMedia{ti: key, media: med}
 	medias <- res
-	return res
 }
 
 func runTransferSideEffects(i *Indexer, contractAddress persist.Address, tokenID persist.TokenID, to, from persist.Address, bals tokenBalances) {
@@ -688,6 +681,7 @@ func updateCollections(ctx context.Context, contractAddress persist.Address, tok
 func getBalances(contractAddress persist.Address, from persist.Address, tokenID persist.TokenID, key persist.TokenIdentifiers, blockNumber persist.BlockNumber, to persist.Address, ethClient *ethclient.Client) (tokenBalances, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
+
 	ierc1155, err := contracts.NewIERC1155Caller(contractAddress.Address(), ethClient)
 	if err != nil {
 		logrus.WithError(err).Errorf("error creating IERC1155 contract caller for %s", contractAddress)
@@ -883,7 +877,9 @@ func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balan
 			balanceMap[balance.from] = fromBal
 		}
 
-		balances[balance.ti] = balanceMap
+		if len(balanceMap) > 0 {
+			balances[balance.ti] = balanceMap
+		}
 
 	}
 }
@@ -900,13 +896,13 @@ func (i *Indexer) fieldMapsToTokens(owners map[persist.TokenIdentifiers]ownerAtB
 	for _, v := range balances {
 		totalBalances += len(v)
 	}
-	result := make([]persist.Token, len(owners)+totalBalances)
-	j := 0
+	result := make([]persist.Token, 0, len(owners)+totalBalances)
 
 	for k, v := range owners {
 		contractAddress, tokenID, err := k.GetParts()
 		if err != nil {
-			panic(err)
+			logrus.WithError(err).Errorf("error getting parts from %s: - %s | val: %+v", k, err, v)
+			continue
 		}
 		previousOwnerAddresses := make([]persist.AddressAtBlock, len(previousOwners[k]))
 		for i, w := range previousOwners[k] {
@@ -946,14 +942,14 @@ func (i *Indexer) fieldMapsToTokens(owners map[persist.TokenIdentifiers]ownerAtB
 			Media:            media.media,
 		}
 
-		result[j] = t
-		j++
+		result = append(result, t)
 		delete(owners, k)
 	}
 	for k, v := range balances {
 		contractAddress, tokenID, err := k.GetParts()
 		if err != nil {
-			panic(err)
+			logrus.WithError(err).Errorf("error getting parts from %s: - %s | val: %+v", k, err, v)
+			continue
 		}
 
 		metadata := metadatas[k]
@@ -989,8 +985,7 @@ func (i *Indexer) fieldMapsToTokens(owners map[persist.TokenIdentifiers]ownerAtB
 				BlockNumber:     balance.block,
 				Media:           media.media,
 			}
-			result[j] = t
-			j++
+			result = append(result, t)
 			delete(balances, k)
 		}
 	}

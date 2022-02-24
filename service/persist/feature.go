@@ -50,10 +50,7 @@ func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdenti
 }
 
 func (t TokenIdentifiers) String() string {
-	if t.Valid() {
-		return string(t)
-	}
-	return ""
+	return string(t)
 }
 
 // Valid returns true if the token identifiers are valid
