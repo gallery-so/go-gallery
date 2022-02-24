@@ -278,7 +278,9 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 			return
 		}
 
-		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewWriter(ctx)
+		obj := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String()))
+		obj.Delete(ctx)
+		storageWriter := obj.NewWriter(ctx)
 		defer storageWriter.Close()
 
 		if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
