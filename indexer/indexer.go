@@ -628,15 +628,23 @@ func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persi
 func runTransferSideEffects(i *Indexer, contractAddress persist.Address, tokenID persist.TokenID, to, from persist.Address, bals tokenBalances) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	user, err := i.userRepo.GetByAddress(ctx, from)
-	if err != nil {
-		return
-	}
 	if bals.fromAmt != nil {
 		if bals.fromAmt.Cmp(bigZero) != 0 {
 			return
 		}
 	}
+
+	user, err := i.userRepo.GetByAddress(ctx, from)
+	if err != nil {
+		return
+	}
+
+	for _, addr := range user.Addresses {
+		if addr.String() == to.String() {
+			return
+		}
+	}
+
 	err = updateCollections(ctx, contractAddress, tokenID, user.ID, i.collRepo)
 	if err != nil {
 		logrus.WithError(err).Errorf("error updating collections for %s: %s", persist.NewTokenIdentifiers(contractAddress, tokenID), err)
