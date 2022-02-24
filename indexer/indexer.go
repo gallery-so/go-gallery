@@ -157,7 +157,7 @@ func (i *Indexer) Start() {
 	cancel()
 
 	remainder := lastSyncedBlock % blocksPerLogsCall
-	lastSyncedBlock -= (remainder + (blocksPerLogsCall * 500))
+	lastSyncedBlock -= (remainder + (blocksPerLogsCall * 50))
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
