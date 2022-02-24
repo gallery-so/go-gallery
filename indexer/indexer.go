@@ -158,6 +158,7 @@ func (i *Indexer) Start() {
 
 	remainder := lastSyncedBlock % blocksPerLogsCall
 	lastSyncedBlock -= (remainder + (blocksPerLogsCall * 50))
+	i.lastSyncedBlock = uint64(lastSyncedBlock)
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
@@ -200,6 +201,9 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	go i.processLogs(transfers, start, topics)
 	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
 	i.processTokens(uris, metadatas, owners, previousOwners, balances)
+	if i.lastSyncedBlock < start.Uint64() {
+		i.lastSyncedBlock = start.Uint64()
+	}
 }
 func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	i.isListening = true
@@ -251,8 +255,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 			panic(err)
 		}
 	} else {
-
-		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -278,8 +281,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewWriter(ctx)
 		defer storageWriter.Close()
 
-		err := json.NewEncoder(storageWriter).Encode(logsTo)
-		if err != nil {
+		if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
 			panic(err)
 		}
 	}
