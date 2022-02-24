@@ -128,7 +128,7 @@ func TestDeleteCollection_Success_Token(t *testing.T) {
 	assertValidResponse(assert, resp)
 
 	// Assert that the collection was deleted
-	coll, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID, false)
+	coll, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID)
 	assert.NotNil(err)
 	assert.Empty(coll.ID)
 }
@@ -171,37 +171,6 @@ func TestGetHiddenCollections_Success_Token(t *testing.T) {
 	assert.Nil(err)
 
 	resp := sendCollUserGetRequestToken(assert, string(tc.user1.id), tc.user1)
-
-	type CollectionsResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
-	}
-
-	body := CollectionsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Empty(body.Error)
-}
-
-func TestGetNoHiddenCollections_Success_Token(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	nftIDs := seedTokens(assert)
-	_, err := tc.repos.CollectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[0:1],
-		Hidden:      false,
-	})
-	_, err = tc.repos.CollectionTokenRepository.Create(context.Background(), persist.CollectionTokenDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[1:],
-		Hidden:      true,
-	})
-	assert.Nil(err)
-
-	resp := sendCollUserGetRequestToken(assert, string(tc.user1.id), tc.user2)
 
 	type CollectionsResponse struct {
 		Collections []*persist.Collection `json:"collections"`
@@ -294,7 +263,7 @@ func TestUpdateCollectionNfts_Success_Token(t *testing.T) {
 }
 
 func verifyCollectionExistsInDbForIDToken(assert *assert.Assertions, collID persist.DBID) {
-	collectionsBeforeDelete, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID, false)
+	collectionsBeforeDelete, err := tc.repos.CollectionTokenRepository.GetByID(context.Background(), collID)
 	assert.Nil(err)
 	assert.Equal(collectionsBeforeDelete.ID, collID)
 }

@@ -81,9 +81,7 @@ func getCollectionsByUserIDToken(collectionsRepository persist.CollectionTokenRe
 			return
 		}
 
-		userID := auth.GetUserIDFromCtx(c)
-		auth := userID == input.UserID
-		colls, err := collectionsRepository.GetByUserID(c, input.UserID, auth)
+		colls, err := collectionsRepository.GetByUserID(c, input.UserID)
 		if len(colls) == 0 || err != nil {
 			colls = []persist.CollectionToken{}
 		}
@@ -104,8 +102,7 @@ func getCollectionByIDToken(collectionsRepository persist.CollectionTokenReposit
 			return
 		}
 
-		auth := c.GetBool(auth.AuthContextKey)
-		coll, err := collectionsRepository.GetByID(c, input.ID, auth)
+		coll, err := collectionsRepository.GetByID(c, input.ID)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrCollectionNotFoundByID); ok {

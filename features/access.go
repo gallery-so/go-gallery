@@ -85,7 +85,11 @@ func upsertAccessState(pCtx context.Context, userID persist.DBID, userRepo persi
 	for _, feature := range allFeatures {
 		switch feature.TokenType {
 		case persist.TokenTypeERC1155:
-			address, tokenID := feature.RequiredToken.GetParts()
+			address, tokenID, err := feature.RequiredToken.GetParts()
+			if err != nil {
+				logrus.WithError(err).Error("failed to get parts from required token")
+				return err
+			}
 			ca, err := contracts.NewIERC1155Caller(address.Address(), ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("failed to initialize ERC1155 caller")
@@ -102,7 +106,11 @@ func upsertAccessState(pCtx context.Context, userID persist.DBID, userRepo persi
 			}
 			tis[feature.RequiredToken] = totalBal.Uint64()
 		case persist.TokenTypeERC721:
-			address, tokenID := feature.RequiredToken.GetParts()
+			address, tokenID, err := feature.RequiredToken.GetParts()
+			if err != nil {
+				logrus.WithError(err).Error("failed to get parts from required token")
+				return err
+			}
 			ca, err := contracts.NewIERC721Caller(address.Address(), ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("failed to initialize ERC1155 caller")
@@ -120,7 +128,11 @@ func upsertAccessState(pCtx context.Context, userID persist.DBID, userRepo persi
 			}
 			tis[feature.RequiredToken] = uint64(isOwner)
 		case persist.TokenTypeERC20:
-			address, _ := feature.RequiredToken.GetParts()
+			address, _, err := feature.RequiredToken.GetParts()
+			if err != nil {
+				logrus.WithError(err).Error("failed to get parts from required token")
+				return err
+			}
 			ca, err := contracts.NewIERC20Caller(address.Address(), ethClient)
 			if err != nil {
 				logrus.WithError(err).Error("failed to initialize ERC1155 caller")
