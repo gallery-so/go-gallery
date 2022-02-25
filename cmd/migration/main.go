@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -21,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	ens "github.com/wealdtech/go-ens"
 )
 
 var bigZero = big.NewInt(0)
@@ -93,6 +95,16 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 		for u, addrs := range userIDs {
 			userID := u
 			addresses := addrs
+			for i, addr := range addresses {
+				if strings.ContainsAny(addr.String(), ".eth") {
+					resolved, err := ens.Resolve(ethClient, addr.String())
+					if err != nil {
+						logrus.Errorf("Error resolving ens address %s: %s", addr.String(), err)
+						continue
+					}
+					addresses[i] = persist.Address(strings.ToLower(resolved.Hex()))
+				}
+			}
 			wp.Submit(func() {
 				c, cancel := context.WithTimeout(ctx, time.Minute*30)
 				defer cancel()
@@ -120,11 +132,15 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 					for _, nftID := range nftIDs {
 						fullNFT, err := nftRepo.GetByID(c, nftID)
 						if err != nil {
-							if _, ok := err.(persist.ErrNFTNotFoundByID); !ok {
-								panic(err)
-							} else {
-								logrus.Infof("NFT %s not found for collection %s", nftID, coll)
+							panic(err)
+						}
+						if strings.ContainsAny(fullNFT.OwnerAddress.String(), ".eth") {
+							addr, err := ens.Resolve(ethClient, fullNFT.OwnerAddress.String())
+							if err != nil {
+								logrus.Errorf("Error resolving ens address %s: %s", fullNFT.OwnerAddress.String(), err)
+								continue
 							}
+							fullNFT.OwnerAddress = persist.Address(strings.ToLower(addr.Hex()))
 						}
 
 						if fullNFT.Contract.ContractAddress == "" {
