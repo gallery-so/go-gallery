@@ -35,7 +35,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				c.Set(auth.UserIDContextKey, persist.DBID(authHeaders[1]))
+				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
 				c.Next()
 				return
 			}
@@ -43,7 +43,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrNoJWT.Error()})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrNoCookie.Error()})
 				return
 			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
@@ -52,14 +52,9 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 
 		// use an env variable as jwt secret as upposed to using a stateful secret stored in
 		// database that is unique to every user and session
-		valid, userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-
-		if !valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
 			return
 		}
 
@@ -85,8 +80,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 			}
 		}
 
-		c.Set(auth.UserIDContextKey, userID)
-
+		auth.SetAuthStateForCtx(c, userID, nil)
 		c.Next()
 	}
 }
@@ -99,7 +93,7 @@ func AuthOptional() gin.HandlerFunc {
 		authHeaders := strings.Split(header, " ")
 		if len(authHeaders) == 2 {
 			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				c.Set(auth.UserIDContextKey, persist.DBID(authHeaders[1]))
+				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
 				c.Next()
 				return
 			}
@@ -107,17 +101,46 @@ func AuthOptional() gin.HandlerFunc {
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				c.Set(auth.AuthContextKey, false)
-				c.Set(auth.UserIDContextKey, persist.DBID(""))
+				auth.SetAuthStateForCtx(c, "", err)
 				c.Next()
 				return
 			}
 			c.AbortWithError(http.StatusUnauthorized, err)
 			return
 		}
-		valid, userID, _ := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
-		c.Set(auth.AuthContextKey, valid)
-		c.Set(auth.UserIDContextKey, userID)
+		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		auth.SetAuthStateForCtx(c, userID, err)
+		c.Next()
+	}
+}
+
+// AddAuthToContext is a middleware that validates auth data and stores the results in the context
+func AddAuthToContext() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		authHeaders := strings.Split(header, " ")
+		if len(authHeaders) == 2 {
+			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
+				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
+				c.Next()
+				return
+			}
+		}
+
+		jwt, err := c.Cookie(auth.JWTCookieKey)
+
+		if err != nil {
+			if err == http.ErrNoCookie {
+				err = auth.ErrNoCookie
+			}
+
+			auth.SetAuthStateForCtx(c, "", err)
+			c.Next()
+			return
+		}
+
+		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		auth.SetAuthStateForCtx(c, userID, err)
 		c.Next()
 	}
 }

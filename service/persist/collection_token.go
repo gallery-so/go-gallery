@@ -19,7 +19,7 @@ const (
 // between collections and NFTS
 // This struct will only be used when updating or querying the database
 type CollectionTokenDB struct {
-	Version      NullInt64       `json:"version"` // schema version for this model
+	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
 	Deleted      NullBool        `json:"-"`
@@ -41,7 +41,7 @@ type CollectionTokenDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type CollectionToken struct {
-	Version      NullInt64       `json:"version"` // schema version for this model
+	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
 	Deleted      NullBool        `json:"-"`
@@ -60,7 +60,7 @@ type CollectionToken struct {
 
 // TokenLayout defines the layout of a collection of tokens
 type TokenLayout struct {
-	Columns    NullInt64 `json:"columns"`
+	Columns    NullInt32 `json:"columns"`
 	Whitespace []int     `json:"whitespace"`
 	// Padding         int   `bson:"padding" json:"padding"`
 }

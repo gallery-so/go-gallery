@@ -93,20 +93,6 @@ type MergeUsersInput struct {
 	WalletType   auth.WalletType `json:"wallet_type"`
 }
 
-type errUserNotFound struct {
-	userID   persist.DBID
-	address  persist.Address
-	username string
-}
-
-type ErrUserExistsWithAddress struct {
-	Address persist.Address
-}
-
-type errCouldNotEnsureMediaForAddress struct {
-	address persist.Address
-}
-
 // CreateUserToken creates a JWT token for the user
 func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (CreateUserOutput, error) {
 
@@ -117,7 +103,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserExistsWithAddress{Address: pInput.Address}
+		return CreateUserOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -204,19 +190,16 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (*model.CreateUserResult, error) {
+	galleryRepo persist.GalleryRepository) (*model.CreateUserPayload, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, err
+		return nil, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	// TODO: ErrUserExistsWithAddress accepts an address parameter, but we don't have one to supply here
-	// Might be worthwhile for an authenticator interface to have a method for some sort of credential/ID/info-dump string
-	// that we can use in situations like this
 	if authResult.UserID != "" {
-		return nil, ErrUserExistsWithAddress{}
+		return nil, ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -269,7 +252,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.CreateUserResult{
+	output := model.CreateUserPayload{
 		UserID:    util.StringToPointer(userID.String()),
 		GalleryID: util.StringToPointer(galleryID.String()),
 	}
@@ -328,10 +311,10 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 
 	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
 	if nonce == "" {
-		return AddUserAddressOutput{}, auth.ErrNonceNotFound{pInput.Address}
+		return AddUserAddressOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if userID != "" {
-		return AddUserAddressOutput{}, ErrUserExistsWithAddress{pInput.Address}
+		return AddUserAddressOutput{}, ErrAddressOwnedByUser{Address: pInput.Address, OwnerID: userID}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -440,7 +423,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, auth.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
@@ -633,10 +616,28 @@ func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress 
 	return nil
 }
 
-func (e ErrUserExistsWithAddress) Error() string {
-	return fmt.Sprintf("user already exists with address: %s", e.Address)
+type ErrUserAlreadyExists struct {
+	Address       persist.Address
+	Authenticator string
+}
+
+func (e ErrUserAlreadyExists) Error() string {
+	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
+}
+
+type ErrAddressOwnedByUser struct {
+	Address persist.Address
+	OwnerID persist.DBID
+}
+
+func (e ErrAddressOwnedByUser) Error() string {
+	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.Address, e.OwnerID)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {
 	return fmt.Sprintf("could not ensure media for address: %s", e.address)
+}
+
+type errCouldNotEnsureMediaForAddress struct {
+	address persist.Address
 }

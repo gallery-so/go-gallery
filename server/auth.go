@@ -29,7 +29,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 			return
 		}
 
-		authed := c.GetBool(auth.AuthContextKey)
+		authed := auth.GetUserAuthedFromCtx(c)
 
 		output, err := auth.GetAuthNonceREST(c, input, authed, userRepository, authNonceRepository, ethClient)
 		if err != nil {

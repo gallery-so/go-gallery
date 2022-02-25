@@ -8,7 +8,7 @@ import (
 
 // MembershipTier represents the membership tier of a user
 type MembershipTier struct {
-	Version      NullInt64         `json:"version"` // schema version for this model
+	Version      NullInt32         `json:"version"` // schema version for this model
 	ID           DBID              `json:"id" binding:"required"`
 	CreationTime CreationTime      `json:"created_at"`
 	Deleted      NullBool          `json:"-"`

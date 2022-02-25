@@ -11,7 +11,7 @@ import (
 // a join relationship in the database
 // This struct will only be used in database operations
 type GalleryDB struct {
-	Version      NullInt64       `json:"version"` // schema version for this model
+	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
 	Deleted      NullBool        `json:"-"`
@@ -26,7 +26,7 @@ type GalleryDB struct {
 // This struct will be decoded from a find database operation and used throughout
 // the application where GalleryDB is not used
 type Gallery struct {
-	Version      NullInt64       `json:"version"` // schema version for this model
+	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
 	Deleted      NullBool        `json:"-"`

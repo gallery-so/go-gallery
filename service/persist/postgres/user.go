@@ -105,7 +105,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 			return err
 		}
 		if rows == 0 {
-			return persist.ErrUserNotFoundByID{ID: pID}
+			return persist.ErrUserNotFound{UserID: pID}
 		}
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -157,7 +157,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFoundByID{ID: pID}
+			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
 		}
 		return persist.User{}, err
 	}
@@ -171,7 +171,7 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 	err := u.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFoundByAddress{Address: pAddress}
+			return persist.User{}, persist.ErrUserNotFound{Address: pAddress}
 		}
 		return persist.User{}, err
 	}
@@ -187,7 +187,7 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFoundByUsername{Username: pUsername}
+			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}
 		}
 		return persist.User{}, err
 	}
@@ -207,7 +207,7 @@ func (u *UserRepository) Delete(pCtx context.Context, pID persist.DBID) error {
 		return err
 	}
 	if rows == 0 {
-		return persist.ErrUserNotFoundByID{ID: pID}
+		return persist.ErrUserNotFound{UserID: pID}
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func (u *UserRepository) AddAddresses(pCtx context.Context, pID persist.DBID, pA
 		return err
 	}
 	if rows == 0 {
-		return persist.ErrUserNotFoundByID{ID: pID}
+		return persist.ErrUserNotFound{UserID: pID}
 	}
 	return nil
 }
@@ -242,7 +242,7 @@ func (u *UserRepository) RemoveAddresses(pCtx context.Context, pID persist.DBID,
 			return err
 		}
 		if rows == 0 {
-			return persist.ErrUserNotFoundByAddress{Address: address}
+			return persist.ErrUserNotFound{Address: address}
 		}
 	}
 
