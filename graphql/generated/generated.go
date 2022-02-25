@@ -1118,7 +1118,7 @@ type Viewer {
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
-union ViewerOrError = Viewer | ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredNFT
+union ViewerOrError = Viewer | ErrNotAuthorized
 
 type Query {
   viewer: ViewerOrError @authRequired
@@ -6204,27 +6204,13 @@ func (ec *executionContext) _ViewerOrError(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._Viewer(ctx, sel, obj)
-	case model.ErrNoCookie:
-		return ec._ErrNoCookie(ctx, sel, &obj)
-	case *model.ErrNoCookie:
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrNoCookie(ctx, sel, obj)
-	case model.ErrInvalidToken:
-		return ec._ErrInvalidToken(ctx, sel, &obj)
-	case *model.ErrInvalidToken:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrInvalidToken(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -6391,7 +6377,7 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
-var errDoesNotOwnRequiredNFTImplementors = []string{"ErrDoesNotOwnRequiredNFT", "ViewerOrError", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
+var errDoesNotOwnRequiredNFTImplementors = []string{"ErrDoesNotOwnRequiredNFT", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredNft) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errDoesNotOwnRequiredNFTImplementors)
@@ -6422,7 +6408,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel a
 	return out
 }
 
-var errInvalidTokenImplementors = []string{"ErrInvalidToken", "ViewerOrError", "AuthorizationError", "Error"}
+var errInvalidTokenImplementors = []string{"ErrInvalidToken", "AuthorizationError", "Error"}
 
 func (ec *executionContext) _ErrInvalidToken(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidToken) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidTokenImplementors)
@@ -6453,7 +6439,7 @@ func (ec *executionContext) _ErrInvalidToken(ctx context.Context, sel ast.Select
 	return out
 }
 
-var errNoCookieImplementors = []string{"ErrNoCookie", "ViewerOrError", "AuthorizationError", "Error"}
+var errNoCookieImplementors = []string{"ErrNoCookie", "AuthorizationError", "Error"}
 
 func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNoCookie) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNoCookieImplementors)
@@ -6484,7 +6470,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)

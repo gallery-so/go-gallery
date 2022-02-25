@@ -93,7 +93,6 @@ type ErrDoesNotOwnRequiredNft struct {
 	Message string `json:"message"`
 }
 
-func (ErrDoesNotOwnRequiredNft) IsViewerOrError()              {}
 func (ErrDoesNotOwnRequiredNft) IsGetAuthNoncePayloadOrError() {}
 func (ErrDoesNotOwnRequiredNft) IsAuthorizationError()         {}
 func (ErrDoesNotOwnRequiredNft) IsError()                      {}
@@ -104,7 +103,6 @@ type ErrInvalidToken struct {
 	Message string `json:"message"`
 }
 
-func (ErrInvalidToken) IsViewerOrError()      {}
 func (ErrInvalidToken) IsAuthorizationError() {}
 func (ErrInvalidToken) IsError()              {}
 
@@ -112,7 +110,6 @@ type ErrNoCookie struct {
 	Message string `json:"message"`
 }
 
-func (ErrNoCookie) IsViewerOrError()      {}
 func (ErrNoCookie) IsAuthorizationError() {}
 func (ErrNoCookie) IsError()              {}
 
@@ -121,7 +118,8 @@ type ErrNotAuthorized struct {
 	Cause   AuthorizationError `json:"cause"`
 }
 
-func (ErrNotAuthorized) IsError() {}
+func (ErrNotAuthorized) IsViewerOrError() {}
+func (ErrNotAuthorized) IsError()         {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`

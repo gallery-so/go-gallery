@@ -2,7 +2,9 @@
 # resolved unless the caller asks for them
 directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
-# Add @authRequired to any field that requires a user to be logged in.
+# Add @authRequired to any field that requires a user to be logged in. NOTE: Any field tagged with
+# @authRequired MUST return a union type that includes ErrNotAuthorized.
+#
 # If we need more control over auth in the future, this directive can be updated to take
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
@@ -121,7 +123,7 @@ type Viewer {
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
 
-union ViewerOrError = Viewer | ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredNFT
+union ViewerOrError = Viewer | ErrNotAuthorized
 
 type Query {
   viewer: ViewerOrError @authRequired
