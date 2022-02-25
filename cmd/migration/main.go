@@ -22,7 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	ens "github.com/wealdtech/go-ens"
+	ens "github.com/wealdtech/go-ens/v3"
 )
 
 var bigZero = big.NewInt(0)

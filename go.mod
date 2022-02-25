@@ -12,7 +12,6 @@ require (
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/asottile/dockerfile v3.1.0+incompatible
-	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/containerd/continuity v0.2.2 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -22,7 +21,6 @@ require (
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-playground/validator/v10 v10.10.0
 	github.com/go-redis/redis/v8 v8.11.4
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/jackc/pgx/v4 v4.14.1
@@ -39,10 +37,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/vektah/gqlparser/v2 v2.2.0
-	github.com/wealdtech/go-ens v1.0.0
-	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a // indirect
+	github.com/wealdtech/go-ens/v3 v3.5.2
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
 	google.golang.org/api v0.67.0
 	google.golang.org/appengine v1.6.7
