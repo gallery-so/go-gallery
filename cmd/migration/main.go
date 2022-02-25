@@ -132,71 +132,99 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 							assets, err := opensea.FetchAssets(c, fullNFT.OwnerAddress, "", opensea.TokenID(fullNFT.OpenseaTokenID.String()), 0, 0, nil)
 							if err != nil {
 								logrus.Errorf("Error fetching contract address for NFT %s: %d assets found - err %s", nftID, len(assets), err)
-								continue
-							}
-							matchingAsset, err := findMatchingAsset(assets, fullNFT)
-							if err != nil {
-								logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-								err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+							} else {
+								matchingAsset, err := findMatchingAsset(assets, fullNFT)
 								if err != nil {
-									logrus.Errorf("Error updating assets for user %s: %s", userID, err)
-									continue
+									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
+									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+									if err != nil {
+										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
+									} else {
+										fullNFT, err = nftRepo.GetByID(c, nftID)
+										if err != nil {
+											logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
+										} else {
+											if fullNFT.Contract.ContractAddress == "" {
+												logrus.Errorf("NFT %s still has no contract address", nftID)
+
+											}
+										}
+									}
 								}
-								fullNFT, err = nftRepo.GetByID(c, nftID)
-								if err != nil {
-									logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
-									continue
-								}
-								if fullNFT.Contract.ContractAddress == "" {
-									logrus.Errorf("NFT %s still has no contract address", nftID)
-									continue
-								}
+								logrus.Infof("Found contract address %s for NFT %s", matchingAsset.Contract.ContractAddress, nftID)
+								fullNFT.Contract = matchingAsset.Contract
 							}
-							logrus.Infof("Found contract address %s for NFT %s", matchingAsset.Contract.ContractAddress, nftID)
-							fullNFT.Contract = matchingAsset.Contract
 						}
 
 						if fullNFT.OpenseaTokenID == "" {
 							assets, err := opensea.FetchAssets(c, fullNFT.OwnerAddress, fullNFT.Contract.ContractAddress, "", 0, 0, nil)
 							if err != nil {
 								logrus.Errorf("Error fetching token ID for NFT %s: %d assets found - err %s", nftID, len(assets), err)
-								continue
-							}
-							matchingAsset, err := findMatchingAsset(assets, fullNFT)
-							if err != nil {
-								logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-								err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+							} else {
+								matchingAsset, err := findMatchingAsset(assets, fullNFT)
 								if err != nil {
-									logrus.Errorf("Error updating assets for user %s: %s", userID, err)
-									continue
+									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
+									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+									if err != nil {
+										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
+									} else {
+										fullNFT, err = nftRepo.GetByID(c, nftID)
+										if err != nil {
+											logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
+										} else {
+											if fullNFT.OpenseaTokenID == "" {
+												logrus.Errorf("NFT %s still has no token ID", nftID)
+											}
+										}
+									}
 								}
-								fullNFT, err = nftRepo.GetByID(c, nftID)
-								if err != nil {
-									logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
-									continue
-								}
-								if fullNFT.OpenseaTokenID == "" {
-									logrus.Errorf("NFT %s still has no token ID", nftID)
-									continue
-								}
+								logrus.Infof("Found token ID %s for NFT %s", matchingAsset.TokenID.ToBase16(), nftID)
+								fullNFT.OpenseaTokenID = persist.TokenID(matchingAsset.TokenID.ToBase16())
 							}
-							logrus.Infof("Found token ID %s for NFT %s", matchingAsset.TokenID.ToBase16(), nftID)
-							fullNFT.OpenseaTokenID = persist.TokenID(matchingAsset.TokenID.ToBase16())
 						}
 
-						tokenEquivelents, err := tokenRepo.GetByTokenIdentifiers(c, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
+						var tokenEquivelents []persist.Token
+						if fullNFT.OpenseaTokenID == "" && fullNFT.Contract.ContractAddress != "" {
+							logrus.Warnf("NFT %s has no token ID and has a contract address", nftID)
+							tokenEquivelents, err = tokenRepo.GetByContract(c, fullNFT.Contract.ContractAddress, -1, -1)
+							if err == nil {
+								tokenEquivelents = findMatchingToken(tokenEquivelents, fullNFT)
+							}
+						} else if fullNFT.OpenseaTokenID != "" && fullNFT.Contract.ContractAddress == "" {
+							tokenEquivelents, err = tokenRepo.GetByTokenID(c, fullNFT.OpenseaTokenID, -1, -1)
+							if err == nil {
+								tokenEquivelents = findMatchingToken(tokenEquivelents, fullNFT)
+							}
+						} else if fullNFT.OpenseaTokenID != "" && fullNFT.Contract.ContractAddress != "" {
+							tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
+						} else {
+							logrus.Errorf("NFT %s has no token ID and no contract address", nftID)
+							continue
+						}
 						if err != nil {
-							if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
-								logrus.Infof("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
-								tokenEquivelents, err = nftToTokens(c, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
-								if err != nil {
-									logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
-									continue
-								}
-							} else {
-								logrus.Errorf("Error getting tokens by identifiers for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
+							logrus.Warnf("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+							tokenEquivelents, err = nftToTokens(c, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
+							if err != nil {
+								logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
+								continue
+							}
+							if len(tokenEquivelents) == 0 {
+								logrus.Errorf("No token equivalent found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
+								continue
+							}
+							logrus.Warnf("Upserting token equivalent for %s-%s in collection %s: %+v", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, tokenEquivelents)
+							err = tokenRepo.BulkUpsert(c, tokenEquivelents)
+							if err != nil {
+								logrus.Errorf("Error upserting token equivalents for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
+								continue
+							}
+							tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
+							if err != nil {
+								logrus.Errorf("Error fetching token equivalents for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
+								continue
 							}
 						}
+
 						for _, token := range tokenEquivelents {
 							if containsAddress(token.OwnerAddress, addresses) {
 								logrus.Infof("token %s-%s is owned by %s", token.ContractAddress, token.TokenID, token.OwnerAddress)
@@ -278,28 +306,18 @@ func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Addre
 		OwnerAddress:    nft.OwnerAddress,
 		ContractAddress: nft.Contract.ContractAddress,
 		BlockNumber:     persist.BlockNumber(block),
-		OwnershipHistory: []persist.AddressAtBlock{
-			{
-				Address: persist.ZeroAddress,
-				Block:   persist.BlockNumber(block - 1),
-			},
-		},
-		ExternalURL: nft.ExternalURL,
-		Description: nft.Description,
-		Name:        nft.Name,
-		Quantity:    "1",
+		ExternalURL:     nft.ExternalURL,
+		Description:     nft.Description,
+		Name:            nft.Name,
+		Quantity:        "1",
 	}
 	switch nft.Contract.ContractSchemaName {
-	case "ERC721", "CRYPTOPUNKS":
-		t.TokenType = persist.TokenTypeERC721
-		allTokens = append(allTokens, t)
 	case "ERC1155":
 		t.TokenType = persist.TokenTypeERC1155
 		ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethClient)
 		if err != nil {
 			return nil, fmt.Errorf("error getting ERC1155 contract: %s", err)
 		}
-
 		for _, addr := range addresses {
 			new := t
 			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, addr.Address(), t.TokenID.BigInt())
@@ -314,8 +332,16 @@ func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Addre
 			}
 		}
 	default:
-		return nil, fmt.Errorf("unsupported token type: %s", nft.Contract.ContractSchemaName)
+		t.TokenType = persist.TokenTypeERC721
+		t.OwnershipHistory = []persist.AddressAtBlock{
+			{
+				Address: persist.ZeroAddress,
+				Block:   persist.BlockNumber(block - 1),
+			},
+		}
+		allTokens = append(allTokens, t)
 	}
+
 	return allTokens, nil
 }
 
@@ -345,4 +371,27 @@ func findMatchingAsset(assets []opensea.Asset, pNFT persist.NFT) (opensea.Asset,
 		}
 	}
 	return opensea.Asset{}, errNoMatchingAsset
+}
+func findMatchingToken(tokens []persist.Token, pNFT persist.NFT) []persist.Token {
+	result := make([]persist.Token, 0, 10)
+	logrus.Infof("finding matching asset for %s-%s using %d assets", pNFT.Contract.ContractAddress, pNFT.OpenseaTokenID, len(tokens))
+	for _, t := range tokens {
+		switch {
+		case t.TokenID.String() == pNFT.OpenseaTokenID.String() && t.ContractAddress.String() == pNFT.Contract.ContractAddress.String():
+			result = append(result, t)
+		case t.Name.String() == pNFT.Name.String():
+			result = append(result, t)
+		case t.TokenURI.String() == pNFT.TokenMetadataURL.String():
+			result = append(result, t)
+		case t.Media.MediaURL == pNFT.ImageURL, t.Media.MediaURL == pNFT.ImagePreviewURL, t.Media.MediaURL == pNFT.ImageOriginalURL, t.Media.MediaURL == pNFT.ImageThumbnailURL, t.Media.ThumbnailURL == pNFT.ImageThumbnailURL, t.Media.MediaURL == pNFT.ImageURL:
+			result = append(result, t)
+		case t.Media.MediaURL == pNFT.AnimationURL, t.Media.MediaURL == pNFT.AnimationOriginalURL:
+			result = append(result, t)
+		case t.ExternalURL == pNFT.ExternalURL:
+			result = append(result, t)
+		case t.Description.String() == pNFT.Description.String():
+			result = append(result, t)
+		}
+	}
+	return result
 }

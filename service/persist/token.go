@@ -230,6 +230,7 @@ type TokenRepository interface {
 	GetByUserID(context.Context, DBID, int64, int64) ([]Token, error)
 	GetByContract(context.Context, Address, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]Token, error)
+	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
