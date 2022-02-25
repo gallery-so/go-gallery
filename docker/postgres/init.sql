@@ -120,6 +120,8 @@ CREATE INDEX owner_address_idx ON tokens (OWNER_ADDRESS);
 
 CREATE INDEX contract_address_idx ON tokens (CONTRACT_ADDRESS);
 
+CREATE INDEX token_ids_idx ON tokens (TOKEN_ID);
+
 CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
 
 CREATE TABLE contracts (

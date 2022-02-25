@@ -240,6 +240,10 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 		return nil, err
 	}
 
+	if len(tokens) == 0 {
+		return nil, persist.ErrTokensNotFoundByContract{ContractAddress: pContractAddress}
+	}
+
 	return tokens, nil
 }
 
@@ -302,6 +306,10 @@ func (t *TokenRepository) GetByTokenID(pCtx context.Context, pTokenID persist.To
 
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	if len(tokens) == 0 {
+		return nil, persist.ErrTokensNotFoundByTokenID{TokenID: pTokenID}
 	}
 
 	return tokens, nil

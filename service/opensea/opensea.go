@@ -275,7 +275,8 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 	result := []Asset{}
 
 	if pOffset > 20000 {
-		return result, fmt.Errorf("failed to fetch assets for wallet %s: too many results", pWalletAddress)
+		logrus.Errorf("failed to fetch more assets for wallet %s, contract %s, token %s: too many results", pWalletAddress, pContractAddress, pTokenID)
+		return result, nil
 	}
 
 	dir := "desc"
@@ -306,13 +307,13 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)
 	}
 	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {

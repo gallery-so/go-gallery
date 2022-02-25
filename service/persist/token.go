@@ -252,6 +252,14 @@ type ErrTokenNotFoundByID struct {
 	ID DBID
 }
 
+type ErrTokensNotFoundByTokenID struct {
+	TokenID TokenID
+}
+
+type ErrTokensNotFoundByContract struct {
+	ContractAddress Address
+}
+
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
 
@@ -295,6 +303,14 @@ func MediaFromContentType(contentType string) MediaType {
 
 func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
+}
+
+func (e ErrTokensNotFoundByTokenID) Error() string {
+	return fmt.Sprintf("tokens not found by token ID: %s", e.TokenID)
+}
+
+func (e ErrTokensNotFoundByContract) Error() string {
+	return fmt.Sprintf("tokens not found by contract: %s", e.ContractAddress)
 }
 
 func (e ErrTokenNotFoundByIdentifiers) Error() string {
