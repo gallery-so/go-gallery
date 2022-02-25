@@ -2,14 +2,8 @@
 
 package model
 
-import (
-	"fmt"
-	"io"
-	"strconv"
-)
-
-type AddressOrGalleryUser interface {
-	IsAddressOrGalleryUser()
+type AuthorizationError interface {
+	IsAuthorizationError()
 }
 
 type CreateUserPayloadOrError interface {
@@ -18,6 +12,10 @@ type CreateUserPayloadOrError interface {
 
 type Error interface {
 	IsError()
+}
+
+type GalleryUserOrWallet interface {
+	IsGalleryUserOrWallet()
 }
 
 type GetAuthNoncePayloadOrError interface {
@@ -83,30 +81,47 @@ type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
 
-type ErrAddressDoesNotOwnRequiredNft struct {
+type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrAddressDoesNotOwnRequiredNft) IsGetAuthNoncePayloadOrError() {}
-func (ErrAddressDoesNotOwnRequiredNft) IsError()                      {}
-func (ErrAddressDoesNotOwnRequiredNft) IsLoginPayloadOrError()        {}
-func (ErrAddressDoesNotOwnRequiredNft) IsCreateUserPayloadOrError()   {}
+func (ErrAuthenticationFailed) IsError()                    {}
+func (ErrAuthenticationFailed) IsLoginPayloadOrError()      {}
+func (ErrAuthenticationFailed) IsCreateUserPayloadOrError() {}
+
+type ErrDoesNotOwnRequiredNft struct {
+	Message string `json:"message"`
+}
+
+func (ErrDoesNotOwnRequiredNft) IsViewerOrError()              {}
+func (ErrDoesNotOwnRequiredNft) IsGetAuthNoncePayloadOrError() {}
+func (ErrDoesNotOwnRequiredNft) IsAuthorizationError()         {}
+func (ErrDoesNotOwnRequiredNft) IsError()                      {}
+func (ErrDoesNotOwnRequiredNft) IsLoginPayloadOrError()        {}
+func (ErrDoesNotOwnRequiredNft) IsCreateUserPayloadOrError()   {}
+
+type ErrInvalidToken struct {
+	Message string `json:"message"`
+}
+
+func (ErrInvalidToken) IsViewerOrError()      {}
+func (ErrInvalidToken) IsAuthorizationError() {}
+func (ErrInvalidToken) IsError()              {}
+
+type ErrNoCookie struct {
+	Message string `json:"message"`
+}
+
+func (ErrNoCookie) IsViewerOrError()      {}
+func (ErrNoCookie) IsAuthorizationError() {}
+func (ErrNoCookie) IsError()              {}
 
 type ErrNotAuthorized struct {
-	Message   string          `json:"message"`
-	ErrorType AuthFailureType `json:"errorType"`
+	Message string             `json:"message"`
+	Cause   AuthorizationError `json:"cause"`
 }
 
-func (ErrNotAuthorized) IsViewerOrError() {}
-func (ErrNotAuthorized) IsError()         {}
-
-type ErrSignatureVerificationFailed struct {
-	Message string `json:"message"`
-}
-
-func (ErrSignatureVerificationFailed) IsError()                    {}
-func (ErrSignatureVerificationFailed) IsLoginPayloadOrError()      {}
-func (ErrSignatureVerificationFailed) IsCreateUserPayloadOrError() {}
+func (ErrNotAuthorized) IsError() {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -174,14 +189,14 @@ type GalleryUser struct {
 }
 
 func (GalleryUser) IsNode()                  {}
-func (GalleryUser) IsAddressOrGalleryUser()  {}
+func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
 type GenericNft struct {
-	ID                  string               `json:"id"`
-	Name                *string              `json:"name"`
-	TokenCollectionName *string              `json:"tokenCollectionName"`
-	Owner               AddressOrGalleryUser `json:"owner"`
+	ID                  string              `json:"id"`
+	Name                *string             `json:"name"`
+	TokenCollectionName *string             `json:"tokenCollectionName"`
+	Owner               GalleryUserOrWallet `json:"owner"`
 }
 
 func (GenericNft) IsNftInterface() {}
@@ -195,11 +210,11 @@ type GnosisSafeAuth struct {
 }
 
 type ImageNft struct {
-	ID                  string               `json:"id"`
-	Name                *string              `json:"name"`
-	TokenCollectionName *string              `json:"tokenCollectionName"`
-	Owner               AddressOrGalleryUser `json:"owner"`
-	ImageURL            *string              `json:"imageUrl"`
+	ID                  string              `json:"id"`
+	Name                *string             `json:"name"`
+	TokenCollectionName *string             `json:"tokenCollectionName"`
+	Owner               GalleryUserOrWallet `json:"owner"`
+	ImageURL            *string             `json:"imageUrl"`
 }
 
 func (ImageNft) IsNftInterface() {}
@@ -276,10 +291,10 @@ type UpdateUserInfoPayload struct {
 }
 
 type VideoNft struct {
-	ID                  string               `json:"id"`
-	Name                *string              `json:"name"`
-	TokenCollectionName *string              `json:"tokenCollectionName"`
-	Owner               AddressOrGalleryUser `json:"owner"`
+	ID                  string              `json:"id"`
+	Name                *string             `json:"name"`
+	TokenCollectionName *string             `json:"tokenCollectionName"`
+	Owner               GalleryUserOrWallet `json:"owner"`
 }
 
 func (VideoNft) IsNftInterface() {}
@@ -288,7 +303,6 @@ func (VideoNft) IsNft()          {}
 
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
-	Wallets         []*Wallet        `json:"wallets"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 }
 
@@ -304,50 +318,5 @@ type Wallet struct {
 	Nfts    []Nft   `json:"nfts"`
 }
 
-func (Wallet) IsNode()                 {}
-func (Wallet) IsAddressOrGalleryUser() {}
-
-type AuthFailureType string
-
-const (
-	AuthFailureTypeNoCookie              AuthFailureType = "NoCookie"
-	AuthFailureTypeInvalidToken          AuthFailureType = "InvalidToken"
-	AuthFailureTypeDoesNotOwnRequiredNft AuthFailureType = "DoesNotOwnRequiredNFT"
-	AuthFailureTypeInternalError         AuthFailureType = "InternalError"
-)
-
-var AllAuthFailureType = []AuthFailureType{
-	AuthFailureTypeNoCookie,
-	AuthFailureTypeInvalidToken,
-	AuthFailureTypeDoesNotOwnRequiredNft,
-	AuthFailureTypeInternalError,
-}
-
-func (e AuthFailureType) IsValid() bool {
-	switch e {
-	case AuthFailureTypeNoCookie, AuthFailureTypeInvalidToken, AuthFailureTypeDoesNotOwnRequiredNft, AuthFailureTypeInternalError:
-		return true
-	}
-	return false
-}
-
-func (e AuthFailureType) String() string {
-	return string(e)
-}
-
-func (e *AuthFailureType) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = AuthFailureType(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid AuthFailureType", str)
-	}
-	return nil
-}
-
-func (e AuthFailureType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
+func (Wallet) IsNode()                {}
+func (Wallet) IsGalleryUserOrWallet() {}

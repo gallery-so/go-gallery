@@ -24,11 +24,11 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 	var mappedErr model.Error = nil
 
 	switch err.(type) {
-	case auth.ErrSignatureVerificationFailed:
-		mappedErr = model.ErrSignatureVerificationFailed{Message: message}
-	case auth.ErrAddressDoesNotOwnRequiredNFT:
-		mappedErr = model.ErrAddressDoesNotOwnRequiredNft{Message: message}
-	case auth.ErrUserNotFound:
+	case auth.ErrAuthenticationFailed:
+		mappedErr = model.ErrAuthenticationFailed{Message: message}
+	case auth.ErrDoesNotOwnRequiredNFT:
+		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
+	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case user.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
@@ -140,7 +140,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 			Gallery:        galleryIDToGalleryModel(galleryID),
 			Layout:         layoutToLayoutModel(ctx, r, collection.Layout),
 			Hidden:         &hidden,
-			Nfts:           nil, // TODO: Delegate to a resolver
+			Nfts:           nil, // handled by dedicated resolver
 		}
 	}
 
@@ -202,17 +202,17 @@ func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persi
 	return wallets
 }
 
-func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId string) (model.AddressOrGalleryUser, error) {
+func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId string) (model.GalleryUserOrWallet, error) {
 	nft, err := dataloader.For(ctx).NftByNftId.Load(nftId)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveWalletOrGalleryUserByAddress(ctx, r, nft.OwnerAddress.String())
+	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress.String())
 }
 
-func resolveWalletOrGalleryUserByAddress(ctx context.Context, r *Resolver, address string) (model.AddressOrGalleryUser, error) {
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address string) (model.GalleryUserOrWallet, error) {
 	owner, err := dataloader.For(ctx).UserByAddress.Load(address)
 
 	if err == nil {
@@ -220,7 +220,7 @@ func resolveWalletOrGalleryUserByAddress(ctx context.Context, r *Resolver, addre
 	}
 
 	// TODO: Change this error type once I change persist error types
-	if _, ok := err.(persist.ErrUserNotFoundByAddress); ok {
+	if _, ok := err.(persist.ErrUserNotFound); ok {
 		wallet := model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
 			Address: util.StringToPointer(address),

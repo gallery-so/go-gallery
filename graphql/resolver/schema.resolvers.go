@@ -30,15 +30,51 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.ID)
 }
 
+func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
+	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(obj.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	nfts := collection.NFTs
+
+	output := make([]*model.GalleryNft, len(nfts))
+	for i, nft := range nfts {
+
+		// TODO: For resolvers, I don't think we want to use existing SQL queries that recursively fill out an entire
+		// Gallery -> Collection -> NFT hierarchy for us. Rather, I think we want to do DB calls as necessary based on
+		// what the client asks for. But for now, I'm using the existing SQL stuff to create these GalleryNft objects.
+		// Also worth noting: we should get rid of persist.CollectionNFT, which is a struct with a subset of NFT fields
+		// that reads from the same NFT database but just grabs less data. With GraphQL, clients will select the data
+		// they want.
+
+		genericNft := model.GenericNft{
+			ID:                  nft.ID.String(),
+			Name:                util.StringToPointer(nft.Name.String()),
+			TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
+			Owner:               nil, // handled by dedicated resolver
+		}
+
+		output[i] = &model.GalleryNft{
+			ID:         nft.ID.String(),
+			Nft:        genericNft,
+			Collection: obj,
+		}
+	}
+
+	return output, nil
+}
+
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
 	return resolveGalleriesByUserID(ctx, r.Resolver, obj.ID)
 }
 
-func (r *genericNftResolver) Owner(ctx context.Context, obj *model.GenericNft) (model.AddressOrGalleryUser, error) {
+func (r *genericNftResolver) Owner(ctx context.Context, obj *model.GenericNft) (model.GalleryUserOrWallet, error) {
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
-func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (model.AddressOrGalleryUser, error) {
+func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (model.GalleryUserOrWallet, error) {
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
@@ -175,7 +211,6 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 
 	viewer := &model.Viewer{
 		User:            user,
-		Wallets:         user.Wallets,
 		ViewerGalleries: nil, // handled by dedicated resolver
 	}
 
@@ -210,7 +245,7 @@ func (r *queryResolver) MembershipTiers(ctx context.Context) ([]*model.Membershi
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (model.AddressOrGalleryUser, error) {
+func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (model.GalleryUserOrWallet, error) {
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
@@ -249,6 +284,11 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.N
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
 
+// GalleryCollection returns generated.GalleryCollectionResolver implementation.
+func (r *Resolver) GalleryCollection() generated.GalleryCollectionResolver {
+	return &galleryCollectionResolver{r}
+}
+
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
@@ -274,6 +314,7 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
 type galleryResolver struct{ *Resolver }
+type galleryCollectionResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type genericNftResolver struct{ *Resolver }
 type imageNftResolver struct{ *Resolver }

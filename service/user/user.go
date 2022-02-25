@@ -93,21 +93,6 @@ type MergeUsersInput struct {
 	WalletType   auth.WalletType `json:"wallet_type"`
 }
 
-type errUserNotFound struct {
-	userID   persist.DBID
-	address  persist.Address
-	username string
-}
-
-type ErrUserAlreadyExists struct {
-	Address        persist.Address
-	AuthDescriptor auth.AuthDescriptor
-}
-
-type errCouldNotEnsureMediaForAddress struct {
-	address persist.Address
-}
-
 // CreateUserToken creates a JWT token for the user
 func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (CreateUserOutput, error) {
 
@@ -210,11 +195,11 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, err
+		return nil, auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID != "" {
-		return nil, ErrUserAlreadyExists{AuthDescriptor: authenticator.GetDescriptor()}
+		return nil, ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -329,7 +314,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		return AddUserAddressOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if userID != "" {
-		return AddUserAddressOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
+		return AddUserAddressOutput{}, ErrAddressOwnedByUser{Address: pInput.Address, OwnerID: userID}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -438,7 +423,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, auth.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
@@ -631,10 +616,28 @@ func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress 
 	return nil
 }
 
+type ErrUserAlreadyExists struct {
+	Address       persist.Address
+	Authenticator string
+}
+
 func (e ErrUserAlreadyExists) Error() string {
-	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.AuthDescriptor)
+	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
+}
+
+type ErrAddressOwnedByUser struct {
+	Address persist.Address
+	OwnerID persist.DBID
+}
+
+func (e ErrAddressOwnedByUser) Error() string {
+	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.Address, e.OwnerID)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {
 	return fmt.Sprintf("could not ensure media for address: %s", e.address)
+}
+
+type errCouldNotEnsureMediaForAddress struct {
+	address persist.Address
 }

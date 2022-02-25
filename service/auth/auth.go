@@ -99,10 +99,10 @@ type GetPreflightOutput struct {
 }
 
 type Authenticator interface {
-	// GetDescriptor returns information about the authenticator for error and logging purposes.
-	// NOTE: GetDescriptor should NOT include any sensitive data (passwords, auth tokens, etc)
+	// GetDescription returns information about the authenticator for error and logging purposes.
+	// NOTE: GetDescription should NOT include any sensitive data (passwords, auth tokens, etc)
 	// that we wouldn't want showing up in logs!
-	GetDescriptor() AuthDescriptor
+	GetDescription() string
 
 	Authenticate(context.Context) (*AuthResult, error)
 }
@@ -112,7 +112,17 @@ type AuthResult struct {
 	Addresses []persist.Address
 }
 
-type AuthDescriptor string
+type ErrAuthenticationFailed struct {
+	WrappedErr error
+}
+
+func (e ErrAuthenticationFailed) Unwrap() error {
+	return e.WrappedErr
+}
+
+func (e ErrAuthenticationFailed) Error() string {
+	return fmt.Sprintf("authentication failed: %s", e.WrappedErr.Error())
+}
 
 type ErrSignatureVerificationFailed struct {
 	WrappedErr error
@@ -126,11 +136,11 @@ func (e ErrSignatureVerificationFailed) Error() string {
 	return fmt.Sprintf("signature verification failed: %s", e.WrappedErr.Error())
 }
 
-type ErrAddressDoesNotOwnRequiredNFT struct {
+type ErrDoesNotOwnRequiredNFT struct {
 	address persist.Address
 }
 
-func (e ErrAddressDoesNotOwnRequiredNFT) Error() string {
+func (e ErrDoesNotOwnRequiredNFT) Error() string {
 	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
 }
 
@@ -140,18 +150,6 @@ type ErrNonceNotFound struct {
 
 func (e ErrNonceNotFound) Error() string {
 	return fmt.Sprintf("nonce not found for address: %s", e.Address)
-}
-
-// ErrUserNotFound is returned when a user is not found
-type ErrUserNotFound struct {
-	UserID         persist.DBID
-	Address        persist.Address
-	Username       string
-	AuthDescriptor AuthDescriptor
-}
-
-func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, username: %s, authenticator: %s", e.Address, e.UserID, e.Username, e.AuthDescriptor)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -172,8 +170,8 @@ type EthereumNonceAuthenticator struct {
 	EthClient  *ethclient.Client
 }
 
-func (e EthereumNonceAuthenticator) GetDescriptor() AuthDescriptor {
-	return AuthDescriptor(fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType))
+func (e EthereumNonceAuthenticator) GetDescription() string {
+	return fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType)
 }
 
 func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
@@ -266,11 +264,11 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPaylo
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, err
+		return nil, ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID == "" {
-		return nil, ErrUserNotFound{AuthDescriptor: authenticator.GetDescriptor()}
+		return nil, persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
@@ -438,7 +436,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 				}
 			}
 			if !has {
-				return nil, ErrAddressDoesNotOwnRequiredNFT{pAddress}
+				return nil, ErrDoesNotOwnRequiredNFT{pAddress}
 			}
 
 		}
@@ -520,7 +518,7 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 	if user.ID != "" {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, ErrUserNotFound{Address: pAddress}
+		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress}
 	}
 
 	return nonceValue, userID, nil

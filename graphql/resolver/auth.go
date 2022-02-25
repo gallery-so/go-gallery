@@ -17,24 +17,27 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
 
+		makeErrNotAuthorized := func(e string, c model.AuthorizationError) model.ErrNotAuthorized {
+			return model.ErrNotAuthorized{
+				Message: fmt.Sprintf("authorization failed: %s", e),
+				Cause:   c,
+			}
+		}
+
 		if authError := auth.GetAuthErrorFromCtx(gc); authError != nil {
-			var errorType model.AuthFailureType
+			var gqlModel model.AuthorizationError
+			errorMsg := authError.Error()
 
 			switch authError {
 			case auth.ErrNoCookie:
-				errorType = model.AuthFailureTypeNoCookie
+				gqlModel = model.ErrNoCookie{Message: errorMsg}
 			case auth.ErrInvalidJWT:
-				errorType = model.AuthFailureTypeInvalidToken
+				gqlModel = model.ErrInvalidToken{Message: errorMsg}
 			default:
-				errorType = model.AuthFailureTypeInternalError
+				return nil, authError
 			}
 
-			notAuthorized := model.ErrNotAuthorized{
-				Message:   authError.Error(),
-				ErrorType: errorType,
-			}
-
-			return notAuthorized, nil
+			return makeErrNotAuthorized(errorMsg, gqlModel), nil
 		}
 
 		userID := auth.GetUserIDFromCtx(gc)
@@ -44,9 +47,9 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 
 		if viper.GetBool("REQUIRE_NFTS") {
 			user, err := dataloader.For(ctx).UserByUserId.Load(userID.String())
+
 			if err != nil {
-				notAuthorized := model.ErrNotAuthorized{Message: err.Error(), ErrorType: model.AuthFailureTypeInternalError}
-				return notAuthorized, nil
+				return nil, err
 			}
 
 			has := false
@@ -60,8 +63,10 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 				}
 			}
 			if !has {
-				notAuthorized := model.ErrNotAuthorized{Message: err.Error(), ErrorType: model.AuthFailureTypeDoesNotOwnRequiredNft}
-				return notAuthorized, nil
+				errorMsg := auth.ErrDoesNotOwnRequiredNFT{}.Error()
+				nftErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
+
+				return makeErrNotAuthorized(errorMsg, nftErr), nil
 			}
 		}
 
