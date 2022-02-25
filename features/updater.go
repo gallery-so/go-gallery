@@ -50,7 +50,10 @@ func trackFeatures(pCtx context.Context, userRepo persist.UserRepository, featur
 
 	addresses := []common.Address{}
 	for _, feature := range allFeatures {
-		address, _ := feature.RequiredToken.GetParts()
+		address, _, err := feature.RequiredToken.GetParts()
+		if err != nil {
+			panic(err)
+		}
 		addresses = append(addresses, address.Address())
 	}
 	topics := [][]common.Hash{{common.HexToHash(string(transferEventHash)), common.HexToHash(string(transferSingleEventHash)), common.HexToHash(string(transferBatchEventHash))}}

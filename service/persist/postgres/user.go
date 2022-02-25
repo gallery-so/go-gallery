@@ -167,21 +167,9 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 // GetByAddress gets the user with the given address in their list of addresses
 func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.User, error) {
 
-	res, err := u.getByAddressStmt.QueryContext(pCtx, pAddress)
-	if err != nil {
-		return persist.User{}, err
-	}
-	defer res.Close()
-
 	var user persist.User
-	for res.Next() {
-		err = res.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
-		if err != nil {
-			return persist.User{}, err
-		}
-	}
-
-	if err = res.Err(); err != nil {
+	err := u.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Address: pAddress}
 		}
@@ -195,27 +183,14 @@ func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.Add
 // GetByUsername gets the user with the given username
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
-	res, err := u.getByUsernameStmt.QueryContext(pCtx, strings.ToLower(pUsername))
-	if err != nil {
-		return persist.User{}, err
-	}
-	defer res.Close()
-
 	var user persist.User
-	for res.Next() {
-		err = res.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
-		if err != nil {
-			return persist.User{}, err
-		}
-	}
-
-	if err = res.Err(); err != nil {
+	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Addresses), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}
 		}
 		return persist.User{}, err
 	}
-
 	return user, nil
 
 }
