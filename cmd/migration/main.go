@@ -132,7 +132,8 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 					for _, nftID := range nftIDs {
 						fullNFT, err := nftRepo.GetByID(c, nftID)
 						if err != nil {
-							panic(err)
+							logrus.Errorf("Error getting nft %s: %s", nftID, err)
+							continue
 						}
 						if strings.ContainsAny(fullNFT.OwnerAddress.String(), ".eth") {
 							addr, err := ens.Resolve(ethClient, fullNFT.OwnerAddress.String())
