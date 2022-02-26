@@ -141,9 +141,9 @@ func (ErrUserNotFound) IsError()                 {}
 func (ErrUserNotFound) IsLoginPayloadOrError()   {}
 
 type EthereumEoaAuth struct {
-	Address   string `json:"address"`
-	Nonce     string `json:"nonce"`
-	Signature string `json:"signature"`
+	Address   persist.Address `json:"address"`
+	Nonce     string          `json:"nonce"`
+	Signature string          `json:"signature"`
 }
 
 type Gallery struct {
@@ -206,9 +206,9 @@ func (GenericNft) IsNode()         {}
 func (GenericNft) IsNft()          {}
 
 type GnosisSafeAuth struct {
-	Address   string `json:"address"`
-	Nonce     string `json:"nonce"`
-	Signature string `json:"signature"`
+	Address   persist.Address `json:"address"`
+	Nonce     string          `json:"nonce"`
+	Signature string          `json:"signature"`
 }
 
 type ImageNft struct {
@@ -315,9 +315,9 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	ID      persist.DBID `json:"id"`
-	Address *string      `json:"address"`
-	Nfts    []Nft        `json:"nfts"`
+	ID      persist.DBID     `json:"id"`
+	Address *persist.Address `json:"address"`
+	Nfts    []Nft            `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}

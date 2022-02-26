@@ -264,7 +264,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (CreateUserOutput, error) {
 
 	authenticator := auth.EthereumNonceAuthenticator{
-		Address:    pInput.Address.String(),
+		Address:    pInput.Address,
 		Nonce:      pInput.Nonce,
 		Signature:  pInput.Signature,
 		WalletType: pInput.WalletType,
@@ -280,8 +280,8 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 
 	output := CreateUserOutput{
 		SignatureValid: true,
-		UserID:         persist.DBID(*gqlOutput.UserID),
-		GalleryID:      persist.DBID(*gqlOutput.GalleryID),
+		UserID:         *gqlOutput.UserID,
+		GalleryID:      *gqlOutput.GalleryID,
 	}
 
 	return output, nil

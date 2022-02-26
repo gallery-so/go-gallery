@@ -44,7 +44,7 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
 
-	ethNonceAuth := func(address string, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
+	ethNonceAuth := func(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
 		authenticator := auth.EthereumNonceAuthenticator{
 			Address:    address,
 			Nonce:      nonce,
@@ -194,7 +194,7 @@ func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persi
 	for i, address := range addresses {
 		wallets[i] = &model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
-			Address: util.StringToPointer(address.String()),
+			Address: &address,
 			Nfts:    nil, // handled by dedicated resolver
 		}
 	}
@@ -219,11 +219,10 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, addre
 		return userToUserModel(ctx, r, owner)
 	}
 
-	// TODO: Change this error type once I change persist error types
 	if _, ok := err.(persist.ErrUserNotFound); ok {
 		wallet := model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
-			Address: util.StringToPointer(address.String()),
+			Address: &address,
 			Nfts:    nil, // handled by dedicated resolver
 		}
 

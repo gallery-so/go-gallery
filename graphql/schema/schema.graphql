@@ -10,6 +10,7 @@ directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITI
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 scalar DateTime
+scalar Address
 
 interface Node {
   id: ID!
@@ -30,7 +31,7 @@ type GalleryUser implements Node {
 
 type Wallet implements Node {
   id: ID!
-  address: String
+  address: Address
   # TODO: Do we paginate these currently?
   nfts: [Nft] @goField(forceResolver: true)
 }
@@ -240,13 +241,13 @@ input AuthMechanism {
 }
 
 input EthereumEoaAuth {
-  address: String!
+  address: Address!
   nonce: String!
   signature: String!
 }
 
 input GnosisSafeAuth {
-  address: String!
+  address: Address!
   nonce: String!
   signature: String!
 }
@@ -275,13 +276,13 @@ type Mutation {
   updateGalleryCollections(input: UpdateGalleryCollectionsInput): UpdateGalleryCollectionsPayload
 
   # User Mutations
-  removeUserAddress(address: String!): RemoveUserAddressPayload
+  removeUserAddress(address: Address!): RemoveUserAddressPayload
   updateUserInfo(input: UpdateUserInfoInput): UpdateUserInfoPayload
   #addUserAddress()
 
   refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
 
-  getAuthNonce(address: String!): GetAuthNoncePayloadOrError
+  getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError

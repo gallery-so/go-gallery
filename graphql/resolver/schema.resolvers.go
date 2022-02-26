@@ -98,7 +98,7 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) RemoveUserAddress(ctx context.Context, address string) (*model.RemoveUserAddressPayload, error) {
+func (r *mutationResolver) RemoveUserAddress(ctx context.Context, address persist.Address) (*model.RemoveUserAddressPayload, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -110,11 +110,11 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context) (*model.Refre
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address string) (model.GetAuthNoncePayloadOrError, error) {
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	authed := auth.GetUserAuthedFromCtx(gc)
-	output, err := auth.GetAuthNonce(gc, persist.Address(address), authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
+	output, err := auth.GetAuthNonce(gc, address, authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
 
 	if err != nil {
 		// Map known errors to GraphQL return types
@@ -267,7 +267,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
-	nfts, err := dataloader.For(ctx).NftsByAddress.Load(persist.Address(*obj.Address))
+	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
 
 	if err != nil {
 		return nil, err
