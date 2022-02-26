@@ -253,8 +253,8 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
 	output := model.CreateUserPayload{
-		UserID:    util.StringToPointer(userID.String()),
-		GalleryID: util.StringToPointer(galleryID.String()),
+		UserID:    &userID,
+		GalleryID: &galleryID,
 	}
 
 	return &output, nil

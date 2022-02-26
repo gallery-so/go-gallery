@@ -279,7 +279,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPaylo
 	SetJWTCookie(gc, jwtTokenStr)
 
 	output := model.LoginPayload{
-		UserID: util.StringToPointer(authResult.UserID.String()),
+		UserID: &authResult.UserID,
 	}
 
 	return &output, nil

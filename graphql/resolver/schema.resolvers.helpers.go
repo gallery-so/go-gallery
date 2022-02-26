@@ -68,7 +68,7 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	return nil, errNoAuthMechanismFound
 }
 
-func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID string) (*model.GalleryUser, error) {
+func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID persist.DBID) (*model.GalleryUser, error) {
 	user, err := dataloader.For(ctx).UserByUserId.Load(userID)
 
 	if err != nil {
@@ -88,7 +88,7 @@ func resolveGalleryUserByUsername(ctx context.Context, r *Resolver, username str
 	return userToUserModel(ctx, r, user)
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address string) (*model.GalleryUser, error) {
+func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address persist.Address) (*model.GalleryUser, error) {
 	user, err := dataloader.For(ctx).UserByAddress.Load(address)
 
 	if err != nil {
@@ -98,7 +98,7 @@ func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address strin
 	return userToUserModel(ctx, r, user)
 }
 
-func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID string) ([]*model.Gallery, error) {
+func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.DBID) ([]*model.Gallery, error) {
 	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(userID)
 
 	if err != nil {
@@ -113,7 +113,7 @@ func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID string) (
 	return output, nil
 }
 
-func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID string) ([]*model.GalleryCollection, error) {
+func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
 	// TODO: Update this to query for collections by gallery ID, instead of querying for a user and returning
 	// all of their collections. The result is the same right now, since a user only has one gallery.
 
@@ -122,7 +122,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 		return nil, err
 	}
 
-	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID.String())
+	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 		hidden := collection.Hidden.Bool()
 
 		output[i] = &model.GalleryCollection{
-			ID:             collection.ID.String(),
+			ID:             collection.ID,
 			Version:        &version,
 			Name:           util.StringToPointer(collection.Name.String()),
 			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
@@ -148,10 +148,10 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 }
 
 func galleryToGalleryModel(gallery persist.Gallery) *model.Gallery {
-	return galleryIDToGalleryModel(gallery.ID.String())
+	return galleryIDToGalleryModel(gallery.ID)
 }
 
-func galleryIDToGalleryModel(galleryID string) *model.Gallery {
+func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
 	gallery := model.Gallery{
 		ID:          galleryID,
 		Owner:       nil, // handled by dedicated resolver
@@ -162,7 +162,7 @@ func galleryIDToGalleryModel(galleryID string) *model.Gallery {
 }
 
 func layoutToLayoutModel(ctx context.Context, r *Resolver, layout persist.TokenLayout) *model.GalleryCollectionLayout {
-	columns := int(layout.Columns.Int())
+	columns := layout.Columns.Int()
 
 	output := model.GalleryCollectionLayout{
 		Columns: &columns,
@@ -177,7 +177,7 @@ func userToUserModel(ctx context.Context, r *Resolver, user persist.User) (*mode
 	isAuthenticated := auth.GetUserAuthedFromCtx(gc)
 
 	output := &model.GalleryUser{
-		ID:                  user.ID.String(),
+		ID:                  user.ID,
 		Username:            util.StringToPointer(user.Username.String()),
 		Bio:                 util.StringToPointer(user.Bio.String()),
 		Wallets:             addressesToWalletModels(ctx, r, user.Addresses),
@@ -202,17 +202,17 @@ func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persi
 	return wallets
 }
 
-func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId string) (model.GalleryUserOrWallet, error) {
+func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId persist.DBID) (model.GalleryUserOrWallet, error) {
 	nft, err := dataloader.For(ctx).NftByNftId.Load(nftId)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress.String())
+	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress)
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address string) (model.GalleryUserOrWallet, error) {
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address persist.Address) (model.GalleryUserOrWallet, error) {
 	owner, err := dataloader.For(ctx).UserByAddress.Load(address)
 
 	if err == nil {
@@ -223,7 +223,7 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, addre
 	if _, ok := err.(persist.ErrUserNotFound); ok {
 		wallet := model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
-			Address: util.StringToPointer(address),
+			Address: util.StringToPointer(address.String()),
 			Nfts:    nil, // handled by dedicated resolver
 		}
 
@@ -235,7 +235,7 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, addre
 
 func nftToNftModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 	output := model.GenericNft{
-		ID:                  nft.ID.String(),
+		ID:                  nft.ID,
 		Name:                util.StringToPointer(nft.Name.String()),
 		TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
 		Owner:               nil, // handled by dedicated resolver

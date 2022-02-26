@@ -23,7 +23,7 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 		return nil, err
 	}
 
-	return resolveGalleryUserByUserID(ctx, r.Resolver, gallery.OwnerUserID.String())
+	return resolveGalleryUserByUserID(ctx, r.Resolver, gallery.OwnerUserID)
 }
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
@@ -50,14 +50,14 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 		// they want.
 
 		genericNft := model.GenericNft{
-			ID:                  nft.ID.String(),
+			ID:                  nft.ID,
 			Name:                util.StringToPointer(nft.Name.String()),
 			TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
 			Owner:               nil, // handled by dedicated resolver
 		}
 
 		output[i] = &model.GalleryNft{
-			ID:         nft.ID.String(),
+			ID:         nft.ID,
 			Nft:        genericNft,
 			Collection: obj,
 		}
@@ -202,7 +202,7 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 		return nil, err
 	}
 
-	userID := auth.GetUserIDFromCtx(gc).String()
+	userID := auth.GetUserIDFromCtx(gc)
 	user, err := resolveGalleryUserByUserID(ctx, r.Resolver, userID)
 
 	if err != nil {
@@ -267,7 +267,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
-	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
+	nfts, err := dataloader.For(ctx).NftsByAddress.Load(persist.Address(*obj.Address))
 
 	if err != nil {
 		return nil, err

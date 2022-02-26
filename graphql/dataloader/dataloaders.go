@@ -1,10 +1,12 @@
-//go:generate go run github.com/vektah/dataloaden UserLoader string github.com/mikeydub/go-gallery/service/persist.User
-//go:generate go run github.com/vektah/dataloaden GalleryLoader string github.com/mikeydub/go-gallery/service/persist.Gallery
-//go:generate go run github.com/vektah/dataloaden GalleriesLoader string []github.com/mikeydub/go-gallery/service/persist.Gallery
-//go:generate go run github.com/vektah/dataloaden CollectionLoader string github.com/mikeydub/go-gallery/service/persist.Collection
-//go:generate go run github.com/vektah/dataloaden CollectionsLoader string []github.com/mikeydub/go-gallery/service/persist.Collection
-//go:generate go run github.com/vektah/dataloaden NftLoader string github.com/mikeydub/go-gallery/service/persist.NFT
-//go:generate go run github.com/vektah/dataloaden NftsLoader string []github.com/mikeydub/go-gallery/service/persist.NFT
+//go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address github.com/mikeydub/go-gallery/service/persist.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/service/persist.User
+//go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.Gallery
+//go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.Gallery
+//go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.Collection
+//go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.Collection
+//go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.NFT
+//go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/service/persist.NFT
 
 package dataloader
 
@@ -25,69 +27,69 @@ const defaultWaitTime = 1 * time.Millisecond
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-	UserByUserId             UserLoader
-	UserByUsername           UserLoader
-	UserByAddress            UserLoader
-	GalleryByGalleryId       GalleryLoader
-	GalleriesByUserId        GalleriesLoader
-	CollectionByCollectionId CollectionLoader
-	CollectionsByUserId      CollectionsLoader
-	NftByNftId               NftLoader
-	NftsByAddress            NftsLoader
+	UserByUserId             UserLoaderByID
+	UserByUsername           UserLoaderByString
+	UserByAddress            UserLoaderByAddress
+	GalleryByGalleryId       GalleryLoaderByID
+	GalleriesByUserId        GalleriesLoaderByID
+	CollectionByCollectionId CollectionLoaderByID
+	CollectionsByUserId      CollectionsLoaderByID
+	NftByNftId               NftLoaderByID
+	NftsByAddress            NftsLoaderByAddress
 }
 
 func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 	loaders := &Loaders{}
 
-	loaders.UserByUserId = UserLoader{
+	loaders.UserByUserId = UserLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUserId(ctx, loaders, r),
 	}
 
-	loaders.UserByUsername = UserLoader{
+	loaders.UserByUsername = UserLoaderByString{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUsername(ctx, loaders, r),
 	}
 
-	loaders.UserByAddress = UserLoader{
+	loaders.UserByAddress = UserLoaderByAddress{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByAddress(ctx, loaders, r),
 	}
 
-	loaders.GalleryByGalleryId = GalleryLoader{
+	loaders.GalleryByGalleryId = GalleryLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleryByGalleryId(ctx, loaders, r),
 	}
 
-	loaders.GalleriesByUserId = GalleriesLoader{
+	loaders.GalleriesByUserId = GalleriesLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleriesByUserId(ctx, loaders, r),
 	}
 
-	loaders.CollectionByCollectionId = CollectionLoader{
+	loaders.CollectionByCollectionId = CollectionLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadCollectionByCollectionId(ctx, loaders, r),
 	}
 
-	loaders.CollectionsByUserId = CollectionsLoader{
+	loaders.CollectionsByUserId = CollectionsLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadCollectionsByUserId(ctx, loaders, r),
 	}
 
-	loaders.NftByNftId = NftLoader{
+	loaders.NftByNftId = NftLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadNftByNftId(ctx, loaders, r),
 	}
 
-	loaders.NftsByAddress = NftsLoader{
+	loaders.NftsByAddress = NftsLoaderByAddress{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByAddress(ctx, loaders, r),
@@ -96,20 +98,20 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 	return loaders
 }
 
-func loadUserByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([]persist.User, []error) {
-	return func(userIds []string) ([]persist.User, []error) {
+func loadUserByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.User, []error) {
+	return func(userIds []persist.DBID) ([]persist.User, []error) {
 		// TODO: Add a new query to fetch all users at once so we can make use of batching.
 		// Right now, the only benefit here is caching.
 		users := make([]persist.User, len(userIds))
 		errors := make([]error, len(userIds))
 
 		for i, userId := range userIds {
-			user, err := r.UserRepository.GetByID(ctx, persist.DBID(userId))
+			user, err := r.UserRepository.GetByID(ctx, userId)
 
 			// Add results to other loaders' caches
 			loaders.UserByUsername.Prime(user.Username.String(), user)
 			for _, address := range user.Addresses {
-				loaders.UserByAddress.Prime(address.String(), user)
+				loaders.UserByAddress.Prime(address, user)
 			}
 
 			users[i], errors[i] = user, err
@@ -128,9 +130,9 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, r *persist.Reposi
 			user, err := r.UserRepository.GetByUsername(ctx, username)
 
 			// Add results to other loaders' caches
-			loaders.UserByUserId.Prime(user.ID.String(), user)
+			loaders.UserByUserId.Prime(user.ID, user)
 			for _, address := range user.Addresses {
-				loaders.UserByAddress.Prime(address.String(), user)
+				loaders.UserByAddress.Prime(address, user)
 			}
 
 			users[i], errors[i] = user, err
@@ -140,15 +142,15 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, r *persist.Reposi
 	}
 }
 
-func loadUserByAddress(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([]persist.User, []error) {
-	return func(addresses []string) ([]persist.User, []error) {
+func loadUserByAddress(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.Address) ([]persist.User, []error) {
+	return func(addresses []persist.Address) ([]persist.User, []error) {
 		users := make([]persist.User, len(addresses))
 		errors := make([]error, len(addresses))
 
 		for i, address := range addresses {
 			user, err := r.UserRepository.GetByAddress(ctx, persist.Address(address))
 			// Add results to other loaders' caches
-			loaders.UserByUserId.Prime(user.ID.String(), user)
+			loaders.UserByUserId.Prime(user.ID, user)
 			loaders.UserByUsername.Prime(user.Username.String(), user)
 
 			users[i], errors[i] = user, err
@@ -158,30 +160,30 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 	}
 }
 
-func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([]persist.Gallery, []error) {
-	return func(galleryIds []string) ([]persist.Gallery, []error) {
+func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.Gallery, []error) {
+	return func(galleryIds []persist.DBID) ([]persist.Gallery, []error) {
 		galleries := make([]persist.Gallery, len(galleryIds))
 		errors := make([]error, len(galleryIds))
 
 		for i, galleryId := range galleryIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByID(ctx, persist.DBID(galleryId))
+			galleries[i], errors[i] = r.GalleryRepository.GetByID(ctx, galleryId)
 		}
 
 		return galleries, errors
 	}
 }
 
-func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([][]persist.Gallery, []error) {
-	return func(userIds []string) ([][]persist.Gallery, []error) {
+func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Gallery, []error) {
+	return func(userIds []persist.DBID) ([][]persist.Gallery, []error) {
 		galleries := make([][]persist.Gallery, len(userIds))
 		errors := make([]error, len(userIds))
 
 		for i, userId := range userIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByUserID(ctx, persist.DBID(userId))
+			galleries[i], errors[i] = r.GalleryRepository.GetByUserID(ctx, userId)
 
 			// Add results to the GalleryByGalleryId loader's cache
 			for _, gallery := range galleries[i] {
-				loaders.GalleryByGalleryId.Prime(gallery.ID.String(), gallery)
+				loaders.GalleryByGalleryId.Prime(gallery.ID, gallery)
 			}
 		}
 
@@ -189,8 +191,8 @@ func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, r *persist.Rep
 	}
 }
 
-func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([]persist.Collection, []error) {
-	return func(collectionIds []string) ([]persist.Collection, []error) {
+func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.Collection, []error) {
+	return func(collectionIds []persist.DBID) ([]persist.Collection, []error) {
 		collections := make([]persist.Collection, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
@@ -202,30 +204,30 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *pers
 			// any logged-in user can see another user's hidden collections. We'd probably want to move the
 			// auth check into GetByID to see who owns the collection and determine whether it can be returned
 			// to the requesting user.
-			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, persist.DBID(collectionId), authed)
+			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, collectionId, authed)
 		}
 
 		return collections, errors
 	}
 }
 
-func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([][]persist.Collection, []error) {
-	return func(userIds []string) ([][]persist.Collection, []error) {
+func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Collection, []error) {
+	return func(userIds []persist.DBID) ([][]persist.Collection, []error) {
 		collections := make([][]persist.Collection, len(userIds))
 		errors := make([]error, len(userIds))
 
 		gc := util.GinContextFromContext(ctx)
-		authedUserId := auth.GetUserIDFromCtx(gc).String()
+		authedUserId := auth.GetUserIDFromCtx(gc)
 
 		for i, userId := range userIds {
 			// GraphQL best practices would suggest moving this auth logic into the DB fetching layer
 			// so it's applied consistently for all callers. It's probably worth doing at some point.
 			showHidden := userId == authedUserId
-			collections[i], errors[i] = r.CollectionRepository.GetByUserID(ctx, persist.DBID(userId), showHidden)
+			collections[i], errors[i] = r.CollectionRepository.GetByUserID(ctx, userId, showHidden)
 
 			// Add results to the CollectionByCollectionId loader's cache
 			for _, collection := range collections[i] {
-				loaders.CollectionByCollectionId.Prime(collection.ID.String(), collection)
+				loaders.CollectionByCollectionId.Prime(collection.ID, collection)
 			}
 		}
 
@@ -233,17 +235,17 @@ func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.R
 	}
 }
 
-func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([][]persist.NFT, []error) {
-	return func(addresses []string) ([][]persist.NFT, []error) {
+func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.Address) ([][]persist.NFT, []error) {
+	return func(addresses []persist.Address) ([][]persist.NFT, []error) {
 		nfts := make([][]persist.NFT, len(addresses))
 		errors := make([]error, len(addresses))
 
 		for i, address := range addresses {
-			nfts[i], errors[i] = r.NftRepository.GetByAddresses(ctx, []persist.Address{persist.Address(address)})
+			nfts[i], errors[i] = r.NftRepository.GetByAddresses(ctx, []persist.Address{address})
 
 			// Add results to the NftByNftId loader's cache
 			for _, nft := range nfts[i] {
-				loaders.NftByNftId.Prime(nft.ID.String(), nft)
+				loaders.NftByNftId.Prime(nft.ID, nft)
 			}
 		}
 
@@ -251,13 +253,13 @@ func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 	}
 }
 
-func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]string) ([]persist.NFT, []error) {
-	return func(nftIds []string) ([]persist.NFT, []error) {
+func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.NFT, []error) {
+	return func(nftIds []persist.DBID) ([]persist.NFT, []error) {
 		nfts := make([]persist.NFT, len(nftIds))
 		errors := make([]error, len(nftIds))
 
 		for i, nftId := range nftIds {
-			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, persist.DBID(nftId))
+			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, nftId)
 		}
 
 		return nfts, errors

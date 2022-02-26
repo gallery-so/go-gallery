@@ -2,6 +2,10 @@
 
 package model
 
+import (
+	"github.com/mikeydub/go-gallery/service/persist"
+)
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -59,10 +63,10 @@ type AuthNonce struct {
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
 type CreateCollectionInput struct {
-	GalleryID      string                        `json:"galleryId"`
+	GalleryID      persist.DBID                  `json:"galleryId"`
 	Name           *string                       `json:"name"`
 	CollectorsNote *string                       `json:"collectorsNote"`
-	Nfts           []string                      `json:"nfts"`
+	Nfts           []persist.DBID                `json:"nfts"`
 	Layout         *GalleryCollectionLayoutInput `json:"layout"`
 }
 
@@ -71,8 +75,8 @@ type CreateCollectionPayload struct {
 }
 
 type CreateUserPayload struct {
-	UserID    *string `json:"userId"`
-	GalleryID *string `json:"galleryId"`
+	UserID    *persist.DBID `json:"userId"`
+	GalleryID *persist.DBID `json:"galleryId"`
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
@@ -143,7 +147,7 @@ type EthereumEoaAuth struct {
 }
 
 type Gallery struct {
-	ID          string               `json:"id"`
+	ID          persist.DBID         `json:"id"`
 	Owner       *GalleryUser         `json:"owner"`
 	Collections []*GalleryCollection `json:"collections"`
 }
@@ -151,7 +155,7 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryCollection struct {
-	ID             string                   `json:"id"`
+	ID             persist.DBID             `json:"id"`
 	Version        *int                     `json:"version"`
 	Name           *string                  `json:"name"`
 	CollectorsNote *string                  `json:"collectorsNote"`
@@ -172,18 +176,18 @@ type GalleryCollectionLayoutInput struct {
 }
 
 type GalleryNft struct {
-	ID         string             `json:"id"`
+	ID         persist.DBID       `json:"id"`
 	Nft        Nft                `json:"nft"`
 	Collection *GalleryCollection `json:"collection"`
 }
 
 type GalleryUser struct {
-	ID                  string     `json:"id"`
-	Username            *string    `json:"username"`
-	Bio                 *string    `json:"bio"`
-	Wallets             []*Wallet  `json:"wallets"`
-	Galleries           []*Gallery `json:"galleries"`
-	IsAuthenticatedUser *bool      `json:"isAuthenticatedUser"`
+	ID                  persist.DBID `json:"id"`
+	Username            *string      `json:"username"`
+	Bio                 *string      `json:"bio"`
+	Wallets             []*Wallet    `json:"wallets"`
+	Galleries           []*Gallery   `json:"galleries"`
+	IsAuthenticatedUser *bool        `json:"isAuthenticatedUser"`
 }
 
 func (GalleryUser) IsNode()                  {}
@@ -191,7 +195,7 @@ func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
 type GenericNft struct {
-	ID                  string              `json:"id"`
+	ID                  persist.DBID        `json:"id"`
 	Name                *string             `json:"name"`
 	TokenCollectionName *string             `json:"tokenCollectionName"`
 	Owner               GalleryUserOrWallet `json:"owner"`
@@ -208,7 +212,7 @@ type GnosisSafeAuth struct {
 }
 
 type ImageNft struct {
-	ID                  string              `json:"id"`
+	ID                  persist.DBID        `json:"id"`
 	Name                *string             `json:"name"`
 	TokenCollectionName *string             `json:"tokenCollectionName"`
 	Owner               GalleryUserOrWallet `json:"owner"`
@@ -220,13 +224,13 @@ func (ImageNft) IsNode()         {}
 func (ImageNft) IsNft()          {}
 
 type LoginPayload struct {
-	UserID *string `json:"userId"`
+	UserID *persist.DBID `json:"userId"`
 }
 
 func (LoginPayload) IsLoginPayloadOrError() {}
 
 type MembershipTier struct {
-	ID       string                 `json:"id"`
+	ID       persist.DBID           `json:"id"`
 	Name     *string                `json:"name"`
 	AssetURL *string                `json:"assetUrl"`
 	TokenID  *string                `json:"tokenId"`
@@ -236,7 +240,7 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type MembershipTierOwner struct {
-	ID          string       `json:"id"`
+	ID          persist.DBID `json:"id"`
 	User        *GalleryUser `json:"user"`
 	PreviewNfts []*string    `json:"previewNfts"`
 }
@@ -252,9 +256,9 @@ type RemoveUserAddressPayload struct {
 }
 
 type UpdateCollectionInfoInput struct {
-	CollectionID   string  `json:"collectionId"`
-	Name           *string `json:"name"`
-	CollectorsNote *string `json:"collectorsNote"`
+	CollectionID   persist.DBID `json:"collectionId"`
+	Name           *string      `json:"name"`
+	CollectorsNote *string      `json:"collectorsNote"`
 }
 
 type UpdateCollectionInfoPayload struct {
@@ -262,8 +266,8 @@ type UpdateCollectionInfoPayload struct {
 }
 
 type UpdateCollectionNftsInput struct {
-	CollectionID string   `json:"collectionId"`
-	Nfts         []string `json:"nfts"`
+	CollectionID persist.DBID   `json:"collectionId"`
+	Nfts         []persist.DBID `json:"nfts"`
 }
 
 type UpdateCollectionNftsPayload struct {
@@ -271,8 +275,8 @@ type UpdateCollectionNftsPayload struct {
 }
 
 type UpdateGalleryCollectionsInput struct {
-	GalleryID   string   `json:"galleryId"`
-	Collections []string `json:"collections"`
+	GalleryID   persist.DBID   `json:"galleryId"`
+	Collections []persist.DBID `json:"collections"`
 }
 
 type UpdateGalleryCollectionsPayload struct {
@@ -289,7 +293,7 @@ type UpdateUserInfoPayload struct {
 }
 
 type VideoNft struct {
-	ID                  string              `json:"id"`
+	ID                  persist.DBID        `json:"id"`
 	Name                *string             `json:"name"`
 	TokenCollectionName *string             `json:"tokenCollectionName"`
 	Owner               GalleryUserOrWallet `json:"owner"`
@@ -311,9 +315,9 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	ID      string  `json:"id"`
-	Address *string `json:"address"`
-	Nfts    []Nft   `json:"nfts"`
+	ID      persist.DBID `json:"id"`
+	Address *string      `json:"address"`
+	Nfts    []Nft        `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}

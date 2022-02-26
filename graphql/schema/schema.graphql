@@ -261,7 +261,7 @@ union CreateUserPayloadOrError = CreateUserPayload | ErrUserAlreadyExists | ErrA
 
 type CreateUserPayload {
   userId: ID
-  galleryId: String
+  galleryId: ID
 }
 
 type Mutation {
