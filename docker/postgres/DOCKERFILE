@@ -1,5 +1,10 @@
 FROM postgres:14
+
 ENV POSTGRES_HOST_AUTH_METHOD trust
 ENV POSTGRES_USER postgres
 ENV POSTGRES_DB postgres
-COPY docker/postgres/init.sql /docker-entrypoint-initdb.d/
+ENV MIGRATE_VERSION v4.15.1
+ENV PLATFORM_ARCH linux-arm64
+RUN apt-get update && apt-get install -y curl
+RUN curl -L https://github.com/golang-migrate/migrate/releases/download/$MIGRATE_VERSION/migrate.$PLATFORM_ARCH.tar.gz | tar xvz -C /usr/bin
+COPY db/migrations/*up.sql /docker-entrypoint-initdb.d/

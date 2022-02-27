@@ -40,6 +40,16 @@ To remove running redis and postgres instance:
 $ docker-compose down
 ```
 
+The `migrate` cli can be installed via brew (assuming MacOS):
+```bash
+brew install golang-migrate
+```
+
+Create a new migration:
+```bash
+migrate create -ext sql -dir db/migrations -seq <name of migration>
+```
+
 ### Healthcheck
 
 Verify that the server is running by calling the `/v1/health` endpoint.
