@@ -300,11 +300,12 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	logrus.Infof("predicting media type for %s: %s", name, mediaType)
 
+outer:
 	switch mediaType {
 	case persist.MediaTypeImage, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
-			break
+			break outer
 		default:
 			return mediaType, nil
 		}
@@ -314,6 +315,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		downloadLock.Lock()
 		defer downloadLock.Unlock()
 	}
+
 	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", url, err)

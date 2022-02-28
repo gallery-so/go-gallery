@@ -513,10 +513,6 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 				key := persist.NewTokenIdentifiers(contractAddress, tokenID)
 				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-				if !key.Valid() {
-					panic(fmt.Sprintf("Invalid key %s", key))
-				}
-
 				findFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields, sideEffects)
 
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
@@ -542,14 +538,14 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 		wg.Add(2)
 
 		go func() {
-			curOwner := ownerAtBlock{key, to, transfer.BlockNumber}
 			defer wg.Done()
+			curOwner := ownerAtBlock{key, to, transfer.BlockNumber}
 			owners <- curOwner
 		}()
 
 		go func() {
-			prevOwner := ownerAtBlock{key, from, transfer.BlockNumber}
 			defer wg.Done()
+			prevOwner := ownerAtBlock{key, from, transfer.BlockNumber}
 			previousOwners <- prevOwner
 		}()
 
