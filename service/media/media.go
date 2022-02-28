@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/gif"
 	"image/jpeg"
 	"net"
 	"net/http"
@@ -295,17 +296,17 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	initialType := predictMediaType(pCtx, url)
+	mediaType := predictMediaType(pCtx, url)
 
-	logrus.Infof("predicting media type for %s: %s", name, initialType)
+	logrus.Infof("predicting media type for %s: %s", name, mediaType)
 
-	switch initialType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
+	switch mediaType {
+	case persist.MediaTypeImage, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
 			break
 		default:
-			return initialType, nil
+			return mediaType, nil
 		}
 	}
 
@@ -321,12 +322,13 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	logrus.Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, url, name)
 
 	buf := bytes.NewBuffer(bs)
-	mediaType := persist.SniffMediaType(bs)
+	if mediaType == persist.MediaTypeUnknown {
+		mediaType = persist.SniffMediaType(bs)
+	}
 
 	logrus.Infof("sniffed media type for %s: %s", url, mediaType)
 	switch mediaType {
 	case persist.MediaTypeVideo:
-
 		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
 		if err != nil {
 			return mediaType, err
@@ -348,8 +350,19 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	case persist.MediaTypeGIF:
+		d, err := gif.Decode(buf)
+		if err != nil {
+			return mediaType, err
+		}
+		d = resize.Thumbnail(1024, 1024, d, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		err = jpeg.Encode(buf, d, nil)
+		if err != nil {
+			return mediaType, err
+		}
+		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 	default:
-
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
 			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
