@@ -33,6 +33,10 @@ import (
 
 var defaultStartingBlock persist.BlockNumber = 5000000
 
+const defaultWorkerPoolSize = 8
+
+const defaultWorkerPoolWaitSize = 25
+
 const blocksPerLogsCall = 50
 
 // eventHash represents an event keccak256 hash
@@ -157,12 +161,12 @@ func (i *Indexer) Start() {
 	cancel()
 
 	remainder := lastSyncedBlock % blocksPerLogsCall
-	lastSyncedBlock -= (remainder + (blocksPerLogsCall * 50))
+	lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 
 	logrus.Infof("Starting indexer from block %d", lastSyncedBlock)
 
-	wp := workerpool.New(8)
+	wp := workerpool.New(defaultWorkerPoolSize)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -172,17 +176,16 @@ func (i *Indexer) Start() {
 	topics := [][]common.Hash{events}
 
 	go i.listenForNewBlocks()
-	for lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock) {
+	for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
 		input := lastSyncedBlock
 		toQueue := func() {
 			i.startPipeline(input, topics)
 		}
-		if wp.WaitingQueueSize() > 25 {
+		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
 			wp.SubmitWait(toQueue)
 		} else {
 			wp.Submit(toQueue)
 		}
-		lastSyncedBlock += blocksPerLogsCall
 	}
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
@@ -190,6 +193,7 @@ func (i *Indexer) Start() {
 }
 
 func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+	startTime := time.Now()
 	i.isListening = false
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
@@ -204,6 +208,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
 	}
+	logrus.Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
 func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	i.isListening = true
@@ -254,14 +259,21 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		if err != nil {
 			panic(err)
 		}
-	} else {
+	}
+	if len(logsTo) > 0 {
+		lastLog := logsTo[len(logsTo)-1]
+		if nextBlock.Uint64()-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
+			logsTo = []types.Log{}
+		}
+	}
+	if len(logsTo) == 0 {
 		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
 		})
 		if err != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 			storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%s-%s", curBlock.String(), nextBlock.String())).NewWriter(ctx)
 			defer storageWriter.Close()
@@ -288,11 +300,11 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		}
 	}
 
-	logrus.Debugf("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
+	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 
 	transfers := logsToTransfers(logsTo, i.ethClient)
 
-	logrus.Debugf("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+	logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
 	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
@@ -605,7 +617,6 @@ func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persi
 	defer cancel()
 	_, err := i.userRepo.GetByAddress(ctx, to)
 	if err != nil {
-		logrus.WithError(err).Errorf("error getting user for %s", to)
 		return
 	}
 
