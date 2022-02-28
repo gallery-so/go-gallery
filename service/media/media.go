@@ -131,7 +131,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeGIF:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeGIF, persist.MediaTypeText:
 		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
 	default:
 		res.MediaType = mediaType
@@ -355,6 +355,7 @@ outer:
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 	case persist.MediaTypeGIF:
 		if asURI.Type() == persist.URITypeIPFS || asURI.Type() == persist.URITypeArweave {
+			logrus.Infof("IPFS LINK: caching raw media for %s", url)
 			err = cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
 			if err != nil {
 				return mediaType, err
@@ -375,6 +376,7 @@ outer:
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
+			logrus.Infof("IPFS LINK: caching raw media for %s", url)
 			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		default:
 			return mediaType, nil
