@@ -1,6 +1,5 @@
 #!/bin/zsh
 function parse_yaml {
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*'
    sed -ne "s|^\([[:space:]]*\):|\1|" -e "s|^\([[:space:]]*\)\([a-zA-Z0-9_]*\)[[:space:]]*:[[:space:]]*[\"']\(.*\)[\"'][[:space:]]*\$|\1$(echo @|tr @ '\034')\2$(echo @|tr @ '\034')\3|p" -e "s|^\([[:space:]]*\)\([a-zA-Z0-9_]*\)[[:space:]]*:[[:space:]]*\(.*\)[[:space:]]*\$|\1$(echo @|tr @ '\034')\2$(echo @|tr @ '\034')\3|p"  $1 |
    awk -F $(echo @|tr @ '\034') '{
       indent = length($1)/2;
