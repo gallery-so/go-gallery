@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -111,6 +112,11 @@ func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.G
 	if err != nil {
 		return "", err
 	}
+	err = g.cacheByUserID(pCtx, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	return id, nil
 }
 
@@ -136,6 +142,11 @@ func (g *GalleryTokenRepository) Update(pCtx context.Context, pID persist.DBID, 
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
+	err = g.cacheByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -151,6 +162,10 @@ func (g *GalleryTokenRepository) UpdateUnsafe(pCtx context.Context, pID persist.
 	}
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
+	}
+	err = g.cacheByID(pCtx, pID)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -213,11 +228,24 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
+	err = g.cacheByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.GalleryToken, error) {
+	initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
+	if len(initial) > 0 {
+		var galleries []persist.GalleryToken
+		err := json.Unmarshal(initial, &galleries)
+		if err != nil {
+			return nil, err
+		}
+		return galleries, nil
+	}
 	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
 		return nil, err
@@ -463,4 +491,38 @@ func addUnaccountedForCollectionsToken(pCtx context.Context, g *GalleryTokenRepo
 		return nil, err
 	}
 	return appendDifference(pColls, colls), nil
+}
+
+func (g *GalleryTokenRepository) cacheByID(pCtx context.Context, pID persist.DBID) error {
+	gal, err := g.GetByID(pCtx, pID)
+	if err != nil {
+		return err
+	}
+	gals, err := g.GetByUserID(pCtx, gal.OwnerUserID)
+	if err != nil {
+		return err
+	}
+	marshalled, err := json.Marshal(gals)
+	if err != nil {
+		return err
+	}
+	if err = g.galleriesCache.Set(pCtx, gal.OwnerUserID.String(), marshalled, time.Hour*24*7); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *GalleryTokenRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	gals, err := g.GetByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+	marshalled, err := json.Marshal(gals)
+	if err != nil {
+		return err
+	}
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, time.Hour*24*7); err != nil {
+		return err
+	}
+	return nil
 }

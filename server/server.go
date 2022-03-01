@@ -117,15 +117,14 @@ func setDefaults() {
 }
 
 func newRepos(db *sql.DB) *persist.Repositories {
-	openseaCache, galleriesCache := redis.NewCache(0), redis.NewCache(1)
-	galleriesCacheToken := redis.NewCache(2)
-	nftsCache := redis.NewCache(3)
+	galleriesCache := redis.NewCache(0)
+	galleriesCacheToken := redis.NewCache(1)
 
 	return &persist.Repositories{
 		UserRepository:            postgres.NewUserRepository(db),
 		NonceRepository:           postgres.NewNonceRepository(db),
 		LoginRepository:           postgres.NewLoginRepository(db),
-		NftRepository:             postgres.NewNFTRepository(db, openseaCache, nftsCache),
+		NftRepository:             postgres.NewNFTRepository(db),
 		TokenRepository:           postgres.NewTokenRepository(db),
 		CollectionRepository:      postgres.NewCollectionRepository(db),
 		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db),

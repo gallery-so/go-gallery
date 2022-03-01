@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -12,7 +11,7 @@ func TestCollectionGetByUserID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -64,7 +63,7 @@ func TestCollectionGetByID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -120,7 +119,7 @@ func TestCollectionUpdate_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -178,7 +177,7 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -245,7 +244,7 @@ func TestCollectionGetUnassigned_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{

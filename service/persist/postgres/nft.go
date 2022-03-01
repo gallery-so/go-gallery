@@ -3,12 +3,10 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -28,14 +26,10 @@ type NFTRepository struct {
 	updateInfoStmt               *sql.Stmt
 	updateOwnerAddressStmt       *sql.Stmt
 	updateOwnerAddressUnsafeStmt *sql.Stmt
-
-	openseaCache         memstore.Cache
-	nftsCache            memstore.Cache
-	nftsCacheUpdateQueue *memstore.UpdateQueue
 }
 
 // NewNFTRepository creates a new persist.NFTPostgresRepository
-func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstore.Cache) *NFTRepository {
+func NewNFTRepository(db *sql.DB) *NFTRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -77,9 +71,6 @@ func NewNFTRepository(db *sql.DB, openseaCache memstore.Cache, nftsCache memstor
 		updateInfoStmt:               updateInfoStmt,
 		updateOwnerAddressStmt:       updateOwnerAddressStmt,
 		updateOwnerAddressUnsafeStmt: updateOwnerAddressUnsafeStmt,
-		openseaCache:                 openseaCache,
-		nftsCache:                    nftsCache,
-		nftsCacheUpdateQueue:         memstore.NewUpdateQueue(nftsCache),
 	}
 }
 
@@ -359,48 +350,4 @@ func (n *NFTRepository) BulkUpsert(pCtx context.Context, pNFTs []persist.NFT) ([
 	}
 
 	return resultIDs, nil
-}
-
-// OpenseaCacheSet adds a set of nfts to the opensea cache under a given set of wallet addresses as well as ensures
-// that the nfts for user cache is most up to date
-func (n *NFTRepository) OpenseaCacheSet(pCtx context.Context, pWalletAddresses []persist.Address, pNfts []persist.NFT) error {
-	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v
-	}
-
-	toCache, err := json.Marshal(pNfts)
-	if err != nil {
-		return err
-	}
-
-	return n.openseaCache.Set(pCtx, fmt.Sprint(pWalletAddresses), toCache, openseaAssetsTTL)
-}
-
-// OpenseaCacheDelete deletes a set of nfts from the opensea cache under a given set of wallet addresses
-func (n *NFTRepository) OpenseaCacheDelete(pCtx context.Context, pWalletAddresses []persist.Address) error {
-
-	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v
-	}
-
-	return n.openseaCache.Delete(pCtx, fmt.Sprint(pWalletAddresses))
-}
-
-// OpenseaCacheGet gets a set of nfts from the opensea cache under a given set of wallet addresses
-func (n *NFTRepository) OpenseaCacheGet(pCtx context.Context, pWalletAddresses []persist.Address) ([]persist.NFT, error) {
-
-	for i, v := range pWalletAddresses {
-		pWalletAddresses[i] = v
-	}
-
-	result, err := n.openseaCache.Get(pCtx, fmt.Sprint(pWalletAddresses))
-	if err != nil {
-		return nil, err
-	}
-
-	nfts := []persist.NFT{}
-	if err := json.Unmarshal([]byte(result), &nfts); err != nil {
-		return nil, err
-	}
-	return nfts, nil
 }

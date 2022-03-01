@@ -229,11 +229,6 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			}
 		}
 
-		if err := nftRepo.OpenseaCacheDelete(c, addresses); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

@@ -4,14 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 func TestNFTCreate_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 
 	nft := persist.NFT{
 		Deleted:      false,
@@ -28,7 +27,7 @@ func TestNFTCreate_Success(t *testing.T) {
 func TestNFTGetByID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 
 	nft := persist.NFT{
 		Deleted:      false,
