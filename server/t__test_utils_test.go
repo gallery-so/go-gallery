@@ -107,17 +107,16 @@ func initializeTestServer(db *sql.DB, a *assert.Assertions, v int) *TestConfig {
 
 	gin.SetMode(gin.ReleaseMode) // Prevent excessive logs
 	repos := newRepos(db)
-	opensea, unassigned, galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1), redis.NewCache(2), redis.NewCache(3)
+	galleries, galleriesToken := redis.NewCache(0), redis.NewCache(1)
 	log.Infof("test server connected at %s ✅", ts.URL)
 
 	return &TestConfig{
-		server:              ts,
-		serverURL:           fmt.Sprintf("%s/glry/v%d", ts.URL, v),
-		repos:               repos,
-		user1:               generateTestUser(a, repos, ""),
-		user2:               generateTestUser(a, repos, ""),
-		openseaCache:        opensea,
-		unassignedCache:     unassigned,
+		server:    ts,
+		serverURL: fmt.Sprintf("%s/glry/v%d", ts.URL, v),
+		repos:     repos,
+		user1:     generateTestUser(a, repos, ""),
+		user2:     generateTestUser(a, repos, ""),
+
 		galleriesCache:      galleries,
 		galleriesCacheToken: galleriesToken,
 	}
@@ -128,6 +127,8 @@ func teardown() {
 	log.Info("tearing down test suite...")
 	tc.server.Close()
 	clearDB()
+	tc.galleriesCache.Close(true)
+	tc.galleriesCacheToken.Close(true)
 }
 
 func clearDB() {
