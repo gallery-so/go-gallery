@@ -64,7 +64,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 		if err != nil {
 			status := http.StatusInternalServerError
 			switch err.(type) {
-			case persist.ErrUserNotFoundByAddress, persist.ErrUserNotFoundByID, persist.ErrUserNotFoundByUsername:
+			case persist.ErrUserNotFound:
 				status = http.StatusNotFound
 			}
 			util.ErrResponse(c, status, err)
@@ -78,7 +78,7 @@ func getUser(userRepository persist.UserRepository) gin.HandlerFunc {
 
 func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authed := c.GetBool(auth.AuthContextKey)
+		authed := auth.GetUserAuthedFromCtx(c)
 		if !authed {
 			c.JSON(http.StatusNoContent, util.SuccessResponse{Success: false})
 			return
@@ -93,7 +93,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 		if err != nil {
 			status := http.StatusInternalServerError
 			switch err.(type) {
-			case persist.ErrUserNotFoundByAddress, persist.ErrUserNotFoundByID, persist.ErrUserNotFoundByUsername:
+			case persist.ErrUserNotFound:
 				status = http.StatusNotFound
 			}
 			util.ErrResponse(c, status, err)

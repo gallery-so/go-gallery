@@ -36,6 +36,7 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.6 // indirect
+	github.com/vektah/dataloaden v0.3.0
 	github.com/vektah/gqlparser/v2 v2.2.0
 	github.com/wealdtech/go-ens/v3 v3.5.2
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11

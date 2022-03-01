@@ -7,7 +7,7 @@ import (
 
 // User represents a user in the datase and throughout the application
 type User struct {
-	Version            NullInt64       `json:"version"` // schema version for this model
+	Version            NullInt32       `json:"version"` // schema version for this model
 	ID                 DBID            `json:"id" binding:"required"`
 	CreationTime       CreationTime    `json:"created_at"`
 	Deleted            NullBool        `json:"-"`
@@ -40,29 +40,14 @@ type UserRepository interface {
 	MergeUsers(context.Context, DBID, DBID) error
 }
 
-// ErrUserNotFoundByID is returned when a user is not found by ID
-type ErrUserNotFoundByID struct {
-	ID DBID
+// ErrUserNotFound is returned when a user is not found
+type ErrUserNotFound struct {
+	UserID        DBID
+	Address       Address
+	Username      string
+	Authenticator string
 }
 
-// ErrUserNotFoundByUsername is returned when a user is not found by username
-type ErrUserNotFoundByUsername struct {
-	Username string
-}
-
-// ErrUserNotFoundByAddress is returned when a user is not found by wallet address
-type ErrUserNotFoundByAddress struct {
-	Address Address
-}
-
-func (e ErrUserNotFoundByID) Error() string {
-	return fmt.Sprintf("user not found by ID: %s", e.ID)
-}
-
-func (e ErrUserNotFoundByAddress) Error() string {
-	return fmt.Sprintf("user not found by address: %s", e.Address)
-}
-
-func (e ErrUserNotFoundByUsername) Error() string {
-	return fmt.Sprintf("user not found by username: %s", e.Username)
+func (e ErrUserNotFound) Error() string {
+	return fmt.Sprintf("user not found: address: %s, ID: %s, username: %s, authenticator: %s", e.Address, e.UserID, e.Username, e.Authenticator)
 }

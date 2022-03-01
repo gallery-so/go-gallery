@@ -35,11 +35,15 @@ const (
 )
 
 const (
-	// UserIDContextKey is the key for the user id in the context
-	UserIDContextKey = "user_id"
-	// AuthContextKey is the key for the auth status in the context
-	AuthContextKey = "authenticated"
+	// Context keys for auth data
+	userIDContextKey     = "auth.user_id"
+	userAuthedContextKey = "auth.authenticated"
+	authErrorContextKey  = "auth.auth_error"
 )
+
+// We don't want our cookies to expire, so their max age is arbitrarily set to 10 years.
+// Note that browsers can still cap this expiration time (e.g. Brave limits cookies to 6 months).
+const cookieMaxAge int = 60 * 60 * 24 * 365 * 10
 
 // NoncePrepend is what is prepended to every nonce
 const NoncePrepend = "Gallery uses this cryptographic signature in place of a password, verifying that you are the owner of this Ethereum address: "
@@ -58,8 +62,8 @@ var ErrNonceMismatch = errors.New("incorrect nonce input")
 // ErrInvalidJWT is returned when the JWT is invalid
 var ErrInvalidJWT = errors.New("invalid or expired auth token")
 
-// ErrNoJWT is returned when there is no JWT in the request
-var ErrNoJWT = errors.New("no jwt passed as cookie")
+// ErrNoCookie is returned when there is no JWT in the request
+var ErrNoCookie = errors.New("no jwt passed as cookie")
 
 // ErrInvalidAuthHeader is returned when the auth header is invalid
 var ErrInvalidAuthHeader = errors.New("invalid auth header format")
@@ -95,12 +99,29 @@ type GetPreflightOutput struct {
 }
 
 type Authenticator interface {
+	// GetDescription returns information about the authenticator for error and logging purposes.
+	// NOTE: GetDescription should NOT include any sensitive data (passwords, auth tokens, etc)
+	// that we wouldn't want showing up in logs!
+	GetDescription() string
+
 	Authenticate(context.Context) (*AuthResult, error)
 }
 
 type AuthResult struct {
 	UserID    persist.DBID
 	Addresses []persist.Address
+}
+
+type ErrAuthenticationFailed struct {
+	WrappedErr error
+}
+
+func (e ErrAuthenticationFailed) Unwrap() error {
+	return e.WrappedErr
+}
+
+func (e ErrAuthenticationFailed) Error() string {
+	return fmt.Sprintf("authentication failed: %s", e.WrappedErr.Error())
 }
 
 type ErrSignatureVerificationFailed struct {
@@ -115,11 +136,11 @@ func (e ErrSignatureVerificationFailed) Error() string {
 	return fmt.Sprintf("signature verification failed: %s", e.WrappedErr.Error())
 }
 
-type ErrAddressDoesNotOwnRequiredNFT struct {
+type ErrDoesNotOwnRequiredNFT struct {
 	address persist.Address
 }
 
-func (e ErrAddressDoesNotOwnRequiredNFT) Error() string {
+func (e ErrDoesNotOwnRequiredNFT) Error() string {
 	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
 }
 
@@ -129,17 +150,6 @@ type ErrNonceNotFound struct {
 
 func (e ErrNonceNotFound) Error() string {
 	return fmt.Sprintf("nonce not found for address: %s", e.Address)
-}
-
-// ErrUserNotFound is returned when a user is not found
-type ErrUserNotFound struct {
-	UserID   persist.DBID
-	Address  persist.Address
-	Username string
-}
-
-func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, Username: %s", e.Address, e.UserID, e.Username)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -158,6 +168,10 @@ type EthereumNonceAuthenticator struct {
 	UserRepo   persist.UserRepository
 	NonceRepo  persist.NonceRepository
 	EthClient  *ethclient.Client
+}
+
+func (e EthereumNonceAuthenticator) GetDescription() string {
+	return fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType)
 }
 
 func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
@@ -245,19 +259,16 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResult, error) {
+func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPayload, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, err
+		return nil, ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	// TODO: ErrUserNotFound accepts an address parameter, but we don't have one to supply here
-	// Might be worthwhile for an authenticator interface to have a method for some sort of
-	//credential/ID/info-dump string that we can use in situations like this
 	if authResult.UserID == "" {
-		return nil, ErrUserNotFound{}
+		return nil, persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
@@ -267,7 +278,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginResul
 
 	SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.LoginResult{
+	output := model.LoginPayload{
 		UserID: util.StringToPointer(authResult.UserID.String()),
 	}
 
@@ -425,7 +436,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 				}
 			}
 			if !has {
-				return nil, ErrAddressDoesNotOwnRequiredNFT{pAddress}
+				return nil, ErrDoesNotOwnRequiredNFT{pAddress}
 			}
 
 		}
@@ -507,7 +518,7 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 	if user.ID != "" {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, ErrUserNotFound{Address: pAddress}
+		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress}
 	}
 
 	return nonceValue, userID, nil
@@ -515,7 +526,28 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo p
 
 // GetUserIDFromCtx returns the user ID from the context
 func GetUserIDFromCtx(c *gin.Context) persist.DBID {
-	return c.MustGet(UserIDContextKey).(persist.DBID)
+	return c.MustGet(userIDContextKey).(persist.DBID)
+}
+
+// GetUserAuthedFromCtx queries the context to determine whether the user is authenticated
+func GetUserAuthedFromCtx(c *gin.Context) bool {
+	return c.GetBool(userAuthedContextKey)
+}
+
+func GetAuthErrorFromCtx(c *gin.Context) error {
+	err := c.MustGet(authErrorContextKey)
+
+	if err == nil {
+		return nil
+	}
+
+	return err.(error)
+}
+
+func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
+	c.Set(userIDContextKey, userID)
+	c.Set(authErrorContextKey, err)
+	c.Set(userAuthedContextKey, userID != "" && err == nil)
 }
 
 // GetAllowlistContracts returns the list of addresses we allowlist against
@@ -573,7 +605,7 @@ func SetJWTCookie(c *gin.Context, token string) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     JWTCookieKey,
 		Value:    token,
-		MaxAge:   viper.GetInt("JWT_TTL"),
+		MaxAge:   cookieMaxAge,
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: httpOnly,

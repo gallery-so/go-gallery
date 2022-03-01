@@ -25,7 +25,7 @@ type JWTValidateResponse struct {
 // ValidateJWT is a handler that validates the JWT token and returns the user ID
 func ValidateJWT() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		auth := c.GetBool(AuthContextKey)
+		auth := GetUserAuthedFromCtx(c)
 		userID := GetUserIDFromCtx(c)
 
 		c.JSON(http.StatusOK, JWTValidateResponse{
@@ -35,9 +35,8 @@ func ValidateJWT() gin.HandlerFunc {
 	}
 }
 
-// JWTParse parses the JWT token from the request and returns whether the token is valid and the user ID associated with it
-func JWTParse(pJWTtokenStr string,
-	pJWTsecretKeyStr string) (bool, persist.DBID, error) {
+// JWTParse parses the JWT token from the request and returns the user ID associated with it
+func JWTParse(pJWTtokenStr string, pJWTsecretKeyStr string) (persist.DBID, error) {
 
 	claims := jwtClaims{}
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
@@ -46,15 +45,11 @@ func JWTParse(pJWTtokenStr string,
 			return []byte(pJWTsecretKeyStr), nil
 		})
 
-	if err != nil {
-		return false, "", err
+	if err != nil || !JWTtoken.Valid {
+		return "", ErrInvalidJWT
 	}
 
-	if !JWTtoken.Valid {
-		return false, "", ErrInvalidJWT
-	}
-
-	return true, claims.UserID, nil
+	return claims.UserID, nil
 }
 
 // JWTGeneratePipeline generates a new JWT token for the user
@@ -69,9 +64,7 @@ func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 	return jwtTokenStr, nil
 }
 
-func jwtGenerate(
-	pIssuerStr string,
-	pUserID persist.DBID) (string, error) {
+func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
 
 	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
 

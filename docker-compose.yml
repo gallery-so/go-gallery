@@ -8,6 +8,13 @@ services:
     build:
       context: "."
       dockerfile: "docker/postgres/DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
     ports:
       - "5432:5432"
     environment:

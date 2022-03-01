@@ -25,6 +25,9 @@ type NullString string
 // NullInt64 represents an int64 that may be null in the DB
 type NullInt64 int64
 
+// NullInt32 represents an int32 that may be null in the DB
+type NullInt32 int32
+
 // NullBool represents a bool that may be null in the DB
 type NullBool bool
 
@@ -210,6 +213,36 @@ func (n *NullInt64) Scan(value interface{}) error {
 		return nil
 	}
 	*n = NullInt64(value.(int64))
+	return nil
+}
+
+// Int32 returns the int32 representation of the NullInt32
+func (n NullInt32) Int32() int32 {
+	return int32(n)
+}
+
+// Int returns the int representation of the NullInt32
+func (n NullInt32) Int() int {
+	return int(n)
+}
+
+func (n NullInt32) String() string {
+	return fmt.Sprint(n.Int32())
+}
+
+// Value implements the database/sql driver Valuer interface for the NullInt32 type
+func (n NullInt32) Value() (driver.Value, error) {
+	return n.Int32(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullInt32 type
+func (n *NullInt32) Scan(value interface{}) error {
+	if value == nil {
+		*n = NullInt32(0)
+		return nil
+	}
+	// database/sql spec says integer values should be returned as int64, even if the underlying column is int32
+	*n = NullInt32(value.(int64))
 	return nil
 }
 
