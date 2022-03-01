@@ -205,7 +205,8 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
-	err = g.cacheByUserID(pCtx, pID)
+	logrus.Infof("Added %d collections to gallery %s", len(pCollections), pID)
+	err = g.cacheByUserID(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
@@ -466,6 +467,10 @@ func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pU
 }
 
 func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	err := g.RefreshCache(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
 	gal, err := g.GetByUserID(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -474,7 +479,8 @@ func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.
 	if err != nil {
 		return err
 	}
-	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, time.Hour*24*7); err != nil {
+	logrus.Infof("Caching gallery %s: %s", pUserID, marshalled)
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
 		return err
 	}
 	return nil

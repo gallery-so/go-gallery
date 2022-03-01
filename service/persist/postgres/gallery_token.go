@@ -228,6 +228,7 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
+
 	err = g.cacheByUserID(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -506,13 +507,17 @@ func (g *GalleryTokenRepository) cacheByID(pCtx context.Context, pID persist.DBI
 	if err != nil {
 		return err
 	}
-	if err = g.galleriesCache.Set(pCtx, gal.OwnerUserID.String(), marshalled, time.Hour*24*7); err != nil {
+	if err = g.galleriesCache.Set(pCtx, gal.OwnerUserID.String(), marshalled, -1); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (g *GalleryTokenRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	err := g.RefreshCache(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
 	gals, err := g.GetByUserID(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -521,7 +526,7 @@ func (g *GalleryTokenRepository) cacheByUserID(pCtx context.Context, pUserID per
 	if err != nil {
 		return err
 	}
-	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, time.Hour*24*7); err != nil {
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
 		return err
 	}
 	return nil
