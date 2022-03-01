@@ -28,25 +28,30 @@ $ ./bin/main
 
 ### Redis and Postgres
 
-The app will connect to a local redis and local postgres instance by default. To spin it up, you can use the official docker containers:
+The app will connect to a local redis and local postgres instance by default. To spin it up, you can use the docker commands below.
 
-The first time you run the docker-containers on your machine, you will need to run the following command(s):
+**[Optional] Shell script to seed NFT data**
 
-_note_: If you have access to the `_encrypted_deploy` files and would like to use indexed data locally, run the source command before running the build command.
+If you want to seed your local database with real, indexed data from our dev or production clusters, you can "prep" your environment using the following bash script. Running this won't execute the import itself, but rather trigger the import when you run the later docker commands. _As a pre-requisite, you must have access to `_encrypted_deploy` in order to access the dev / prod clusters_.
 
-_second note_: If you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
+Note that if you run the following command, don't run `make g-docker` and upload the image to Dockerhub. This will expose the locally migrated data to the public. You can avoid this by opening a
+new shell. More on `make g-docker` further below.
+
+Finally: if you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
 
 ```bash
-$ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user to import data for>
+$ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user to import data>
 ```
 
-**warning**: If you use the source command, make sure not to run `make g-docker` and upload the image to Docker Hub. That will expose user data to the public. Before you do push to docker-hub, open a new shell.
+**Docker commands**
+
+Build the docker containers. If you ran the above shell script, the seed script will be executed. You can re-run this script in the future if you want the latest data:
 
 ```bash
 $ make docker-build
 ```
 
-To run the docker containers, run the following command:
+Run the docker containers:
 
 ```bash
 $ make docker-start
@@ -57,6 +62,12 @@ To remove running redis and postgres instance:
 ```bash
 $ make docker-stop
 ```
+
+**Deploying our Postgres image**
+
+`make g-docker` will push a new docker image that initializes a postgres instance with our custom schema. To get access to our dockerhub, contact a core team member.
+
+_Do not run this script if you've run the shell script for seeding NFT data._
 
 ### Healthcheck
 
