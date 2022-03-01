@@ -32,12 +32,12 @@ The app will connect to a local redis and local postgres instance by default. To
 
 The first time you run the docker-containers on your machine, you will need to run the following command(s):
 
-_note_: If you have access to the \_encrypted_deploy files and would like to use indexed data locally, run the source command before running the build command.
+_note_: If you have access to the `_encrypted_deploy` files and would like to use indexed data locally, run the source command before running the build command.
 
 _second note_: If you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
 
 ```bash
-$ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user you want to import data for>
+$ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user to import data for>
 ```
 
 **warning**: If you use the source command, make sure not to run `make g-docker` and upload the image to Docker Hub. That will expose user data to the public. Before you do push to docker-hub, open a new shell.
