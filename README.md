@@ -40,7 +40,7 @@ new shell. More on `make g-docker` further below.
 Finally: if you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
 
 ```bash
-$ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user to import data>
+$ source ./_import_env.sh <path to dev/prod backend app.yaml> <address of dev/prod wallet to import data>
 ```
 
 **Docker commands**
