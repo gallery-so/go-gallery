@@ -1,4 +1,6 @@
-CREATE TABLE users (
+CREATE SCHEMA IF NOT EXISTS public;
+
+CREATE TABLE IF NOT EXISTS users (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -10,7 +12,7 @@ CREATE TABLE users (
     BIO varchar
 );
 
-CREATE TABLE galleries (
+CREATE TABLE IF NOT EXISTS galleries (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -20,7 +22,7 @@ CREATE TABLE galleries (
     COLLECTIONS varchar(255) []
 );
 
-CREATE TABLE nfts (
+CREATE TABLE IF NOT EXISTS nfts (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -48,9 +50,9 @@ CREATE TABLE nfts (
     TOKEN_METADATA_URL varchar
 );
 
-CREATE UNIQUE INDEX opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
-CREATE TABLE collections (
+CREATE TABLE IF NOT EXISTS collections (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     OWNER_USER_ID varchar(255),
@@ -64,7 +66,7 @@ CREATE TABLE collections (
     LAYOUT jsonb
 );
 
-CREATE TABLE collections_v2 (
+CREATE TABLE IF NOT EXISTS collections_v2 (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     OWNER_USER_ID varchar(255),
@@ -78,7 +80,7 @@ CREATE TABLE collections_v2 (
     LAYOUT jsonb
 );
 
-CREATE TABLE nonces (
+CREATE TABLE IF NOT EXISTS nonces (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -89,7 +91,7 @@ CREATE TABLE nonces (
     VALUE varchar(255)
 );
 
-CREATE TABLE tokens (
+CREATE TABLE IF NOT EXISTS tokens (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -112,17 +114,17 @@ CREATE TABLE tokens (
     BLOCK_NUMBER bigint
 );
 
-CREATE UNIQUE INDEX token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
 
-CREATE INDEX token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
+CREATE INDEX IF NOT EXISTS token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
 
-CREATE INDEX owner_address_idx ON tokens (OWNER_ADDRESS);
+CREATE INDEX IF NOT EXISTS owner_address_idx ON tokens (OWNER_ADDRESS);
 
-CREATE INDEX contract_address_idx ON tokens (CONTRACT_ADDRESS);
+CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
 
-CREATE INDEX block_number_idx ON tokens (BLOCK_NUMBER);
+CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 
-CREATE TABLE contracts (
+CREATE TABLE IF NOT EXISTS contracts (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -134,9 +136,9 @@ CREATE TABLE contracts (
     LATEST_BLOCK bigint
 );
 
-CREATE UNIQUE INDEX address_idx ON contracts (ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS address_idx ON contracts (ADDRESS);
 
-CREATE TABLE login_attempts (
+CREATE TABLE IF NOT EXISTS login_attempts (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -151,7 +153,7 @@ CREATE TABLE login_attempts (
     NONCE_VALUE varchar
 );
 
-CREATE TABLE features (
+CREATE TABLE IF NOT EXISTS features (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -166,11 +168,11 @@ CREATE TABLE features (
     FORCE_ENABLED_USER_IDS varchar(255) []
 );
 
-CREATE UNIQUE INDEX feature_name_idx ON features (NAME);
+CREATE UNIQUE INDEX IF NOT EXISTS feature_name_idx ON features (NAME);
 
-CREATE UNIQUE INDEX feature_required_token_idx ON features (REQUIRED_TOKEN);
+CREATE UNIQUE INDEX IF NOT EXISTS feature_required_token_idx ON features (REQUIRED_TOKEN);
 
-CREATE TABLE backups (
+CREATE TABLE IF NOT EXISTS backups (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -180,7 +182,7 @@ CREATE TABLE backups (
     GALLERY jsonb
 );
 
-CREATE TABLE membership (
+CREATE TABLE IF NOT EXISTS membership (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
@@ -192,9 +194,9 @@ CREATE TABLE membership (
     OWNERS jsonb []
 );
 
-CREATE UNIQUE INDEX token_id_idx ON membership (TOKEN_ID);
+CREATE UNIQUE INDEX IF NOT EXISTS token_id_idx ON membership (TOKEN_ID);
 
-CREATE TABLE access (
+CREATE TABLE IF NOT EXISTS access (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,

@@ -31,3 +31,14 @@ g-docker:
 	docker push bcgallery/gallery-postgres:circle
 	docker-compose up -d
 
+docker-start-clean:	docker-build
+	docker-compose up -d
+
+docker-build: docker-stop
+	docker-compose build
+
+docker-start: docker-stop
+	docker-compose up -d
+
+docker-stop: 
+	docker-compose down

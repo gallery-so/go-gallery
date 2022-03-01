@@ -28,17 +28,46 @@ $ ./bin/main
 
 ### Redis and Postgres
 
-The app will connect to a local redis and local postgres instance by default. To spin it up, you can use the official docker containers:
+The app will connect to a local redis and local postgres instance by default. To spin it up, you can use the docker commands below.
+
+**[Optional] Shell script to seed NFT data**
+
+If you want to seed your local database with real, indexed data from our dev or production clusters, you can "prep" your environment using the following bash script. Running this won't execute the import itself, but rather trigger the import when you run the later docker commands. _As a pre-requisite, you must have access to `_encrypted_deploy` in order to access the dev / prod clusters_.
+
+Note that if you run the following command, don't run `make g-docker` and upload the image to Dockerhub. This will expose the locally migrated data to the public. You can avoid this by opening a
+new shell. More on `make g-docker` further below.
+
+Finally: if you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
 
 ```bash
-$ docker-compose up -d
+$ source ./_import_env.sh <path to dev/prod backend app.yaml> <address of dev/prod wallet to import data>
+```
+
+**Docker commands**
+
+Build the docker containers. If you ran the above shell script, the seed script will be executed. You can re-run this script in the future if you want the latest data:
+
+```bash
+$ make docker-build
+```
+
+Run the docker containers:
+
+```bash
+$ make docker-start
 ```
 
 To remove running redis and postgres instance:
 
 ```bash
-$ docker-compose down
+$ make docker-stop
 ```
+
+**Deploying our Postgres image**
+
+`make g-docker` will push a new docker image that initializes a postgres instance with our custom schema. To get access to our dockerhub, contact a core team member.
+
+_Do not run this script if you've run the shell script for seeding NFT data._
 
 ### Healthcheck
 
@@ -71,6 +100,7 @@ go test -run {testName}
 Add `-v` for detailed logs.
 
 Skip longer running tests with the `-short` flag:
+
 ```bash
 go test -short
 ```
@@ -78,6 +108,7 @@ go test -short
 ### Integration Testing
 
 Run integration tests against ethereum mainnet:
+
 ```bash
 go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
 ```
