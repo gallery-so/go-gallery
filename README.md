@@ -36,7 +36,7 @@ _note_: If you have access to the \_encrypted_deploy files and would like to use
 
 _second note_: If you are using bash/sh instead of zsh, change the first line of the `_import_env.sh` file to match your shell.
 
-_third note_: If you do this, make sure not to run `make g-docker` and upload the image to Docker Hub. That will expose user data to the public.
+_third note_: If you do this, make sure not to run `make g-docker` and upload the image to Docker Hub. That will expose user data to the public. Before you do push to docker-hub, open a new shell and rebuild the image with `make docker-build`.
 
 ```bash
 $ source ./_import_env.sh <path to dev/prod backend app.yaml> <username of dev/prod user you want to import data for>
