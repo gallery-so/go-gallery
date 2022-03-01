@@ -122,6 +122,8 @@ CREATE INDEX IF NOT EXISTS owner_address_idx ON tokens (OWNER_ADDRESS);
 
 CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
 
+CREATE INDEX IF NOT EXISTS token_ids_idx ON tokens (TOKEN_ID);
+
 CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 
 CREATE TABLE IF NOT EXISTS contracts (
