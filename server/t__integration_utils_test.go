@@ -140,7 +140,7 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 
 	// Seed db
 	db = postgres.NewClient()
-	for _, f := range []string{"../docker/postgres/init.sql"} {
+	for _, f := range []string{"../docker/postgres/03_init.sql"} {
 		migration, err := os.ReadFile(f)
 		if err != nil {
 			panic(err)
