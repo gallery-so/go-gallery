@@ -50,13 +50,13 @@ Create a new migration:
 migrate create -ext sql -dir db/migrations -seq <name of migration>
 ```
 
-Run a migration:
+Run a migration on dev:
 ```bash
-# Apply an up migration locally. Note: sslmode=disable is for Docker.
-migrate -path db/migrations -database "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable" up
+# Apply an up migration.
+migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
 
 # Undo a migration.
-migrate -path db/migrations -database "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable" down
+migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down
 ```
 
 ### Healthcheck
