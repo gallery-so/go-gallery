@@ -6,12 +6,14 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/pubsub"
 )
 
 type NftAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
 	ethClient *ethclient.Client
+	pubsub    pubsub.PubSub
 }
 
 func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) error {

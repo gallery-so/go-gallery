@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -19,6 +20,7 @@ type GalleryAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
 	ethClient *ethclient.Client
+	pubsub    pubsub.PubSub
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {

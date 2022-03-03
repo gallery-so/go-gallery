@@ -5,8 +5,6 @@ package graphql
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -175,7 +173,24 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *
 }
 
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (*model.AddUserAddressPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	api := publicapi.For(ctx)
+
+	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	if err != nil {
+		return nil, err
+	}
+
+	err = api.User.AddUserAddress(ctx, address, authenticator)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.AddUserAddressPayload{
+		Viewer: nil,
+	}
+
+	return output, nil
 }
 
 func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (*model.RemoveUserAddressesPayload, error) {

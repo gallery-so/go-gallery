@@ -140,10 +140,24 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			return
 		}
 
-		output, err := user.AddAddressToUser(c, userID, input, userRepository, nonceRepository, ethClient, psub)
+		authenticator := auth.EthereumNonceAuthenticator{
+			Address:    input.Address,
+			Nonce:      input.Nonce,
+			Signature:  input.Signature,
+			WalletType: input.WalletType,
+			UserRepo:   userRepository,
+			NonceRepo:  nonceRepository,
+			EthClient:  ethClient,
+		}
+
+		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository, psub)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
+		}
+
+		output := user.AddUserAddressOutput{
+			SignatureValid: true,
 		}
 
 		c.JSON(http.StatusOK, output)

@@ -7,6 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
 )
 
@@ -14,16 +15,16 @@ type UserAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
 	ethClient *ethclient.Client
+	pubsub    pubsub.PubSub
 }
 
 func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, authenticator auth.Authenticator) error {
-	//userID, err := getAuthenticatedUser(ctx)
-	//if err != nil {
-	//	return err
-	//}
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
 
-	//user.AddAddressToUser()
-	panic("need to rework with authenticators")
+	return user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository, api.pubsub)
 }
 
 func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) error {

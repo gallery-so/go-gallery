@@ -27,22 +27,22 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *et
 
 	nftHandlersInit(apiGroupV1, repos, ethClient, stg, psub)
 	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, stg, psub)
-	graphqlHandlersInit(graphqlGroup, repos, ethClient)
+	graphqlHandlersInit(graphqlGroup, repos, ethClient, psub)
 
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client) {
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	if viper.GetString("ENV") != "production" {
 		// Keep graphql route out of prod while it's under development
-		parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient))
+		parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient, pubsub))
 
 		// TODO: Consider completely disabling introspection in production
 		parent.GET("/playground", graphqlPlaygroundHandler())
 	}
 }
 
-func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client) gin.HandlerFunc {
+func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) gin.HandlerFunc {
 	// TODO: Resolver probably doesn't need repos or ethClient once the publicAPI is done
 	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
@@ -52,7 +52,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client) gi
 	return func(c *gin.Context) {
 		// TODO: Remove dataloader here
 		dataloader.AddTo(c, repos)
-		publicapi.AddTo(c, repos, ethClient)
+		publicapi.AddTo(c, repos, ethClient, pubsub)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

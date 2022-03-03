@@ -7,6 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -21,15 +22,15 @@ type PublicAPI struct {
 	Nft        *NftAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client) {
+func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
 	api := PublicAPI{
 		repos:      repos,
 		loaders:    loaders,
-		Collection: &CollectionAPI{repos: repos, loaders: loaders, ethClient: ethClient},
-		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, ethClient: ethClient},
-		User:       &UserAPI{repos: repos, loaders: loaders, ethClient: ethClient},
-		Nft:        &NftAPI{repos: repos, loaders: loaders, ethClient: ethClient},
+		Collection: &CollectionAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
+		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
+		User:       &UserAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
+		Nft:        &NftAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
 	}
 
 	ctx.Set(apiContextKey, api)

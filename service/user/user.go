@@ -304,36 +304,22 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUserAddressesInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (AddUserAddressOutput, error) {
+func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, addressAuth auth.Authenticator,
+	userRepo persist.UserRepository, psub pubsub.PubSub) error {
 
-	output := AddUserAddressOutput{}
-
-	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonce == "" {
-		return AddUserAddressOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
-	}
-	if userID != "" {
-		return AddUserAddressOutput{}, ErrAddressOwnedByUser{Address: pInput.Address, OwnerID: userID}
-	}
-
-	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
-			return AddUserAddressOutput{}, auth.ErrNonceMismatch
-		}
-	}
-
-	dataStr := nonce
-	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
-		dataStr,
-		pInput.Address, pInput.WalletType, ethClient)
+	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
-		return AddUserAddressOutput{}, err
+		return err
 	}
 
-	output.SignatureValid = sigValidBool
-	if !sigValidBool {
-		return output, nil
+	addressUserID := authResult.UserID
+
+	if addressUserID != "" {
+		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
+	}
+
+	if !containsAddress(authResult.Addresses, pAddress) {
+		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
 	}
 
 	defer func() {
@@ -341,7 +327,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		// validate that the user's NFTs are valid and have cached media content
 		if viper.GetString("ENV") != "local" {
 			go func() {
-				err := publishUserAddAddress(pCtx, pUserID, pInput.Address, psub)
+				err := publishUserAddAddress(pCtx, pUserID, pAddress, psub)
 				if err != nil {
 					logrus.WithError(err).Error("failed to publish user signup")
 				}
@@ -358,23 +344,18 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pInput.Address)
+			err := ensureMediaContent(ctx, pAddress)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
 
-	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address}); err != nil {
-		return AddUserAddressOutput{}, err
+	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pAddress}); err != nil {
+		return err
 	}
 
-	err = auth.NonceRotate(pCtx, pInput.Address, pUserID, nonceRepo)
-	if err != nil {
-		return AddUserAddressOutput{}, err
-	}
-
-	return output, nil
+	return nil
 }
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
@@ -634,10 +615,30 @@ func (e ErrAddressOwnedByUser) Error() string {
 	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.Address, e.OwnerID)
 }
 
+type ErrAddressNotOwnedByUser struct {
+	Address persist.Address
+	UserID  persist.DBID
+}
+
+func (e ErrAddressNotOwnedByUser) Error() string {
+	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.Address, e.UserID)
+}
+
 func (e errCouldNotEnsureMediaForAddress) Error() string {
 	return fmt.Sprintf("could not ensure media for address: %s", e.address)
 }
 
 type errCouldNotEnsureMediaForAddress struct {
 	address persist.Address
+}
+
+// containsAddress checks whether an address exists in a slice
+func containsAddress(a []persist.Address, b persist.Address) bool {
+	for _, v := range a {
+		if v == b {
+			return true
+		}
+	}
+
+	return false
 }
