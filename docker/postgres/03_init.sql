@@ -51,11 +51,6 @@ CREATE TABLE IF NOT EXISTS nfts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
-<<<<<<< HEAD:db/migrations/000001_create_core_tables.up.sql
-=======
-CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
-
->>>>>>> main:docker/postgres/03_init.sql
 CREATE TABLE IF NOT EXISTS collections (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -119,23 +114,12 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
-<<<<<<< HEAD:db/migrations/000001_create_core_tables.up.sql
 
 CREATE INDEX IF NOT EXISTS token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
 
 CREATE INDEX IF NOT EXISTS owner_address_idx ON tokens (OWNER_ADDRESS);
 
 CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
-=======
-
-CREATE INDEX IF NOT EXISTS token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
-
-CREATE INDEX IF NOT EXISTS owner_address_idx ON tokens (OWNER_ADDRESS);
-
-CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
-
-CREATE INDEX IF NOT EXISTS token_ids_idx ON tokens (TOKEN_ID);
->>>>>>> main:docker/postgres/03_init.sql
 
 CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 

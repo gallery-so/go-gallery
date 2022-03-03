@@ -1,3 +1,5 @@
+CREATE SCHEMA IF NOT EXISTS public;
+
 CREATE TABLE IF NOT EXISTS users (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
