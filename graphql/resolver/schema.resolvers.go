@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -78,36 +79,151 @@ func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (mode
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
-func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (*model.CreateCollectionPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	layout := persist.TokenLayout{
+		Columns:    persist.NullInt32(input.Layout.Columns),
+		Whitespace: input.Layout.Whitespace,
+	}
+
+	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Nfts, layout)
+
+	if err != nil {
+		return nil, err
+	}
+
+	collectionModel := collectionToModel(ctx, r.Resolver, *collection)
+
+	// TODO: Use field collection here, and only query for the collection if it was requested.
+	// That also means returning just the ID from the public API and using it here.
+	output := model.CreateCollectionPayload{
+		Collection: &collectionModel,
+	}
+
+	return output, nil
 }
 
-func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID *int) (*model.DeleteCollectionPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID persist.DBID) (*model.DeleteCollectionPayload, error) {
+	api := publicapi.For(ctx)
+	err := api.Collection.DeleteCollection(ctx, collectionID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Need to be able to look up a gallery by a collection -- maybe gallery ID by collection ID -- and then grab it after the deletion.
+	// As above, use field collection to see if we need to look up the gallery.
+	output := &model.DeleteCollectionPayload{
+		Gallery: nil,
+	}
+
+	return output, nil
 }
 
 func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (*model.UpdateCollectionInfoPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	api := publicapi.For(ctx)
+	err := api.Collection.UpdateCollection(ctx, input.CollectionID, input.Name, input.CollectorsNote)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: field collection
+	output := &model.UpdateCollectionInfoPayload{
+		Collection: nil,
+	}
+
+	return output, nil
 }
 
 func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (*model.UpdateCollectionNftsPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	api := publicapi.For(ctx)
+
+	layout := persist.TokenLayout{
+		Columns:    persist.NullInt32(input.Layout.Columns),
+		Whitespace: input.Layout.Whitespace,
+	}
+
+	err := api.Collection.UpdateCollectionNfts(ctx, input.CollectionID, input.Nfts, layout)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.UpdateCollectionNftsPayload{
+		Collection: nil,
+	}
+
+	return output, nil
 }
 
 func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *model.UpdateGalleryCollectionsInput) (*model.UpdateGalleryCollectionsPayload, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Gallery.UpdateGalleryCollections(ctx, input.GalleryID, input.Collections)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.UpdateGalleryCollectionsPayload{
+		Gallery: nil,
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (*model.AddUserAddressPayload, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) RemoveUserAddress(ctx context.Context, address persist.Address) (*model.RemoveUserAddressPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (*model.RemoveUserAddressesPayload, error) {
+	api := publicapi.For(ctx)
+
+	err := api.User.RemoveUserAddresses(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.RemoveUserAddressesPayload{
+		Viewer: nil,
+	}
+
+	return output, nil
 }
 
-func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input *model.UpdateUserInfoInput) (*model.UpdateUserInfoPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (*model.UpdateUserInfoPayload, error) {
+	api := publicapi.For(ctx)
+
+	err := api.User.UpdateUserInfo(ctx, input.Username, input.Bio)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.UpdateUserInfoPayload{
+		Viewer: nil,
+	}
+
+	return output, nil
 }
 
-func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context) (*model.RefreshOpenSeaNftsPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses string) (*model.RefreshOpenSeaNftsPayload, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Nft.RefreshOpenSeaNfts(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.RefreshOpenSeaNftsPayload{
+		Viewer: nil,
+	}
+
+	return output, nil
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error) {
@@ -241,8 +357,26 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (mo
 	return user, nil
 }
 
-func (r *queryResolver) MembershipTiers(ctx context.Context) ([]*model.MembershipTier, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error) {
+	api := publicapi.For(ctx)
+
+	refresh := false
+	if forceRefresh != nil {
+		refresh = *forceRefresh
+	}
+
+	tiers, err := api.User.GetMembershipTiers(ctx, refresh)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]*model.MembershipTier, len(tiers))
+	for i, tier := range tiers {
+		tierModel := membershipTierToModel(ctx, tier)
+		output[i] = &tierModel
+	}
+
+	return output, nil
 }
 
 func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (model.GalleryUserOrWallet, error) {
@@ -275,7 +409,7 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.N
 
 	output := make([]model.Nft, len(nfts))
 	for i, nft := range nfts {
-		output[i] = nftToNftModel(ctx, r.Resolver, nft)
+		output[i] = nftToModel(ctx, r.Resolver, nft)
 	}
 
 	return output, nil

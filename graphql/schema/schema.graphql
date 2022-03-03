@@ -78,6 +78,7 @@ type GalleryNft {
 
 type GalleryCollectionLayout {
   columns: Int
+  whitespace: [Int]
 }
 
 type GalleryCollection implements Node {
@@ -97,7 +98,7 @@ type Gallery implements Node {
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
-type MembershipTierOwner implements Node {
+type MembershipOwner implements Node {
   id: ID!
 
   user: GalleryUser
@@ -109,7 +110,7 @@ type MembershipTier implements Node {
   name: String
   assetUrl: String
   tokenId: String
-  owners: [MembershipTierOwner]
+  owners: [MembershipOwner]
 }
 
 # We have this extra type in case we need to stick authed data
@@ -129,23 +130,26 @@ union ViewerOrError = Viewer | ErrNotAuthorized
 type Query {
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
-  membershipTiers: [MembershipTier]
+  membershipTiers(forceRefresh: Boolean): [MembershipTier]
 }
 
 input GalleryCollectionLayoutInput {
-  columns: Int
+  columns: Int!
+  whitespace: [Int!]!
 }
 
 input CreateCollectionInput {
   galleryId: ID!
-  name: String
-  collectorsNote: String
+  name: String!
+  collectorsNote: String!
   nfts: [ID!]!
   layout: GalleryCollectionLayoutInput!
 }
 
+union CreateCollectionPayloadOrError = CreateCollectionPayload | ErrNotAuthorized
+
 type CreateCollectionPayload {
-  gallery: Gallery
+  collection: GalleryCollection
 }
 
 type DeleteCollectionPayload {
@@ -154,8 +158,8 @@ type DeleteCollectionPayload {
 
 input UpdateCollectionInfoInput {
   collectionId: ID!
-  name: String
-  collectorsNote: String
+  name: String!
+  collectorsNote: String!
 }
 
 type UpdateCollectionInfoPayload {
@@ -165,6 +169,7 @@ type UpdateCollectionInfoPayload {
 input UpdateCollectionNftsInput {
   collectionId: ID!
   nfts: [ID!]!
+  layout: GalleryCollectionLayoutInput!
 }
 
 type UpdateCollectionNftsPayload {
@@ -180,13 +185,17 @@ type UpdateGalleryCollectionsPayload {
   gallery: Gallery
 }
 
-type RemoveUserAddressPayload {
+type AddUserAddressPayload {
+  viewer: Viewer
+}
+
+type RemoveUserAddressesPayload {
   viewer: Viewer
 }
 
 input UpdateUserInfoInput {
-  username: String
-  bio: String
+  username: String!
+  bio: String!
 }
 
 type UpdateUserInfoPayload {
@@ -194,7 +203,7 @@ type UpdateUserInfoPayload {
 }
 
 type RefreshOpenSeaNftsPayload {
-  wallet: Wallet
+  viewer: Viewer
 }
 
 type AuthNonce {
@@ -267,8 +276,8 @@ type CreateUserPayload {
 
 type Mutation {
   # Collection Mutations
-  createCollection(input: CreateCollectionInput!): CreateCollectionPayload
-  deleteCollection(collectionId: Int): DeleteCollectionPayload
+  createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError
+  deleteCollection(collectionId: ID!): DeleteCollectionPayload
   updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayload
   updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayload
 
@@ -276,11 +285,13 @@ type Mutation {
   updateGalleryCollections(input: UpdateGalleryCollectionsInput): UpdateGalleryCollectionsPayload
 
   # User Mutations
-  removeUserAddress(address: Address!): RemoveUserAddressPayload
-  updateUserInfo(input: UpdateUserInfoInput): UpdateUserInfoPayload
+  addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayload
+  removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayload
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayload
   #addUserAddress()
 
-  refreshOpenSeaNfts: RefreshOpenSeaNftsPayload
+  # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
+  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayload
 
   getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 

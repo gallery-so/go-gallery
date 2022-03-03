@@ -435,3 +435,68 @@ func OrderMembershipTiers(pTiers []persist.MembershipTier) []persist.MembershipT
 	}
 	return result
 }
+
+func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository,
+	galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+
+	if forceRefresh {
+		logrus.Infof("Force refresh - updating membership tiers")
+	}
+
+	allTiers, err := membershipRepository.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Debugf("Found %d membership tiers in the DB", len(allTiers))
+
+	if len(allTiers) > 0 {
+		if len(allTiers) != len(MembershipTierIDs) {
+			tiers := make(map[persist.TokenID]bool)
+
+			for _, tier := range allTiers {
+				tiers[tier.TokenID] = true
+			}
+
+			for _, tierID := range MembershipTierIDs {
+				if ok := tiers[tierID]; !ok {
+					logrus.Infof("Tier not found - updating membership tier %s", tierID)
+					newTier, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
+					if err != nil {
+						return nil, err
+					}
+					allTiers = append(allTiers, newTier)
+				}
+			}
+		}
+
+		tiersToUpdate := make([]persist.TokenID, 0, len(allTiers))
+		for _, tier := range allTiers {
+			if time.Since(tier.LastUpdated.Time()) > time.Hour || forceRefresh {
+				logrus.Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
+				tiersToUpdate = append(tiersToUpdate, tier.TokenID)
+			}
+		}
+
+		if len(tiersToUpdate) > 0 {
+			go func() {
+				for _, tierID := range tiersToUpdate {
+					_, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
+					if err != nil {
+						logrus.WithError(err).Errorf("Failed to update membership tier %s", tierID)
+					}
+				}
+			}()
+		}
+
+		return OrderMembershipTiers(allTiers), nil
+	}
+
+	logrus.Infof("No tiers found - updating membership tiers")
+	membershipTiers, err := UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, ethClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return OrderMembershipTiers(membershipTiers), nil
+}

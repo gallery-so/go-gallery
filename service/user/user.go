@@ -288,7 +288,7 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 }
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
+func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address,
 	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
@@ -296,11 +296,11 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return err
 	}
 
-	if len(user.Addresses) <= len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pAddresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 
-	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
+	return userRepo.RemoveAddresses(pCtx, pUserID, pAddresses)
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
@@ -438,15 +438,15 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 }
 
 // UpdateUser updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
-	if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
+func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
+	if strings.HasSuffix(strings.ToLower(username), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {
 			return err
 		}
 		can := false
 		for _, addr := range user.Addresses {
-			if resolves, _ := eth.ResolvesENS(pCtx, input.UserName, addr, ethClient); resolves {
+			if resolves, _ := eth.ResolvesENS(pCtx, username, addr, ethClient); resolves {
 				can = true
 				break
 			}
@@ -460,9 +460,9 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		pCtx,
 		userID,
 		persist.UserUpdateInfoInput{
-			UsernameIdempotent: persist.NullString(strings.ToLower(input.UserName)),
-			Username:           persist.NullString(input.UserName),
-			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(input.BioStr)),
+			UsernameIdempotent: persist.NullString(strings.ToLower(username)),
+			Username:           persist.NullString(username),
+			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(bio)),
 		},
 	)
 	if err != nil {

@@ -35,7 +35,7 @@ func updateUserInfo(userRepository persist.UserRepository, ethClient *ethclient.
 			return
 		}
 
-		err := user.UpdateUser(c, userID, input, userRepository, ethClient)
+		err := user.UpdateUser(c, userID, input.UserName, input.BioStr, userRepository, ethClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
