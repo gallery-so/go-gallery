@@ -41,15 +41,15 @@ type TestAddressFile struct {
 
 // N.B. This isn't the entire Docker Compose spec...
 type ComposeFile struct {
-	Version  string
-	Services map[string]Service
+	Version  string             `yaml:"version"`
+	Services map[string]Service `yaml:"services"`
 }
 
 type Service struct {
-	Image       string
-	Ports       []string
-	Build       map[string]string
-	Environment []string
+	Image       string                 `yaml:"image"`
+	Ports       []string               `yaml:"ports"`
+	Build       map[string]interface{} `yaml:"build"`
+	Environment []string               `yaml:"environment"`
 }
 
 func configureContainerCleanup(config *docker.HostConfig) {
@@ -100,7 +100,7 @@ func getImageAndVersion(s string) ([]string, error) {
 }
 
 func getBuildImage(s Service) ([]string, error) {
-	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"])
+	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"].(string))
 	if err != nil {
 		log.Fatal(err)
 	}

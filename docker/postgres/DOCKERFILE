@@ -3,4 +3,18 @@ FROM postgres:14
 ENV POSTGRES_HOST_AUTH_METHOD trust
 ENV POSTGRES_USER postgres
 ENV POSTGRES_DB postgres
+ARG PGHOST="localhost"
+ARG PGPORT=5432
+ARG PGUSER=postgres
+ARG PGPASSWORD=""
+ARG PGDATABASE=postgres
+ARG PGTESTUSER=benny
+ARG PGDATABASE=postgres
+# Note that the migrations in db/migrations will run before the migrations in
+# docker/postgres due to how the files are nanmed.
 COPY db/migrations/*up.sql /docker-entrypoint-initdb.d/
+COPY docker/postgres/01_init.sql /docker-entrypoint-initdb.d/01_init.sql
+COPY docker/postgres/03_init.sql /docker-entrypoint-initdb.d/03_init.sql
+RUN apt-get update && apt-get install git perl libdbi-perl libdbd-pg-perl -y
+RUN git clone https://github.com/mla/pg_sample.git
+RUN ./pg_sample/pg_sample $PGDATABASE --user=$PGUSER --password=$PGPASSWORD --host=$PGHOST --port=$PGPORT --file="/docker-entrypoint-initdb.d/02_init.sql" --limit="tokens = OWNER_ADDRESS = '$PGTESTUSER', tokens = 500" --verbose --force --schema=public

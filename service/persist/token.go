@@ -230,6 +230,7 @@ type TokenRepository interface {
 	GetByUserID(context.Context, DBID, int64, int64) ([]Token, error)
 	GetByContract(context.Context, Address, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]Token, error)
+	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
@@ -249,6 +250,14 @@ type ErrTokenNotFoundByIdentifiers struct {
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
 type ErrTokenNotFoundByID struct {
 	ID DBID
+}
+
+type ErrTokensNotFoundByTokenID struct {
+	TokenID TokenID
+}
+
+type ErrTokensNotFoundByContract struct {
+	ContractAddress Address
 }
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
@@ -294,6 +303,14 @@ func MediaFromContentType(contentType string) MediaType {
 
 func (e ErrTokenNotFoundByID) Error() string {
 	return fmt.Sprintf("token not found by ID: %s", e.ID)
+}
+
+func (e ErrTokensNotFoundByTokenID) Error() string {
+	return fmt.Sprintf("tokens not found by token ID: %s", e.TokenID)
+}
+
+func (e ErrTokensNotFoundByContract) Error() string {
+	return fmt.Sprintf("tokens not found by contract: %s", e.ContractAddress)
 }
 
 func (e ErrTokenNotFoundByIdentifiers) Error() string {
