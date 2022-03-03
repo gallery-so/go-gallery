@@ -63,6 +63,14 @@ To remove running redis and postgres instance:
 $ make docker-stop
 ```
 
+**Deploying our Postgres image**
+
+`make g-docker` will push a new docker image that initializes a postgres instance with our custom schema. To get access to our dockerhub, contact a core team member.
+
+_Do not run this script if you've run the shell script for seeding NFT data._
+
+**Working with migrations**
+
 The `migrate` cli can be installed via brew (assuming MacOS):
 ```bash
 brew install golang-migrate
@@ -81,10 +89,6 @@ migrate -path db/migrations -database "postgresql://postgres:<dev db password he
 # Undo a migration.
 migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down
 ```
-
-`make g-docker` will push a new docker image that initializes a postgres instance with our custom schema. To get access to our dockerhub, contact a core team member.
-
-_Do not run this script if you've run the shell script for seeding NFT data._
 
 ### Healthcheck
 
