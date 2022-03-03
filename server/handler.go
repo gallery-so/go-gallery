@@ -9,7 +9,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
-	"github.com/mikeydub/go-gallery/graphql/resolver"
+	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -113,6 +113,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.UserRepository))
 	usersGroup.GET("/membership", getMembershipTiersREST(repos.MembershipRepository, repos.UserRepository, repos.GalleryRepository, ethClient))
 	usersGroup.POST("/create", createUser(repos.UserRepository, repos.NonceRepository, repos.GalleryRepository, psub, ethClient))
+	// TODO: Add these
 	usersGroup.GET("/previews", getNFTPreviews(repos.GalleryRepository, repos.UserRepository))
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
 
