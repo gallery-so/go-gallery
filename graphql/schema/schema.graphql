@@ -280,7 +280,6 @@ input EthereumEoaAuth {
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
-  signature: String!
 }
 
 union LoginPayloadOrError = LoginPayload | ErrUserNotFound | ErrAuthenticationFailed | ErrDoesNotOwnRequiredNFT

@@ -68,7 +68,8 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	}
 
 	if m.GnosisSafe != nil {
-		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, m.GnosisSafe.Signature, auth.WalletTypeGnosis), nil
+		// GnosisSafe passes an empty signature
+		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, "0x", auth.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound

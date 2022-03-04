@@ -156,6 +156,7 @@ type ErrInvalidInput struct {
 	Reason    string `json:"reason"`
 }
 
+func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
@@ -280,9 +281,8 @@ func (GenericNft) IsNode()         {}
 func (GenericNft) IsNft()          {}
 
 type GnosisSafeAuth struct {
-	Address   persist.Address `json:"address"`
-	Nonce     string          `json:"nonce"`
-	Signature string          `json:"signature"`
+	Address persist.Address `json:"address"`
+	Nonce   string          `json:"nonce"`
 }
 
 type ImageNft struct {
