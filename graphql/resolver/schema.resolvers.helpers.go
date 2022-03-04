@@ -277,7 +277,6 @@ func membershipTierToModel(ctx context.Context, membershipTier persist.Membershi
 		owners[i] = &ownerModel
 	}
 
-	// TODO: Consider field collection on owners
 	return model.MembershipTier{
 		ID:       membershipTier.ID,
 		Name:     util.StringToPointer(membershipTier.Name.String()),
@@ -296,7 +295,8 @@ func membershipOwnerToModel(ctx context.Context, membershipOwner persist.Members
 	// TODO: Probably want to add "address" here to, assuming it means "the address holding the membership card"
 	return model.MembershipOwner{
 		ID:          membershipOwner.UserID, // TODO: Not sure this is relevant if we have the user object too
-		User:        nil,                    // TODO: Resolve or do field collection now. Resolving is fine if we keep the ID, FC is better if we drop it.
+		Address:     &membershipOwner.Address,
+		User:        nil, // handled by dedicated resolver
 		PreviewNfts: previewNfts,
 	}
 }

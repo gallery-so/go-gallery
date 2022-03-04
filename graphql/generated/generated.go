@@ -42,6 +42,7 @@ type ResolverRoot interface {
 	GalleryUser() GalleryUserResolver
 	GenericNft() GenericNftResolver
 	ImageNft() ImageNftResolver
+	MembershipOwner() MembershipOwnerResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	VideoNft() VideoNftResolver
@@ -168,6 +169,7 @@ type ComplexityRoot struct {
 	}
 
 	MembershipOwner struct {
+		Address     func(childComplexity int) int
 		ID          func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
@@ -264,6 +266,9 @@ type GenericNftResolver interface {
 }
 type ImageNftResolver interface {
 	Owner(ctx context.Context, obj *model.ImageNft) (model.GalleryUserOrWallet, error)
+}
+type MembershipOwnerResolver interface {
+	User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error)
 }
 type MutationResolver interface {
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
@@ -659,6 +664,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LoginPayload.UserID(childComplexity), true
+
+	case "MembershipOwner.address":
+		if e.complexity.MembershipOwner.Address == nil {
+			break
+		}
+
+		return e.complexity.MembershipOwner.Address(childComplexity), true
 
 	case "MembershipOwner.id":
 		if e.complexity.MembershipOwner.ID == nil {
@@ -1169,8 +1181,8 @@ type Gallery implements Node {
 
 type MembershipOwner implements Node {
   id: ID!
-
-  user: GalleryUser
+  address: Address
+  user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
 }
 
@@ -3353,7 +3365,7 @@ func (ec *executionContext) _MembershipOwner_id(ctx context.Context, field graph
 	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _MembershipOwner_user(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
+func (ec *executionContext) _MembershipOwner_address(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3371,7 +3383,39 @@ func (ec *executionContext) _MembershipOwner_user(ctx context.Context, field gra
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return obj.Address, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MembershipOwner_user(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MembershipOwner",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.MembershipOwner().User(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7994,15 +8038,32 @@ func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.Select
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
-		case "user":
+		case "address":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MembershipOwner_user(ctx, field, obj)
+				return ec._MembershipOwner_address(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MembershipOwner_user(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "previewNfts":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._MembershipOwner_previewNfts(ctx, field, obj)

@@ -304,9 +304,10 @@ type LoginPayload struct {
 func (LoginPayload) IsLoginPayloadOrError() {}
 
 type MembershipOwner struct {
-	ID          persist.DBID `json:"id"`
-	User        *GalleryUser `json:"user"`
-	PreviewNfts []*string    `json:"previewNfts"`
+	ID          persist.DBID     `json:"id"`
+	Address     *persist.Address `json:"address"`
+	User        *GalleryUser     `json:"user"`
+	PreviewNfts []*string        `json:"previewNfts"`
 }
 
 func (MembershipOwner) IsNode() {}

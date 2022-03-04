@@ -78,6 +78,10 @@ func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (mode
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
+func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.ID)
+}
+
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
 	gc := util.GinContextFromContext(ctx)
@@ -558,6 +562,11 @@ func (r *Resolver) GenericNft() generated.GenericNftResolver { return &genericNf
 // ImageNft returns generated.ImageNftResolver implementation.
 func (r *Resolver) ImageNft() generated.ImageNftResolver { return &imageNftResolver{r} }
 
+// MembershipOwner returns generated.MembershipOwnerResolver implementation.
+func (r *Resolver) MembershipOwner() generated.MembershipOwnerResolver {
+	return &membershipOwnerResolver{r}
+}
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -578,6 +587,7 @@ type galleryCollectionResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type genericNftResolver struct{ *Resolver }
 type imageNftResolver struct{ *Resolver }
+type membershipOwnerResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type videoNftResolver struct{ *Resolver }

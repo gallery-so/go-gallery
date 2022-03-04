@@ -100,8 +100,8 @@ type Gallery implements Node {
 
 type MembershipOwner implements Node {
   id: ID!
-
-  user: GalleryUser
+  address: Address
+  user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
 }
 
