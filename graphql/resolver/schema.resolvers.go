@@ -185,9 +185,8 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.AddUserAddressPayload{
-		Viewer: nil,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -201,9 +200,8 @@ func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.RemoveUserAddressesPayload{
-		Viewer: nil,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -217,9 +215,8 @@ func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.Updat
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.UpdateUserInfoPayload{
-		Viewer: nil,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -233,9 +230,8 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses str
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.RefreshOpenSeaNftsPayload{
-		Viewer: nil,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -319,12 +315,7 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error) {
-	viewer := &model.Viewer{
-		User:            nil, // handled by dedicated resolver
-		ViewerGalleries: nil, // handled by dedicated resolver
-	}
-
-	return viewer, nil
+	return resolveViewer(ctx), nil
 }
 
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error) {

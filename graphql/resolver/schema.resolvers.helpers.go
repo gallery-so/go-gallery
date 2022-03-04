@@ -293,3 +293,12 @@ func membershipOwnerToModel(ctx context.Context, membershipOwner persist.Members
 		PreviewNfts: previewNfts,
 	}
 }
+
+func resolveViewer(ctx context.Context) *model.Viewer {
+	viewer := &model.Viewer{
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}
+
+	return viewer
+}
