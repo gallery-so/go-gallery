@@ -97,7 +97,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	}
 
 	// ensure that there are no repeat NFTs
-	// TODO: Is this something we should be handling gracefully, or can we throw a validation error when we see a duplicate?
+	// TODO: Throw a validation error instead of removing duplicates
 	nfts = persist.RemoveDuplicateDBIDs(nfts)
 	layout, err = persist.ValidateLayout(layout, nfts)
 	if err != nil {

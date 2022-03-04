@@ -292,9 +292,8 @@ func membershipOwnerToModel(ctx context.Context, membershipOwner persist.Members
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	// TODO: Probably want to add "address" here to, assuming it means "the address holding the membership card"
 	return model.MembershipOwner{
-		ID:          membershipOwner.UserID, // TODO: Not sure this is relevant if we have the user object too
+		ID:          membershipOwner.UserID,
 		Address:     &membershipOwner.Address,
 		User:        nil, // handled by dedicated resolver
 		PreviewNfts: previewNfts,

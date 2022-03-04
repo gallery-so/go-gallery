@@ -33,7 +33,7 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.
 		return err
 	}
 
-	// TODO: Validation error?
+	// TODO: Throw a validation error instead of removing duplicates
 	addresses = persist.RemoveDuplicateAddresses(addresses)
 
 	return user.RemoveAddressesFromUser(ctx, userID, addresses, api.repos.UserRepository)

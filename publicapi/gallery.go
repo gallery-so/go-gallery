@@ -34,7 +34,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return errTooManyCollectionsInGallery
 	}
 
-	// TODO: Is this something we should be handling gracefully, or can we throw a validation error when we see a duplicate?
+	// TODO: Throw a validation error instead of removing duplicates
 	collections = persist.RemoveDuplicateDBIDs(collections)
 
 	update := persist.GalleryUpdateInput{Collections: collections}
