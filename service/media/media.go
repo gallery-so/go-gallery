@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/gif"
 	"image/jpeg"
 	"net"
 	"net/http"
@@ -130,7 +131,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeGIF, persist.MediaTypeText:
 		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
 	default:
 		res.MediaType = mediaType
@@ -295,17 +296,19 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	initialType := predictMediaType(pCtx, url)
+	mediaType := predictMediaType(pCtx, url)
 
-	logrus.Infof("predicting media type for %s: %s", name, initialType)
+	logrus.Infof("predicting media type for %s: %s", name, mediaType)
 
-	switch initialType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeHTML, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeSVG, persist.MediaTypeBase64JSON, persist.MediaTypeBase64SVG, persist.MediaTypeJSON:
+outer:
+	switch mediaType {
+	case persist.MediaTypeVideo, persist.MediaTypeGIF, persist.MediaTypeUnknown:
+	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
-			break
+			break outer
 		default:
-			return initialType, nil
+			return mediaType, nil
 		}
 	}
 
@@ -313,6 +316,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		downloadLock.Lock()
 		defer downloadLock.Unlock()
 	}
+
 	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", url, err)
@@ -321,12 +325,13 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 	logrus.Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, url, name)
 
 	buf := bytes.NewBuffer(bs)
-	mediaType := persist.SniffMediaType(bs)
+	if mediaType == persist.MediaTypeUnknown {
+		mediaType = persist.SniffMediaType(bs)
+	}
 
 	logrus.Infof("sniffed media type for %s: %s", url, mediaType)
 	switch mediaType {
 	case persist.MediaTypeVideo:
-
 		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
 		if err != nil {
 			return mediaType, err
@@ -348,10 +353,30 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		}
 
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-	default:
+	case persist.MediaTypeGIF:
+		if asURI.Type() == persist.URITypeIPFS || asURI.Type() == persist.URITypeArweave {
+			logrus.Infof("IPFS LINK: caching raw media for %s", url)
+			err = cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+			if err != nil {
+				return mediaType, err
+			}
+		}
+		d, err := gif.Decode(buf)
+		if err != nil {
+			return mediaType, err
+		}
+		d = resize.Thumbnail(1024, 1024, d, resize.NearestNeighbor)
+		buf = &bytes.Buffer{}
+		err = jpeg.Encode(buf, d, nil)
+		if err != nil {
+			return mediaType, err
+		}
 
+		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
+			logrus.Infof("IPFS LINK: caching raw media for %s", url)
 			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 		default:
 			return mediaType, nil

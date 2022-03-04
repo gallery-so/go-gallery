@@ -17,6 +17,9 @@ import (
 
 	"github.com/asottile/dockerfile"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang-migrate/migrate/v4"
+	pgdriver "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -38,15 +41,15 @@ type TestAddressFile struct {
 
 // N.B. This isn't the entire Docker Compose spec...
 type ComposeFile struct {
-	Version  string
-	Services map[string]Service
+	Version  string             `yaml:"version"`
+	Services map[string]Service `yaml:"services"`
 }
 
 type Service struct {
-	Image       string
-	Ports       []string
-	Build       map[string]string
-	Environment []string
+	Image       string                 `yaml:"image"`
+	Ports       []string               `yaml:"ports"`
+	Build       map[string]interface{} `yaml:"build"`
+	Environment []string               `yaml:"environment"`
 }
 
 func configureContainerCleanup(config *docker.HostConfig) {
@@ -97,7 +100,7 @@ func getImageAndVersion(s string) ([]string, error) {
 }
 
 func getBuildImage(s Service) ([]string, error) {
-	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"])
+	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"].(string))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,17 +143,16 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 
 	// Seed db
 	db = postgres.NewClient()
-	for _, f := range []string{"../docker/postgres/init.sql"} {
-		migration, err := os.ReadFile(f)
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = db.Exec(string(migration))
-		if err != nil {
-			log.Fatalf("failed to seed the db: %s", err)
-		}
+	d, err := pgdriver.WithInstance(db, &pgdriver.Config{})
+	if err != nil {
+		log.Fatalf("could not create pg driver: %s", err)
 	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://../db/migrations", "postgres", d)
+	if err != nil {
+		log.Fatalf("failed to create migration: %s", err)
+	}
+	m.Up()
 
 	return pg, db
 }

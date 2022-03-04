@@ -20,6 +20,8 @@ type TokenRepository struct {
 	getUserAddressesStmt                    *sql.Stmt
 	getByContractStmt                       *sql.Stmt
 	getByContractPaginateStmt               *sql.Stmt
+	getByTokenIDStmt                        *sql.Stmt
+	getByTokenIDPaginateStmt                *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
 	getByTokenIdentifiersPaginateStmt       *sql.Stmt
 	getByIDStmt                             *sql.Stmt
@@ -57,6 +59,12 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByContractPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	checkNoErr(err)
+
+	getByTokenIDStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 ORDER BY BLOCK_NUMBER DESC;`)
+	checkNoErr(err)
+
+	getByTokenIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
 	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC;`)
@@ -101,7 +109,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
-	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt, upsertStmt: upsertStmt, deleteBalanceZeroStmt: deleteBalanceZeroStmt, deleteStmt: deleteStmt}
+	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt, upsertStmt: upsertStmt, deleteBalanceZeroStmt: deleteBalanceZeroStmt, deleteStmt: deleteStmt, getByTokenIDStmt: getByTokenIDStmt, getByTokenIDPaginateStmt: getByTokenIDPaginateStmt}
 }
 
 // CreateBulk creates many tokens in the database
@@ -232,14 +240,15 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 		return nil, err
 	}
 
+	if len(tokens) == 0 {
+		return nil, persist.ErrTokensNotFoundByContract{ContractAddress: pContractAddress}
+	}
+
 	return tokens, nil
 }
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address
 func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, limit int64, page int64) ([]persist.Token, error) {
-	if pTokenID == "" || pContractAddress == "" {
-		return nil, fmt.Errorf("token ID and contract address must be provided - provided: %s, %s", pContractAddress, pTokenID)
-	}
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
@@ -267,6 +276,40 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 
 	if len(tokens) == 0 {
 		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
+	}
+
+	return tokens, nil
+}
+
+// GetByTokenID retrieves all tokens associated with a contract
+func (t *TokenRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID, limit int64, page int64) ([]persist.Token, error) {
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page)
+	} else {
+		rows, err = t.getByTokenIDStmt.QueryContext(pCtx, pTokenID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := make([]persist.Token, 0, 10)
+	for rows.Next() {
+		token := persist.Token{}
+		if err := rows.Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(tokens) == 0 {
+		return nil, persist.ErrTokensNotFoundByTokenID{TokenID: pTokenID}
 	}
 
 	return tokens, nil
