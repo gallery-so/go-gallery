@@ -319,29 +319,8 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error) {
-	gc := util.GinContextFromContext(ctx)
-
-	// Map known errors to GraphQL return types
-	remapError := func(err error) (model.ViewerOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
-			if returnType, ok := errorType.(model.ViewerOrError); ok {
-				return returnType, nil
-			}
-		}
-
-		gc.Error(err)
-		return nil, err
-	}
-
-	userID := auth.GetUserIDFromCtx(gc)
-	user, err := resolveGalleryUserByUserID(ctx, r.Resolver, userID)
-
-	if err != nil {
-		return remapError(err)
-	}
-
 	viewer := &model.Viewer{
-		User:            user,
+		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
 	}
 
@@ -398,8 +377,17 @@ func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (mode
 	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
 }
 
+func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
+	gc := util.GinContextFromContext(ctx)
+	userID := auth.GetUserIDFromCtx(gc)
+	return resolveGalleryUserByUserID(ctx, r.Resolver, userID)
+}
+
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
-	galleries, err := resolveGalleriesByUserID(ctx, r.Resolver, obj.User.ID)
+	gc := util.GinContextFromContext(ctx)
+	userID := auth.GetUserIDFromCtx(gc)
+
+	galleries, err := resolveGalleriesByUserID(ctx, r.Resolver, userID)
 
 	if err != nil {
 		return nil, err

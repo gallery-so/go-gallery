@@ -282,6 +282,7 @@ type VideoNftResolver interface {
 	Owner(ctx context.Context, obj *model.VideoNft) (model.GalleryUserOrWallet, error)
 }
 type ViewerResolver interface {
+	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
 }
 type WalletResolver interface {
@@ -1161,7 +1162,7 @@ type ViewerGallery {
 }
 
 type Viewer {
-  user: GalleryUser
+  user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
@@ -4430,14 +4431,14 @@ func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.Coll
 		Object:     "Viewer",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return ec.resolvers.Viewer().User(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7902,12 +7903,22 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Viewer")
 		case "user":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Viewer_user(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_user(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "viewerGalleries":
 			field := field
 

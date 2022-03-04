@@ -120,7 +120,7 @@ type ViewerGallery {
 }
 
 type Viewer {
-  user: GalleryUser
+  user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound
