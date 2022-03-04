@@ -123,7 +123,7 @@ type Viewer {
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
-union UserByUsernameOrError = GalleryUser | ErrUserNotFound
+union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
@@ -146,11 +146,13 @@ input CreateCollectionInput {
   layout: GalleryCollectionLayoutInput!
 }
 
-union CreateCollectionPayloadOrError = CreateCollectionPayload | ErrNotAuthorized
+union CreateCollectionPayloadOrError = CreateCollectionPayload | ErrNotAuthorized | ErrInvalidInput
 
 type CreateCollectionPayload {
   collection: GalleryCollection
 }
+
+union DeleteCollectionPayloadOrError = DeleteCollectionPayload | ErrNotAuthorized | ErrInvalidInput
 
 type DeleteCollectionPayload {
   gallery: Gallery
@@ -162,6 +164,8 @@ input UpdateCollectionInfoInput {
   collectorsNote: String!
 }
 
+union UpdateCollectionInfoPayloadOrError = UpdateCollectionInfoPayload | ErrNotAuthorized | ErrInvalidInput
+
 type UpdateCollectionInfoPayload {
   collection: GalleryCollection
 }
@@ -172,6 +176,8 @@ input UpdateCollectionNftsInput {
   layout: GalleryCollectionLayoutInput!
 }
 
+union UpdateCollectionNftsPayloadOrError = UpdateCollectionNftsPayload | ErrNotAuthorized | ErrInvalidInput
+
 type UpdateCollectionNftsPayload {
   collection: GalleryCollection
 }
@@ -181,13 +187,19 @@ input UpdateGalleryCollectionsInput {
   collections: [ID!]!
 }
 
+union UpdateGalleryCollectionsPayloadOrError = UpdateGalleryCollectionsPayload | ErrNotAuthorized | ErrInvalidInput
+
 type UpdateGalleryCollectionsPayload {
   gallery: Gallery
 }
 
+union AddUserAddressPayloadOrError = AddUserAddressPayload | ErrAuthenticationFailed | ErrNotAuthorized | ErrInvalidInput
+
 type AddUserAddressPayload {
   viewer: Viewer
 }
+
+union RemoveUserAddressesPayloadOrError = RemoveUserAddressesPayload | ErrNotAuthorized | ErrInvalidInput
 
 type RemoveUserAddressesPayload {
   viewer: Viewer
@@ -198,9 +210,13 @@ input UpdateUserInfoInput {
   bio: String!
 }
 
+union UpdateUserInfoPayloadOrError = UpdateUserInfoPayload | ErrNotAuthorized | ErrInvalidInput
+
 type UpdateUserInfoPayload {
   viewer: Viewer
 }
+
+union RefreshOpenSeaNftsPayloadOrError = RefreshOpenSeaNftsPayload | ErrNotAuthorized
 
 type RefreshOpenSeaNftsPayload {
   viewer: Viewer
@@ -230,6 +246,12 @@ union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequired
 type ErrNotAuthorized implements Error {
   message: String!
   cause: AuthorizationError!
+}
+
+type ErrInvalidInput implements Error {
+  message: String!
+  parameter: String!
+  reason: String!
 }
 
 type ErrNoCookie implements Error {
@@ -276,22 +298,21 @@ type CreateUserPayload {
 
 type Mutation {
   # Collection Mutations
-  createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError
-  deleteCollection(collectionId: ID!): DeleteCollectionPayload
-  updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayload
-  updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayload
+  createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
+  deleteCollection(collectionId: ID!): DeleteCollectionPayloadOrError @authRequired
+  updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
+  updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
 
   # Gallery Mutations
-  updateGalleryCollections(input: UpdateGalleryCollectionsInput): UpdateGalleryCollectionsPayload
+  updateGalleryCollections(input: UpdateGalleryCollectionsInput): UpdateGalleryCollectionsPayloadOrError @authRequired
 
   # User Mutations
-  addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayload
-  removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayload
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayload
-  #addUserAddress()
+  addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
+  removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayloadOrError @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
   # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayload
+  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError @authRequired
 
   getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 

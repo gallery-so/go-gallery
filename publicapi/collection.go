@@ -55,8 +55,6 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	// TODO: Get a shallow collection instead of a fully unnested one. Can we roll these into a single struct with
 	// multiple fields (nftIds, nfts) and assume it's not hydrated if nfts is null? And then maybe include a parameter
 	// for whether to hydrate the hierarchy or not?
-	// TODO: Resolvers shouldn't use dataloaders directly anymore, since there's no auth guarantee there. Remember:
-	// all public access to repos -- including reads -- must go through the public API layer.
 	createdCollection, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
 	if err != nil {
 		return nil, err

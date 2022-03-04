@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -23,6 +24,8 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 	message := err.Error()
 	var mappedErr model.Error = nil
 
+	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
+
 	switch err.(type) {
 	case auth.ErrAuthenticationFailed:
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
@@ -32,6 +35,9 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case user.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
+	case publicapi.ErrInvalidInput:
+		validationErr, _ := err.(publicapi.ErrInvalidInput)
+		mappedErr = model.ErrInvalidInput{Message: message, Parameter: validationErr.Parameter, Reason: validationErr.Reason}
 	}
 
 	if mappedErr != nil {
@@ -138,7 +144,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 			Name:           util.StringToPointer(collection.Name.String()),
 			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
 			Gallery:        galleryIDToGalleryModel(galleryID),
-			Layout:         layoutToModel(ctx, r, collection.Layout),
+			Layout:         layoutToModel(ctx, collection.Layout),
 			Hidden:         &hidden,
 			Nfts:           nil, // handled by dedicated resolver
 		}
@@ -161,7 +167,7 @@ func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
 	return &gallery
 }
 
-func layoutToModel(ctx context.Context, r *Resolver, layout persist.TokenLayout) *model.GalleryCollectionLayout {
+func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.GalleryCollectionLayout {
 	columns := layout.Columns.Int()
 
 	output := model.GalleryCollectionLayout{
@@ -243,21 +249,21 @@ func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 	return output
 }
 
-func collectionToModel(ctx context.Context, r *Resolver, collection persist.Collection) model.GalleryCollection {
+func collectionToModel(ctx context.Context, collection persist.Collection) *model.GalleryCollection {
 	version := collection.Version.Int()
 	hidden := collection.Hidden.Bool()
 
-	// TODO: Start here! Should we be filling this collection's gallery out, or leaving it to a resolver?
+	// TODO: Should we be filling this collection's gallery out, or leaving it to a resolver?
 	// The Gallery->Collections path currently fills out the Gallery field on each Collection it returns,
 	// and switching to a resolver here means switching to a resolver there. Not a big deal, just remember
 	// to prime the "GalleryByCollectionId" cache with results from the "collections by gallery" lookup.
-	return model.GalleryCollection{
+	return &model.GalleryCollection{
 		ID:             collection.ID,
 		Version:        &version,
 		Name:           util.StringToPointer(collection.Name.String()),
 		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
 		Gallery:        nil, // TODO: Add SQL query to find gallery parent for collection. // galleryIDToGalleryModel(galleryID),
-		Layout:         layoutToModel(ctx, r, collection.Layout),
+		Layout:         layoutToModel(ctx, collection.Layout),
 		Hidden:         &hidden,
 		Nfts:           nil, // handled by dedicated resolver
 	}

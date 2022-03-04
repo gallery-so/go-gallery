@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -24,7 +25,7 @@ type PublicAPI struct {
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
-	api := PublicAPI{
+	api := &PublicAPI{
 		repos:      repos,
 		loaders:    loaders,
 		Collection: &CollectionAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
@@ -51,4 +52,13 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 
 	userID := auth.GetUserIDFromCtx(gc)
 	return userID, nil
+}
+
+type ErrInvalidInput struct {
+	Parameter string
+	Reason    string
+}
+
+func (e ErrInvalidInput) Error() string {
+	return fmt.Sprintf("invalid input: parameter '%s': %s", e.Parameter, e.Reason)
 }

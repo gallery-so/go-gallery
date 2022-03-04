@@ -5,6 +5,7 @@ package graphql
 
 import (
 	"context"
+
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -79,6 +80,19 @@ func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (mode
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.CreateCollectionPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.CreateCollectionPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	layout := persist.TokenLayout{
 		Columns:    persist.NullInt32(input.Layout.Columns),
@@ -88,26 +102,37 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Nfts, layout)
 
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
-
-	collectionModel := collectionToModel(ctx, r.Resolver, *collection)
 
 	// TODO: Use field collection here, and only query for the collection if it was requested.
 	// That also means returning just the ID from the public API and using it here.
 	output := model.CreateCollectionPayload{
-		Collection: &collectionModel,
+		Collection: collectionToModel(ctx, *collection),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID persist.DBID) (*model.DeleteCollectionPayload, error) {
+func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID persist.DBID) (model.DeleteCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
-	err := api.Collection.DeleteCollection(ctx, collectionID)
+	gc := util.GinContextFromContext(ctx)
 
-	if err != nil {
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.DeleteCollectionPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.DeleteCollectionPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
 		return nil, err
+	}
+
+	err := api.Collection.DeleteCollection(ctx, collectionID)
+	if err != nil {
+		return remapError(err)
 	}
 
 	// TODO: Need to be able to look up a gallery by a collection -- maybe gallery ID by collection ID -- and then grab it after the deletion.
@@ -119,24 +144,56 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (*model.UpdateCollectionInfoPayload, error) {
+func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.UpdateCollectionInfoPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.UpdateCollectionInfoPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
+
 	err := api.Collection.UpdateCollection(ctx, input.CollectionID, input.Name, input.CollectorsNote)
 
 	if err != nil {
-		return nil, err
+		return remapError(err)
+	}
+
+	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	if err != nil {
+		return remapError(err)
 	}
 
 	// TODO: field collection
 	output := &model.UpdateCollectionInfoPayload{
-		Collection: nil,
+		Collection: collectionToModel(ctx, collection),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (*model.UpdateCollectionNftsPayload, error) {
+func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.UpdateCollectionNftsPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.UpdateCollectionNftsPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	layout := persist.TokenLayout{
 		Columns:    persist.NullInt32(input.Layout.Columns),
@@ -145,44 +202,80 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 
 	err := api.Collection.UpdateCollectionNfts(ctx, input.CollectionID, input.Nfts, layout)
 	if err != nil {
-		return nil, err
+		return remapError(err)
+	}
+
+	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	if err != nil {
+		return remapError(err)
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateCollectionNftsPayload{
-		Collection: nil,
+		Collection: collectionToModel(ctx, collection),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *model.UpdateGalleryCollectionsInput) (*model.UpdateGalleryCollectionsPayload, error) {
+func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.UpdateGalleryCollectionsPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.UpdateGalleryCollectionsPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	err := api.Gallery.UpdateGalleryCollections(ctx, input.GalleryID, input.Collections)
 	if err != nil {
-		return nil, err
+		return remapError(err)
+	}
+
+	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(input.GalleryID)
+	if err != nil {
+		return remapError(err)
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateGalleryCollectionsPayload{
-		Gallery: nil,
+		Gallery: galleryToModel(gallery),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (*model.AddUserAddressPayload, error) {
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.AddUserAddressPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.AddUserAddressPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
 	err = api.User.AddUserAddress(ctx, address, authenticator)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
 	output := &model.AddUserAddressPayload{
@@ -192,12 +285,25 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (*model.RemoveUserAddressesPayload, error) {
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.RemoveUserAddressesPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.RemoveUserAddressesPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	err := api.User.RemoveUserAddresses(ctx, addresses)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
 	output := &model.RemoveUserAddressesPayload{
@@ -207,12 +313,25 @@ func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (*model.UpdateUserInfoPayload, error) {
+func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.UpdateUserInfoPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.UpdateUserInfoPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	err := api.User.UpdateUserInfo(ctx, input.Username, input.Bio)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
 	output := &model.UpdateUserInfoPayload{
@@ -222,12 +341,25 @@ func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.Updat
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses string) (*model.RefreshOpenSeaNftsPayload, error) {
+func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	gc := util.GinContextFromContext(ctx)
+
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.RefreshOpenSeaNftsPayloadOrError, error) {
+		if errorType, ok := r.errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.RefreshOpenSeaNftsPayloadOrError); ok {
+				return returnType, nil
+			}
+		}
+
+		gc.Error(err)
+		return nil, err
+	}
 
 	err := api.Nft.RefreshOpenSeaNfts(ctx, addresses)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
 	output := &model.RefreshOpenSeaNftsPayload{
