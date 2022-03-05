@@ -1,26 +1,29 @@
 package feedbot
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 func Init() {
-	router := coreInit()
+	router := coreInit(postgres.NewClient())
 	http.Handle("/", router)
 }
 
-func coreInit() *gin.Engine {
+func coreInit(pqClient *sql.DB) *gin.Engine {
 	setDefaults()
 	router := gin.Default()
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	return handlersInit(router)
+	return handlersInit(router, postgres.NewEventRepository(pqClient))
+
 }
 
 func setDefaults() {
