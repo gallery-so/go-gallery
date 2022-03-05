@@ -33,10 +33,9 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *et
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
-	if viper.GetString("ENV") != "production" {
-		// Keep graphql route out of prod while it's under development
-		parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient, pubsub))
+	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient, pubsub))
 
+	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
 		parent.GET("/playground", graphqlPlaygroundHandler())
 	}
