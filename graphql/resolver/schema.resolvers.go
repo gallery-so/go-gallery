@@ -222,7 +222,7 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input *model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
+func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
 	api := publicapi.For(ctx)
 	gc := util.GinContextFromContext(ctx)
 
