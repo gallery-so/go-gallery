@@ -90,6 +90,11 @@ migrate -path db/migrations -database "postgresql://postgres:<dev db password he
 migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down
 ```
 
+Run a migration locally:
+```bash
+migrate -path db/migrations -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" down
+```
+
 ### Healthcheck
 
 Verify that the server is running by calling the `/v1/health` endpoint.
