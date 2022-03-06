@@ -11,19 +11,18 @@ import (
 )
 
 func Init() {
+	setDefaults()
 	router := coreInit(postgres.NewClient())
 	http.Handle("/", router)
 }
 
 func coreInit(pqClient *sql.DB) *gin.Engine {
-	setDefaults()
 	router := gin.Default()
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 	return handlersInit(router, postgres.NewEventRepository(pqClient))
-
 }
 
 func setDefaults() {
@@ -32,6 +31,11 @@ func setDefaults() {
 	viper.SetDefault("DISCORD_API", "https://discord.com/api/v9")
 	viper.SetDefault("CHANNEL_ID", "936895075076685845") // #gallery-feed-test channel
 	viper.SetDefault("BOT_TOKEN", "")
+	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
+	viper.SetDefault("POSTGRES_PORT", 5432)
+	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_PASSWORD", "")
+	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("PORT", 4123)
 	viper.AutomaticEnv()
 	if viper.GetString("BOT_TOKEN") == "" {

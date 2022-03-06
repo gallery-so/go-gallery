@@ -2,6 +2,7 @@ SET SCHEMA 'public';
 
 CREATE TABLE IF NOT EXISTS events (
     ID varchar(255) PRIMARY KEY,
+    USER_ID varchar(255),
     VERSION int,
     EVENT_TYPE varchar(255),
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -9,4 +10,4 @@ CREATE TABLE IF NOT EXISTS events (
     MESSAGE jsonb
 );
 
-CREATE INDEX IF NOT EXISTS event_type_created_at ON events (EVENT_TYPE, CREATED_AT);
+CREATE INDEX IF NOT EXISTS user_id_event_type_created_at ON events (USER_ID, EVENT_TYPE, CREATED_AT);
