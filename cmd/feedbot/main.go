@@ -4,9 +4,14 @@ import (
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/feedbot"
+	"google.golang.org/appengine"
 )
 
 func main() {
 	feedbot.Init()
-	http.ListenAndServe(":4123", nil)
+	if appengine.IsAppEngine() {
+		appengine.Main()
+	} else {
+		http.ListenAndServe(":4123", nil)
+	}
 }

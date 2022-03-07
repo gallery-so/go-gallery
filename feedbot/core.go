@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -22,7 +23,7 @@ func coreInit(pqClient *sql.DB) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	return handlersInit(router, postgres.NewEventRepository(pqClient))
+	return handlersInit(router, event.NewEventRepos(pqClient))
 }
 
 func setDefaults() {
@@ -37,6 +38,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("PORT", 4123)
+	viper.SetDefault("GALLERY_HOST", "http://localhost:3000")
 	viper.AutomaticEnv()
 	if viper.GetString("BOT_TOKEN") == "" {
 		panic("BOT_TOKEN must be set")

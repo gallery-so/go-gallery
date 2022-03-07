@@ -3,22 +3,11 @@ package feedbot
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/event"
 )
 
-func handlersInit(router *gin.Engine, eventRepo *postgres.EventRepository) *gin.Engine {
+func handlersInit(router *gin.Engine, eventRepos *event.EventRepositories) *gin.Engine {
 	router.GET("/ping", ping())
-	router.POST("/tasks/feed-events", middleware.TaskRequired(), handleEvent(eventRepo, eventRoutes()))
+	router.POST("/tasks/feed-events", middleware.TaskRequired(), handleMessage(eventRepos))
 	return router
-}
-
-func eventRoutes() EventToRoute {
-	return map[persist.EventType]func(*gin.Context, *postgres.EventRepository, Event){
-		eventTypeUserCreated:          handleEventNewUser,
-		eventTypeUpdateNFT:            handleEventUpdateNFT,
-		eventTypeNewCollection:        handleEventNewCollection,
-		eventTypeUpdateCollectionInfo: handleEventUpdateCollectionInfo,
-		eventTypeUpdateCollectionNFTs: handleEventUpdateCollectionNFTs,
-	}
 }

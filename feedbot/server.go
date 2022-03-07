@@ -1,63 +1,58 @@
 package feedbot
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/util"
 )
 
-const (
-	eventTypeUserCreated          persist.EventType = "userCreated"
-	eventTypeUpdateNFT            persist.EventType = "updateNFT"
-	eventTypeNewCollection        persist.EventType = "newCollection"
-	eventTypeUpdateCollectionInfo persist.EventType = "updateCollectionInfo"
-	eventTypeUpdateCollectionNFTs persist.EventType = "updateCollectionNFTs"
-)
-
-type Event struct {
-	ID      persist.DBID      `json:"id" binding:"required"`
-	Type    persist.EventType `json:"event_type" binding:"required"`
-	Message string            `json:"message" binding:"required"`
+type RetryableTasKError interface {
+	Retryable() bool
+	Error() string
 }
 
-type EventUserCreated struct {
-	Event
-	UserID   persist.DBID `json:"user_id" binding:"required"`
-	Username string       `json:"message" binding:"required"`
-}
+var errInvalidEvent = errors.New("unknown event type")
 
-type EventNFTUpdated struct {
-	Event
-	UserID         persist.DBID       `json:"user_id" binding:"required"`
-	NftID          persist.DBID       `json:"id" binding:"required"`
-	CollectorsNote persist.NullString `json:"collectors_note"`
-}
+func handleMessage(eventRepos *event.EventRepositories) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := event.EventMessage{}
+		if retried := retryTask(c, c.ShouldBindJSON(&input)); retried {
+			return
+		}
 
-type EventNewCollection struct {
-	Event
-	UserID       persist.DBID `json:"user_id" binding:"required"`
-	CollectionID persist.DBID `json:"collection_id" binding:"required"`
-}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
 
-type EventUpdateCollectionInfo struct {
-	Event
-	UserID       persist.DBID `json:"user_id" binding:"required"`
-	CollectionID persist.DBID `json:"collection_id" binding:"required"`
-}
+		switch event.GetCategoryFromEventTypeID(input.EventTypeID) {
+		case event.UserEventType:
+			err := handleUserEvents(ctx, eventRepos.UserEventRepository, input)
+			if retried := retryTask(c, err); retried {
+				return
+			}
+		case event.TokenEventType:
+			err := handleTokenEvents(ctx, eventRepos.TokenEventRepository, input)
+			if retried := retryTask(c, err); retried {
+				return
+			}
+		case event.CollectionEventType:
+			err := handleCollectionEvents(ctx, eventRepos.CollectionEventRepository, input)
+			if retried := retryTask(c, err); retried {
+				return
+			}
+		default:
+			util.ErrResponse(c, http.StatusBadRequest, errInvalidEvent)
+			return
+		}
 
-type EventUpdateCollectionNFTs struct {
-	Event
-	UserID       persist.DBID                `json:"user_id" binding:"required"`
-	CollectionID persist.DBID                `json:"collection_id" binding:"required"`
-	NFTs         []persist.TokenInCollection `json:"nfts" binding:"required"`
+		c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event(%s) processed", input.ID)})
+	}
 }
-
-type EventToRoute map[persist.EventType]func(*gin.Context, *postgres.EventRepository, Event)
 
 func ping() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -65,57 +60,15 @@ func ping() gin.HandlerFunc {
 	}
 }
 
-func handleEvent(eventRepo *postgres.EventRepository, routes EventToRoute) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		input := Event{}
-		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+func retryTask(c *gin.Context, err error) bool {
+	if err != nil {
+		if re, ok := err.(RetryableTasKError); ok && re.Retryable() {
+			// Statuses other than 2xx and 503 are retried.
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return true
 		}
-
-		handle, exists := routes[input.Type]
-		if !exists {
-			util.ErrResponse(c, http.StatusBadRequest, errors.New("unknown event type"))
-		}
-
-		handle(c, eventRepo, input)
+		c.JSON(http.StatusOK, err)
+		return true
 	}
-}
-
-func handleEventNewUser(c *gin.Context, eventRepo *postgres.EventRepository, event Event) {
-	message := EventUserCreated{}
-	if err := util.UnmarshallBody(&message, strings.NewReader(event.Message)); err != nil {
-		util.ErrResponse(c, http.StatusBadRequest, err)
-	}
-	c.JSON(http.StatusOK, gin.H{"msg": "task accepted"})
-}
-
-func handleEventUpdateNFT(c *gin.Context, eventRepo *postgres.EventRepository, event Event) {
-	message := EventNFTUpdated{}
-	if err := util.UnmarshallBody(&message, strings.NewReader(event.Message)); err != nil {
-		util.ErrResponse(c, http.StatusBadRequest, err)
-	}
-	c.JSON(http.StatusOK, gin.H{"msg": "task accepted"})
-}
-
-func handleEventNewCollection(c *gin.Context, eventRepo *postgres.EventRepository, event Event) {
-	message := EventNewCollection{}
-	if err := util.UnmarshallBody(&message, strings.NewReader(event.Message)); err != nil {
-		util.ErrResponse(c, http.StatusBadRequest, err)
-	}
-	c.JSON(http.StatusOK, gin.H{"msg": "task accepted"})
-}
-
-func handleEventUpdateCollectionInfo(c *gin.Context, eventRepo *postgres.EventRepository, event Event) {
-	message := EventUpdateCollectionInfo{}
-	if err := util.UnmarshallBody(&message, strings.NewReader(event.Message)); err != nil {
-		util.ErrResponse(c, http.StatusBadRequest, err)
-	}
-	c.JSON(http.StatusOK, gin.H{"msg": "task accepted"})
-}
-
-func handleEventUpdateCollectionNFTs(c *gin.Context, eventRepo *postgres.EventRepository, event Event) {
-	message := EventUpdateCollectionNFTs{}
-	if err := util.UnmarshallBody(&message, strings.NewReader(event.Message)); err != nil {
-		util.ErrResponse(c, http.StatusBadRequest, err)
-	}
+	return false
 }

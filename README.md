@@ -92,7 +92,7 @@ migrate -path db/migrations -database "postgresql://postgres:<dev db password he
 
 Run a migration locally:
 ```bash
-migrate -path db/migrations -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" down
+migrate -path db/migrations -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
 ```
 
 ### Healthcheck
