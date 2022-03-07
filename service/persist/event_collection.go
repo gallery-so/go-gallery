@@ -17,8 +17,8 @@ type CollectionEventRecord struct {
 }
 
 type CollectionEvent struct {
-	NFTs           []CollectionNFT `json:"nfts"`
-	CollectorsNote NullString      `json:"collectors_note"`
+	NFTs           []DBID     `json:"nfts"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 type CollectionEventRepository interface {

@@ -14,10 +14,10 @@ type EventMessage struct {
 
 type EventHandler struct {
 	// Channel of persisted events
-	events <-chan persist.DBID
+	events <-chan EventMessage
 }
 
-func NewEventHandler(ch chan persist.DBID) EventHandler {
+func NewEventHandler(ch <-chan EventMessage) EventHandler {
 	return EventHandler{events: ch}
 }
 

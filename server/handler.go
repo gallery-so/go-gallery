@@ -51,7 +51,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 
 	return func(c *gin.Context) {
 		// Start event handler
-		eventCh := make(chan persist.DBID)
+		eventCh := make(chan event.EventMessage)
 		defer close(eventCh)
 		eventHandler := event.NewEventHandler(eventCh)
 		go eventHandler.Handle()
