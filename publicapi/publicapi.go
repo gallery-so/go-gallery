@@ -21,7 +21,7 @@ type PublicAPI struct {
 	repos      *persist.Repositories
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
-	Collection *CollectionAPI
+	Collection PublicCollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
 	Nft        *NftAPI

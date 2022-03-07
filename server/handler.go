@@ -50,8 +50,12 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 
 	return func(c *gin.Context) {
 		// TODO: Remove dataloader here
+		events := make(chan persist.DBID)
+		defer close(events)
+
 		dataloader.AddTo(c, repos)
 		publicapi.AddTo(c, repos, ethClient, pubsub)
+
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

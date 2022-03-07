@@ -13,21 +13,21 @@ import (
 
 var errInvalidTokenEvent = errors.New("unknown user event type")
 
-func handleTokenEvents(ctx context.Context, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
-	switch event.GetSubtypeFromEventTypeID(message.EventTypeID) {
-	case event.TokenCollectorsNoteAddedEvent:
-		return handleTokenCollectorsNoteAdded(ctx, tokenEventRepo, message)
+func handleTokenEvents(ctx context.Context, userRepo persist.UserRepository, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
+	switch persist.NameFromEventID(message.EventID) {
+	case persist.TokenCollectorsNoteAddedEvent:
+		return handleTokenCollectorsNoteAdded(ctx, userRepo, tokenEventRepo, message)
 	default:
 		return errInvalidTokenEvent
 	}
 }
 
-func handleTokenCollectorsNoteAdded(ctx context.Context, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
+func handleTokenCollectorsNoteAdded(ctx context.Context, userRepo persist.UserRepository, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
 	event, err := tokenEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
 	}
-	if event.Event.CollectorsNote == "" {
+	if event.Data.CollectorsNote == "" {
 		return nil
 	}
 
@@ -39,9 +39,13 @@ func handleTokenCollectorsNoteAdded(ctx context.Context, tokenEventRepo persist.
 		return nil
 	}
 
+	user, err := userRepo.GetByID(ctx, event.UserID)
+	if err != nil {
+		return err
+	}
 	payload, err := createMessage(
 		fmt.Sprintf("**%s** added a collector's note to their NFT: %s/%s/%s/%s",
-			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username, event.Event.CollectionID, event.TokenID,
+			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.Data.CollectionID, event.TokenID,
 		),
 	)
 	if err != nil {

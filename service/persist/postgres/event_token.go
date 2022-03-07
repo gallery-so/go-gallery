@@ -21,19 +21,19 @@ func NewTokenEventRepository(db *sql.DB) *TokenEventRepository {
 	defer cancel()
 
 	createStmt, err := db.PrepareContext(ctx,
-		`INSERT INTO token_events (ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, EVENT) VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO token_events (ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, DATA) VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING ID;`,
 	)
 	checkNoErr(err)
 
 	getByEventIDStmt, err := db.PrepareContext(ctx,
-		`SELECT ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, EVENT, CREATED_AT, LAST_UPDATED
+		`SELECT ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM token_events WHERE ID = $1;`,
 	)
 	checkNoErr(err)
 
 	getMatchingEventsForUserAndTokenStmt, err := db.PrepareContext(ctx,
-		`SELECT ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, EVENT, CREATED_AT, LAST_UPDATED
+		`SELECT ID, USER_ID, TOKEN_ID, VERSION, EVENT_TYPE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM token_events
 		 WHERE USER_ID = $1 AND TOKEN_ID = $2 AND EVENT_TYPE = $3 AND CREATED_AT > $4 AND CREATED_AT <= $5;`,
 	)
@@ -61,7 +61,7 @@ func (e errFailedToFetchTokenEvent) Error() string {
 
 func (e *TokenEventRepository) Add(ctx context.Context, event persist.TokenEventRecord) (persist.DBID, error) {
 	var id persist.DBID
-	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.TokenID, event.Version, event.Type, event.Event).Scan(&id)
+	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.TokenID, event.Version, event.Type, event.Data).Scan(&id)
 	if err != nil {
 		return "", err
 	}

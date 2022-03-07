@@ -13,11 +13,10 @@ type TokenEventRecord struct {
 	Type         int             `json:"event_type"`
 	CreationTime CreationTime    `json:"created_at"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
-	Event        TokenEvent      `json:"event"`
+	Data         TokenEvent      `json:"data"`
 }
 
 type TokenEvent struct {
-	Username       string     `json:"username"`
 	CollectionID   DBID       `json:"collection_id"`
 	CollectorsNote NullString `json:"collectors_note"`
 }

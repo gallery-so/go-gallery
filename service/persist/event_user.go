@@ -12,12 +12,10 @@ type UserEventRecord struct {
 	Type         int             `json:"event_type"`
 	CreationTime CreationTime    `json:"created_at"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
-	Event        UserEvent       `json:"event"`
+	Data         UserEvent       `json:"data"`
 }
 
-type UserEvent struct {
-	Username string `json:"username"`
-}
+type UserEvent struct{}
 
 type UserEventRepository interface {
 	Add(context.Context, UserEventRecord) (DBID, error)

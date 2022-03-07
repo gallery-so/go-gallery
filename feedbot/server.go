@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -19,7 +20,7 @@ type RetryableTasKError interface {
 
 var errInvalidEvent = errors.New("unknown event type")
 
-func handleMessage(eventRepos *event.EventRepositories) gin.HandlerFunc {
+func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.TokenEventRepository, collectionEventRepo persist.CollectionEventRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := event.EventMessage{}
 		if retried := retryTask(c, c.ShouldBindJSON(&input)); retried {
@@ -29,19 +30,19 @@ func handleMessage(eventRepos *event.EventRepositories) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
-		switch event.GetCategoryFromEventTypeID(input.EventTypeID) {
-		case event.UserEventType:
-			err := handleUserEvents(ctx, eventRepos.UserEventRepository, input)
+		switch persist.CategoryFromEventID(input.EventID) {
+		case persist.UserEventType:
+			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return
 			}
-		case event.TokenEventType:
-			err := handleTokenEvents(ctx, eventRepos.TokenEventRepository, input)
+		case persist.TokenEventType:
+			err := handleTokenEvents(ctx, userRepo, tokenEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return
 			}
-		case event.CollectionEventType:
-			err := handleCollectionEvents(ctx, eventRepos.CollectionEventRepository, input)
+		case persist.CollectionEventType:
+			err := handleCollectionEvents(ctx, userRepo, collectionEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return
 			}

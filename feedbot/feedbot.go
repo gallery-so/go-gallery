@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -23,7 +22,7 @@ func coreInit(pqClient *sql.DB) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	return handlersInit(router, event.NewEventRepos(pqClient))
+	return handlersInit(router, postgres.NewUserRepository(pqClient), postgres.NewUserEventRepository(pqClient), postgres.NewTokenEventRepository(pqClient), postgres.NewCollectionEventRepository(pqClient))
 }
 
 func setDefaults() {

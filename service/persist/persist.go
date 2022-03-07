@@ -45,6 +45,9 @@ type Repositories struct {
 	ContractRepository        ContractRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
+	UserEventRepository       UserEventRepository
+	TokenEventRepository      TokenEventRepository
+	CollectionEventRepository CollectionEventRepository
 }
 
 // GenerateID generates a application-wide unique ID

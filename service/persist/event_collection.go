@@ -13,13 +13,12 @@ type CollectionEventRecord struct {
 	Type         int             `json:"event_type"`
 	CreationTime CreationTime    `json:"created_at"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
-	Event        CollectionEvent `json:"event"`
+	Data         CollectionEvent `json:"data"`
 }
 
 type CollectionEvent struct {
-	Username       string     `json:"username"`
-	NFTs           []DBID     `json:"nfts"`
-	CollectorsNote NullString `json:"collectors_note"`
+	NFTs           []CollectionNFT `json:"nfts"`
+	CollectorsNote NullString      `json:"collectors_note"`
 }
 
 type CollectionEventRepository interface {
