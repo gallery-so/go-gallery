@@ -2,8 +2,8 @@ package feedbot
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/event"
 )
 
 func handlersInit(router *gin.Engine, eventRepos *event.EventRepositories) *gin.Engine {

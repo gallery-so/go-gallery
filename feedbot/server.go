@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/event"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/util"
 )
 

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/event"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"

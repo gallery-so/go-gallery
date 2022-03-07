@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/event"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
