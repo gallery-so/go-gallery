@@ -148,10 +148,6 @@ func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresse
 		}
 	}
 
-	if err := nftRepo.OpenseaCacheDelete(ctx, addresses); err != nil {
-		return err
-	}
-
 	return nil
 }
 
