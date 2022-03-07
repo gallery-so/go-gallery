@@ -2,4 +2,4 @@ FROM circleci/postgres
 ENV POSTGRES_HOST_AUTH_METHOD trust
 ENV POSTGRES_USER postgres
 ENV POSTGRES_DB postgres
-COPY docker/postgres/03_init.sql /docker-entrypoint-initdb.d/
+COPY db/migrations/*up.sql /docker-entrypoint-initdb.d/

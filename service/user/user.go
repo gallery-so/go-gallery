@@ -253,8 +253,8 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
 	output := model.CreateUserPayload{
-		UserID:    util.StringToPointer(userID.String()),
-		GalleryID: util.StringToPointer(galleryID.String()),
+		UserID:    &userID,
+		GalleryID: &galleryID,
 	}
 
 	return &output, nil
@@ -264,7 +264,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (CreateUserOutput, error) {
 
 	authenticator := auth.EthereumNonceAuthenticator{
-		Address:    pInput.Address.String(),
+		Address:    pInput.Address,
 		Nonce:      pInput.Nonce,
 		Signature:  pInput.Signature,
 		WalletType: pInput.WalletType,
@@ -280,15 +280,15 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 
 	output := CreateUserOutput{
 		SignatureValid: true,
-		UserID:         persist.DBID(*gqlOutput.UserID),
-		GalleryID:      persist.DBID(*gqlOutput.GalleryID),
+		UserID:         *gqlOutput.UserID,
+		GalleryID:      *gqlOutput.GalleryID,
 	}
 
 	return output, nil
 }
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
+func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address,
 	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
@@ -296,44 +296,30 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pInput 
 		return err
 	}
 
-	if len(user.Addresses) <= len(pInput.Addresses) {
+	if len(user.Addresses) <= len(pAddresses) {
 		return errUserCannotRemoveAllAddresses
 	}
 
-	return userRepo.RemoveAddresses(pCtx, pUserID, pInput.Addresses)
+	return userRepo.RemoveAddresses(pCtx, pUserID, pAddresses)
 }
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUserAddressesInput,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (AddUserAddressOutput, error) {
+func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, addressAuth auth.Authenticator,
+	userRepo persist.UserRepository, psub pubsub.PubSub) error {
 
-	output := AddUserAddressOutput{}
-
-	nonce, userID, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
-	if nonce == "" {
-		return AddUserAddressOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
-	}
-	if userID != "" {
-		return AddUserAddressOutput{}, ErrAddressOwnedByUser{Address: pInput.Address, OwnerID: userID}
-	}
-
-	if pInput.WalletType != auth.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
-			return AddUserAddressOutput{}, auth.ErrNonceMismatch
-		}
-	}
-
-	dataStr := nonce
-	sigValidBool, err := auth.VerifySignatureAllMethods(pInput.Signature,
-		dataStr,
-		pInput.Address, pInput.WalletType, ethClient)
+	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
-		return AddUserAddressOutput{}, err
+		return err
 	}
 
-	output.SignatureValid = sigValidBool
-	if !sigValidBool {
-		return output, nil
+	addressUserID := authResult.UserID
+
+	if addressUserID != "" {
+		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
+	}
+
+	if !containsAddress(authResult.Addresses, pAddress) {
+		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
 	}
 
 	defer func() {
@@ -341,7 +327,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		// validate that the user's NFTs are valid and have cached media content
 		if viper.GetString("ENV") != "local" {
 			go func() {
-				err := publishUserAddAddress(pCtx, pUserID, pInput.Address, psub)
+				err := publishUserAddAddress(pCtx, pUserID, pAddress, psub)
 				if err != nil {
 					logrus.WithError(err).Error("failed to publish user signup")
 				}
@@ -358,23 +344,18 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pInput AddUser
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pInput.Address)
+			err := ensureMediaContent(ctx, pAddress)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
 
-	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pInput.Address}); err != nil {
-		return AddUserAddressOutput{}, err
+	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pAddress}); err != nil {
+		return err
 	}
 
-	err = auth.NonceRotate(pCtx, pInput.Address, pUserID, nonceRepo)
-	if err != nil {
-		return AddUserAddressOutput{}, err
-	}
-
-	return output, nil
+	return nil
 }
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
@@ -438,15 +419,15 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 }
 
 // UpdateUser updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
-	if strings.HasSuffix(strings.ToLower(input.UserName), ".eth") {
+func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
+	if strings.HasSuffix(strings.ToLower(username), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {
 			return err
 		}
 		can := false
 		for _, addr := range user.Addresses {
-			if resolves, _ := eth.ResolvesENS(pCtx, input.UserName, addr, ethClient); resolves {
+			if resolves, _ := eth.ResolvesENS(pCtx, username, addr, ethClient); resolves {
 				can = true
 				break
 			}
@@ -460,9 +441,9 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, input UpdateUserInput
 		pCtx,
 		userID,
 		persist.UserUpdateInfoInput{
-			UsernameIdempotent: persist.NullString(strings.ToLower(input.UserName)),
-			Username:           persist.NullString(input.UserName),
-			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(input.BioStr)),
+			UsernameIdempotent: persist.NullString(strings.ToLower(username)),
+			Username:           persist.NullString(username),
+			Bio:                persist.NullString(validate.SanitizationPolicy.Sanitize(bio)),
 		},
 	)
 	if err != nil {
@@ -634,10 +615,30 @@ func (e ErrAddressOwnedByUser) Error() string {
 	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.Address, e.OwnerID)
 }
 
+type ErrAddressNotOwnedByUser struct {
+	Address persist.Address
+	UserID  persist.DBID
+}
+
+func (e ErrAddressNotOwnedByUser) Error() string {
+	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.Address, e.UserID)
+}
+
 func (e errCouldNotEnsureMediaForAddress) Error() string {
 	return fmt.Sprintf("could not ensure media for address: %s", e.address)
 }
 
 type errCouldNotEnsureMediaForAddress struct {
 	address persist.Address
+}
+
+// containsAddress checks whether an address exists in a slice
+func containsAddress(a []persist.Address, b persist.Address) bool {
+	for _, v := range a {
+		if v == b {
+			return true
+		}
+	}
+
+	return false
 }

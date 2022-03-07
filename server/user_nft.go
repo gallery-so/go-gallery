@@ -50,7 +50,7 @@ func removeAddresses(userRepository persist.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		err := user.RemoveAddressesFromUser(c, userID, input, userRepository)
+		err := user.RemoveAddressesFromUser(c, userID, input.Addresses, userRepository)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

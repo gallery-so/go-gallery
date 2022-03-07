@@ -15,19 +15,20 @@ import (
 
 // GalleryRepository is the repository for interacting with galleries in a postgres database
 type GalleryRepository struct {
-	db                        *sql.DB
-	createStmt                *sql.Stmt
-	updateStmt                *sql.Stmt
-	addCollectionsStmt        *sql.Stmt
-	getByUserIDStmt           *sql.Stmt
-	getByIDStmt               *sql.Stmt
-	getByUserIDRawStmt        *sql.Stmt
-	getByIDRawStmt            *sql.Stmt
-	checkOwnCollectionsStmt   *sql.Stmt
-	countAllCollectionsStmt   *sql.Stmt
-	countCollsStmt            *sql.Stmt
-	getCollectionsStmt        *sql.Stmt
-	getGalleryCollectionsStmt *sql.Stmt
+	db                            *sql.DB
+	createStmt                    *sql.Stmt
+	updateStmt                    *sql.Stmt
+	addCollectionsStmt            *sql.Stmt
+	getByUserIDStmt               *sql.Stmt
+	getByIDStmt                   *sql.Stmt
+	getByUserIDRawStmt            *sql.Stmt
+	getByIDRawStmt                *sql.Stmt
+	getByChildCollectionIDRawStmt *sql.Stmt
+	checkOwnCollectionsStmt       *sql.Stmt
+	countAllCollectionsStmt       *sql.Stmt
+	countCollsStmt                *sql.Stmt
+	getCollectionsStmt            *sql.Stmt
+	getGalleryCollectionsStmt     *sql.Stmt
 
 	galleriesCache memstore.Cache
 }
@@ -75,6 +76,9 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.ID = $1 AND g.DELETED = false;`)
 	checkNoErr(err)
 
+	getByChildCollectionIDRawStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,OWNER_USER_ID,CREATED_AT,LAST_UPDATED FROM galleries WHERE COLLECTIONS @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
+	checkNoErr(err)
+
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
@@ -90,7 +94,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT array_agg(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false GROUP BY coll_ord ORDER BY coll_ord;`)
 	checkNoErr(err)
 
-	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
+	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt, getByChildCollectionIDRawStmt: getByChildCollectionIDRawStmt}
 }
 
 // Create creates a new gallery
@@ -412,6 +416,17 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 		return gallery, nil
 	}
 	return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
+}
+
+// GetByChildCollectionID returns the gallery that contains the collection with the given ID
+func (g *GalleryRepository) GetByChildCollectionID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
+	res := persist.Gallery{}
+	err := g.getByChildCollectionIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
+	if err != nil {
+		return persist.Gallery{}, err
+	}
+
+	return g.GetByID(pCtx, res.ID)
 }
 
 // RefreshCache deletes the given key in the cache

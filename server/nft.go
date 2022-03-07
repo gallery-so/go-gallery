@@ -1,7 +1,7 @@
 package server
 
 import (
-	"fmt"
+	"github.com/mikeydub/go-gallery/service/nft"
 	"net/http"
 	"strings"
 
@@ -45,11 +45,6 @@ type getUnassignedNftsOutput struct {
 type updateNftByIDInput struct {
 	ID             persist.DBID `json:"id" binding:"required"`
 	CollectorsNote string       `json:"collectors_note" binding:"collectors_note"`
-}
-
-type errDoesNotOwnWallets struct {
-	id        persist.DBID
-	addresses []persist.Address
 }
 
 func getNftByID(nftRepository persist.NFTRepository) gin.HandlerFunc {
@@ -175,13 +170,13 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 					addresses = append(addresses, persist.Address(address))
 				}
 			}
-			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
+			ownsWallet, err := nft.DoesUserOwnWallets(c, userID, addresses, userRepo)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
 			if !ownsWallet {
-				util.ErrResponse(c, http.StatusBadRequest, errDoesNotOwnWallets{userID, addresses})
+				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{userID, addresses})
 				return
 			}
 		}
@@ -195,7 +190,8 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
-func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {
+
+func refreshOpenseaNFTsREST(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &refreshOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -209,30 +205,14 @@ func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := []persist.Address{}
-		if input.WalletAddresses != "" {
-			addresses = []persist.Address{persist.Address(input.WalletAddresses)}
-			if strings.Contains(input.WalletAddresses, ",") {
-				addressesStrings := strings.Split(input.WalletAddresses, ",")
-				for _, address := range addressesStrings {
-					addresses = append(addresses, persist.Address(address))
-				}
-			}
-			ownsWallet, err := doesUserOwnWallets(c, userID, addresses, userRepo)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			if !ownsWallet {
-				util.ErrResponse(c, http.StatusBadRequest, errDoesNotOwnWallets{id: userID, addresses: addresses})
+		err := nft.RefreshOpenseaNFTs(c, userID, input.WalletAddresses, nftRepo, userRepo)
+		if err != nil {
+			if _, ok := err.(nft.ErrDoesNotOwnWallets); ok {
+				util.ErrResponse(c, http.StatusBadRequest, err)
 				return
 			}
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
-}
-
-func (e errDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.id, e.addresses)
 }

@@ -69,6 +69,27 @@ $ make docker-stop
 
 _Do not run this script if you've run the shell script for seeding NFT data._
 
+**Working with migrations**
+
+The `migrate` cli can be installed via brew (assuming MacOS):
+```bash
+brew install golang-migrate
+```
+
+Create a new migration:
+```bash
+migrate create -ext sql -dir db/migrations -seq <name of migration>
+```
+
+Run a migration on dev:
+```bash
+# Apply an up migration.
+migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
+
+# Undo a migration.
+migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down
+```
+
 ### Healthcheck
 
 Verify that the server is running by calling the `/v1/health` endpoint.

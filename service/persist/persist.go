@@ -269,3 +269,33 @@ func (n *NullBool) Scan(value interface{}) error {
 	*n = NullBool(value.(bool))
 	return nil
 }
+
+// RemoveDuplicateDBIDs ensures that an array of DBIDs has no repeat items
+func RemoveDuplicateDBIDs(a []DBID) []DBID {
+	result := make([]DBID, 0, len(a))
+	m := map[DBID]bool{}
+
+	for _, val := range a {
+		if _, ok := m[val]; !ok {
+			m[val] = true
+			result = append(result, val)
+		}
+	}
+
+	return result
+}
+
+// RemoveDuplicateAddresses ensures that an array of addresses has no repeat items
+func RemoveDuplicateAddresses(a []Address) []Address {
+	result := make([]Address, 0, len(a))
+	m := map[Address]bool{}
+
+	for _, val := range a {
+		if _, ok := m[val]; !ok {
+			m[val] = true
+			result = append(result, val)
+		}
+	}
+
+	return result
+}

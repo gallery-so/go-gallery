@@ -9,10 +9,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// CollectionLoaderConfig captures the config to create a new CollectionLoader
-type CollectionLoaderConfig struct {
+// CollectionLoaderByIDConfig captures the config to create a new CollectionLoaderByID
+type CollectionLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []string) ([]persist.Collection, []error)
+	Fetch func(keys []persist.DBID) ([]persist.Collection, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -21,19 +21,19 @@ type CollectionLoaderConfig struct {
 	MaxBatch int
 }
 
-// NewCollectionLoader creates a new CollectionLoader given a fetch, wait, and maxBatch
-func NewCollectionLoader(config CollectionLoaderConfig) *CollectionLoader {
-	return &CollectionLoader{
+// NewCollectionLoaderByID creates a new CollectionLoaderByID given a fetch, wait, and maxBatch
+func NewCollectionLoaderByID(config CollectionLoaderByIDConfig) *CollectionLoaderByID {
+	return &CollectionLoaderByID{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// CollectionLoader batches and caches requests
-type CollectionLoader struct {
+// CollectionLoaderByID batches and caches requests
+type CollectionLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []string) ([]persist.Collection, []error)
+	fetch func(keys []persist.DBID) ([]persist.Collection, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,18 +44,18 @@ type CollectionLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[string]persist.Collection
+	cache map[persist.DBID]persist.Collection
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *collectionLoaderBatch
+	batch *collectionLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type collectionLoaderBatch struct {
-	keys    []string
+type collectionLoaderByIDBatch struct {
+	keys    []persist.DBID
 	data    []persist.Collection
 	error   []error
 	closing bool
@@ -63,14 +63,14 @@ type collectionLoaderBatch struct {
 }
 
 // Load a Collection by key, batching and caching will be applied automatically
-func (l *CollectionLoader) Load(key string) (persist.Collection, error) {
+func (l *CollectionLoaderByID) Load(key persist.DBID) (persist.Collection, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Collection.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionLoader) LoadThunk(key string) func() (persist.Collection, error) {
+func (l *CollectionLoaderByID) LoadThunk(key persist.DBID) func() (persist.Collection, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -79,7 +79,7 @@ func (l *CollectionLoader) LoadThunk(key string) func() (persist.Collection, err
 		}
 	}
 	if l.batch == nil {
-		l.batch = &collectionLoaderBatch{done: make(chan struct{})}
+		l.batch = &collectionLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -113,7 +113,7 @@ func (l *CollectionLoader) LoadThunk(key string) func() (persist.Collection, err
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *CollectionLoader) LoadAll(keys []string) ([]persist.Collection, []error) {
+func (l *CollectionLoaderByID) LoadAll(keys []persist.DBID) ([]persist.Collection, []error) {
 	results := make([]func() (persist.Collection, error), len(keys))
 
 	for i, key := range keys {
@@ -131,7 +131,7 @@ func (l *CollectionLoader) LoadAll(keys []string) ([]persist.Collection, []error
 // LoadAllThunk returns a function that when called will block waiting for a Collections.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionLoader) LoadAllThunk(keys []string) func() ([]persist.Collection, []error) {
+func (l *CollectionLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]persist.Collection, []error) {
 	results := make([]func() (persist.Collection, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -149,7 +149,7 @@ func (l *CollectionLoader) LoadAllThunk(keys []string) func() ([]persist.Collect
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *CollectionLoader) Prime(key string, value persist.Collection) bool {
+func (l *CollectionLoaderByID) Prime(key persist.DBID, value persist.Collection) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -160,22 +160,22 @@ func (l *CollectionLoader) Prime(key string, value persist.Collection) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *CollectionLoader) Clear(key string) {
+func (l *CollectionLoaderByID) Clear(key persist.DBID) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *CollectionLoader) unsafeSet(key string, value persist.Collection) {
+func (l *CollectionLoaderByID) unsafeSet(key persist.DBID, value persist.Collection) {
 	if l.cache == nil {
-		l.cache = map[string]persist.Collection{}
+		l.cache = map[persist.DBID]persist.Collection{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *collectionLoaderBatch) keyIndex(l *CollectionLoader, key string) int {
+func (b *collectionLoaderByIDBatch) keyIndex(l *CollectionLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -199,7 +199,7 @@ func (b *collectionLoaderBatch) keyIndex(l *CollectionLoader, key string) int {
 	return pos
 }
 
-func (b *collectionLoaderBatch) startTimer(l *CollectionLoader) {
+func (b *collectionLoaderByIDBatch) startTimer(l *CollectionLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -215,7 +215,7 @@ func (b *collectionLoaderBatch) startTimer(l *CollectionLoader) {
 	b.end(l)
 }
 
-func (b *collectionLoaderBatch) end(l *CollectionLoader) {
+func (b *collectionLoaderByIDBatch) end(l *CollectionLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

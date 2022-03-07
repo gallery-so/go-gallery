@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -23,6 +24,8 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 	message := err.Error()
 	var mappedErr model.Error = nil
 
+	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
+
 	switch err.(type) {
 	case auth.ErrAuthenticationFailed:
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
@@ -32,6 +35,9 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case user.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
+	case publicapi.ErrInvalidInput:
+		validationErr, _ := err.(publicapi.ErrInvalidInput)
+		mappedErr = model.ErrInvalidInput{Message: message, Parameter: validationErr.Parameter, Reason: validationErr.Reason}
 	}
 
 	if mappedErr != nil {
@@ -44,7 +50,7 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
 
-	ethNonceAuth := func(address string, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
+	ethNonceAuth := func(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
 		authenticator := auth.EthereumNonceAuthenticator{
 			Address:    address,
 			Nonce:      nonce,
@@ -62,20 +68,21 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	}
 
 	if m.GnosisSafe != nil {
-		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, m.GnosisSafe.Signature, auth.WalletTypeGnosis), nil
+		// GnosisSafe passes an empty signature
+		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, "0x", auth.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
 }
 
-func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID string) (*model.GalleryUser, error) {
+func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID persist.DBID) (*model.GalleryUser, error) {
 	user, err := dataloader.For(ctx).UserByUserId.Load(userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToUserModel(ctx, r, user)
+	return userToModel(ctx, r, user)
 }
 
 func resolveGalleryUserByUsername(ctx context.Context, r *Resolver, username string) (*model.GalleryUser, error) {
@@ -85,20 +92,20 @@ func resolveGalleryUserByUsername(ctx context.Context, r *Resolver, username str
 		return nil, err
 	}
 
-	return userToUserModel(ctx, r, user)
+	return userToModel(ctx, r, user)
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address string) (*model.GalleryUser, error) {
+func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address persist.Address) (*model.GalleryUser, error) {
 	user, err := dataloader.For(ctx).UserByAddress.Load(address)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToUserModel(ctx, r, user)
+	return userToModel(ctx, r, user)
 }
 
-func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID string) ([]*model.Gallery, error) {
+func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.DBID) ([]*model.Gallery, error) {
 	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(userID)
 
 	if err != nil {
@@ -107,13 +114,13 @@ func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID string) (
 
 	var output = make([]*model.Gallery, len(galleries))
 	for i, gallery := range galleries {
-		output[i] = galleryToGalleryModel(gallery)
+		output[i] = galleryToModel(gallery)
 	}
 
 	return output, nil
 }
 
-func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID string) ([]*model.GalleryCollection, error) {
+func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
 	// TODO: Update this to query for collections by gallery ID, instead of querying for a user and returning
 	// all of their collections. The result is the same right now, since a user only has one gallery.
 
@@ -122,7 +129,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 		return nil, err
 	}
 
-	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID.String())
+	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,12 +140,12 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 		hidden := collection.Hidden.Bool()
 
 		output[i] = &model.GalleryCollection{
-			ID:             collection.ID.String(),
+			ID:             collection.ID,
 			Version:        &version,
 			Name:           util.StringToPointer(collection.Name.String()),
 			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
 			Gallery:        galleryIDToGalleryModel(galleryID),
-			Layout:         layoutToLayoutModel(ctx, r, collection.Layout),
+			Layout:         layoutToModel(ctx, collection.Layout),
 			Hidden:         &hidden,
 			Nfts:           nil, // handled by dedicated resolver
 		}
@@ -147,11 +154,11 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 	return output, nil
 }
 
-func galleryToGalleryModel(gallery persist.Gallery) *model.Gallery {
-	return galleryIDToGalleryModel(gallery.ID.String())
+func galleryToModel(gallery persist.Gallery) *model.Gallery {
+	return galleryIDToGalleryModel(gallery.ID)
 }
 
-func galleryIDToGalleryModel(galleryID string) *model.Gallery {
+func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
 	gallery := model.Gallery{
 		ID:          galleryID,
 		Owner:       nil, // handled by dedicated resolver
@@ -161,8 +168,8 @@ func galleryIDToGalleryModel(galleryID string) *model.Gallery {
 	return &gallery
 }
 
-func layoutToLayoutModel(ctx context.Context, r *Resolver, layout persist.TokenLayout) *model.GalleryCollectionLayout {
-	columns := int(layout.Columns.Int())
+func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.GalleryCollectionLayout {
+	columns := layout.Columns.Int()
 
 	output := model.GalleryCollectionLayout{
 		Columns: &columns,
@@ -171,16 +178,16 @@ func layoutToLayoutModel(ctx context.Context, r *Resolver, layout persist.TokenL
 	return &output
 }
 
-// userToUserModel converts a persist.User to a model.User
-func userToUserModel(ctx context.Context, r *Resolver, user persist.User) (*model.GalleryUser, error) {
+// userToModel converts a persist.User to a model.User
+func userToModel(ctx context.Context, r *Resolver, user persist.User) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	isAuthenticated := auth.GetUserAuthedFromCtx(gc)
 
 	output := &model.GalleryUser{
-		ID:                  user.ID.String(),
+		ID:                  user.ID,
 		Username:            util.StringToPointer(user.Username.String()),
 		Bio:                 util.StringToPointer(user.Bio.String()),
-		Wallets:             addressesToWalletModels(ctx, r, user.Addresses),
+		Wallets:             addressesToModels(ctx, r, user.Addresses),
 		Galleries:           nil, // handled by dedicated resolver
 		IsAuthenticatedUser: &isAuthenticated,
 	}
@@ -188,13 +195,13 @@ func userToUserModel(ctx context.Context, r *Resolver, user persist.User) (*mode
 	return output, nil
 }
 
-// addressesToWalletModels converts a slice of persist.Address to a slice of model.Wallet
-func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persist.Address) []*model.Wallet {
+// addressesToModels converts a slice of persist.Address to a slice of model.Wallet
+func addressesToModels(ctx context.Context, r *Resolver, addresses []persist.Address) []*model.Wallet {
 	wallets := make([]*model.Wallet, len(addresses))
 	for i, address := range addresses {
 		wallets[i] = &model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
-			Address: util.StringToPointer(address.String()),
+			Address: &address,
 			Nfts:    nil, // handled by dedicated resolver
 		}
 	}
@@ -202,28 +209,27 @@ func addressesToWalletModels(ctx context.Context, r *Resolver, addresses []persi
 	return wallets
 }
 
-func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId string) (model.GalleryUserOrWallet, error) {
+func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId persist.DBID) (model.GalleryUserOrWallet, error) {
 	nft, err := dataloader.For(ctx).NftByNftId.Load(nftId)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress.String())
+	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress)
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address string) (model.GalleryUserOrWallet, error) {
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address persist.Address) (model.GalleryUserOrWallet, error) {
 	owner, err := dataloader.For(ctx).UserByAddress.Load(address)
 
 	if err == nil {
-		return userToUserModel(ctx, r, owner)
+		return userToModel(ctx, r, owner)
 	}
 
-	// TODO: Change this error type once I change persist error types
 	if _, ok := err.(persist.ErrUserNotFound); ok {
 		wallet := model.Wallet{
 			ID:      "", // TODO: What's a wallet's ID?
-			Address: util.StringToPointer(address),
+			Address: &address,
 			Nfts:    nil, // handled by dedicated resolver
 		}
 
@@ -233,13 +239,72 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, addre
 	return nil, err
 }
 
-func nftToNftModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
+func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 	output := model.GenericNft{
-		ID:                  nft.ID.String(),
+		ID:                  nft.ID,
 		Name:                util.StringToPointer(nft.Name.String()),
 		TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
 		Owner:               nil, // handled by dedicated resolver
 	}
 
 	return output
+}
+
+func collectionToModel(ctx context.Context, collection persist.Collection) *model.GalleryCollection {
+	version := collection.Version.Int()
+	hidden := collection.Hidden.Bool()
+
+	// TODO: Should we be filling this collection's gallery out, or leaving it to a resolver?
+	// The Gallery->Collections path currently fills out the Gallery field on each Collection it returns,
+	// and switching to a resolver here means switching to a resolver there. Not a big deal, just remember
+	// to prime the "GalleryByCollectionId" cache with results from the "collections by gallery" lookup.
+	return &model.GalleryCollection{
+		ID:             collection.ID,
+		Version:        &version,
+		Name:           util.StringToPointer(collection.Name.String()),
+		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
+		Gallery:        nil, // TODO: Add SQL query to find gallery parent for collection. // galleryIDToGalleryModel(galleryID),
+		Layout:         layoutToModel(ctx, collection.Layout),
+		Hidden:         &hidden,
+		Nfts:           nil, // handled by dedicated resolver
+	}
+}
+
+func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) model.MembershipTier {
+	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
+	for i, owner := range membershipTier.Owners {
+		ownerModel := membershipOwnerToModel(ctx, owner)
+		owners[i] = &ownerModel
+	}
+
+	return model.MembershipTier{
+		ID:       membershipTier.ID,
+		Name:     util.StringToPointer(membershipTier.Name.String()),
+		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
+		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
+		Owners:   owners,
+	}
+}
+
+func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) model.MembershipOwner {
+	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
+	for i, nft := range membershipOwner.PreviewNFTs {
+		previewNfts[i] = util.StringToPointer(nft.String())
+	}
+
+	return model.MembershipOwner{
+		ID:          membershipOwner.UserID,
+		Address:     &membershipOwner.Address,
+		User:        nil, // handled by dedicated resolver
+		PreviewNfts: previewNfts,
+	}
+}
+
+func resolveViewer(ctx context.Context) *model.Viewer {
+	viewer := &model.Viewer{
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}
+
+	return viewer
 }

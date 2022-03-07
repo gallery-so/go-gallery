@@ -161,7 +161,7 @@ func GenerateNonce() string {
 }
 
 type EthereumNonceAuthenticator struct {
-	Address    string
+	Address    persist.Address
 	Nonce      string
 	Signature  string
 	WalletType WalletType
@@ -176,7 +176,7 @@ func (e EthereumNonceAuthenticator) GetDescription() string {
 
 func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 
-	address := persist.Address(e.Address)
+	address := e.Address
 	nonce, userID, _ := GetUserWithNonce(pCtx, address, e.UserRepo, e.NonceRepo)
 	if nonce == "" {
 		return nil, ErrNonceNotFound{Address: address}
@@ -236,7 +236,7 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
 
 	authenticator := EthereumNonceAuthenticator{
-		Address:    pInput.Address.String(),
+		Address:    pInput.Address,
 		Nonce:      pInput.Nonce,
 		Signature:  pInput.Signature,
 		WalletType: pInput.WalletType,
@@ -252,7 +252,7 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 
 	output := LoginOutput{
 		SignatureValid: true,
-		UserID:         persist.DBID(*gqlOutput.UserID),
+		UserID:         *gqlOutput.UserID,
 	}
 
 	return output, nil
@@ -279,7 +279,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPaylo
 	SetJWTCookie(gc, jwtTokenStr)
 
 	output := model.LoginPayload{
-		UserID: util.StringToPointer(authResult.UserID.String()),
+		UserID: &authResult.UserID,
 	}
 
 	return &output, nil

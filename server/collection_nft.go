@@ -208,7 +208,7 @@ func updateCollectionNfts(collectionsRepository persist.CollectionRepository, ga
 		}
 
 		// ensure that there are no repeat NFTs
-		withNoRepeats := uniqueDBID(input.Nfts)
+		withNoRepeats := persist.RemoveDuplicateDBIDs(input.Nfts)
 		layout, err := persist.ValidateLayout(input.Layout, input.Nfts)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
