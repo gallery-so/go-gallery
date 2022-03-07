@@ -46,7 +46,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		if viper.GetBool("REQUIRE_NFTS") {
-			user, err := dataloader.For(ctx).UserByUserId.Load(userID.String())
+			user, err := dataloader.For(ctx).UserByUserId.Load(userID)
 
 			if err != nil {
 				return nil, err

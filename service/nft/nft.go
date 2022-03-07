@@ -3,6 +3,8 @@ package nft
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -123,4 +125,64 @@ outer:
 	}
 	return result
 
+}
+
+func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
+
+	addresses := []persist.Address{}
+	if walletAddresses != "" {
+		addresses = []persist.Address{persist.Address(walletAddresses)}
+		if strings.Contains(walletAddresses, ",") {
+			addressesStrings := strings.Split(walletAddresses, ",")
+			for _, address := range addressesStrings {
+				addresses = append(addresses, persist.Address(address))
+			}
+		}
+		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
+		if err != nil {
+			return err
+		}
+
+		if !ownsWallet {
+			return ErrDoesNotOwnWallets{Id: userID, Addresses: addresses}
+		}
+	}
+
+	if err := nftRepo.OpenseaCacheDelete(ctx, addresses); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Address, userRepo persist.UserRepository) (bool, error) {
+	user, err := userRepo.GetByID(pCtx, userID)
+	if err != nil {
+		return false, err
+	}
+	for _, walletAddress := range walletAddresses {
+		if !ContainsWalletAddresses(user.Addresses, walletAddress) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func ContainsWalletAddresses(a []persist.Address, b persist.Address) bool {
+	for _, v := range a {
+		if v == b {
+			return true
+		}
+	}
+
+	return false
+}
+
+type ErrDoesNotOwnWallets struct {
+	Id        persist.DBID
+	Addresses []persist.Address
+}
+
+func (e ErrDoesNotOwnWallets) Error() string {
+	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.Id, e.Addresses)
 }

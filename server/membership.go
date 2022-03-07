@@ -20,71 +20,22 @@ type getMembershipTiersResponse struct {
 	Tiers []persist.MembershipTier `json:"tiers"`
 }
 
-func getMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getMembershipTiersREST(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input getMembershipTiersInput
 		if err := c.ShouldBindQuery(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		if input.ForceRefresh {
-			logrus.Infof("Force refresh - updating membership tiers")
-		}
-		allTiers, err := membershipRepository.GetAll(c)
+
+		membershipTiers, err := membership.GetMembershipTiers(c, input.ForceRefresh, membershipRepository, userRepository, galleryRepository, ethClient)
+
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logrus.Debugf("Found %d membership tiers in the DB", len(allTiers))
-		if len(allTiers) > 0 {
-			if len(allTiers) != len(membership.MembershipTierIDs) {
-				tiers := make(map[persist.TokenID]bool)
-				for _, tier := range allTiers {
-					tiers[tier.TokenID] = true
-				}
-				for _, tierID := range membership.MembershipTierIDs {
-					if ok := tiers[tierID]; !ok {
-						logrus.Infof("Tier not found - updating membership tier %s", tierID)
-						newTier, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
-						if err != nil {
-							util.ErrResponse(c, http.StatusInternalServerError, err)
-							return
-						}
-						allTiers = append(allTiers, newTier)
-					}
-				}
 
-			}
-
-			tiersToUpdate := make([]persist.TokenID, 0, len(allTiers))
-			for _, tier := range allTiers {
-				if time.Since(tier.LastUpdated.Time()) > time.Hour || input.ForceRefresh {
-					logrus.Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
-					tiersToUpdate = append(tiersToUpdate, tier.TokenID)
-				}
-			}
-			if len(tiersToUpdate) > 0 {
-				go func() {
-					for _, tierID := range tiersToUpdate {
-						_, err := membership.UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
-						if err != nil {
-							logrus.WithError(err).Errorf("Failed to update membership tier %s", tierID)
-						}
-					}
-				}()
-			}
-
-			c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(allTiers)})
-			return
-		}
-
-		logrus.Infof("No tiers found - updating membership tiers")
-		membershipTiers, err := membership.UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, ethClient)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membership.OrderMembershipTiers(membershipTiers)})
+		c.JSON(http.StatusOK, getMembershipTiersResponse{Tiers: membershipTiers})
 	}
 }
 

@@ -9,10 +9,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// GalleriesLoaderConfig captures the config to create a new GalleriesLoader
-type GalleriesLoaderConfig struct {
+// GalleriesLoaderByIDConfig captures the config to create a new GalleriesLoaderByID
+type GalleriesLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []string) ([][]persist.Gallery, []error)
+	Fetch func(keys []persist.DBID) ([][]persist.Gallery, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -21,19 +21,19 @@ type GalleriesLoaderConfig struct {
 	MaxBatch int
 }
 
-// NewGalleriesLoader creates a new GalleriesLoader given a fetch, wait, and maxBatch
-func NewGalleriesLoader(config GalleriesLoaderConfig) *GalleriesLoader {
-	return &GalleriesLoader{
+// NewGalleriesLoaderByID creates a new GalleriesLoaderByID given a fetch, wait, and maxBatch
+func NewGalleriesLoaderByID(config GalleriesLoaderByIDConfig) *GalleriesLoaderByID {
+	return &GalleriesLoaderByID{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// GalleriesLoader batches and caches requests
-type GalleriesLoader struct {
+// GalleriesLoaderByID batches and caches requests
+type GalleriesLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []string) ([][]persist.Gallery, []error)
+	fetch func(keys []persist.DBID) ([][]persist.Gallery, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,18 +44,18 @@ type GalleriesLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[string][]persist.Gallery
+	cache map[persist.DBID][]persist.Gallery
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *galleriesLoaderBatch
+	batch *galleriesLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type galleriesLoaderBatch struct {
-	keys    []string
+type galleriesLoaderByIDBatch struct {
+	keys    []persist.DBID
 	data    [][]persist.Gallery
 	error   []error
 	closing bool
@@ -63,14 +63,14 @@ type galleriesLoaderBatch struct {
 }
 
 // Load a Gallery by key, batching and caching will be applied automatically
-func (l *GalleriesLoader) Load(key string) ([]persist.Gallery, error) {
+func (l *GalleriesLoaderByID) Load(key persist.DBID) ([]persist.Gallery, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Gallery.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleriesLoader) LoadThunk(key string) func() ([]persist.Gallery, error) {
+func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Gallery, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -79,7 +79,7 @@ func (l *GalleriesLoader) LoadThunk(key string) func() ([]persist.Gallery, error
 		}
 	}
 	if l.batch == nil {
-		l.batch = &galleriesLoaderBatch{done: make(chan struct{})}
+		l.batch = &galleriesLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -113,7 +113,7 @@ func (l *GalleriesLoader) LoadThunk(key string) func() ([]persist.Gallery, error
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GalleriesLoader) LoadAll(keys []string) ([][]persist.Gallery, []error) {
+func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.Gallery, []error) {
 	results := make([]func() ([]persist.Gallery, error), len(keys))
 
 	for i, key := range keys {
@@ -131,7 +131,7 @@ func (l *GalleriesLoader) LoadAll(keys []string) ([][]persist.Gallery, []error) 
 // LoadAllThunk returns a function that when called will block waiting for a Gallerys.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleriesLoader) LoadAllThunk(keys []string) func() ([][]persist.Gallery, []error) {
+func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]persist.Gallery, []error) {
 	results := make([]func() ([]persist.Gallery, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -149,7 +149,7 @@ func (l *GalleriesLoader) LoadAllThunk(keys []string) func() ([][]persist.Galler
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GalleriesLoader) Prime(key string, value []persist.Gallery) bool {
+func (l *GalleriesLoaderByID) Prime(key persist.DBID, value []persist.Gallery) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -164,22 +164,22 @@ func (l *GalleriesLoader) Prime(key string, value []persist.Gallery) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GalleriesLoader) Clear(key string) {
+func (l *GalleriesLoaderByID) Clear(key persist.DBID) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *GalleriesLoader) unsafeSet(key string, value []persist.Gallery) {
+func (l *GalleriesLoaderByID) unsafeSet(key persist.DBID, value []persist.Gallery) {
 	if l.cache == nil {
-		l.cache = map[string][]persist.Gallery{}
+		l.cache = map[persist.DBID][]persist.Gallery{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *galleriesLoaderBatch) keyIndex(l *GalleriesLoader, key string) int {
+func (b *galleriesLoaderByIDBatch) keyIndex(l *GalleriesLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -203,7 +203,7 @@ func (b *galleriesLoaderBatch) keyIndex(l *GalleriesLoader, key string) int {
 	return pos
 }
 
-func (b *galleriesLoaderBatch) startTimer(l *GalleriesLoader) {
+func (b *galleriesLoaderByIDBatch) startTimer(l *GalleriesLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -219,7 +219,7 @@ func (b *galleriesLoaderBatch) startTimer(l *GalleriesLoader) {
 	b.end(l)
 }
 
-func (b *galleriesLoaderBatch) end(l *GalleriesLoader) {
+func (b *galleriesLoaderByIDBatch) end(l *GalleriesLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

@@ -43,8 +43,12 @@ autobind:
 # modelgen, the others will be allowed when binding to fields. Configure them to
 # your liking
 models:
+  Address:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Address
   ID:
     model:
+      - github.com/mikeydub/go-gallery/service/persist.DBID
       - github.com/99designs/gqlgen/graphql.ID
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Int64

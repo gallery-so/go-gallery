@@ -9,10 +9,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// GalleryLoaderConfig captures the config to create a new GalleryLoader
-type GalleryLoaderConfig struct {
+// UserLoaderByAddressConfig captures the config to create a new UserLoaderByAddress
+type UserLoaderByAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []string) ([]persist.Gallery, []error)
+	Fetch func(keys []persist.Address) ([]persist.User, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -21,19 +21,19 @@ type GalleryLoaderConfig struct {
 	MaxBatch int
 }
 
-// NewGalleryLoader creates a new GalleryLoader given a fetch, wait, and maxBatch
-func NewGalleryLoader(config GalleryLoaderConfig) *GalleryLoader {
-	return &GalleryLoader{
+// NewUserLoaderByAddress creates a new UserLoaderByAddress given a fetch, wait, and maxBatch
+func NewUserLoaderByAddress(config UserLoaderByAddressConfig) *UserLoaderByAddress {
+	return &UserLoaderByAddress{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// GalleryLoader batches and caches requests
-type GalleryLoader struct {
+// UserLoaderByAddress batches and caches requests
+type UserLoaderByAddress struct {
 	// this method provides the data for the loader
-	fetch func(keys []string) ([]persist.Gallery, []error)
+	fetch func(keys []persist.Address) ([]persist.User, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,51 +44,51 @@ type GalleryLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[string]persist.Gallery
+	cache map[persist.Address]persist.User
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *galleryLoaderBatch
+	batch *userLoaderByAddressBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type galleryLoaderBatch struct {
-	keys    []string
-	data    []persist.Gallery
+type userLoaderByAddressBatch struct {
+	keys    []persist.Address
+	data    []persist.User
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a Gallery by key, batching and caching will be applied automatically
-func (l *GalleryLoader) Load(key string) (persist.Gallery, error) {
+// Load a User by key, batching and caching will be applied automatically
+func (l *UserLoaderByAddress) Load(key persist.Address) (persist.User, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a Gallery.
+// LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleryLoader) LoadThunk(key string) func() (persist.Gallery, error) {
+func (l *UserLoaderByAddress) LoadThunk(key persist.Address) func() (persist.User, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (persist.Gallery, error) {
+		return func() (persist.User, error) {
 			return it, nil
 		}
 	}
 	if l.batch == nil {
-		l.batch = &galleryLoaderBatch{done: make(chan struct{})}
+		l.batch = &userLoaderByAddressBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (persist.Gallery, error) {
+	return func() (persist.User, error) {
 		<-batch.done
 
-		var data persist.Gallery
+		var data persist.User
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,43 +113,43 @@ func (l *GalleryLoader) LoadThunk(key string) func() (persist.Gallery, error) {
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GalleryLoader) LoadAll(keys []string) ([]persist.Gallery, []error) {
-	results := make([]func() (persist.Gallery, error), len(keys))
+func (l *UserLoaderByAddress) LoadAll(keys []persist.Address) ([]persist.User, []error) {
+	results := make([]func() (persist.User, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	gallerys := make([]persist.Gallery, len(keys))
+	users := make([]persist.User, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		gallerys[i], errors[i] = thunk()
+		users[i], errors[i] = thunk()
 	}
-	return gallerys, errors
+	return users, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a Gallerys.
+// LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleryLoader) LoadAllThunk(keys []string) func() ([]persist.Gallery, []error) {
-	results := make([]func() (persist.Gallery, error), len(keys))
+func (l *UserLoaderByAddress) LoadAllThunk(keys []persist.Address) func() ([]persist.User, []error) {
+	results := make([]func() (persist.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]persist.Gallery, []error) {
-		gallerys := make([]persist.Gallery, len(keys))
+	return func() ([]persist.User, []error) {
+		users := make([]persist.User, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			gallerys[i], errors[i] = thunk()
+			users[i], errors[i] = thunk()
 		}
-		return gallerys, errors
+		return users, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GalleryLoader) Prime(key string, value persist.Gallery) bool {
+func (l *UserLoaderByAddress) Prime(key persist.Address, value persist.User) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -160,22 +160,22 @@ func (l *GalleryLoader) Prime(key string, value persist.Gallery) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GalleryLoader) Clear(key string) {
+func (l *UserLoaderByAddress) Clear(key persist.Address) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *GalleryLoader) unsafeSet(key string, value persist.Gallery) {
+func (l *UserLoaderByAddress) unsafeSet(key persist.Address, value persist.User) {
 	if l.cache == nil {
-		l.cache = map[string]persist.Gallery{}
+		l.cache = map[persist.Address]persist.User{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *galleryLoaderBatch) keyIndex(l *GalleryLoader, key string) int {
+func (b *userLoaderByAddressBatch) keyIndex(l *UserLoaderByAddress, key persist.Address) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -199,7 +199,7 @@ func (b *galleryLoaderBatch) keyIndex(l *GalleryLoader, key string) int {
 	return pos
 }
 
-func (b *galleryLoaderBatch) startTimer(l *GalleryLoader) {
+func (b *userLoaderByAddressBatch) startTimer(l *UserLoaderByAddress) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -215,7 +215,7 @@ func (b *galleryLoaderBatch) startTimer(l *GalleryLoader) {
 	b.end(l)
 }
 
-func (b *galleryLoaderBatch) end(l *GalleryLoader) {
+func (b *userLoaderByAddressBatch) end(l *UserLoaderByAddress) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

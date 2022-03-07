@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/pubsub v1.18.0
 	cloud.google.com/go/secretmanager v1.2.0
 	cloud.google.com/go/storage v1.21.0
-	github.com/99designs/gqlgen v0.16.0
+	github.com/99designs/gqlgen v0.15.1
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b

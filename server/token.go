@@ -184,19 +184,6 @@ func refreshUnassignedTokensForUser(collectionRepository persist.CollectionToken
 	}
 }
 
-func doesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Address, userRepo persist.UserRepository) (bool, error) {
-	user, err := userRepo.GetByID(pCtx, userID)
-	if err != nil {
-		return false, err
-	}
-	for _, walletAddress := range walletAddresses {
-		if !containsWalletAddresses(user.Addresses, walletAddress) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {
 	switch {
 	case input.ID != "":
@@ -239,14 +226,4 @@ func (e errCouldNotUpdateMedia) Error() string {
 
 func (e errInvalidInput) Error() string {
 	return fmt.Sprintf("invalid input: %s", e.reason)
-}
-
-func containsWalletAddresses(a []persist.Address, b persist.Address) bool {
-	for _, v := range a {
-		if v == b {
-			return true
-		}
-	}
-
-	return false
 }
