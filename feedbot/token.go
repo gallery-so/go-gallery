@@ -21,13 +21,15 @@ func handleTokenEvents(ctx context.Context, tokenEventRepo persist.TokenEventRep
 	default:
 		return errInvalidTokenEvent
 	}
-	return nil
 }
 
 func handleTokenCollectorsNoteAdded(ctx context.Context, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
 	event, err := tokenEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
+	}
+	if event.Event.CollectorsNote == "" {
+		return nil
 	}
 
 	eventsSince, err := tokenEventRepo.GetEventsSince(ctx, event, time.Now())

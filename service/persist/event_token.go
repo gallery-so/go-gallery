@@ -17,8 +17,9 @@ type TokenEventRecord struct {
 }
 
 type TokenEvent struct {
-	Username     string `json:"username"`
-	CollectionID DBID   `json:"collection_id"`
+	Username       string     `json:"username"`
+	CollectionID   DBID       `json:"collection_id"`
+	CollectorsNote NullString `json:"collectors_note"`
 }
 
 type TokenEventRepository interface {

@@ -25,7 +25,6 @@ func handleCollectionEvents(ctx context.Context, collectionEventRepo persist.Col
 	default:
 		return errInvalidCollectionEvent
 	}
-	return nil
 }
 
 func handleCollectionCreatedEvent(ctx context.Context, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
@@ -55,6 +54,9 @@ func handleCollectionCollectorsNoteAdded(ctx context.Context, collectionEventRep
 	event, err := collectionEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
+	}
+	if event.Event.CollectorsNote == "" {
+		return nil
 	}
 
 	eventsSince, err := collectionEventRepo.GetEventsSince(ctx, event, time.Now())
