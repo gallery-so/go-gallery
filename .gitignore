@@ -1,3 +1,10 @@
+##########################################################################
+# KEEP THIS FILE IN SYNC WITH .gcloudignore
+##########################################################################
+# If you add something here, it needs to be added to .gcloudignore too.
+# Otherwise, it'll get uploaded when we deploy to Google Cloud.
+##########################################################################
+
 # IDE
 .idea
 .graphqlconfig
