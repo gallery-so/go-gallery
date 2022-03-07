@@ -86,7 +86,7 @@ type GalleryCollection implements Node {
   version: Int
   name: String
   collectorsNote: String
-  gallery: Gallery
+  gallery: Gallery @goField(forceResolver: true)
   layout: GalleryCollectionLayout
   hidden: Boolean
   nfts: [GalleryNft] @goField(forceResolver: true)

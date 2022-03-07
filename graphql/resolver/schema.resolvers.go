@@ -5,7 +5,6 @@ package graphql
 
 import (
 	"context"
-
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -28,6 +27,15 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
 	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.ID)
+}
+
+func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return galleryToModel(gallery), nil
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
@@ -134,15 +142,23 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	err := api.Collection.DeleteCollection(ctx, collectionID)
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	galleryID := gallery.ID
+
+	err = api.Collection.DeleteCollection(ctx, collectionID)
 	if err != nil {
 		return remapError(err)
 	}
 
-	// TODO: Need to be able to look up a gallery by a collection -- maybe gallery ID by collection ID -- and then grab it after the deletion.
-	// As above, use field collection to see if we need to look up the gallery.
+	dataloader.For(ctx).GalleryByGalleryId.Clear(galleryID)
+	gallery, err = dataloader.For(ctx).GalleryByGalleryId.Load(galleryID)
+
 	output := &model.DeleteCollectionPayload{
-		Gallery: nil,
+		Gallery: galleryToModel(gallery),
 	}
 
 	return output, nil

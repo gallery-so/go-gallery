@@ -31,6 +31,7 @@ type Loaders struct {
 	UserByUsername           UserLoaderByString
 	UserByAddress            UserLoaderByAddress
 	GalleryByGalleryId       GalleryLoaderByID
+	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
 	CollectionByCollectionId CollectionLoaderByID
 	CollectionsByUserId      CollectionsLoaderByID
@@ -63,6 +64,12 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleryByGalleryId(ctx, loaders, r),
+	}
+
+	loaders.GalleryByCollectionId = GalleryLoaderByID{
+		maxBatch: defaultMaxBatch,
+		wait:     defaultWaitTime,
+		fetch:    loadGalleryByCollectionId(ctx, loaders, r),
 	}
 
 	loaders.GalleriesByUserId = GalleriesLoaderByID{
@@ -107,14 +114,15 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, r *persist.Reposito
 
 		for i, userId := range userIds {
 			user, err := r.UserRepository.GetByID(ctx, userId)
+			users[i], errors[i] = user, err
 
 			// Add results to other loaders' caches
-			loaders.UserByUsername.Prime(user.Username.String(), user)
-			for _, address := range user.Addresses {
-				loaders.UserByAddress.Prime(address, user)
+			if err == nil {
+				loaders.UserByUsername.Prime(user.Username.String(), user)
+				for _, address := range user.Addresses {
+					loaders.UserByAddress.Prime(address, user)
+				}
 			}
-
-			users[i], errors[i] = user, err
 		}
 
 		return users, errors
@@ -128,14 +136,15 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, r *persist.Reposi
 
 		for i, username := range usernames {
 			user, err := r.UserRepository.GetByUsername(ctx, username)
+			users[i], errors[i] = user, err
 
 			// Add results to other loaders' caches
-			loaders.UserByUserId.Prime(user.ID, user)
-			for _, address := range user.Addresses {
-				loaders.UserByAddress.Prime(address, user)
+			if err == nil {
+				loaders.UserByUserId.Prime(user.ID, user)
+				for _, address := range user.Addresses {
+					loaders.UserByAddress.Prime(address, user)
+				}
 			}
-
-			users[i], errors[i] = user, err
 		}
 
 		return users, errors
@@ -149,11 +158,13 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 
 		for i, address := range addresses {
 			user, err := r.UserRepository.GetByAddress(ctx, persist.Address(address))
-			// Add results to other loaders' caches
-			loaders.UserByUserId.Prime(user.ID, user)
-			loaders.UserByUsername.Prime(user.Username.String(), user)
-
 			users[i], errors[i] = user, err
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.UserByUserId.Prime(user.ID, user)
+				loaders.UserByUsername.Prime(user.Username.String(), user)
+			}
 		}
 
 		return users, errors
@@ -167,6 +178,31 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Re
 
 		for i, galleryId := range galleryIds {
 			galleries[i], errors[i] = r.GalleryRepository.GetByID(ctx, galleryId)
+
+			// Add results to other loaders' caches
+			if errors[i] == nil {
+				for _, collection := range galleries[i].Collections {
+					loaders.GalleryByCollectionId.Prime(collection.ID, galleries[i])
+				}
+			}
+		}
+
+		return galleries, errors
+	}
+}
+
+func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.Gallery, []error) {
+	return func(collectionIds []persist.DBID) ([]persist.Gallery, []error) {
+		galleries := make([]persist.Gallery, len(collectionIds))
+		errors := make([]error, len(collectionIds))
+
+		for i, collectionId := range collectionIds {
+			galleries[i], errors[i] = r.GalleryRepository.GetByChildCollectionID(ctx, collectionId)
+
+			// Add results to other loaders' caches
+			if errors[i] == nil {
+				loaders.GalleryByGalleryId.Prime(galleries[i].ID, galleries[i])
+			}
 		}
 
 		return galleries, errors
@@ -181,9 +217,14 @@ func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, r *persist.Rep
 		for i, userId := range userIds {
 			galleries[i], errors[i] = r.GalleryRepository.GetByUserID(ctx, userId)
 
-			// Add results to the GalleryByGalleryId loader's cache
-			for _, gallery := range galleries[i] {
-				loaders.GalleryByGalleryId.Prime(gallery.ID, gallery)
+			// Add results to other loaders' caches
+			if errors[i] == nil {
+				for _, gallery := range galleries[i] {
+					loaders.GalleryByGalleryId.Prime(gallery.ID, gallery)
+					for _, collection := range gallery.Collections {
+						loaders.GalleryByCollectionId.Prime(collection.ID, gallery)
+					}
+				}
 			}
 		}
 
@@ -226,8 +267,10 @@ func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.R
 			collections[i], errors[i] = r.CollectionRepository.GetByUserID(ctx, userId, showHidden)
 
 			// Add results to the CollectionByCollectionId loader's cache
-			for _, collection := range collections[i] {
-				loaders.CollectionByCollectionId.Prime(collection.ID, collection)
+			if errors[i] == nil {
+				for _, collection := range collections[i] {
+					loaders.CollectionByCollectionId.Prime(collection.ID, collection)
+				}
 			}
 		}
 
@@ -244,8 +287,10 @@ func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 			nfts[i], errors[i] = r.NftRepository.GetByAddresses(ctx, []persist.Address{address})
 
 			// Add results to the NftByNftId loader's cache
-			for _, nft := range nfts[i] {
-				loaders.NftByNftId.Prime(nft.ID, nft)
+			if errors[i] == nil {
+				for _, nft := range nfts[i] {
+					loaders.NftByNftId.Prime(nft.ID, nft)
+				}
 			}
 		}
 

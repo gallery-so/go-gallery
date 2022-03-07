@@ -256,6 +256,8 @@ type GalleryResolver interface {
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error)
 }
 type GalleryCollectionResolver interface {
+	Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error)
+
 	Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error)
 }
 type GalleryUserResolver interface {
@@ -1167,7 +1169,7 @@ type GalleryCollection implements Node {
   version: Int
   name: String
   collectorsNote: String
-  gallery: Gallery
+  gallery: Gallery @goField(forceResolver: true)
   layout: GalleryCollectionLayout
   hidden: Boolean
   nfts: [GalleryNft] @goField(forceResolver: true)
@@ -2544,14 +2546,14 @@ func (ec *executionContext) _GalleryCollection_gallery(ctx context.Context, fiel
 		Object:     "GalleryCollection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Gallery, nil
+		return ec.resolvers.GalleryCollection().Gallery(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7679,12 +7681,22 @@ func (ec *executionContext) _GalleryCollection(ctx context.Context, sel ast.Sele
 			out.Values[i] = innerFunc(ctx)
 
 		case "gallery":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_gallery(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryCollection_gallery(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "layout":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryCollection_layout(ctx, field, obj)
