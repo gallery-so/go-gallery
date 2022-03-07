@@ -14,7 +14,7 @@ import (
 var errInvalidUserEvent = errors.New("unknown user event type")
 
 func handleUserEvents(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message event.EventMessage) error {
-	switch persist.NameFromEventType(message.EventType) {
+	switch persist.NameFromEventCode(message.EventCode) {
 	case persist.UserCreatedEvent:
 		return handleUserCreated(ctx, userRepo, userEventRepo, message)
 	default:

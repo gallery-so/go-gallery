@@ -53,7 +53,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 		// Start event handler
 		eventCh := make(chan persist.DBID)
 		defer close(eventCh)
-		eventHandler := event.EventHandler{Events: eventCh}
+		eventHandler := event.NewEventHandler(eventCh)
 		go eventHandler.Handle()
 
 		// TODO: Remove dataloader here

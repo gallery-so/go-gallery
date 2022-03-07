@@ -21,21 +21,21 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 	defer cancel()
 
 	createStmt, err := db.PrepareContext(ctx,
-		`INSERT INTO user_events (ID, USER_ID, VERSION, EVENT_TYPE, DATA) VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO user_events (ID, USER_ID, VERSION, EVENT_CODE, DATA) VALUES ($1, $2, $3, $4, $5)
 		 RETURNING ID;`,
 	)
 	checkNoErr(err)
 
 	getByEventIDStmt, err := db.PrepareContext(ctx,
-		`SELECT ID, USER_ID, VERSION, EVENT_TYPE, DATA, CREATED_AT, LAST_UPDATED
+		`SELECT ID, USER_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM user_events WHERE ID = $1;`,
 	)
 	checkNoErr(err)
 
 	getMatchingEventsForUserStmt, err := db.PrepareContext(ctx,
-		`SELECT ID, USER_ID, VERSION, EVENT_TYPE, DATA, CREATED_AT, LAST_UPDATED
+		`SELECT ID, USER_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM user_events
-		 WHERE USER_ID = $1 AND EVENT_TYPE = $2 AND CREATED_AT > $3 AND CREATED_AT <= $4;`,
+		 WHERE USER_ID = $1 AND EVENT_CODE = $2 AND CREATED_AT > $3 AND CREATED_AT <= $4;`,
 	)
 	checkNoErr(err)
 
@@ -61,7 +61,7 @@ func (e errFailedToFetchUserEvent) Error() string {
 
 func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRecord) (persist.DBID, error) {
 	var id persist.DBID
-	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.Version, event.Type, event.Data).Scan(&id)
+	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.Version, event.Code, event.Data).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -81,7 +81,7 @@ func (e *UserEventRepository) Get(ctx context.Context, eventID persist.DBID) (pe
 }
 
 func (e *UserEventRepository) GetEventsSince(ctx context.Context, event persist.UserEventRecord, since time.Time) ([]persist.UserEventRecord, error) {
-	res, err := e.getMatchingEventsForUserStmt.QueryContext(ctx, event.UserID, event.Type, event.CreationTime, since)
+	res, err := e.getMatchingEventsForUserStmt.QueryContext(ctx, event.UserID, event.Code, event.CreationTime, since)
 	if err != nil {
 		return []persist.UserEventRecord{}, errFailedToFetchUserEvent{event.ID}
 	}

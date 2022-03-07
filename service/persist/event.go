@@ -1,30 +1,30 @@
 package persist
 
-// Represents an event. The first 6 bits specify the category and
-// rhe remaining 10 bits encode the particular event name.
-type EventType int16
+// Represents an event. The first 8 bits specify the category and
+// the remaining 8 bits encode the particular event name.
+type EventCode int16
 
 const (
-	UserEventType = (1 << 6) + iota
+	UserEventCode = (1 << 8) + iota
 	UserCreatedEvent
 	UserDeletedEvent
 )
 const (
-	TokenEventType = (2 << 6) + iota
+	TokenEventCode = (2 << 8) + iota
 	TokenCollectorsNoteAddedEvent
 )
 const (
-	CollectionEventType = (3 << 6) + iota
+	CollectionEventCode = (3 << 8) + iota
 	CollectionCreatedEvent
 	CollectionCollectorsNoteAdded
 	CollectionTokensAdded
 )
 
-func CategoryFromEventType(eventTypeID EventType) int {
-	return int(eventTypeID) >> 6
+func CategoryFromEventCode(eventCode EventCode) int {
+	return int(eventCode) >> 8
 }
 
-func NameFromEventType(eventTypeID EventType) int {
-	mask := (1 << 6) - 1
-	return int(eventTypeID) & mask
+func NameFromEventCode(eventCode EventCode) int {
+	mask := (1 << 8) - 1
+	return int(eventCode) & mask
 }

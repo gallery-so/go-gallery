@@ -14,12 +14,12 @@ import (
 var errInvalidCollectionEvent = errors.New("unknown user event type")
 
 func handleCollectionEvents(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
-	switch persist.CategoryFromEventType(message.EventType) {
+	switch persist.CategoryFromEventCode(message.EventCode) {
 	case persist.CollectionCreatedEvent:
 		return handleCollectionCreatedEvent(ctx, userRepo, collectionEventRepo, message)
 	case persist.CollectionCollectorsNoteAdded:
 		return handleCollectionCollectorsNoteAdded(ctx, userRepo, collectionEventRepo, message)
-	case persist.CollectionEventType:
+	case persist.CollectionTokensAdded:
 		return handleCollectionTokensAdded(ctx, userRepo, collectionEventRepo, message)
 	default:
 		return errInvalidCollectionEvent

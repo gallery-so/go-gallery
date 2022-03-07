@@ -6,23 +6,27 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// Represents a message added to a task queue.
+// Represents a message to be added to a task queue.
 type EventMessage struct {
 	ID        persist.DBID
-	EventType persist.EventType
+	EventCode persist.EventCode
 }
 
 type EventHandler struct {
 	// Channel of persisted events
-	Events <-chan persist.DBID
+	events <-chan persist.DBID
+}
+
+func NewEventHandler(ch chan persist.DBID) EventHandler {
+	return EventHandler{events: ch}
 }
 
 func (e *EventHandler) Handle() {
 	for {
-		e, ok := <-e.Events
+		e, ok := <-e.events
 		if ok {
 			fmt.Println(e)
-			// Sent to task queue.
+			// Send to task queue.
 		} else {
 			return
 		}

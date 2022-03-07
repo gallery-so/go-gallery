@@ -30,18 +30,18 @@ func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEv
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
-		switch persist.CategoryFromEventType(input.EventType) {
-		case persist.UserEventType:
+		switch persist.CategoryFromEventCode(input.EventCode) {
+		case persist.UserEventCode:
 			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return
 			}
-		case persist.TokenEventType:
+		case persist.TokenEventCode:
 			err := handleTokenEvents(ctx, userRepo, tokenEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return
 			}
-		case persist.CollectionEventType:
+		case persist.CollectionEventCode:
 			err := handleCollectionEvents(ctx, userRepo, collectionEventRepo, input)
 			if retried := retryTask(c, err); retried {
 				return

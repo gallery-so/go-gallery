@@ -31,7 +31,7 @@ func (c CollectionAPIHandler) CreateCollection(ctx context.Context, galleryID pe
 		eventID, err := c.collectionEventRepo.Add(ctx, persist.CollectionEventRecord{
 			UserID:       auth.GetUserIDFromCtx(c.gc),
 			CollectionID: col.ID,
-			Type:         persist.CollectionCreatedEvent,
+			Code:         persist.CollectionCreatedEvent,
 			Data:         persist.CollectionEvent{NFTs: col.NFTs, CollectorsNote: col.CollectorsNote},
 		})
 		if err != nil {
