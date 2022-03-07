@@ -7,26 +7,23 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 )
 
-// top-level event categories
 const (
 	UserEventType = iota + 1
 	TokenEventType
 	CollectionEventType
 )
 
-// userEvents
 const (
-	UserCreatedEvent = iota
+	UserCreatedEvent = (UserEventType << 8) + iota + 1
+	UserDeletedEvent
 )
 
-// tokenEvents
 const (
-	TokenCollectorsNoteAddedEvent = iota
+	TokenCollectorsNoteAddedEvent = (TokenEventType << 8) + iota + 1
 )
 
-// collectionEvents
 const (
-	CollectionCreatedEvent = iota
+	CollectionCreatedEvent = (CollectionEventType << 8) + iota + 1
 	CollectionCollectorsNoteAdded
 	CollectionTokensAdded
 )

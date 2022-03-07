@@ -3,6 +3,7 @@ package feedbot
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +22,10 @@ func (e errFailedToPostMessage) Retryable() bool {
 
 func (e errFailedToPostMessage) Error() string {
 	return fmt.Sprintf("failed to send message: %s", e.err)
+}
+
+func createMessage(content string) ([]byte, error) {
+	return json.Marshal(map[string]interface{}{"content": content, "tts": false})
 }
 
 func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {

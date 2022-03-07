@@ -2,7 +2,6 @@ package feedbot
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -40,13 +39,11 @@ func handleTokenCollectorsNoteAdded(ctx context.Context, tokenEventRepo persist.
 		return nil
 	}
 
-	messagePost := map[string]interface{}{
-		"content": fmt.Sprintf("**%s** added a collector's note to their NFT: %s/%s/%s/%s",
+	payload, err := createMessage(
+		fmt.Sprintf("**%s** added a collector's note to their NFT: %s/%s/%s/%s",
 			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username, event.Event.CollectionID, event.TokenID,
 		),
-		"tts": false,
-	}
-	payload, err := json.Marshal(messagePost)
+	)
 	if err != nil {
 		return err
 	}

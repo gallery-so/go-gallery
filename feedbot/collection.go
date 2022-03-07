@@ -2,7 +2,6 @@ package feedbot
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -36,13 +35,11 @@ func handleCollectionCreatedEvent(ctx context.Context, collectionEventRepo persi
 		return nil
 	}
 
-	messagePost := map[string]interface{}{
-		"content": fmt.Sprintf("**%s** created a collection: %s/%s/%s",
+	payload, err := createMessage(
+		fmt.Sprintf("**%s** created a collection: %s/%s/%s",
 			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username, event.CollectionID,
 		),
-		"tts": false,
-	}
-	payload, err := json.Marshal(messagePost)
+	)
 	if err != nil {
 		return err
 	}
@@ -67,13 +64,11 @@ func handleCollectionCollectorsNoteAdded(ctx context.Context, collectionEventRep
 		return nil
 	}
 
-	messagePost := map[string]interface{}{
-		"content": fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
+	payload, err := createMessage(
+		fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
 			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username, event.CollectionID,
 		),
-		"tts": false,
-	}
-	payload, err := json.Marshal(messagePost)
+	)
 	if err != nil {
 		return err
 	}
@@ -95,13 +90,11 @@ func handleCollectionTokensAdded(ctx context.Context, collectionEventRepo persis
 		return nil
 	}
 
-	messagePost := map[string]interface{}{
-		"content": fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
+	payload, err := createMessage(
+		fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
 			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username, event.CollectionID,
 		),
-		"tts": false,
-	}
-	payload, err := json.Marshal(messagePost)
+	)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,6 @@ package feedbot
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -21,7 +20,6 @@ func handleUserEvents(ctx context.Context, userEventRepo persist.UserEventReposi
 	default:
 		return errInvalidUserEvent
 	}
-	return nil
 }
 
 func handleUserCreated(ctx context.Context, userEventRepo persist.UserEventRepository, message event.EventMessage) error {
@@ -41,13 +39,11 @@ func handleUserCreated(ctx context.Context, userEventRepo persist.UserEventRepos
 		return nil
 	}
 
-	messagePost := map[string]interface{}{
-		"content": fmt.Sprintf("**%s** joined Gallery: %s/%s",
+	payload, err := createMessage(
+		fmt.Sprintf("**%s** joined Gallery: %s/%s",
 			event.Event.Username, viper.GetString("GALLERY_HOST"), event.Event.Username,
 		),
-		"tts": false,
-	}
-	payload, err := json.Marshal(messagePost)
+	)
 	if err != nil {
 		return err
 	}
