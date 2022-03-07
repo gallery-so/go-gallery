@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
@@ -49,13 +50,15 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(config))
 
 	return func(c *gin.Context) {
+		// Start event handler
+		eventCh := make(chan persist.DBID)
+		defer close(eventCh)
+		eventHandler := event.EventHandler{Events: eventCh}
+		go eventHandler.Handle()
+
 		// TODO: Remove dataloader here
-		events := make(chan persist.DBID)
-		defer close(events)
-
 		dataloader.AddTo(c, repos)
-		publicapi.AddTo(c, repos, ethClient, pubsub)
-
+		publicapi.AddTo(c, repos, ethClient, pubsub, eventCh)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

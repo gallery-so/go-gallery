@@ -2,7 +2,7 @@ package persist
 
 // Represents an event. The first 6 bits specify the category and
 // rhe remaining 10 bits encode the particular event name.
-type EventID int16
+type EventType int16
 
 const (
 	UserEventType = (1 << 6) + iota
@@ -20,11 +20,11 @@ const (
 	CollectionTokensAdded
 )
 
-func CategoryFromEventID(eventTypeID EventID) int {
+func CategoryFromEventType(eventTypeID EventType) int {
 	return int(eventTypeID) >> 6
 }
 
-func NameFromEventID(eventTypeID EventID) int {
+func NameFromEventType(eventTypeID EventType) int {
 	mask := (1 << 6) - 1
 	return int(eventTypeID) & mask
 }

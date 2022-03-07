@@ -14,7 +14,7 @@ import (
 var errInvalidTokenEvent = errors.New("unknown user event type")
 
 func handleTokenEvents(ctx context.Context, userRepo persist.UserRepository, tokenEventRepo persist.TokenEventRepository, message event.EventMessage) error {
-	switch persist.NameFromEventID(message.EventID) {
+	switch persist.NameFromEventType(message.EventType) {
 	case persist.TokenCollectorsNoteAddedEvent:
 		return handleTokenCollectorsNoteAdded(ctx, userRepo, tokenEventRepo, message)
 	default:

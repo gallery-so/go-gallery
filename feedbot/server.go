@@ -30,7 +30,7 @@ func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEv
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
-		switch persist.CategoryFromEventID(input.EventID) {
+		switch persist.CategoryFromEventType(input.EventType) {
 		case persist.UserEventType:
 			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
 			if retried := retryTask(c, err); retried {

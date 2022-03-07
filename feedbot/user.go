@@ -14,7 +14,7 @@ import (
 var errInvalidUserEvent = errors.New("unknown user event type")
 
 func handleUserEvents(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message event.EventMessage) error {
-	switch persist.NameFromEventID(message.EventID) {
+	switch persist.NameFromEventType(message.EventType) {
 	case persist.UserCreatedEvent:
 		return handleUserCreated(ctx, userRepo, userEventRepo, message)
 	default:
@@ -27,7 +27,11 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 	if err != nil {
 		return err
 	}
-	if event.Data.Username == "" {
+	user, err := userRepo.GetByID(ctx, event.UserID)
+	if err != nil {
+		return err
+	}
+	if user.Username == "" {
 		return nil
 	}
 
@@ -39,10 +43,6 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 		return nil
 	}
 
-	user, err := userRepo.GetByID(ctx, event.UserID)
-	if err != nil {
-		return err
-	}
 	payload, err := createMessage(
 		fmt.Sprintf("**%s** joined Gallery: %s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username,

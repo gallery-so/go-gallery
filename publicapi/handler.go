@@ -28,7 +28,7 @@ func (c CollectionAPIHandler) CreateCollection(ctx context.Context, galleryID pe
 	col, err := c.PublicCollectionAPI.CreateCollection(ctx, galleryID, name, collectorsNote, nfts, layout)
 
 	go func() {
-		_, err := c.collectionEventRepo.Add(ctx, persist.CollectionEventRecord{
+		eventID, err := c.collectionEventRepo.Add(ctx, persist.CollectionEventRecord{
 			UserID:       auth.GetUserIDFromCtx(c.gc),
 			CollectionID: col.ID,
 			Type:         persist.CollectionCreatedEvent,
@@ -37,7 +37,7 @@ func (c CollectionAPIHandler) CreateCollection(ctx context.Context, galleryID pe
 		if err != nil {
 			// TODO: Log this out.
 		}
-		// Send event to task queues.
+		c.events <- eventID
 	}()
 
 	return col, err
