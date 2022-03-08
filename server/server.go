@@ -51,13 +51,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
-		v.RegisterValidation("medium", validate.MediumStringValidator)
-		v.RegisterValidation("collectors_note", validate.CollectorsNoteValidator)
-		v.RegisterValidation("eth_addr", validate.EthValidator)
-		v.RegisterValidation("nonce", validate.NonceValidator)
-		v.RegisterValidation("signature", validate.SignatureValidator)
-		v.RegisterValidation("username", validate.UsernameValidator)
-
+		validate.RegisterCustomValidators(v)
 	}
 
 	if err := redis.ClearCache(); err != nil {

@@ -250,8 +250,8 @@ type ErrNotAuthorized implements Error {
 
 type ErrInvalidInput implements Error {
   message: String!
-  parameter: String!
-  reason: String!
+  parameters: [String!]!
+  reasons: [String!]!
 }
 
 type ErrNoCookie implements Error {

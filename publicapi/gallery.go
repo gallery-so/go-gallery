@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
@@ -19,13 +20,17 @@ var errTooManyCollectionsInGallery = errors.New(fmt.Sprintf("maximum of %d colle
 type GalleryAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
+	validator *validator.Validate
 	ethClient *ethclient.Client
 	pubsub    pubsub.PubSub
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
-	userID, err := getAuthenticatedUser(ctx)
-	if err != nil {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID":   {galleryID, "required"},
+		"collections": {collections, "required,unique"},
+	}); err != nil {
 		return err
 	}
 
@@ -34,8 +39,10 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return errTooManyCollectionsInGallery
 	}
 
-	// TODO: Throw a validation error instead of removing duplicates
-	collections = persist.RemoveDuplicateDBIDs(collections)
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
 
 	update := persist.GalleryUpdateInput{Collections: collections}
 
