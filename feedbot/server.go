@@ -5,49 +5,58 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
-type RetryableTasKError interface {
-	Retryable() bool
-	Error() string
-}
-
-var errInvalidEvent = errors.New("unknown event type")
-
-func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.TokenEventRepository, collectionEventRepo persist.CollectionEventRepository) gin.HandlerFunc {
+func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.NftEventRepository, collectionEventRepo persist.CollectionEventRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := event.EventMessage{}
-		if retried := retryTask(c, c.ShouldBindJSON(&input)); retried {
+		input := cloudtask.EventMessage{}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		ctx, cancel := context.WithCancel(c.Request.Context())
 		defer cancel()
 
 		switch persist.CategoryFromEventCode(input.EventCode) {
 		case persist.UserEventCode:
 			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
-			if retried := retryTask(c, err); retried {
-				return
+			if err != nil {
+				if err == errInvalidUserEvent || err == errMissingUserEvent {
+					util.ErrResponse(c, http.StatusOK, err)
+					return
+				} else {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
 			}
-		case persist.TokenEventCode:
-			err := handleTokenEvents(ctx, userRepo, tokenEventRepo, input)
-			if retried := retryTask(c, err); retried {
-				return
+		case persist.NftEventCode:
+			err := handleNftEvents(ctx, userRepo, tokenEventRepo, input)
+			if err != nil {
+				if err == errInvalidNftEvent || err == errMissingNftEvent {
+					util.ErrResponse(c, http.StatusOK, err)
+					return
+				} else {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+				}
 			}
 		case persist.CollectionEventCode:
 			err := handleCollectionEvents(ctx, userRepo, collectionEventRepo, input)
-			if retried := retryTask(c, err); retried {
-				return
+			if err != nil {
+				if err == errInvalidCollectionEvent || err == errMissingCollectionEvent {
+					util.ErrResponse(c, http.StatusOK, err)
+					return
+				} else {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+				}
 			}
 		default:
-			util.ErrResponse(c, http.StatusBadRequest, errInvalidEvent)
+			util.ErrResponse(c, http.StatusOK, errors.New("unknown event type"))
 			return
 		}
 
@@ -59,17 +68,4 @@ func ping() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ping": "pong"})
 	}
-}
-
-func retryTask(c *gin.Context, err error) bool {
-	if err != nil {
-		if re, ok := err.(RetryableTasKError); ok && re.Retryable() {
-			// Statuses other than 2xx and 503 are retried.
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return true
-		}
-		c.JSON(http.StatusOK, err)
-		return true
-	}
-	return false
 }

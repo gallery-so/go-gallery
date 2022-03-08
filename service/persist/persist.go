@@ -46,7 +46,7 @@ type Repositories struct {
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
 	UserEventRepository       UserEventRepository
-	TokenEventRepository      TokenEventRepository
+	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
 }
 

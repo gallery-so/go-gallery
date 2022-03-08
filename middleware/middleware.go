@@ -28,10 +28,6 @@ type errUserDoesNotHaveRequiredNFT struct {
 	addresses []persist.Address
 }
 
-type errBadTaskRequest struct {
-	msg string
-}
-
 // AuthRequired is a middleware that checks if the user is authenticated
 func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -215,23 +211,4 @@ func GinContextToContext() gin.HandlerFunc {
 
 func (e errUserDoesNotHaveRequiredNFT) Error() string {
 	return fmt.Sprintf("required tokens not owned by addresses: %v", e.addresses)
-}
-
-func (e errBadTaskRequest) Error() string {
-	return fmt.Sprintf("bad task request: %s", e.msg)
-}
-
-// TaskRequired checks that the request comes from Cloud Tasks.
-func TaskRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		taskName := c.Request.Header.Get("X-Appengine-Taskname")
-		if taskName == "" {
-			c.AbortWithError(http.StatusBadRequest, errBadTaskRequest{"invalid task"})
-		}
-
-		queueName := c.Request.Header.Get("X-Appengine-Queuename")
-		if queueName == "" {
-			c.AbortWithError(http.StatusInternalServerError, errBadTaskRequest{"invalid queue"})
-		}
-	}
 }

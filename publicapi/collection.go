@@ -18,28 +18,12 @@ const maxNftsPerCollection = 1000
 // TODO: Convert this to a validation error, and enforce in all potential contexts here
 var errTooManyNFTsInCollection = errors.New(fmt.Sprintf("maximum of %d NFTs in a collection", maxNftsPerCollection))
 
-type PublicCollectionAPI interface {
-	CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error)
-	DeleteCollection(ctx context.Context, collectionID persist.DBID) error
-	UpdateCollectionNfts(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error
-	UpdateCollection(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error
-}
-
 type CollectionAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 	pubsub    pubsub.PubSub
-}
-
-func NewCollectionAPI(repos *persist.Repositories, loaders *dataloader.Loaders, ethClient *ethclient.Client, pubsub pubsub.PubSub) *CollectionAPI {
-	return &CollectionAPI{
-		repos:     repos,
-		loaders:   loaders,
-		ethClient: ethClient,
-		pubsub:    pubsub,
-	}
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {

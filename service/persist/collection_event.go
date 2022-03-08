@@ -10,7 +10,7 @@ type CollectionEventRecord struct {
 	UserID       DBID            `json:"user_id"`
 	CollectionID DBID            `json:"collection_id"`
 	Version      NullInt32       `json:"version"`
-	Code         int             `json:"event_code"`
+	Code         EventCode       `json:"event_code"`
 	CreationTime CreationTime    `json:"created_at"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 	Data         CollectionEvent `json:"data"`

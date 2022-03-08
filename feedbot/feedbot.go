@@ -22,7 +22,7 @@ func coreInit(pqClient *sql.DB) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	return handlersInit(router, postgres.NewUserRepository(pqClient), postgres.NewUserEventRepository(pqClient), postgres.NewTokenEventRepository(pqClient), postgres.NewCollectionEventRepository(pqClient))
+	return handlersInit(router, postgres.NewUserRepository(pqClient), postgres.NewUserEventRepository(pqClient), postgres.NewNftEventRepository(pqClient), postgres.NewCollectionEventRepository(pqClient))
 }
 
 func setDefaults() {
@@ -38,6 +38,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("PORT", 4123)
 	viper.SetDefault("GALLERY_HOST", "http://localhost:3000")
+	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.AutomaticEnv()
 	if viper.GetString("BOT_TOKEN") == "" {
 		panic("BOT_TOKEN must be set")

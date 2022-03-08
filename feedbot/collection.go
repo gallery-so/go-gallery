@@ -2,35 +2,44 @@ package feedbot
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
-var errInvalidCollectionEvent = errors.New("unknown user event type")
+var errInvalidCollectionEvent = errors.New("unknown collection event type")
+var errMissingCollectionEvent = errors.New("collection event does not exist")
 
-func handleCollectionEvents(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
-	switch persist.CategoryFromEventCode(message.EventCode) {
+func handleCollectionEvents(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message cloudtask.EventMessage) error {
+	var err error
+	switch message.EventCode {
 	case persist.CollectionCreatedEvent:
-		return handleCollectionCreatedEvent(ctx, userRepo, collectionEventRepo, message)
+		err = handleCollectionCreatedEvent(ctx, userRepo, collectionEventRepo, message)
 	case persist.CollectionCollectorsNoteAdded:
-		return handleCollectionCollectorsNoteAdded(ctx, userRepo, collectionEventRepo, message)
+		err = handleCollectionCollectorsNoteAdded(ctx, userRepo, collectionEventRepo, message)
 	case persist.CollectionTokensAdded:
-		return handleCollectionTokensAdded(ctx, userRepo, collectionEventRepo, message)
+		err = handleCollectionTokensAdded(ctx, userRepo, collectionEventRepo, message)
 	default:
-		return errInvalidCollectionEvent
+		err = errInvalidCollectionEvent
 	}
+	if err == sql.ErrNoRows {
+		return errMissingCollectionEvent
+	}
+	return err
 }
 
-func handleCollectionCreatedEvent(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
+func handleCollectionCreatedEvent(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message cloudtask.EventMessage) error {
 	event, err := collectionEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
 	}
+
+	// Don't send empty collections.
 	if len(event.Data.NFTs) < 1 {
 		return nil
 	}
@@ -51,11 +60,13 @@ func handleCollectionCreatedEvent(ctx context.Context, userRepo persist.UserRepo
 	return sendMessage(ctx, payload)
 }
 
-func handleCollectionCollectorsNoteAdded(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
+func handleCollectionCollectorsNoteAdded(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message cloudtask.EventMessage) error {
 	event, err := collectionEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
 	}
+
+	// Don't send with empty notes.
 	if event.Data.CollectorsNote == "" {
 		return nil
 	}
@@ -84,10 +95,15 @@ func handleCollectionCollectorsNoteAdded(ctx context.Context, userRepo persist.U
 	return sendMessage(ctx, payload)
 }
 
-func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message event.EventMessage) error {
+func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepository, collectionEventRepo persist.CollectionEventRepository, message cloudtask.EventMessage) error {
 	event, err := collectionEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
+	}
+
+	// Don't send empty collections.
+	if len(event.Data.NFTs) < 1 {
+		return nil
 	}
 
 	eventsSince, err := collectionEventRepo.GetEventsSince(ctx, event, time.Now())
@@ -103,7 +119,7 @@ func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepos
 		return err
 	}
 	payload, err := createMessage(
-		fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
+		fmt.Sprintf("**%s** added an NFT(s) to their collection: %s/%s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.CollectionID,
 		),
 	)

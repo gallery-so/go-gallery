@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -47,18 +46,6 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 	}
 }
 
-type errFailedToFetchCollectionEvent struct {
-	eventID persist.DBID
-}
-
-func (e errFailedToFetchCollectionEvent) Retryable() bool {
-	return true
-}
-
-func (e errFailedToFetchCollectionEvent) Error() string {
-	return fmt.Sprintf("event does not exist: %s", e.eventID)
-}
-
 func (e *CollectionEventRepository) Add(ctx context.Context, event persist.CollectionEventRecord) (persist.DBID, error) {
 	var id persist.DBID
 	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.CollectionID, event.Version, event.Code, event.Data).Scan(&id)
@@ -71,11 +58,8 @@ func (e *CollectionEventRepository) Add(ctx context.Context, event persist.Colle
 func (e *CollectionEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.CollectionEventRecord, error) {
 	var event persist.CollectionEventRecord
 	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event)
-	if err == sql.ErrNoRows {
-		return persist.CollectionEventRecord{}, err
-	}
 	if err != nil {
-		return persist.CollectionEventRecord{}, errFailedToFetchCollectionEvent{event.ID}
+		return persist.CollectionEventRecord{}, nil
 	}
 	return event, nil
 }
@@ -83,13 +67,13 @@ func (e *CollectionEventRepository) Get(ctx context.Context, eventID persist.DBI
 func (e *CollectionEventRepository) GetEventsSince(ctx context.Context, event persist.CollectionEventRecord, since time.Time) ([]persist.CollectionEventRecord, error) {
 	res, err := e.getMatchingEventForUserAndCollectionStmt.QueryContext(ctx, event.UserID, event.CollectionID, event.Code, event.CreationTime, since)
 	if err != nil {
-		return []persist.CollectionEventRecord{}, errFailedToFetchCollectionEvent{event.ID}
+		return nil, err
 	}
 	events := make([]persist.CollectionEventRecord, 0)
 	for res.Next() {
 		var event persist.CollectionEventRecord
 		if err := res.Scan(&event); err != nil {
-			return nil, errFailedToFetchCollectionEvent{event.ID}
+			return nil, err
 		}
 		events = append(events, event)
 	}

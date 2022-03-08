@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -47,18 +46,6 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 	}
 }
 
-type errFailedToFetchUserEvent struct {
-	eventID persist.DBID
-}
-
-func (e errFailedToFetchUserEvent) Retryable() bool {
-	return true
-}
-
-func (e errFailedToFetchUserEvent) Error() string {
-	return fmt.Sprintf("event does not exist: %s", e.eventID)
-}
-
 func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRecord) (persist.DBID, error) {
 	var id persist.DBID
 	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.Version, event.Code, event.Data).Scan(&id)
@@ -71,11 +58,8 @@ func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRe
 func (e *UserEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.UserEventRecord, error) {
 	var event persist.UserEventRecord
 	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event)
-	if err == sql.ErrNoRows {
-		return persist.UserEventRecord{}, err
-	}
 	if err != nil {
-		return persist.UserEventRecord{}, errFailedToFetchUserEvent{event.ID}
+		return persist.UserEventRecord{}, err
 	}
 	return event, nil
 }
@@ -83,13 +67,13 @@ func (e *UserEventRepository) Get(ctx context.Context, eventID persist.DBID) (pe
 func (e *UserEventRepository) GetEventsSince(ctx context.Context, event persist.UserEventRecord, since time.Time) ([]persist.UserEventRecord, error) {
 	res, err := e.getMatchingEventsForUserStmt.QueryContext(ctx, event.UserID, event.Code, event.CreationTime, since)
 	if err != nil {
-		return []persist.UserEventRecord{}, errFailedToFetchUserEvent{event.ID}
+		return nil, err
 	}
 	events := make([]persist.UserEventRecord, 0)
 	for res.Next() {
 		var event persist.UserEventRecord
 		if err := res.Scan(&event); err != nil {
-			return nil, errFailedToFetchUserEvent{event.ID}
+			return nil, err
 		}
 		events = append(events, event)
 	}

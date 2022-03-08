@@ -30,12 +30,7 @@ func createMessage(content string) ([]byte, error) {
 
 func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
 	url := fmt.Sprintf("%s/channels/%s/messages", viper.GetString("DISCORD_API"), viper.GetString("CHANNEL_ID"))
-	req, err := http.NewRequestWithContext(
-		ctx,
-		"POST",
-		url,
-		bytes.NewReader(body),
-	)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

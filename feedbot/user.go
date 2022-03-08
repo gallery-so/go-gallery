@@ -2,27 +2,34 @@ package feedbot
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
 var errInvalidUserEvent = errors.New("unknown user event type")
+var errMissingUserEvent = errors.New("user event does not exist")
 
-func handleUserEvents(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message event.EventMessage) error {
-	switch persist.NameFromEventCode(message.EventCode) {
+func handleUserEvents(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message cloudtask.EventMessage) error {
+	var err error
+	switch message.EventCode {
 	case persist.UserCreatedEvent:
-		return handleUserCreated(ctx, userRepo, userEventRepo, message)
+		err = handleUserCreated(ctx, userRepo, userEventRepo, message)
 	default:
-		return errInvalidUserEvent
+		err = errInvalidUserEvent
 	}
+	if err == sql.ErrNoRows {
+		return errMissingUserEvent
+	}
+	return err
 }
 
-func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message event.EventMessage) error {
+func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, message cloudtask.EventMessage) error {
 	event, err := userEventRepo.Get(ctx, message.ID)
 	if err != nil {
 		return err
@@ -31,6 +38,8 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 	if err != nil {
 		return err
 	}
+
+	// Make sure the username is set.
 	if user.Username == "" {
 		return nil
 	}

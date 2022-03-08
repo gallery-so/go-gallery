@@ -9,13 +9,16 @@ type UserEventRecord struct {
 	ID           DBID            `json:"id"`
 	UserID       DBID            `json:"user_id"`
 	Version      NullInt32       `json:"version"`
-	Code         int             `json:"event_code"`
+	Code         EventCode       `json:"event_code"`
 	CreationTime CreationTime    `json:"created_at"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 	Data         UserEvent       `json:"data"`
 }
 
-type UserEvent struct{}
+type UserEvent struct {
+	Username string     `json:"username"`
+	Bio      NullString `json:"bio"`
+}
 
 type UserEventRepository interface {
 	Add(context.Context, UserEventRecord) (DBID, error)
