@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
@@ -13,23 +14,38 @@ import (
 
 const maxNftsPerCollection = 1000
 
-// TODO: Convert this to a validation error
+// TODO: Convert this to a validation error, and enforce in all potential contexts here
 var errTooManyNFTsInCollection = errors.New(fmt.Sprintf("maximum of %d NFTs in a collection", maxNftsPerCollection))
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
+	validator *validator.Validate
 	ethClient *ethclient.Client
 	pubsub    pubsub.PubSub
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+		// TODO: Validate name length
+		"collectorsNote": {collectorsNote, "medium"},
+		"nfts":           {nfts, "required,unique"},
+	}); err != nil {
+		return nil, err
+	}
+
+	layout, err := persist.ValidateLayout(layout, nfts)
 	if err != nil {
 		return nil, err
 	}
 
-	layout, err = persist.ValidateLayout(layout, nfts)
+	// Sanitize
+	name = validate.SanitizationPolicy.Sanitize(name)
+	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
+
+	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +54,8 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		OwnerUserID:    userID,
 		NFTs:           nfts,
 		Layout:         layout,
-		Name:           persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
-		CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(collectorsNote)),
+		Name:           persist.NullString(name),
+		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
 	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
@@ -64,6 +80,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionID, "required"},
+	}); err != nil {
+		return err
+	}
+
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
@@ -73,21 +96,42 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 }
 
 func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID":   {collectionID, "required"},
+		"name":           {name, "required"}, // TODO: Validate length
+		"collectorsNote": {collectorsNote, "required,medium"},
+	}); err != nil {
+		return err
+	}
+
+	// Sanitize
+	name = validate.SanitizationPolicy.Sanitize(name)
+	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
+
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
 	update := persist.CollectionUpdateInfoInput{
-		Name:           persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
-		CollectorsNote: persist.NullString(validate.SanitizationPolicy.Sanitize(collectorsNote)),
+		Name:           persist.NullString(name),
+		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
 	return api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
 }
 
 func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error {
-	userID, err := getAuthenticatedUser(ctx)
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionID, "required"},
+		"nfts":         {nfts, "required,unique"},
+	}); err != nil {
+		return err
+	}
+
+	layout, err := persist.ValidateLayout(layout, nfts)
 	if err != nil {
 		return err
 	}
@@ -96,10 +140,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 		return errTooManyNFTsInCollection
 	}
 
-	// ensure that there are no repeat NFTs
-	// TODO: Throw a validation error instead of removing duplicates
-	nfts = persist.RemoveDuplicateDBIDs(nfts)
-	layout, err = persist.ValidateLayout(layout, nfts)
+	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}

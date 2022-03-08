@@ -37,7 +37,7 @@ func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool)
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
-		mappedErr = model.ErrInvalidInput{Message: message, Parameter: validationErr.Parameter, Reason: validationErr.Reason}
+		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 	}
 
 	if mappedErr != nil {

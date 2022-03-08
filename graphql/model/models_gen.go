@@ -151,9 +151,9 @@ func (ErrDoesNotOwnRequiredNft) IsLoginPayloadOrError()        {}
 func (ErrDoesNotOwnRequiredNft) IsCreateUserPayloadOrError()   {}
 
 type ErrInvalidInput struct {
-	Message   string `json:"message"`
-	Parameter string `json:"parameter"`
-	Reason    string `json:"reason"`
+	Message    string   `json:"message"`
+	Parameters []string `json:"parameters"`
+	Reasons    []string `json:"reasons"`
 }
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 const apiContextKey = "publicapi.api"
@@ -17,6 +19,7 @@ const apiContextKey = "publicapi.api"
 type PublicAPI struct {
 	repos      *persist.Repositories
 	loaders    *dataloader.Loaders
+	validator  *validator.Validate
 	Collection *CollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
@@ -25,13 +28,16 @@ type PublicAPI struct {
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
+	validator := newValidator()
+
 	api := &PublicAPI{
 		repos:      repos,
 		loaders:    loaders,
-		Collection: &CollectionAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
-		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
-		User:       &UserAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
-		Nft:        &NftAPI{repos: repos, loaders: loaders, ethClient: ethClient, pubsub: pubsub},
+		validator:  validator,
+		Collection: &CollectionAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		User:       &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		Nft:        &NftAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
 	}
 
 	ctx.Set(apiContextKey, api)
@@ -40,6 +46,12 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.C
 func For(ctx context.Context) *PublicAPI {
 	gc := util.GinContextFromContext(ctx)
 	return gc.Value(apiContextKey).(*PublicAPI)
+}
+
+func newValidator() *validator.Validate {
+	v := validator.New()
+	validate.RegisterCustomValidators(v)
+	return v
 }
 
 func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
@@ -54,11 +66,46 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 	return userID, nil
 }
 
+type validationMap map[string]struct {
+	value interface{}
+	tag   string
+}
+
+func validateFields(validator *validator.Validate, fields validationMap) error {
+	validationErr := ErrInvalidInput{}
+	foundErrors := false
+
+	for k, v := range fields {
+		err := validator.Var(v.value, v.tag)
+		if err != nil {
+			foundErrors = true
+			validationErr.Append(k, err.Error())
+		}
+	}
+
+	if foundErrors {
+		return validationErr
+	}
+
+	return nil
+}
+
 type ErrInvalidInput struct {
-	Parameter string
-	Reason    string
+	Parameters []string
+	Reasons    []string
+}
+
+func (e *ErrInvalidInput) Append(parameter string, reason string) {
+	e.Parameters = append(e.Parameters, parameter)
+	e.Reasons = append(e.Reasons, reason)
 }
 
 func (e ErrInvalidInput) Error() string {
-	return fmt.Sprintf("invalid input: parameter '%s': %s", e.Parameter, e.Reason)
+	str := "invalid input:\n"
+
+	for i, _ := range e.Parameters {
+		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
+	}
+
+	return str
 }

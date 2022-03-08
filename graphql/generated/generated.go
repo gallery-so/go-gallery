@@ -86,9 +86,9 @@ type ComplexityRoot struct {
 	}
 
 	ErrInvalidInput struct {
-		Message   func(childComplexity int) int
-		Parameter func(childComplexity int) int
-		Reason    func(childComplexity int) int
+		Message    func(childComplexity int) int
+		Parameters func(childComplexity int) int
+		Reasons    func(childComplexity int) int
 	}
 
 	ErrInvalidToken struct {
@@ -387,19 +387,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrInvalidInput.Message(childComplexity), true
 
-	case "ErrInvalidInput.parameter":
-		if e.complexity.ErrInvalidInput.Parameter == nil {
+	case "ErrInvalidInput.parameters":
+		if e.complexity.ErrInvalidInput.Parameters == nil {
 			break
 		}
 
-		return e.complexity.ErrInvalidInput.Parameter(childComplexity), true
+		return e.complexity.ErrInvalidInput.Parameters(childComplexity), true
 
-	case "ErrInvalidInput.reason":
-		if e.complexity.ErrInvalidInput.Reason == nil {
+	case "ErrInvalidInput.reasons":
+		if e.complexity.ErrInvalidInput.Reasons == nil {
 			break
 		}
 
-		return e.complexity.ErrInvalidInput.Reason(childComplexity), true
+		return e.complexity.ErrInvalidInput.Reasons(childComplexity), true
 
 	case "ErrInvalidToken.message":
 		if e.complexity.ErrInvalidToken.Message == nil {
@@ -1333,8 +1333,8 @@ type ErrNotAuthorized implements Error {
 
 type ErrInvalidInput implements Error {
   message: String!
-  parameter: String!
-  reason: String!
+  parameters: [String!]!
+  reasons: [String!]!
 }
 
 type ErrNoCookie implements Error {
@@ -2025,7 +2025,7 @@ func (ec *executionContext) _ErrInvalidInput_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrInvalidInput_parameter(ctx context.Context, field graphql.CollectedField, obj *model.ErrInvalidInput) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrInvalidInput_parameters(ctx context.Context, field graphql.CollectedField, obj *model.ErrInvalidInput) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2043,7 +2043,7 @@ func (ec *executionContext) _ErrInvalidInput_parameter(ctx context.Context, fiel
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Parameter, nil
+		return obj.Parameters, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2055,12 +2055,12 @@ func (ec *executionContext) _ErrInvalidInput_parameter(ctx context.Context, fiel
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.([]string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrInvalidInput_reason(ctx context.Context, field graphql.CollectedField, obj *model.ErrInvalidInput) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrInvalidInput_reasons(ctx context.Context, field graphql.CollectedField, obj *model.ErrInvalidInput) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2078,7 +2078,7 @@ func (ec *executionContext) _ErrInvalidInput_reason(ctx context.Context, field g
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Reason, nil
+		return obj.Reasons, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2090,9 +2090,9 @@ func (ec *executionContext) _ErrInvalidInput_reason(ctx context.Context, field g
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.([]string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrInvalidToken_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrInvalidToken) (ret graphql.Marshaler) {
@@ -7378,9 +7378,9 @@ func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "parameter":
+		case "parameters":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrInvalidInput_parameter(ctx, field, obj)
+				return ec._ErrInvalidInput_parameters(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -7388,9 +7388,9 @@ func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "reason":
+		case "reasons":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrInvalidInput_reason(ctx, field, obj)
+				return ec._ErrInvalidInput_reasons(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -9366,6 +9366,38 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNUpdateCollectionInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInfoInput(ctx context.Context, v interface{}) (model.UpdateCollectionInfoInput, error) {
