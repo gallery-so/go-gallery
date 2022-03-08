@@ -6,14 +6,15 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 func TestGalleriesGetByUserID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	galleryRepo := NewGalleryRepository(db, redis.NewCache(3))
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db)
-	nftRepo := NewNFTRepository(db, redis.NewCache(0), redis.NewCache(1))
+	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -67,10 +68,12 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	galleries, err := galleryRepo.GetByUserID(context.Background(), userID)
 	a.NoError(err)
 
-	a.Equal(1, len(galleries))
+	a.Len(galleries, 1)
+
+	logrus.Infof("%+v", galleries)
 
 	a.Equal(userID, galleries[0].OwnerUserID)
-	a.Equal(1, len(galleries[0].Collections))
-	a.Equal(2, len(galleries[0].Collections[0].NFTs))
+	a.Len(galleries[0].Collections, 1)
+	a.Len(galleries[0].Collections[0].NFTs, 2)
 
 }

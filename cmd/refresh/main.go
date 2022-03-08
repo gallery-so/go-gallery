@@ -45,7 +45,7 @@ func main() {
 	pc := postgres.NewClient()
 
 	userRepo := postgres.NewUserRepository(pc)
-	nftRepo := postgres.NewNFTRepository(pc, nil, nil)
+	nftRepo := postgres.NewNFTRepository(pc)
 	collRepo := postgres.NewCollectionRepository(pc)
 	for _, group := range groupings {
 		g := group

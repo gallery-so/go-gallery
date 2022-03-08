@@ -1,9 +1,10 @@
 package server
 
 import (
-	"github.com/mikeydub/go-gallery/service/nft"
 	"net/http"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/nft"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -211,7 +212,6 @@ func refreshOpenseaNFTsREST(nftRepo persist.NFTRepository, userRepo persist.User
 				util.ErrResponse(c, http.StatusBadRequest, err)
 				return
 			}
-
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

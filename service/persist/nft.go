@@ -117,9 +117,6 @@ type NFTRepository interface {
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	BulkUpsert(context.Context, []NFT) ([]DBID, error)
-	OpenseaCacheGet(context.Context, []Address) ([]NFT, error)
-	OpenseaCacheSet(context.Context, []Address, []NFT) error
-	OpenseaCacheDelete(context.Context, []Address) error
 }
 
 // Value implements the driver.Valuer interface for the ContractCollectionNFT type

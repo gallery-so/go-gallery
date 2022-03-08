@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -114,6 +115,11 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.Galler
 	if err != nil {
 		return "", err
 	}
+	err = g.cacheByUserID(pCtx, pGallery.OwnerUserID)
+	if err != nil {
+		return "", err
+	}
+
 	return id, nil
 }
 
@@ -139,6 +145,11 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
+	err = g.cacheByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -198,11 +209,25 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
+	logrus.Infof("Added %d collections to gallery %s", len(pCollections), pID)
+	err = g.cacheByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
+	initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
+	if len(initial) > 0 {
+		var galleries []persist.Gallery
+		err := json.Unmarshal(initial, &galleries)
+		if err != nil {
+			return nil, err
+		}
+		return galleries, nil
+	}
 	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
 		return nil, err
@@ -454,4 +479,24 @@ func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pU
 		return nil, err
 	}
 	return appendDifference(pColls, colls), nil
+}
+
+func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	err := g.RefreshCache(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+	gal, err := g.GetByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+	marshalled, err := json.Marshal(gal)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("Caching gallery %s: %s", pUserID, marshalled)
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
+		return err
+	}
+	return nil
 }
