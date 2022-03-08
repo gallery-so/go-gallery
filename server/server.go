@@ -133,6 +133,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		ContractRepository:        postgres.NewContractRepository(db),
 		BackupRepository:          postgres.NewBackupRepository(db),
 		MembershipRepository:      postgres.NewMembershipRepository(db),
+		CommunityRepository:       postgres.NewCommunityRepository(db),
 	}
 }
 

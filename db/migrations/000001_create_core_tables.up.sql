@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS nfts (
     ACQUISITION_DATE varchar,
     TOKEN_METADATA_URL varchar
 );
+
 CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
 CREATE TABLE IF NOT EXISTS collections (
@@ -194,6 +195,23 @@ CREATE TABLE IF NOT EXISTS membership (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS token_id_idx ON membership (TOKEN_ID);
+
+CREATE TABLE IF NOT EXISTS community (
+    ID varchar(255) PRIMARY KEY,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONTRACT_ADDRESS varchar,
+    TOKEN_ID_RANGES jsonb [],
+    NAME varchar,
+    DESCRIPTION varchar,
+    PROFILE_IMAGE_URL varchar,
+    BANNER_IMAGE_URL varchar,
+    OWNERS jsonb []
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS contract_address_com_idx ON community (CONTRACT_ADDRESS);
 
 CREATE TABLE IF NOT EXISTS access (
     ID varchar(255) PRIMARY KEY,

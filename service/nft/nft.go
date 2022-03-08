@@ -144,7 +144,7 @@ func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresse
 		}
 
 		if !ownsWallet {
-			return ErrDoesNotOwnWallets{Id: userID, Addresses: addresses}
+			return ErrDoesNotOwnWallets{UserID: userID, Addresses: addresses}
 		}
 	}
 
@@ -175,10 +175,10 @@ func ContainsWalletAddresses(a []persist.Address, b persist.Address) bool {
 }
 
 type ErrDoesNotOwnWallets struct {
-	Id        persist.DBID
+	UserID    persist.DBID
 	Addresses []persist.Address
 }
 
 func (e ErrDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.Id, e.Addresses)
+	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.UserID, e.Addresses)
 }

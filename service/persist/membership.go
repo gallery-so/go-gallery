@@ -53,15 +53,6 @@ type ErrMembershipNotFoundByTokenID struct {
 	TokenID TokenID
 }
 
-// ErrMembershipNotFoundByName represents an error when a membership is not found by name
-type ErrMembershipNotFoundByName struct {
-	Name string
-}
-
-func (e ErrMembershipNotFoundByName) Error() string {
-	return "membership not found by name: " + e.Name
-}
-
 func (e ErrMembershipNotFoundByTokenID) Error() string {
 	return "membership not found by token id: " + e.TokenID.String()
 }

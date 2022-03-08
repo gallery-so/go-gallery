@@ -1,13 +1,27 @@
 DROP TABLE IF EXISTS users;
+
 DROP TABLE IF EXISTS galleries;
+
 DROP TABLE IF EXISTS nfts;
+
 DROP TABLE IF EXISTS collections;
+
 DROP TABLE IF EXISTS collections_v2;
+
 DROP TABLE IF EXISTS nonces;
+
 DROP TABLE IF EXISTS tokens;
+
 DROP TABLE IF EXISTS contracts;
+
 DROP TABLE IF EXISTS login_attempts;
+
 DROP TABLE IF EXISTS features;
+
 DROP TABLE IF EXISTS backups;
+
 DROP TABLE IF EXISTS membership;
+
 DROP TABLE IF EXISTS access;
+
+DROP TABLE IF EXISTS community;

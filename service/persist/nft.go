@@ -60,6 +60,7 @@ type CollectionNFT struct {
 	Name NullString `json:"name"`
 
 	Contract            ContractCollectionNFT `json:"asset_contract"`
+	OpenseaTokenID      TokenID               `json:"opensea_token_id"`
 	TokenCollectionName NullString            `json:"token_collection_name"`
 	CreatorAddress      Address               `json:"creator_address"`
 	CreatorName         NullString            `json:"creator_name"`
@@ -113,6 +114,7 @@ type NFTRepository interface {
 	GetByAddresses(context.Context, []Address) ([]NFT, error)
 	GetByID(context.Context, DBID) (NFT, error)
 	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
+	GetByContractAddress(context.Context, Address) ([]NFT, error)
 	GetByOpenseaID(context.Context, NullInt64, Address) ([]NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
@@ -155,7 +157,13 @@ type ErrNFTNotFoundByID struct {
 
 // ErrNFTNotFoundByContractData is an error that occurs when an NFT is not found by its contract data (token ID and contract address)
 type ErrNFTNotFoundByContractData struct {
-	TokenID, ContractAddress string
+	TokenID         TokenID
+	ContractAddress Address
+}
+
+// ErrNFTNotFoundByContractAddress is an error that occurs when an NFT is not found by its contract address
+type ErrNFTNotFoundByContractAddress struct {
+	ContractAddress Address
 }
 
 func (e ErrNFTNotFoundByID) Error() string {
@@ -163,5 +171,9 @@ func (e ErrNFTNotFoundByID) Error() string {
 }
 
 func (e ErrNFTNotFoundByContractData) Error() string {
-	return fmt.Sprintf("could not find NFT with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
+	return fmt.Sprintf("could not find NFT with contract address %s and token ID %s", e.ContractAddress, e.TokenID)
+}
+
+func (e ErrNFTNotFoundByContractAddress) Error() string {
+	return fmt.Sprintf("could not find NFT with contract address %s", e.ContractAddress)
 }

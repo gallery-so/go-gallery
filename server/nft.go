@@ -177,7 +177,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 				return
 			}
 			if !ownsWallet {
-				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{userID, addresses})
+				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{UserID: userID, Addresses: addresses})
 				return
 			}
 		}

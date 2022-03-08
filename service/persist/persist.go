@@ -45,6 +45,7 @@ type Repositories struct {
 	ContractRepository        ContractRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
+	CommunityRepository       CommunityRepository
 }
 
 // GenerateID generates a application-wide unique ID

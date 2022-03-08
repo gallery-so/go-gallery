@@ -9,7 +9,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
-	"github.com/mikeydub/go-gallery/graphql/resolver"
+	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -89,6 +89,8 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories,
 	usersGroup.POST("/create", createUserToken(repos.UserRepository, repos.NonceRepository, repos.GalleryTokenRepository, psub, ethClient))
 	usersGroup.GET("/previews", getNFTPreviewsToken(repos.GalleryTokenRepository, repos.UserRepository))
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
+	usersGroup.GET("/communities", getAllCommunities(repos.CommunityRepository, repos.NftRepository, repos.GalleryRepository, repos.UserRepository))
+	usersGroup.GET("/communities/:address", getCommunity(repos.CommunityRepository, repos.NftRepository, repos.GalleryRepository, repos.UserRepository))
 }
 
 func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, psub pubsub.PubSub) {
