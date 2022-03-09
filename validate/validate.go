@@ -61,6 +61,10 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("max_string_length", MaxStringLengthValidator)
 	v.RegisterAlias("medium", "max_string_length=600")
 	v.RegisterAlias("collectors_note", "max_string_length=1200")
+	v.RegisterAlias("collection_name", "max_string_length=200")
+	v.RegisterAlias("collection_note", "max_string_length=600")
+	v.RegisterAlias("nft_note", "max_string_length=1200")
+	v.RegisterAlias("bio", "max_string_length=600")
 }
 
 // EthValidator validates ethereum addresses

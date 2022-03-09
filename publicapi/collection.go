@@ -28,9 +28,9 @@ type CollectionAPI struct {
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"galleryID": {galleryID, "required"},
-		// TODO: Validate name length
-		"collectorsNote": {collectorsNote, "medium"},
+		"galleryID":      {galleryID, "required"},
+		"name":           {name, "collection_name"},
+		"collectorsNote": {collectorsNote, "collection_note"},
 		"nfts":           {nfts, "required,unique"},
 	}); err != nil {
 		return nil, err
@@ -99,8 +99,8 @@ func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID pers
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID":   {collectionID, "required"},
-		"name":           {name, "required"}, // TODO: Validate length
-		"collectorsNote": {collectorsNote, "required,medium"},
+		"name":           {name, "required,collection_name"},
+		"collectorsNote": {collectorsNote, "required,collection_note"},
 	}); err != nil {
 		return err
 	}
