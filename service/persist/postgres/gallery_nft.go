@@ -310,6 +310,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		return result, nil
 	}
 
+	goingToCache := false
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
@@ -320,6 +321,10 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
+		if time.Since(gallery.LastUpdated.Time()) > time.Hour*24 && !goingToCache {
+			defer g.cacheByUserID(pCtx, pUserID)
+			goingToCache = true
+		}
 	}
 	return result, nil
 
