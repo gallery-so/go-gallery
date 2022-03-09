@@ -1,7 +1,9 @@
 package validate
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -52,12 +54,13 @@ var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
 var SanitizationPolicy = bluemonday.UGCPolicy()
 
 func RegisterCustomValidators(v *validator.Validate) {
-	v.RegisterValidation("medium", MediumStringValidator)
-	v.RegisterValidation("collectors_note", CollectorsNoteValidator)
 	v.RegisterValidation("eth_addr", EthValidator)
 	v.RegisterValidation("nonce", NonceValidator)
 	v.RegisterValidation("signature", SignatureValidator)
 	v.RegisterValidation("username", UsernameValidator)
+	v.RegisterValidation("max_string_length", MaxStringLengthValidator)
+	v.RegisterAlias("medium", "max_string_length=600")
+	v.RegisterAlias("collectors_note", "max_string_length=1200")
 }
 
 // EthValidator validates ethereum addresses
@@ -87,22 +90,16 @@ var NonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return len(nonce) >= 10 && len(nonce) <= 150
 }
 
-// MediumStringValidator validates short strings
-var MediumStringValidator validator.Func = func(fl validator.FieldLevel) bool {
+// MaxStringLengthValidator validates strings with a given maximum length
+var MaxStringLengthValidator validator.Func = func(fl validator.FieldLevel) bool {
 	s := fl.Field().String()
-	if s == "" {
-		return true
-	}
-	return len(s) < 600
-}
 
-// CollectorsNoteValidator validates medium strings
-var CollectorsNoteValidator validator.Func = func(fl validator.FieldLevel) bool {
-	s := fl.Field().String()
-	if s == "" {
-		return true
+	maxLength, err := strconv.Atoi(fl.Param())
+	if err != nil {
+		panic(fmt.Errorf("error parsing MaxStringLengthValidator parameter: %s", err))
 	}
-	return len(s) < 1200
+
+	return len(s) <= maxLength
 }
 
 // UsernameValidator ensures that usernames are not reserved, are alphanumeric with the exception of underscores and periods, and do not contain consecutive periods or underscores
