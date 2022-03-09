@@ -19,7 +19,7 @@ func (e errBadTaskRequest) Error() string {
 }
 
 // TaskRequired checks that the request comes from Cloud Tasks and does a basic auth check.
-// Returns a 200 status to remove the message from the queue.
+// Returns a 200 status to remove the message from the queue if it is a bad request.
 func TaskRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		taskName := c.Request.Header.Get("X-Appengine-Taskname")
