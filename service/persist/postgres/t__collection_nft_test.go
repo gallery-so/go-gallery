@@ -13,7 +13,7 @@ func TestCollectionGetByUserID_Success(t *testing.T) {
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db, galleryRepo)
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, galleryRepo)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -66,7 +66,7 @@ func TestCollectionGetByID_Success(t *testing.T) {
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db, galleryRepo)
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, galleryRepo)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -123,7 +123,7 @@ func TestCollectionUpdate_Success(t *testing.T) {
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db, galleryRepo)
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, galleryRepo)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -182,7 +182,7 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db, galleryRepo)
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, galleryRepo)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{
@@ -250,7 +250,7 @@ func TestCollectionGetUnassigned_Success(t *testing.T) {
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
 	collectionRepo := NewCollectionRepository(db, galleryRepo)
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, galleryRepo)
 	userRepo := NewUserRepository(db)
 
 	user := persist.User{

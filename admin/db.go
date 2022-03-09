@@ -93,7 +93,7 @@ func newStatements(db *sql.DB) *statements {
 		updateCollectionStmt:  updateCollectionStmt,
 
 		galleryRepo: galleryRepo,
-		nftRepo:     postgres.NewNFTRepository(db),
+		nftRepo:     postgres.NewNFTRepository(db, galleryRepo),
 		userRepo:    postgres.NewUserRepository(db),
 		collRepo:    postgres.NewCollectionRepository(db, galleryRepo),
 	}

@@ -75,6 +75,6 @@ func setDefaults() {
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
 	pgClient := postgres.NewClient()
-
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, postgres.NewGalleryTokenRepository(pgClient, nil))
+	galleryRepo := postgres.NewGalleryTokenRepository(pgClient, nil)
+	return postgres.NewTokenRepository(pgClient, galleryRepo), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, galleryRepo)
 }

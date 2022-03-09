@@ -40,8 +40,8 @@ func run() {
 	defer cancel()
 
 	galleryRepo := postgres.NewGalleryRepository(pgClient, nil)
-	tokenRepo := postgres.NewTokenRepository(pgClient)
-	nftRepo := postgres.NewNFTRepository(pgClient)
+	tokenRepo := postgres.NewTokenRepository(pgClient, nil)
+	nftRepo := postgres.NewNFTRepository(pgClient, galleryRepo)
 	userRepo := postgres.NewUserRepository(pgClient)
 	collectionRepo := postgres.NewCollectionRepository(pgClient, galleryRepo)
 

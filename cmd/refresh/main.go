@@ -46,7 +46,7 @@ func main() {
 
 	galleryRepo := postgres.NewGalleryRepository(pc, nil)
 	userRepo := postgres.NewUserRepository(pc)
-	nftRepo := postgres.NewNFTRepository(pc)
+	nftRepo := postgres.NewNFTRepository(pc, galleryRepo)
 	collRepo := postgres.NewCollectionRepository(pc, galleryRepo)
 	for _, group := range groupings {
 		g := group
