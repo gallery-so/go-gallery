@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -13,9 +12,6 @@ import (
 )
 
 const maxNftsPerCollection = 1000
-
-// TODO: Convert this to a validation error, and enforce in all potential contexts here
-var errTooManyNFTsInCollection = errors.New(fmt.Sprintf("maximum of %d NFTs in a collection", maxNftsPerCollection))
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
@@ -31,7 +27,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
-		"nfts":           {nfts, "required,unique"},
+		"nfts":           {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
 	}); err != nil {
 		return nil, err
 	}
@@ -126,7 +122,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"nfts":         {nfts, "required,unique"},
+		"nfts":         {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
 	}); err != nil {
 		return err
 	}
@@ -134,10 +130,6 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	layout, err := persist.ValidateLayout(layout, nfts)
 	if err != nil {
 		return err
-	}
-
-	if len(nfts) > maxNftsPerCollection {
-		return errTooManyNFTsInCollection
 	}
 
 	userID, err := getAuthenticatedUser(ctx)
