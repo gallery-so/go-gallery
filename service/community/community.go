@@ -64,6 +64,8 @@ func UpdateCommunities(pCtx context.Context, communityRepository persist.Communi
 			if err := UpdateCommunity(pCtx, addr, nftRepository, userRepository, galleryRepository, communityRepository); err != nil {
 				done <- err
 				return
+			} else {
+				done <- nil
 			}
 		}(a)
 	}
