@@ -62,6 +62,12 @@ func getCommunity(communityRepository persist.CommunityRepository, nftRepository
 					util.ErrResponse(c, http.StatusInternalServerError, err)
 					return
 				}
+				com, err = communityRepository.GetByContract(c, input.ContractAddress)
+				if err != nil {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
+				c.JSON(http.StatusOK, getCommunityOutput{Community: com})
 				return
 			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
