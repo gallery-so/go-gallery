@@ -30,8 +30,15 @@ func getAllCommunities(communityRepository persist.CommunityRepository, nftRepos
 			return
 		}
 		c.JSON(http.StatusOK, getCommunitiesOutput{Communities: communities})
+
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 		defer cancel()
+		if len(communities) != len(community.Communities) {
+			if err := community.UpdateCommunities(ctx, communityRepository, galleryRepository, userRepository, nftRepository); err != nil {
+				logrus.WithError(err).Error("Error updating communities")
+			}
+			return
+		}
 		for _, com := range communities {
 			if time.Since(com.LastUpdated.Time()) > time.Hour*24 {
 				go community.UpdateCommunity(ctx, com.ContractAddress, nftRepository, userRepository, galleryRepository, communityRepository)
@@ -49,6 +56,14 @@ func getCommunity(communityRepository persist.CommunityRepository, nftRepository
 		}
 		com, err := communityRepository.GetByContract(c, input.ContractAddress)
 		if err != nil {
+			if _, ok := err.(persist.ErrCommunityNotFoundByAddress); ok {
+				err := community.UpdateCommunity(c, input.ContractAddress, nftRepository, userRepository, galleryRepository, communityRepository)
+				if err != nil {
+					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
+				}
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

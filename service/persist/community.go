@@ -82,5 +82,5 @@ type ErrCommunityNotFoundByAddress struct {
 }
 
 func (e ErrCommunityNotFoundByAddress) Error() string {
-	return "membership not found by token id: " + e.ContractAddress.String()
+	return "community not found by token id: " + e.ContractAddress.String()
 }

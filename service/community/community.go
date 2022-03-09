@@ -17,9 +17,9 @@ type communityData struct {
 	TokenIDRanges   []persist.TokenIDRange
 }
 
-// right now these communities are hard coded, if we wanted to have this be dynamic we can get all of the information we need on a collection
+// Communities - right now these Communities are hard coded, if we wanted to have this be dynamic we can get all of the information we need on a collection
 // from opensea or the indexed NFTs (indexed NFTs won't have a banner image)
-var communities = map[persist.Address]communityData{
+var Communities = map[persist.Address]communityData{
 	// cryptocoven
 	"0x5180db8f5c931aae63c74266b211f580155ecac8": {
 		Name:            "CryptoCoven",
@@ -59,7 +59,7 @@ var communities = map[persist.Address]communityData{
 // UpdateCommunities updates the communities in the database
 func UpdateCommunities(pCtx context.Context, communityRepository persist.CommunityRepository, galleryRepository persist.GalleryRepository, userRepository persist.UserRepository, nftRepository persist.NFTRepository) error {
 	done := make(chan error)
-	for a := range communities {
+	for a := range Communities {
 		go func(addr persist.Address) {
 			if err := UpdateCommunity(pCtx, addr, nftRepository, userRepository, galleryRepository, communityRepository); err != nil {
 				done <- err
@@ -67,7 +67,7 @@ func UpdateCommunities(pCtx context.Context, communityRepository persist.Communi
 			}
 		}(a)
 	}
-	for i := 0; i < len(communities); i++ {
+	for i := 0; i < len(Communities); i++ {
 		if err := <-done; err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func UpdateCommunities(pCtx context.Context, communityRepository persist.Communi
 
 // UpdateCommunity updates a community in the database
 func UpdateCommunity(pCtx context.Context, addr persist.Address, nftRepository persist.NFTRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, communityRepository persist.CommunityRepository) error {
-	data, ok := communities[addr]
+	data, ok := Communities[addr]
 	if !ok {
 		return fmt.Errorf("community %s not found", addr)
 	}
@@ -162,7 +162,7 @@ func filterValidRanges(ranges []persist.TokenIDRange, nfts []persist.NFT) []pers
 // UpdateCommunitiesToken updates the communities in the database
 func UpdateCommunitiesToken(pCtx context.Context, communityRepository persist.CommunityRepository, galleryRepository persist.GalleryTokenRepository, userRepository persist.UserRepository, tokenRepository persist.TokenRepository) error {
 	done := make(chan error)
-	for a := range communities {
+	for a := range Communities {
 		go func(addr persist.Address) {
 			if err := UpdateCommunityToken(pCtx, addr, tokenRepository, userRepository, galleryRepository, communityRepository); err != nil {
 				done <- err
@@ -170,7 +170,7 @@ func UpdateCommunitiesToken(pCtx context.Context, communityRepository persist.Co
 			}
 		}(a)
 	}
-	for i := 0; i < len(communities); i++ {
+	for i := 0; i < len(Communities); i++ {
 		if err := <-done; err != nil {
 			return err
 		}
@@ -180,7 +180,7 @@ func UpdateCommunitiesToken(pCtx context.Context, communityRepository persist.Co
 
 // UpdateCommunityToken updates a community in the database
 func UpdateCommunityToken(pCtx context.Context, addr persist.Address, tokenRepository persist.TokenRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, communityRepository persist.CommunityRepository) error {
-	data := communities[addr]
+	data := Communities[addr]
 	community := persist.Community{
 		ContractAddress: addr,
 		TokenIDRanges:   data.TokenIDRanges,
