@@ -39,10 +39,11 @@ func run() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*12)
 	defer cancel()
 
+	galleryRepo := postgres.NewGalleryRepository(pgClient, nil)
 	tokenRepo := postgres.NewTokenRepository(pgClient)
 	nftRepo := postgres.NewNFTRepository(pgClient)
 	userRepo := postgres.NewUserRepository(pgClient)
-	collectionRepo := postgres.NewCollectionRepository(pgClient)
+	collectionRepo := postgres.NewCollectionRepository(pgClient, galleryRepo)
 
 	ethClient := rpc.NewEthClient()
 	ipfsClient := rpc.NewIPFSShell()

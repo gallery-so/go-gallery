@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -76,5 +77,7 @@ func setDefaults() {
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
 	pgClient := postgres.NewClient()
 
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient)
+	galleryRepo := postgres.NewGalleryTokenRepository(pgClient, redis.NewCache(1))
+
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, galleryRepo)
 }

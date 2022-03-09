@@ -13,7 +13,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
 	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
-	collectionRepo := NewCollectionRepository(db)
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 

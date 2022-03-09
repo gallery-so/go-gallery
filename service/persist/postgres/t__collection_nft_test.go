@@ -4,13 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 func TestCollectionGetByUserID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	collectionRepo := NewCollectionRepository(db)
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
@@ -62,7 +64,8 @@ func TestCollectionGetByUserID_Success(t *testing.T) {
 func TestCollectionGetByID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	collectionRepo := NewCollectionRepository(db)
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
@@ -118,7 +121,8 @@ func TestCollectionGetByID_Success(t *testing.T) {
 func TestCollectionUpdate_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	collectionRepo := NewCollectionRepository(db)
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
@@ -176,7 +180,8 @@ func TestCollectionUpdate_Success(t *testing.T) {
 func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	collectionRepo := NewCollectionRepository(db)
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 
@@ -243,7 +248,8 @@ func TestCollectionUpdateNFTOrder_Success(t *testing.T) {
 func TestCollectionGetUnassigned_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	collectionRepo := NewCollectionRepository(db)
+	galleryRepo := NewGalleryRepository(db, redis.NewCache(0))
+	collectionRepo := NewCollectionRepository(db, galleryRepo)
 	nftRepo := NewNFTRepository(db)
 	userRepo := NewUserRepository(db)
 

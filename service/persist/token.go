@@ -583,7 +583,11 @@ func (m *TokenMetadata) Scan(src interface{}) error {
 
 // Value implements the database/sql/driver Valuer interface for the TokenMetadata type
 func (m TokenMetadata) Value() (driver.Value, error) {
-	return json.Marshal(m)
+	val, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(strings.ReplaceAll(string(val), "\u0000", "")), nil
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type

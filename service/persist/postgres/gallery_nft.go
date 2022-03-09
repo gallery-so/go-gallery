@@ -431,6 +431,9 @@ func (g *GalleryRepository) GetByChildCollectionID(pCtx context.Context, pID per
 
 // RefreshCache deletes the given key in the cache
 func (g *GalleryRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	return g.galleriesCache.Delete(pCtx, pUserID.String())
 }
 
@@ -482,6 +485,9 @@ func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pU
 }
 
 func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	err := g.RefreshCache(pCtx, pUserID)
 	if err != nil {
 		return err

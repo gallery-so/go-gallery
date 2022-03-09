@@ -16,6 +16,7 @@ var errNotOwnedByUser = errors.New("not all nfts are owned by the user")
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
 type CollectionTokenRepository struct {
 	db                      *sql.DB
+	galleryRepo             *GalleryTokenRepository
 	createStmt              *sql.Stmt
 	getByUserIDOwnerStmt    *sql.Stmt
 	getByUserIDOwnerRawStmt *sql.Stmt
@@ -40,7 +41,7 @@ type CollectionTokenRepository struct {
 }
 
 // NewCollectionTokenRepository creates a new CollectionTokenRepository
-func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
+func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *CollectionTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -112,7 +113,7 @@ func NewCollectionTokenRepository(db *sql.DB) *CollectionTokenRepository {
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionTokenRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
+	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
 }
 
 // Create creates a new collection in the database
@@ -124,6 +125,9 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 	var id persist.DBID
 	err = c.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
 	if err != nil {
+		return "", err
+	}
+	if err := c.galleryRepo.RefreshCache(pCtx, pColl.OwnerUserID); err != nil {
 		return "", err
 	}
 	return id, nil
@@ -267,7 +271,7 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBI
 	if rowsAffected == 0 {
 		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
-	return nil
+	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // UpdateNFTs updates the nfts of a collection in the database
@@ -287,7 +291,7 @@ func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist
 	if rows == 0 {
 		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
-	return nil
+	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // UpdateUnsafe updates a collection in the database
@@ -367,7 +371,7 @@ func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 		}
 	}
 
-	return nil
+	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 
 }
 
@@ -431,7 +435,7 @@ func (c *CollectionTokenRepository) RemoveNFTsOfOldAddresses(pCtx context.Contex
 		}
 	}
 
-	return nil
+	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // Delete deletes a collection from the database
@@ -447,7 +451,7 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 	if rowsAffected == 0 {
 		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
-	return nil
+	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // GetUnassigned returns all unassigned nfts
