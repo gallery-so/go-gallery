@@ -3,7 +3,6 @@ package publicapi
 import (
 	"context"
 	"fmt"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
