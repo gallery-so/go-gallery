@@ -46,6 +46,8 @@ const (
 	MediaTypeAudio MediaType = "audio"
 	// MediaTypeJSON represents json metadata
 	MediaTypeJSON MediaType = "json"
+	// MediaTypeAnimation represents an animation (.glb)
+	MediaTypeAnimation MediaType = "animation"
 	// MediaTypeInvalid represents an invalid media type such as when a token's external metadata's API is broken or no longer exists
 	MediaTypeInvalid MediaType = "invalid"
 	// MediaTypeUnknown represents an unknown media type
@@ -354,7 +356,8 @@ func (uri TokenURI) Value() (driver.Value, error) {
 	if strings.Contains(result, "://") {
 		result = url.QueryEscape(result)
 	}
-	return strings.ToValidUTF8(result, ""), nil
+	clean := strings.Map(cleanString, result)
+	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), ""), nil
 }
 
 // ReplaceID replaces the token's ID with the given ID
@@ -587,7 +590,10 @@ func (m TokenMetadata) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte(strings.ReplaceAll(string(val), "\u0000", "")), nil
+
+	clean := strings.Map(cleanString, string(val))
+
+	return []byte(strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), "")), nil
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type

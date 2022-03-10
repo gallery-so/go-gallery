@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/segmentio/ksuid"
 )
+
+var cleanString = func(r rune) rune {
+	if unicode.IsGraphic(r) || unicode.IsPrint(r) {
+		return r
+	}
+	return -1
+}
 
 // DBID represents a database ID
 type DBID string
@@ -179,7 +187,8 @@ func (n NullString) Value() (driver.Value, error) {
 	if n.String() == "" {
 		return "", nil
 	}
-	return strings.ToValidUTF8(n.String(), ""), nil
+	clean := strings.Map(cleanString, n.String())
+	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), ""), nil
 }
 
 // Scan implements the database/sql Scanner interface for the NullString type

@@ -826,14 +826,36 @@ func createTokens(i *Indexer, ownersMap map[persist.TokenIdentifiers]ownerAtBloc
 
 	logrus.Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * time.Duration(len(tokens)/100)) + (time.Minute * 2)
+	timeout := (time.Minute * time.Duration(len(tokens)/100)) + (time.Minute)
 	logrus.Info("Upserting tokens and contracts with a timeout of ", timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.tokenDBMu, i.contractDBMu)
 	if err != nil {
 		logrus.WithError(err).Error("error upserting tokens and contracts")
-		panic(err)
+		randKey := util.RandStringBytes(24)
+		ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("DB-ERR-%s", randKey)).NewWriter(ctx)
+		defer storageWriter.Close()
+		metadatas := make([]string, 0, len(tokens))
+		for _, token := range tokens {
+			val, err := token.TokenMetadata.Value()
+			if err != nil {
+				logrus.WithError(err).Error("error getting token metadata value")
+				continue
+			}
+			metadatas = append(metadatas, string(val.([]byte)))
+		}
+		errData := map[string]interface{}{
+			"meta": metadatas,
+		}
+		logrus.Error(errData)
+		newErr := json.NewEncoder(storageWriter).Encode(errData)
+		if newErr != nil {
+			panic(newErr)
+		}
+		panic(fmt.Sprintf("error upserting tokens and contracts: %s - error key: %s", err, randKey))
 	}
 
 }
