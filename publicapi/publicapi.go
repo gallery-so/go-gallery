@@ -27,10 +27,6 @@ type PublicAPI struct {
 	Nft        *NftAPI
 }
 
-type PublicNftAPI interface {
-	RefreshOpenSeaNfts(ctx context.Context, addresses string) error
-}
-
 func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
 	validator := newValidator()
