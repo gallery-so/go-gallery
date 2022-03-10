@@ -84,7 +84,7 @@ func handleCollectionCollectorsNoteAdded(ctx context.Context, userRepo persist.U
 		return err
 	}
 	payload, err := createMessage(
-		fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
+		fmt.Sprintf("**%s** updated their collection's details: %s/%s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.CollectionID,
 		),
 	)
@@ -119,7 +119,7 @@ func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepos
 		return err
 	}
 	payload, err := createMessage(
-		fmt.Sprintf("**%s** added an NFT(s) to their collection: %s/%s/%s",
+		fmt.Sprintf("**%s** curated the NFT(s) in their collection: %s/%s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.CollectionID,
 		),
 	)
