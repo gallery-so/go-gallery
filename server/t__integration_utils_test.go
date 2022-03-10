@@ -50,7 +50,6 @@ type Service struct {
 	Ports       []string               `yaml:"ports"`
 	Build       map[string]interface{} `yaml:"build"`
 	Environment []string               `yaml:"environment"`
-	Command     string                 `yaml:"command"`
 }
 
 func configureContainerCleanup(config *docker.HostConfig) {
