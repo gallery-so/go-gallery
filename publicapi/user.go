@@ -89,7 +89,7 @@ func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID 
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User
 	evt := persist.UserEventRecord{
-		UserID: auth.GetUserIDFromCtx(gc),
+		UserID: userID,
 		Code:   eventCode,
 		Data:   userData,
 	}

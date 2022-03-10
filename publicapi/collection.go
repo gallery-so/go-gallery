@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
@@ -86,7 +85,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		nftIDs[i] = nft.ID
 	}
 	collectionData := persist.CollectionEvent{NFTs: nftIDs, CollectorsNote: createdCollection.CollectorsNote}
-	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, createdCollection.ID, collectionData)
+	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
 
 	return &createdCollection, nil
 }
@@ -133,7 +132,7 @@ func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID pers
 
 	// Send event
 	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, collectionID, collectionData)
+	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
 
 	return api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
 }
@@ -172,16 +171,16 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 
 	// Send event
 	collectionData := persist.CollectionEvent{NFTs: nfts}
-	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, collectionID, collectionData)
+	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
 
 	return nil
 }
 
-func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, collectionID persist.DBID, collectionData persist.CollectionEvent) {
+func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
 	gc := util.GinContextFromContext(ctx)
 	collectionHandlers := event.For(gc).Collection
 	evt := persist.CollectionEventRecord{
-		UserID:       auth.GetUserIDFromCtx(gc),
+		UserID:       userID,
 		CollectionID: collectionID,
 		Code:         eventCode,
 		Data:         collectionData,

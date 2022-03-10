@@ -57,7 +57,8 @@ func (e *NftEventRepository) Add(ctx context.Context, event persist.NftEventReco
 
 func (e *NftEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.NftEventRecord, error) {
 	var event persist.NftEventRecord
-	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event)
+	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event.ID, &event.UserID, &event.NftID,
+		&event.Version, &event.Code, &event.Data, &event.CreationTime, &event.NftID)
 	if err != nil {
 		return persist.NftEventRecord{}, err
 	}
@@ -72,7 +73,7 @@ func (e *NftEventRepository) GetEventsSince(ctx context.Context, event persist.N
 	events := make([]persist.NftEventRecord, 0)
 	for res.Next() {
 		var event persist.NftEventRecord
-		if err := res.Scan(&event); err != nil {
+		if err := res.Scan(&event.ID, &event.UserID, &event.NftID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.NftID); err != nil {
 			return nil, err
 		}
 		events = append(events, event)

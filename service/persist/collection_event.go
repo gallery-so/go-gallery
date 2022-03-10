@@ -2,6 +2,8 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 )
 
@@ -19,6 +21,18 @@ type CollectionEventRecord struct {
 type CollectionEvent struct {
 	NFTs           []DBID     `json:"nfts"`
 	CollectorsNote NullString `json:"collectors_note"`
+}
+
+func (c CollectionEvent) Value() (driver.Value, error) {
+	return json.Marshal(c)
+}
+
+func (c *CollectionEvent) Scan(value interface{}) error {
+	if value == nil {
+		*c = CollectionEvent{}
+		return nil
+	}
+	return json.Unmarshal(value.([]uint8), c)
 }
 
 type CollectionEventRepository interface {

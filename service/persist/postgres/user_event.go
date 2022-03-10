@@ -57,7 +57,7 @@ func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRe
 
 func (e *UserEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.UserEventRecord, error) {
 	var event persist.UserEventRecord
-	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event)
+	err := e.getByEventIDStmt.QueryRowContext(ctx, eventID).Scan(&event.ID, &event.UserID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.LastUpdated)
 	if err != nil {
 		return persist.UserEventRecord{}, err
 	}
@@ -72,7 +72,7 @@ func (e *UserEventRepository) GetEventsSince(ctx context.Context, event persist.
 	events := make([]persist.UserEventRecord, 0)
 	for res.Next() {
 		var event persist.UserEventRecord
-		if err := res.Scan(&event); err != nil {
+		if err := res.Scan(&event.ID, &event.UserID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.LastUpdated); err != nil {
 			return nil, err
 		}
 		events = append(events, event)

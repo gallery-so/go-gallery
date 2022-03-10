@@ -2,6 +2,8 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 )
 
@@ -18,6 +20,18 @@ type UserEventRecord struct {
 type UserEvent struct {
 	Username string     `json:"username"`
 	Bio      NullString `json:"bio"`
+}
+
+func (u UserEvent) Value() (driver.Value, error) {
+	return json.Marshal(u)
+}
+
+func (u *UserEvent) Scan(value interface{}) error {
+	if value == nil {
+		*u = UserEvent{}
+		return nil
+	}
+	return json.Unmarshal(value.([]uint8), u)
 }
 
 type UserEventRepository interface {
