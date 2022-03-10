@@ -27,4 +27,4 @@ services:
     ports:
       - "8123:8123"
     environment:
-      APP_ENGINE_EMULATOR_HOST: http://localhost:8080
+      - APP_ENGINE_EMULATOR=http://localhost:8080
