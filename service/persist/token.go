@@ -357,7 +357,7 @@ func (uri TokenURI) Value() (driver.Value, error) {
 		result = url.QueryEscape(result)
 	}
 	clean := strings.Map(cleanString, result)
-	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), ""), nil
+	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\\u0000", ""), ""), nil
 }
 
 // ReplaceID replaces the token's ID with the given ID
@@ -593,7 +593,7 @@ func (m TokenMetadata) Value() (driver.Value, error) {
 
 	clean := strings.Map(cleanString, string(val))
 
-	return []byte(strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), "")), nil
+	return []byte(strings.ToValidUTF8(strings.ReplaceAll(clean, "\\u0000", ""), "")), nil
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type

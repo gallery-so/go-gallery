@@ -838,17 +838,8 @@ func createTokens(i *Indexer, ownersMap map[persist.TokenIdentifiers]ownerAtBloc
 		defer cancel()
 		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("DB-ERR-%s", randKey)).NewWriter(ctx)
 		defer storageWriter.Close()
-		metadatas := make([]string, 0, len(tokens))
-		for _, token := range tokens {
-			val, err := token.TokenMetadata.Value()
-			if err != nil {
-				logrus.WithError(err).Error("error getting token metadata value")
-				continue
-			}
-			metadatas = append(metadatas, string(val.([]byte)))
-		}
 		errData := map[string]interface{}{
-			"meta": metadatas,
+			"tokens": tokens,
 		}
 		logrus.Error(errData)
 		newErr := json.NewEncoder(storageWriter).Encode(errData)

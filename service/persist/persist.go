@@ -188,7 +188,7 @@ func (n NullString) Value() (driver.Value, error) {
 		return "", nil
 	}
 	clean := strings.Map(cleanString, n.String())
-	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\u0000", ""), ""), nil
+	return strings.ToValidUTF8(strings.ReplaceAll(clean, "\\u0000", ""), ""), nil
 }
 
 // Scan implements the database/sql Scanner interface for the NullString type
