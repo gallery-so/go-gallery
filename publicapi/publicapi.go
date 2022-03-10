@@ -21,28 +21,10 @@ type PublicAPI struct {
 	repos      *persist.Repositories
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
-	Collection PublicCollectionAPI
-	Gallery    PublicGalleryAPI
-	User       PublicUserAPI
-	Nft        PublicNftAPI
-}
-
-type PublicCollectionAPI interface {
-	CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error)
-	DeleteCollection(ctx context.Context, collectionID persist.DBID) error
-	UpdateCollectionNfts(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error
-	UpdateCollection(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error
-}
-
-type PublicGalleryAPI interface {
-	UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error
-}
-
-type PublicUserAPI interface {
-	AddUserAddress(ctx context.Context, address persist.Address, authenticator auth.Authenticator) error
-	RemoveUserAddresses(ctx context.Context, addresses []persist.Address) error
-	UpdateUserInfo(ctx context.Context, username, bio string) error
-	GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error)
+	Collection *CollectionAPI
+	Gallery    *GalleryAPI
+	User       *UserAPI
+	Nft        *NftAPI
 }
 
 type PublicNftAPI interface {
@@ -52,17 +34,15 @@ type PublicNftAPI interface {
 func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
 	validator := newValidator()
-	collection := CollectionWithDispatch{PublicCollectionAPI: &CollectionAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub}, gc: ctx}
-	user := UserWithDispatch{PublicUserAPI: &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub}, gc: ctx}
-	nft := NftWithDispatch{PublicNftAPI: &NftAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub}, gc: ctx}
+
 	api := &PublicAPI{
 		repos:      repos,
 		loaders:    loaders,
 		validator:  validator,
-		Collection: collection,
+		Collection: &CollectionAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
 		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
-		User:       user,
-		Nft:        nft,
+		User:       &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		Nft:        &NftAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
 	}
 
 	ctx.Set(apiContextKey, api)
