@@ -2,14 +2,17 @@ package publicapi
 
 import (
 	"context"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -71,9 +74,25 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		return err
 	}
 
+	// Send event
+	userData := persist.UserEvent{Username: username, Bio: persist.NullString(bio)}
+	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
+
 	return user.UpdateUser(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
 	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient)
+}
+
+func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
+	gc := util.GinContextFromContext(ctx)
+	userHandlers := event.For(gc).User
+	evt := persist.UserEventRecord{
+		UserID: userID,
+		Code:   eventCode,
+		Data:   userData,
+	}
+
+	userHandlers.Dispatch(evt)
 }

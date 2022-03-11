@@ -102,6 +102,10 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
+	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("GCLOUD_FEED_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 10) // Set low for debugging
+	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 
 	viper.AutomaticEnv()
 
@@ -127,6 +131,9 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		ContractRepository:        postgres.NewContractRepository(db),
 		BackupRepository:          postgres.NewBackupRepository(db),
 		MembershipRepository:      postgres.NewMembershipRepository(db),
+		UserEventRepository:       postgres.NewUserEventRepository(db),
+		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
+		NftEventRepository:        postgres.NewNftEventRepository(db),
 	}
 }
 

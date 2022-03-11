@@ -9,10 +9,11 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
-	"github.com/mikeydub/go-gallery/graphql/resolver"
+	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
@@ -51,6 +52,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 	return func(c *gin.Context) {
 		// TODO: Remove dataloader here
 		dataloader.AddTo(c, repos)
+		event.AddTo(c, repos)
 		publicapi.AddTo(c, repos, ethClient, pubsub)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
