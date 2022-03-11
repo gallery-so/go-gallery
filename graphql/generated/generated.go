@@ -63,7 +63,7 @@ type ComplexityRoot struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	AuthNonce struct {
@@ -160,17 +160,17 @@ type ComplexityRoot struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	ImageMedia struct {
-		ContentRenderUrls func(childComplexity int) int
+		ContentRenderURLs func(childComplexity int) int
 		MediaType         func(childComplexity int) int
 		MediaURL          func(childComplexity int) int
-		PreviewUrls       func(childComplexity int) int
+		PreviewURLs       func(childComplexity int) int
 	}
 
-	ImageUrlSet struct {
+	ImageURLSet struct {
 		Large  func(childComplexity int) int
 		Medium func(childComplexity int) int
 		Raw    func(childComplexity int) int
@@ -181,14 +181,14 @@ type ComplexityRoot struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	JsonMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	LoginPayload struct {
@@ -251,7 +251,7 @@ type ComplexityRoot struct {
 		Owner       func(childComplexity int) int
 	}
 
-	PreviewUrlSet struct {
+	PreviewURLSet struct {
 		Large  func(childComplexity int) int
 		Medium func(childComplexity int) int
 		Raw    func(childComplexity int) int
@@ -276,14 +276,14 @@ type ComplexityRoot struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	UnknownMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
-		PreviewUrls      func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	UpdateCollectionInfoPayload struct {
@@ -303,13 +303,13 @@ type ComplexityRoot struct {
 	}
 
 	VideoMedia struct {
-		ContentRenderUrls func(childComplexity int) int
+		ContentRenderURLs func(childComplexity int) int
 		MediaType         func(childComplexity int) int
 		MediaURL          func(childComplexity int) int
-		PreviewUrls       func(childComplexity int) int
+		PreviewURLs       func(childComplexity int) int
 	}
 
-	VideoUrlSet struct {
+	VideoURLSet struct {
 		Large  func(childComplexity int) int
 		Medium func(childComplexity int) int
 		Raw    func(childComplexity int) int
@@ -402,7 +402,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AddUserAddressPayload.Viewer(childComplexity), true
 
-	case "AudioMedia.contentRenderUrl":
+	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
 			break
 		}
@@ -416,19 +416,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AudioMedia.MediaType(childComplexity), true
 
-	case "AudioMedia.mediaUrl":
+	case "AudioMedia.mediaURL":
 		if e.complexity.AudioMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.AudioMedia.MediaURL(childComplexity), true
 
-	case "AudioMedia.previewUrls":
-		if e.complexity.AudioMedia.PreviewUrls == nil {
+	case "AudioMedia.previewURLs":
+		if e.complexity.AudioMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.AudioMedia.PreviewUrls(childComplexity), true
+		return e.complexity.AudioMedia.PreviewURLs(childComplexity), true
 
 	case "AuthNonce.nonce":
 		if e.complexity.AuthNonce.Nonce == nil {
@@ -703,7 +703,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Wallets(childComplexity), true
 
-	case "HtmlMedia.contentRenderUrl":
+	case "HtmlMedia.contentRenderURL":
 		if e.complexity.HtmlMedia.ContentRenderURL == nil {
 			break
 		}
@@ -717,26 +717,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HtmlMedia.MediaType(childComplexity), true
 
-	case "HtmlMedia.mediaUrl":
+	case "HtmlMedia.mediaURL":
 		if e.complexity.HtmlMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.HtmlMedia.MediaURL(childComplexity), true
 
-	case "HtmlMedia.previewUrls":
-		if e.complexity.HtmlMedia.PreviewUrls == nil {
+	case "HtmlMedia.previewURLs":
+		if e.complexity.HtmlMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.HtmlMedia.PreviewUrls(childComplexity), true
+		return e.complexity.HtmlMedia.PreviewURLs(childComplexity), true
 
-	case "ImageMedia.contentRenderUrls":
-		if e.complexity.ImageMedia.ContentRenderUrls == nil {
+	case "ImageMedia.contentRenderURLs":
+		if e.complexity.ImageMedia.ContentRenderURLs == nil {
 			break
 		}
 
-		return e.complexity.ImageMedia.ContentRenderUrls(childComplexity), true
+		return e.complexity.ImageMedia.ContentRenderURLs(childComplexity), true
 
 	case "ImageMedia.mediaType":
 		if e.complexity.ImageMedia.MediaType == nil {
@@ -745,49 +745,49 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ImageMedia.MediaType(childComplexity), true
 
-	case "ImageMedia.mediaUrl":
+	case "ImageMedia.mediaURL":
 		if e.complexity.ImageMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.ImageMedia.MediaURL(childComplexity), true
 
-	case "ImageMedia.previewUrls":
-		if e.complexity.ImageMedia.PreviewUrls == nil {
+	case "ImageMedia.previewURLs":
+		if e.complexity.ImageMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.ImageMedia.PreviewUrls(childComplexity), true
+		return e.complexity.ImageMedia.PreviewURLs(childComplexity), true
 
-	case "ImageUrlSet.large":
-		if e.complexity.ImageUrlSet.Large == nil {
+	case "ImageURLSet.large":
+		if e.complexity.ImageURLSet.Large == nil {
 			break
 		}
 
-		return e.complexity.ImageUrlSet.Large(childComplexity), true
+		return e.complexity.ImageURLSet.Large(childComplexity), true
 
-	case "ImageUrlSet.medium":
-		if e.complexity.ImageUrlSet.Medium == nil {
+	case "ImageURLSet.medium":
+		if e.complexity.ImageURLSet.Medium == nil {
 			break
 		}
 
-		return e.complexity.ImageUrlSet.Medium(childComplexity), true
+		return e.complexity.ImageURLSet.Medium(childComplexity), true
 
-	case "ImageUrlSet.raw":
-		if e.complexity.ImageUrlSet.Raw == nil {
+	case "ImageURLSet.raw":
+		if e.complexity.ImageURLSet.Raw == nil {
 			break
 		}
 
-		return e.complexity.ImageUrlSet.Raw(childComplexity), true
+		return e.complexity.ImageURLSet.Raw(childComplexity), true
 
-	case "ImageUrlSet.small":
-		if e.complexity.ImageUrlSet.Small == nil {
+	case "ImageURLSet.small":
+		if e.complexity.ImageURLSet.Small == nil {
 			break
 		}
 
-		return e.complexity.ImageUrlSet.Small(childComplexity), true
+		return e.complexity.ImageURLSet.Small(childComplexity), true
 
-	case "InvalidMedia.contentRenderUrl":
+	case "InvalidMedia.contentRenderURL":
 		if e.complexity.InvalidMedia.ContentRenderURL == nil {
 			break
 		}
@@ -801,21 +801,21 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.InvalidMedia.MediaType(childComplexity), true
 
-	case "InvalidMedia.mediaUrl":
+	case "InvalidMedia.mediaURL":
 		if e.complexity.InvalidMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.InvalidMedia.MediaURL(childComplexity), true
 
-	case "InvalidMedia.previewUrls":
-		if e.complexity.InvalidMedia.PreviewUrls == nil {
+	case "InvalidMedia.previewURLs":
+		if e.complexity.InvalidMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.InvalidMedia.PreviewUrls(childComplexity), true
+		return e.complexity.InvalidMedia.PreviewURLs(childComplexity), true
 
-	case "JsonMedia.contentRenderUrl":
+	case "JsonMedia.contentRenderURL":
 		if e.complexity.JsonMedia.ContentRenderURL == nil {
 			break
 		}
@@ -829,19 +829,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.JsonMedia.MediaType(childComplexity), true
 
-	case "JsonMedia.mediaUrl":
+	case "JsonMedia.mediaURL":
 		if e.complexity.JsonMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.JsonMedia.MediaURL(childComplexity), true
 
-	case "JsonMedia.previewUrls":
-		if e.complexity.JsonMedia.PreviewUrls == nil {
+	case "JsonMedia.previewURLs":
+		if e.complexity.JsonMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.JsonMedia.PreviewUrls(childComplexity), true
+		return e.complexity.JsonMedia.PreviewURLs(childComplexity), true
 
 	case "LoginPayload.userId":
 		if e.complexity.LoginPayload.UserID == nil {
@@ -1197,33 +1197,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.OwnerAtBlock.Owner(childComplexity), true
 
-	case "PreviewUrlSet.large":
-		if e.complexity.PreviewUrlSet.Large == nil {
+	case "PreviewURLSet.large":
+		if e.complexity.PreviewURLSet.Large == nil {
 			break
 		}
 
-		return e.complexity.PreviewUrlSet.Large(childComplexity), true
+		return e.complexity.PreviewURLSet.Large(childComplexity), true
 
-	case "PreviewUrlSet.medium":
-		if e.complexity.PreviewUrlSet.Medium == nil {
+	case "PreviewURLSet.medium":
+		if e.complexity.PreviewURLSet.Medium == nil {
 			break
 		}
 
-		return e.complexity.PreviewUrlSet.Medium(childComplexity), true
+		return e.complexity.PreviewURLSet.Medium(childComplexity), true
 
-	case "PreviewUrlSet.raw":
-		if e.complexity.PreviewUrlSet.Raw == nil {
+	case "PreviewURLSet.raw":
+		if e.complexity.PreviewURLSet.Raw == nil {
 			break
 		}
 
-		return e.complexity.PreviewUrlSet.Raw(childComplexity), true
+		return e.complexity.PreviewURLSet.Raw(childComplexity), true
 
-	case "PreviewUrlSet.small":
-		if e.complexity.PreviewUrlSet.Small == nil {
+	case "PreviewURLSet.small":
+		if e.complexity.PreviewURLSet.Small == nil {
 			break
 		}
 
-		return e.complexity.PreviewUrlSet.Small(childComplexity), true
+		return e.complexity.PreviewURLSet.Small(childComplexity), true
 
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
@@ -1270,7 +1270,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RemoveUserAddressesPayload.Viewer(childComplexity), true
 
-	case "TextMedia.contentRenderUrl":
+	case "TextMedia.contentRenderURL":
 		if e.complexity.TextMedia.ContentRenderURL == nil {
 			break
 		}
@@ -1284,21 +1284,21 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TextMedia.MediaType(childComplexity), true
 
-	case "TextMedia.mediaUrl":
+	case "TextMedia.mediaURL":
 		if e.complexity.TextMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.TextMedia.MediaURL(childComplexity), true
 
-	case "TextMedia.previewUrls":
-		if e.complexity.TextMedia.PreviewUrls == nil {
+	case "TextMedia.previewURLs":
+		if e.complexity.TextMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.TextMedia.PreviewUrls(childComplexity), true
+		return e.complexity.TextMedia.PreviewURLs(childComplexity), true
 
-	case "UnknownMedia.contentRenderUrl":
+	case "UnknownMedia.contentRenderURL":
 		if e.complexity.UnknownMedia.ContentRenderURL == nil {
 			break
 		}
@@ -1312,19 +1312,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UnknownMedia.MediaType(childComplexity), true
 
-	case "UnknownMedia.mediaUrl":
+	case "UnknownMedia.mediaURL":
 		if e.complexity.UnknownMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.UnknownMedia.MediaURL(childComplexity), true
 
-	case "UnknownMedia.previewUrls":
-		if e.complexity.UnknownMedia.PreviewUrls == nil {
+	case "UnknownMedia.previewURLs":
+		if e.complexity.UnknownMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.UnknownMedia.PreviewUrls(childComplexity), true
+		return e.complexity.UnknownMedia.PreviewURLs(childComplexity), true
 
 	case "UpdateCollectionInfoPayload.collection":
 		if e.complexity.UpdateCollectionInfoPayload.Collection == nil {
@@ -1354,12 +1354,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateUserInfoPayload.Viewer(childComplexity), true
 
-	case "VideoMedia.contentRenderUrls":
-		if e.complexity.VideoMedia.ContentRenderUrls == nil {
+	case "VideoMedia.contentRenderURLs":
+		if e.complexity.VideoMedia.ContentRenderURLs == nil {
 			break
 		}
 
-		return e.complexity.VideoMedia.ContentRenderUrls(childComplexity), true
+		return e.complexity.VideoMedia.ContentRenderURLs(childComplexity), true
 
 	case "VideoMedia.mediaType":
 		if e.complexity.VideoMedia.MediaType == nil {
@@ -1368,47 +1368,47 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.VideoMedia.MediaType(childComplexity), true
 
-	case "VideoMedia.mediaUrl":
+	case "VideoMedia.mediaURL":
 		if e.complexity.VideoMedia.MediaURL == nil {
 			break
 		}
 
 		return e.complexity.VideoMedia.MediaURL(childComplexity), true
 
-	case "VideoMedia.previewUrls":
-		if e.complexity.VideoMedia.PreviewUrls == nil {
+	case "VideoMedia.previewURLs":
+		if e.complexity.VideoMedia.PreviewURLs == nil {
 			break
 		}
 
-		return e.complexity.VideoMedia.PreviewUrls(childComplexity), true
+		return e.complexity.VideoMedia.PreviewURLs(childComplexity), true
 
-	case "VideoUrlSet.large":
-		if e.complexity.VideoUrlSet.Large == nil {
+	case "VideoURLSet.large":
+		if e.complexity.VideoURLSet.Large == nil {
 			break
 		}
 
-		return e.complexity.VideoUrlSet.Large(childComplexity), true
+		return e.complexity.VideoURLSet.Large(childComplexity), true
 
-	case "VideoUrlSet.medium":
-		if e.complexity.VideoUrlSet.Medium == nil {
+	case "VideoURLSet.medium":
+		if e.complexity.VideoURLSet.Medium == nil {
 			break
 		}
 
-		return e.complexity.VideoUrlSet.Medium(childComplexity), true
+		return e.complexity.VideoURLSet.Medium(childComplexity), true
 
-	case "VideoUrlSet.raw":
-		if e.complexity.VideoUrlSet.Raw == nil {
+	case "VideoURLSet.raw":
+		if e.complexity.VideoURLSet.Raw == nil {
 			break
 		}
 
-		return e.complexity.VideoUrlSet.Raw(childComplexity), true
+		return e.complexity.VideoURLSet.Raw(childComplexity), true
 
-	case "VideoUrlSet.small":
-		if e.complexity.VideoUrlSet.Small == nil {
+	case "VideoURLSet.small":
+		if e.complexity.VideoURLSet.Small == nil {
 			break
 		}
 
-		return e.complexity.VideoUrlSet.Small(childComplexity), true
+		return e.complexity.VideoURLSet.Small(childComplexity), true
 
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
@@ -1558,21 +1558,21 @@ union GalleryUserOrWallet = GalleryUser | Wallet
 
 union MediaSubtype = ImageMedia | VideoMedia | AudioMedia | TextMedia | HtmlMedia | JsonMedia | UnknownMedia | InvalidMedia
 
-type PreviewUrlSet {
+type PreviewURLSet {
   raw: String
   small: String
   medium: String
   large: String
 }
 
-type ImageUrlSet {
+type ImageURLSet {
   raw: String
   small: String
   medium: String
   large: String
 }
 
-type VideoUrlSet {
+type VideoURLSet {
   raw: String
   small: String
   medium: String
@@ -1580,73 +1580,73 @@ type VideoUrlSet {
 }
 
 interface Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 }
 
 type ImageMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrls: ImageUrlSet
+  contentRenderURLs: ImageURLSet
 }
 
 type VideoMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrls: VideoUrlSet
+  contentRenderURLs: VideoURLSet
 }
 
 type AudioMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type TextMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type JsonMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type UnknownMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 enum TokenType {
@@ -1681,8 +1681,6 @@ type Nft implements Node {
   contractAddress: Address
   externalUrl: String
   blockNumber: String # source is uint64
-
-  #  tokenCollectionName: String <-- Is this still a thing?
 }
 
 type OwnerAtBlock {
@@ -2266,7 +2264,7 @@ func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, f
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _AudioMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _AudioMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2284,7 +2282,7 @@ func (ec *executionContext) _AudioMedia_previewUrls(ctx context.Context, field g
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2295,10 +2293,10 @@ func (ec *executionContext) _AudioMedia_previewUrls(ctx context.Context, field g
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _AudioMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _AudioMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2362,7 +2360,7 @@ func (ec *executionContext) _AudioMedia_mediaType(ctx context.Context, field gra
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _AudioMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _AudioMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3687,7 +3685,7 @@ func (ec *executionContext) _GalleryUser_isAuthenticatedUser(ctx context.Context
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _HtmlMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _HtmlMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3705,7 +3703,7 @@ func (ec *executionContext) _HtmlMedia_previewUrls(ctx context.Context, field gr
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3716,10 +3714,10 @@ func (ec *executionContext) _HtmlMedia_previewUrls(ctx context.Context, field gr
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _HtmlMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _HtmlMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3783,7 +3781,7 @@ func (ec *executionContext) _HtmlMedia_mediaType(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _HtmlMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _HtmlMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3815,7 +3813,7 @@ func (ec *executionContext) _HtmlMedia_contentRenderUrl(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3833,7 +3831,7 @@ func (ec *executionContext) _ImageMedia_previewUrls(ctx context.Context, field g
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3844,10 +3842,10 @@ func (ec *executionContext) _ImageMedia_previewUrls(ctx context.Context, field g
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3911,7 +3909,7 @@ func (ec *executionContext) _ImageMedia_mediaType(ctx context.Context, field gra
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageMedia_contentRenderUrls(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageMedia_contentRenderURLs(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3929,7 +3927,7 @@ func (ec *executionContext) _ImageMedia_contentRenderUrls(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ContentRenderUrls, nil
+		return obj.ContentRenderURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3940,10 +3938,10 @@ func (ec *executionContext) _ImageMedia_contentRenderUrls(ctx context.Context, f
 	}
 	res := resTmp.(*model.ImageURLSet)
 	fc.Result = res
-	return ec.marshalOImageUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx, field.Selections, res)
+	return ec.marshalOImageURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageUrlSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageURLSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3951,7 +3949,7 @@ func (ec *executionContext) _ImageUrlSet_raw(ctx context.Context, field graphql.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ImageUrlSet",
+		Object:     "ImageURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3975,7 +3973,7 @@ func (ec *executionContext) _ImageUrlSet_raw(ctx context.Context, field graphql.
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageUrlSet_small(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageURLSet_small(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3983,7 +3981,7 @@ func (ec *executionContext) _ImageUrlSet_small(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ImageUrlSet",
+		Object:     "ImageURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4007,7 +4005,7 @@ func (ec *executionContext) _ImageUrlSet_small(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageUrlSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageURLSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4015,7 +4013,7 @@ func (ec *executionContext) _ImageUrlSet_medium(ctx context.Context, field graph
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ImageUrlSet",
+		Object:     "ImageURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4039,7 +4037,7 @@ func (ec *executionContext) _ImageUrlSet_medium(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageUrlSet_large(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageURLSet_large(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4047,7 +4045,7 @@ func (ec *executionContext) _ImageUrlSet_large(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ImageUrlSet",
+		Object:     "ImageURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4071,7 +4069,7 @@ func (ec *executionContext) _ImageUrlSet_large(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _InvalidMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _InvalidMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4089,7 +4087,7 @@ func (ec *executionContext) _InvalidMedia_previewUrls(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4100,10 +4098,10 @@ func (ec *executionContext) _InvalidMedia_previewUrls(ctx context.Context, field
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _InvalidMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _InvalidMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4167,7 +4165,7 @@ func (ec *executionContext) _InvalidMedia_mediaType(ctx context.Context, field g
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _InvalidMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _InvalidMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4199,7 +4197,7 @@ func (ec *executionContext) _InvalidMedia_contentRenderUrl(ctx context.Context, 
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _JsonMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _JsonMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4217,7 +4215,7 @@ func (ec *executionContext) _JsonMedia_previewUrls(ctx context.Context, field gr
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4228,10 +4226,10 @@ func (ec *executionContext) _JsonMedia_previewUrls(ctx context.Context, field gr
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _JsonMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _JsonMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4295,7 +4293,7 @@ func (ec *executionContext) _JsonMedia_mediaType(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _JsonMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _JsonMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5944,7 +5942,7 @@ func (ec *executionContext) _OwnerAtBlock_blockNumber(ctx context.Context, field
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PreviewUrlSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _PreviewURLSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5952,7 +5950,7 @@ func (ec *executionContext) _PreviewUrlSet_raw(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "PreviewUrlSet",
+		Object:     "PreviewURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5976,7 +5974,7 @@ func (ec *executionContext) _PreviewUrlSet_raw(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PreviewUrlSet_small(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _PreviewURLSet_small(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5984,7 +5982,7 @@ func (ec *executionContext) _PreviewUrlSet_small(ctx context.Context, field grap
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "PreviewUrlSet",
+		Object:     "PreviewURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6008,7 +6006,7 @@ func (ec *executionContext) _PreviewUrlSet_small(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PreviewUrlSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _PreviewURLSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6016,7 +6014,7 @@ func (ec *executionContext) _PreviewUrlSet_medium(ctx context.Context, field gra
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "PreviewUrlSet",
+		Object:     "PreviewURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6040,7 +6038,7 @@ func (ec *executionContext) _PreviewUrlSet_medium(ctx context.Context, field gra
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PreviewUrlSet_large(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _PreviewURLSet_large(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6048,7 +6046,7 @@ func (ec *executionContext) _PreviewUrlSet_large(ctx context.Context, field grap
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "PreviewUrlSet",
+		Object:     "PreviewURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6337,7 +6335,7 @@ func (ec *executionContext) _RemoveUserAddressesPayload_viewer(ctx context.Conte
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TextMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _TextMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6355,7 +6353,7 @@ func (ec *executionContext) _TextMedia_previewUrls(ctx context.Context, field gr
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6366,10 +6364,10 @@ func (ec *executionContext) _TextMedia_previewUrls(ctx context.Context, field gr
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TextMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _TextMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6433,7 +6431,7 @@ func (ec *executionContext) _TextMedia_mediaType(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TextMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _TextMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6465,7 +6463,7 @@ func (ec *executionContext) _TextMedia_contentRenderUrl(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UnknownMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _UnknownMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6483,7 +6481,7 @@ func (ec *executionContext) _UnknownMedia_previewUrls(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6494,10 +6492,10 @@ func (ec *executionContext) _UnknownMedia_previewUrls(ctx context.Context, field
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UnknownMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _UnknownMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6561,7 +6559,7 @@ func (ec *executionContext) _UnknownMedia_mediaType(ctx context.Context, field g
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UnknownMedia_contentRenderUrl(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _UnknownMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6721,7 +6719,7 @@ func (ec *executionContext) _UpdateUserInfoPayload_viewer(ctx context.Context, f
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoMedia_previewUrls(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6739,7 +6737,7 @@ func (ec *executionContext) _VideoMedia_previewUrls(ctx context.Context, field g
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewUrls, nil
+		return obj.PreviewURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6750,10 +6748,10 @@ func (ec *executionContext) _VideoMedia_previewUrls(ctx context.Context, field g
 	}
 	res := resTmp.(*model.PreviewURLSet)
 	fc.Result = res
-	return ec.marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoMedia_mediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6817,7 +6815,7 @@ func (ec *executionContext) _VideoMedia_mediaType(ctx context.Context, field gra
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoMedia_contentRenderUrls(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoMedia_contentRenderURLs(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6835,7 +6833,7 @@ func (ec *executionContext) _VideoMedia_contentRenderUrls(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ContentRenderUrls, nil
+		return obj.ContentRenderURLs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6846,10 +6844,10 @@ func (ec *executionContext) _VideoMedia_contentRenderUrls(ctx context.Context, f
 	}
 	res := resTmp.(*model.VideoURLSet)
 	fc.Result = res
-	return ec.marshalOVideoUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVideoURLSet(ctx, field.Selections, res)
+	return ec.marshalOVideoURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVideoURLSet(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoUrlSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoURLSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6857,7 +6855,7 @@ func (ec *executionContext) _VideoUrlSet_raw(ctx context.Context, field graphql.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "VideoUrlSet",
+		Object:     "VideoURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6881,7 +6879,7 @@ func (ec *executionContext) _VideoUrlSet_raw(ctx context.Context, field graphql.
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoUrlSet_small(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoURLSet_small(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6889,7 +6887,7 @@ func (ec *executionContext) _VideoUrlSet_small(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "VideoUrlSet",
+		Object:     "VideoURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6913,7 +6911,7 @@ func (ec *executionContext) _VideoUrlSet_small(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoUrlSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoURLSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6921,7 +6919,7 @@ func (ec *executionContext) _VideoUrlSet_medium(ctx context.Context, field graph
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "VideoUrlSet",
+		Object:     "VideoURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6945,7 +6943,7 @@ func (ec *executionContext) _VideoUrlSet_medium(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _VideoUrlSet_large(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
+func (ec *executionContext) _VideoURLSet_large(ctx context.Context, field graphql.CollectedField, obj *model.VideoURLSet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6953,7 +6951,7 @@ func (ec *executionContext) _VideoUrlSet_large(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "VideoUrlSet",
+		Object:     "VideoURLSet",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -9400,16 +9398,16 @@ func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSe
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("AudioMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AudioMedia_previewUrls(ctx, field, obj)
+				return ec._AudioMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AudioMedia_mediaUrl(ctx, field, obj)
+				return ec._AudioMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -9421,9 +9419,9 @@ func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AudioMedia_contentRenderUrl(ctx, field, obj)
+				return ec._AudioMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10174,16 +10172,16 @@ func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("HtmlMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._HtmlMedia_previewUrls(ctx, field, obj)
+				return ec._HtmlMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._HtmlMedia_mediaUrl(ctx, field, obj)
+				return ec._HtmlMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10195,9 +10193,9 @@ func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._HtmlMedia_contentRenderUrl(ctx, field, obj)
+				return ec._HtmlMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10223,16 +10221,16 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ImageMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageMedia_previewUrls(ctx, field, obj)
+				return ec._ImageMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageMedia_mediaUrl(ctx, field, obj)
+				return ec._ImageMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10244,9 +10242,9 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrls":
+		case "contentRenderURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageMedia_contentRenderUrls(ctx, field, obj)
+				return ec._ImageMedia_contentRenderURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10262,40 +10260,40 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var imageUrlSetImplementors = []string{"ImageUrlSet"}
+var imageURLSetImplementors = []string{"ImageURLSet"}
 
-func (ec *executionContext) _ImageUrlSet(ctx context.Context, sel ast.SelectionSet, obj *model.ImageURLSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, imageUrlSetImplementors)
+func (ec *executionContext) _ImageURLSet(ctx context.Context, sel ast.SelectionSet, obj *model.ImageURLSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, imageURLSetImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ImageUrlSet")
+			out.Values[i] = graphql.MarshalString("ImageURLSet")
 		case "raw":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageUrlSet_raw(ctx, field, obj)
+				return ec._ImageURLSet_raw(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "small":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageUrlSet_small(ctx, field, obj)
+				return ec._ImageURLSet_small(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "medium":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageUrlSet_medium(ctx, field, obj)
+				return ec._ImageURLSet_medium(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "large":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageUrlSet_large(ctx, field, obj)
+				return ec._ImageURLSet_large(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10321,16 +10319,16 @@ func (ec *executionContext) _InvalidMedia(ctx context.Context, sel ast.Selection
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("InvalidMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._InvalidMedia_previewUrls(ctx, field, obj)
+				return ec._InvalidMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._InvalidMedia_mediaUrl(ctx, field, obj)
+				return ec._InvalidMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10342,9 +10340,9 @@ func (ec *executionContext) _InvalidMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._InvalidMedia_contentRenderUrl(ctx, field, obj)
+				return ec._InvalidMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10370,16 +10368,16 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("JsonMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._JsonMedia_previewUrls(ctx, field, obj)
+				return ec._JsonMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._JsonMedia_mediaUrl(ctx, field, obj)
+				return ec._JsonMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10391,9 +10389,9 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._JsonMedia_contentRenderUrl(ctx, field, obj)
+				return ec._JsonMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10877,40 +10875,40 @@ func (ec *executionContext) _OwnerAtBlock(ctx context.Context, sel ast.Selection
 	return out
 }
 
-var previewUrlSetImplementors = []string{"PreviewUrlSet"}
+var previewURLSetImplementors = []string{"PreviewURLSet"}
 
-func (ec *executionContext) _PreviewUrlSet(ctx context.Context, sel ast.SelectionSet, obj *model.PreviewURLSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, previewUrlSetImplementors)
+func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.SelectionSet, obj *model.PreviewURLSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, previewURLSetImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("PreviewUrlSet")
+			out.Values[i] = graphql.MarshalString("PreviewURLSet")
 		case "raw":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PreviewUrlSet_raw(ctx, field, obj)
+				return ec._PreviewURLSet_raw(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "small":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PreviewUrlSet_small(ctx, field, obj)
+				return ec._PreviewURLSet_small(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "medium":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PreviewUrlSet_medium(ctx, field, obj)
+				return ec._PreviewURLSet_medium(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "large":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PreviewUrlSet_large(ctx, field, obj)
+				return ec._PreviewURLSet_large(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11096,16 +11094,16 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("TextMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TextMedia_previewUrls(ctx, field, obj)
+				return ec._TextMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TextMedia_mediaUrl(ctx, field, obj)
+				return ec._TextMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11117,9 +11115,9 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TextMedia_contentRenderUrl(ctx, field, obj)
+				return ec._TextMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11145,16 +11143,16 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("UnknownMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UnknownMedia_previewUrls(ctx, field, obj)
+				return ec._UnknownMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UnknownMedia_mediaUrl(ctx, field, obj)
+				return ec._UnknownMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11166,9 +11164,9 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrl":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UnknownMedia_contentRenderUrl(ctx, field, obj)
+				return ec._UnknownMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11306,16 +11304,16 @@ func (ec *executionContext) _VideoMedia(ctx context.Context, sel ast.SelectionSe
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("VideoMedia")
-		case "previewUrls":
+		case "previewURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoMedia_previewUrls(ctx, field, obj)
+				return ec._VideoMedia_previewURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "mediaUrl":
+		case "mediaURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoMedia_mediaUrl(ctx, field, obj)
+				return ec._VideoMedia_mediaURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11327,9 +11325,9 @@ func (ec *executionContext) _VideoMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderUrls":
+		case "contentRenderURLs":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoMedia_contentRenderUrls(ctx, field, obj)
+				return ec._VideoMedia_contentRenderURLs(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11345,40 +11343,40 @@ func (ec *executionContext) _VideoMedia(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var videoUrlSetImplementors = []string{"VideoUrlSet"}
+var videoURLSetImplementors = []string{"VideoURLSet"}
 
-func (ec *executionContext) _VideoUrlSet(ctx context.Context, sel ast.SelectionSet, obj *model.VideoURLSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, videoUrlSetImplementors)
+func (ec *executionContext) _VideoURLSet(ctx context.Context, sel ast.SelectionSet, obj *model.VideoURLSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, videoURLSetImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("VideoUrlSet")
+			out.Values[i] = graphql.MarshalString("VideoURLSet")
 		case "raw":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoUrlSet_raw(ctx, field, obj)
+				return ec._VideoURLSet_raw(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "small":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoUrlSet_small(ctx, field, obj)
+				return ec._VideoURLSet_small(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "medium":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoUrlSet_medium(ctx, field, obj)
+				return ec._VideoURLSet_medium(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "large":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._VideoUrlSet_large(ctx, field, obj)
+				return ec._VideoURLSet_large(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12736,11 +12734,11 @@ func (ec *executionContext) marshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgallery
 	return res
 }
 
-func (ec *executionContext) marshalOImageUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx context.Context, sel ast.SelectionSet, v *model.ImageURLSet) graphql.Marshaler {
+func (ec *executionContext) marshalOImageURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx context.Context, sel ast.SelectionSet, v *model.ImageURLSet) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._ImageUrlSet(ctx, sel, v)
+	return ec._ImageURLSet(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚕᚖint(ctx context.Context, v interface{}) ([]*int, error) {
@@ -12997,11 +12995,11 @@ func (ec *executionContext) marshalOOwnerAtBlock2ᚖgithubᚗcomᚋmikeydubᚋgo
 	return ec._OwnerAtBlock(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOPreviewUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx context.Context, sel ast.SelectionSet, v *model.PreviewURLSet) graphql.Marshaler {
+func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx context.Context, sel ast.SelectionSet, v *model.PreviewURLSet) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._PreviewUrlSet(ctx, sel, v)
+	return ec._PreviewURLSet(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORefreshOpenSeaNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshOpenSeaNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshOpenSeaNftsPayloadOrError) graphql.Marshaler {
@@ -13143,11 +13141,11 @@ func (ec *executionContext) marshalOUserByUsernameOrError2githubᚗcomᚋmikeydu
 	return ec._UserByUsernameOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOVideoUrlSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVideoURLSet(ctx context.Context, sel ast.SelectionSet, v *model.VideoURLSet) graphql.Marshaler {
+func (ec *executionContext) marshalOVideoURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVideoURLSet(ctx context.Context, sel ast.SelectionSet, v *model.VideoURLSet) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._VideoUrlSet(ctx, sel, v)
+	return ec._VideoURLSet(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx context.Context, sel ast.SelectionSet, v *model.Viewer) graphql.Marshaler {

@@ -98,10 +98,10 @@ type AddUserAddressPayload struct {
 func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
 
 type AudioMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (AudioMedia) IsMediaSubtype() {}
@@ -290,20 +290,20 @@ type GnosisSafeAuth struct {
 }
 
 type HTMLMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
 
 type ImageMedia struct {
-	PreviewUrls       *PreviewURLSet `json:"previewUrls"`
-	MediaURL          *string        `json:"mediaUrl"`
+	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
+	MediaURL          *string        `json:"mediaURL"`
 	MediaType         *string        `json:"mediaType"`
-	ContentRenderUrls *ImageURLSet   `json:"contentRenderUrls"`
+	ContentRenderURLs *ImageURLSet   `json:"contentRenderURLs"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
@@ -317,20 +317,20 @@ type ImageURLSet struct {
 }
 
 type InvalidMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (InvalidMedia) IsMediaSubtype() {}
 func (InvalidMedia) IsMedia()        {}
 
 type JSONMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (JSONMedia) IsMediaSubtype() {}
@@ -409,20 +409,20 @@ type RemoveUserAddressesPayload struct {
 func (RemoveUserAddressesPayload) IsRemoveUserAddressesPayloadOrError() {}
 
 type TextMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
 type UnknownMedia struct {
-	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
-	MediaURL         *string        `json:"mediaUrl"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
 	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderUrl"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (UnknownMedia) IsMediaSubtype() {}
@@ -475,10 +475,10 @@ type UpdateUserInfoPayload struct {
 func (UpdateUserInfoPayload) IsUpdateUserInfoPayloadOrError() {}
 
 type VideoMedia struct {
-	PreviewUrls       *PreviewURLSet `json:"previewUrls"`
-	MediaURL          *string        `json:"mediaUrl"`
+	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
+	MediaURL          *string        `json:"mediaURL"`
 	MediaType         *string        `json:"mediaType"`
-	ContentRenderUrls *VideoURLSet   `json:"contentRenderUrls"`
+	ContentRenderURLs *VideoURLSet   `json:"contentRenderURLs"`
 }
 
 func (VideoMedia) IsMediaSubtype() {}

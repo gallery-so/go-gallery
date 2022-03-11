@@ -298,10 +298,10 @@ func getImageMedia(nft persist.NFT) model.ImageMedia {
 	}
 
 	return model.ImageMedia{
-		PreviewUrls:       getPreviewUrls(nft),
+		PreviewURLs:       getPreviewUrls(nft),
 		MediaURL:          getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.ImageURL.String()),
 		MediaType:         nil,
-		ContentRenderUrls: &imageUrls,
+		ContentRenderURLs: &imageUrls,
 	}
 }
 
@@ -314,16 +314,16 @@ func getVideoMedia(nft persist.NFT) model.VideoMedia {
 	}
 
 	return model.VideoMedia{
-		PreviewUrls:       getPreviewUrls(nft),
+		PreviewURLs:       getPreviewUrls(nft),
 		MediaURL:          getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
 		MediaType:         nil,
-		ContentRenderUrls: &videoUrls,
+		ContentRenderURLs: &videoUrls,
 	}
 }
 
 func getAudioMedia(nft persist.NFT) model.AudioMedia {
 	return model.AudioMedia{
-		PreviewUrls:      getPreviewUrls(nft),
+		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
 		MediaType:        nil,
 		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
@@ -332,7 +332,7 @@ func getAudioMedia(nft persist.NFT) model.AudioMedia {
 
 func getTextMedia(nft persist.NFT) model.TextMedia {
 	return model.TextMedia{
-		PreviewUrls:      getPreviewUrls(nft),
+		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
 		MediaType:        nil,
 		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
@@ -341,7 +341,7 @@ func getTextMedia(nft persist.NFT) model.TextMedia {
 
 func getHtmlMedia(nft persist.NFT) model.HTMLMedia {
 	return model.HTMLMedia{
-		PreviewUrls:      getPreviewUrls(nft),
+		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
 		MediaType:        nil,
 		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
@@ -350,7 +350,7 @@ func getHtmlMedia(nft persist.NFT) model.HTMLMedia {
 
 func getJsonMedia(nft persist.NFT) model.JSONMedia {
 	return model.JSONMedia{
-		PreviewUrls:      getPreviewUrls(nft),
+		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
 		MediaType:        nil,
 		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),

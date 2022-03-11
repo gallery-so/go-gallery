@@ -40,21 +40,21 @@ union GalleryUserOrWallet = GalleryUser | Wallet
 
 union MediaSubtype = ImageMedia | VideoMedia | AudioMedia | TextMedia | HtmlMedia | JsonMedia | UnknownMedia | InvalidMedia
 
-type PreviewUrlSet {
+type PreviewURLSet {
   raw: String
   small: String
   medium: String
   large: String
 }
 
-type ImageUrlSet {
+type ImageURLSet {
   raw: String
   small: String
   medium: String
   large: String
 }
 
-type VideoUrlSet {
+type VideoURLSet {
   raw: String
   small: String
   medium: String
@@ -62,73 +62,73 @@ type VideoUrlSet {
 }
 
 interface Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 }
 
 type ImageMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrls: ImageUrlSet
+  contentRenderURLs: ImageURLSet
 }
 
 type VideoMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrls: VideoUrlSet
+  contentRenderURLs: VideoURLSet
 }
 
 type AudioMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type TextMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type JsonMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type UnknownMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
-  previewUrls: PreviewUrlSet
-  mediaUrl: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
   mediaType: String
 
-  contentRenderUrl: String
+  contentRenderURL: String
 }
 
 enum TokenType {
