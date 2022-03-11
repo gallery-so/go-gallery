@@ -9,7 +9,7 @@ directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITI
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
-scalar DateTime
+scalar Time
 scalar Address
 
 interface Node {
@@ -38,37 +38,138 @@ type Wallet implements Node {
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-interface NftInterface {
-  id: ID!
-  name: String
-  tokenCollectionName: String
-  owner: GalleryUserOrWallet
+union MediaSubtype = ImageMedia | VideoMedia | AudioMedia | TextMedia | HtmlMedia | JsonMedia | UnknownMedia | InvalidMedia
+
+type PreviewUrlSet {
+  raw: String
+  small: String
+  medium: String
+  large: String
 }
 
-type ImageNft implements NftInterface & Node {
+type ImageUrlSet {
+  raw: String
+  small: String
+  medium: String
+  large: String
+}
+
+type VideoUrlSet {
+  raw: String
+  small: String
+  medium: String
+  large: String
+}
+
+interface Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+}
+
+type ImageMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrls: ImageUrlSet
+}
+
+type VideoMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrls: VideoUrlSet
+}
+
+type AudioMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+type TextMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+type HtmlMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+type JsonMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+type UnknownMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+type InvalidMedia implements Media {
+  previewUrls: PreviewUrlSet
+  mediaUrl: String
+  mediaType: String
+
+  contentRenderUrl: String
+}
+
+enum TokenType {
+  ERC721
+  ERC1155
+  ERC20
+}
+
+enum Chain {
+  Ethereum
+  Arbitrum
+  Polygon
+  Optimism
+}
+
+type Nft implements Node {
   id: ID!
+  creationTime: Time
+  lastUpdated: Time
+  collectorsNote: String
+  media: MediaSubtype
+  tokenType: TokenType
+  chain: Chain
   name: String
-  tokenCollectionName: String
+  description: String
+  tokenUri: String
+  tokenId: String
+  quantity: String # source is a hex string
   owner: GalleryUserOrWallet @goField(forceResolver: true)
-  imageUrl: String
+  ownershipHistory: [OwnerAtBlock]
+  tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
+  contractAddress: Address
+  externalUrl: String
+  blockNumber: String # source is uint64
 }
 
-type VideoNft implements NftInterface & Node {
-  id: ID!
-  name: String
-  tokenCollectionName: String
+type OwnerAtBlock {
+  # TODO: will need to store addresses to make this resolver work
   owner: GalleryUserOrWallet @goField(forceResolver: true)
+  blockNumber: String # source is uint64
 }
-
-# Temporary NFT type until we support media types via indexer
-type GenericNft implements NftInterface & Node {
-  id: ID!
-  name: String
-  tokenCollectionName: String
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
-}
-
-union Nft = ImageNft | VideoNft | GenericNft
 
 type GalleryNft {
   id: ID!

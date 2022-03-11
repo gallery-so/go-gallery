@@ -14,6 +14,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
+	"path/filepath"
+	"strings"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -239,12 +241,159 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, addre
 	return nil, err
 }
 
+func getUrlExtension(url string) string {
+	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
+}
+
+func getMediaForNft(nft persist.NFT) model.MediaSubtype {
+	ext := getUrlExtension(*getFirstNonEmptyString(nft.AnimationURL.String(), nft.ImageURL.String(), nft.ImageOriginalURL.String()))
+
+	switch ext {
+	case "svg":
+	case "gif":
+	case "jpg":
+	case "jpeg":
+	case "png":
+		return getImageMedia(nft)
+	case "mp4":
+		return getVideoMedia(nft)
+	case "mp3":
+	case "wav":
+		return getAudioMedia(nft)
+	case "html":
+		return getHtmlMedia(nft)
+	case "glb":
+		return getUnknownMedia(nft)
+	}
+	// Note: default in v1 frontend mapping was "animation"
+	return getUnknownMedia(nft)
+}
+
+func getFirstNonEmptyString(strings ...string) *string {
+	for _, str := range strings {
+		if str != "" {
+			return &str
+		}
+	}
+
+	empty := ""
+	return &empty
+}
+
+func getPreviewUrls(nft persist.NFT) *model.PreviewURLSet {
+	return &model.PreviewURLSet{
+		Raw:    getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.AnimationURL.String()),
+		Small:  getFirstNonEmptyString(nft.ImageThumbnailURL.String(), nft.AnimationURL.String()),
+		Medium: getFirstNonEmptyString(nft.ImagePreviewURL.String(), nft.AnimationURL.String()),
+		Large:  getFirstNonEmptyString(nft.ImageURL.String(), nft.AnimationURL.String()),
+	}
+}
+
+func getImageMedia(nft persist.NFT) model.ImageMedia {
+	imageUrls := model.ImageURLSet{
+		Raw:    getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.AnimationURL.String()),
+		Small:  getFirstNonEmptyString(nft.ImageThumbnailURL.String(), nft.AnimationURL.String()),
+		Medium: getFirstNonEmptyString(nft.ImagePreviewURL.String(), nft.AnimationURL.String()),
+		Large:  getFirstNonEmptyString(nft.ImageURL.String(), nft.AnimationURL.String()),
+	}
+
+	return model.ImageMedia{
+		PreviewUrls:       getPreviewUrls(nft),
+		MediaURL:          getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.ImageURL.String()),
+		MediaType:         nil,
+		ContentRenderUrls: &imageUrls,
+	}
+}
+
+func getVideoMedia(nft persist.NFT) model.VideoMedia {
+	videoUrls := model.VideoURLSet{
+		Raw:    util.StringToPointer(nft.AnimationOriginalURL.String()),
+		Small:  util.StringToPointer(nft.AnimationURL.String()),
+		Medium: util.StringToPointer(nft.AnimationURL.String()),
+		Large:  util.StringToPointer(nft.AnimationURL.String()),
+	}
+
+	return model.VideoMedia{
+		PreviewUrls:       getPreviewUrls(nft),
+		MediaURL:          getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:         nil,
+		ContentRenderUrls: &videoUrls,
+	}
+}
+
+func getAudioMedia(nft persist.NFT) model.AudioMedia {
+	return model.AudioMedia{
+		PreviewUrls:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:        nil,
+		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+	}
+}
+
+func getTextMedia(nft persist.NFT) model.TextMedia {
+	return model.TextMedia{
+		PreviewUrls:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:        nil,
+		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+	}
+}
+
+func getHtmlMedia(nft persist.NFT) model.HTMLMedia {
+	return model.HTMLMedia{
+		PreviewUrls:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:        nil,
+		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+	}
+}
+
+func getJsonMedia(nft persist.NFT) model.JSONMedia {
+	return model.JSONMedia{
+		PreviewUrls:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:        nil,
+		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+	}
+}
+
+func getUnknownMedia(nft persist.NFT) model.UnknownMedia {
+	return model.UnknownMedia{}
+}
+
+func getInvalidMedia(nft persist.NFT) model.InvalidMedia {
+	return model.InvalidMedia{}
+}
+
+// TODO: Temporary helper method. VERY SLOW. Will be replaced by optimized lookups before being used in production.
+func collectionNftToNft(ctx context.Context, nft persist.CollectionNFT) (persist.NFT, error) {
+	return dataloader.For(ctx).NftByNftId.Load(nft.ID)
+}
+
 func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
-	output := model.GenericNft{
-		ID:                  nft.ID,
-		Name:                util.StringToPointer(nft.Name.String()),
-		TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
-		Owner:               nil, // handled by dedicated resolver
+	creationTime := nft.CreationTime.Time()
+	lastUpdated := nft.LastUpdatedTime.Time()
+	chainEthereum := model.ChainEthereum
+
+	output := model.Nft{
+		ID:               nft.ID,
+		CreationTime:     &creationTime,
+		LastUpdated:      &lastUpdated,
+		CollectorsNote:   util.StringToPointer(nft.CollectorsNote.String()),
+		Media:            getMediaForNft(nft),
+		TokenType:        nil,            // TODO: later
+		Chain:            &chainEthereum, // Everything's Ethereum right now
+		Name:             util.StringToPointer(nft.Name.String()),
+		Description:      util.StringToPointer(nft.Description.String()),
+		TokenURI:         nil, // TODO: later
+		TokenID:          util.StringToPointer(nft.OpenseaTokenID.String()),
+		Quantity:         nil, // TODO: later
+		Owner:            nil, // handled by dedicated resolver
+		OwnershipHistory: nil, // TODO: later
+		TokenMetadata:    nil, // TODO: later
+		ContractAddress:  &nft.Contract.ContractAddress,
+		ExternalURL:      util.StringToPointer(nft.ExternalURL.String()),
+		BlockNumber:      nil, // TODO: later
 	}
 
 	return output
@@ -263,7 +412,7 @@ func collectionToModel(ctx context.Context, collection persist.Collection) *mode
 		Version:        &version,
 		Name:           util.StringToPointer(collection.Name.String()),
 		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
-		Gallery:        nil, // TODO: Add SQL query to find gallery parent for collection. // galleryIDToGalleryModel(galleryID),
+		Gallery:        nil, // handled by dedicated resolver
 		Layout:         layoutToModel(ctx, collection.Layout),
 		Hidden:         &hidden,
 		Nfts:           nil, // handled by dedicated resolver

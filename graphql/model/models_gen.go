@@ -3,6 +3,11 @@
 package model
 
 import (
+	"fmt"
+	"io"
+	"strconv"
+	"time"
+
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -42,12 +47,12 @@ type LoginPayloadOrError interface {
 	IsLoginPayloadOrError()
 }
 
-type Nft interface {
-	IsNft()
+type Media interface {
+	IsMedia()
 }
 
-type NftInterface interface {
-	IsNftInterface()
+type MediaSubtype interface {
+	IsMediaSubtype()
 }
 
 type Node interface {
@@ -91,6 +96,16 @@ type AddUserAddressPayload struct {
 }
 
 func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
+
+type AudioMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
+}
+
+func (AudioMedia) IsMediaSubtype() {}
+func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
 	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
@@ -252,7 +267,7 @@ type GalleryCollectionLayoutInput struct {
 
 type GalleryNft struct {
 	ID         persist.DBID       `json:"id"`
-	Nft        Nft                `json:"nft"`
+	Nft        *Nft               `json:"nft"`
 	Collection *GalleryCollection `json:"collection"`
 }
 
@@ -269,33 +284,57 @@ func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
-type GenericNft struct {
-	ID                  persist.DBID        `json:"id"`
-	Name                *string             `json:"name"`
-	TokenCollectionName *string             `json:"tokenCollectionName"`
-	Owner               GalleryUserOrWallet `json:"owner"`
-}
-
-func (GenericNft) IsNftInterface() {}
-func (GenericNft) IsNode()         {}
-func (GenericNft) IsNft()          {}
-
 type GnosisSafeAuth struct {
 	Address persist.Address `json:"address"`
 	Nonce   string          `json:"nonce"`
 }
 
-type ImageNft struct {
-	ID                  persist.DBID        `json:"id"`
-	Name                *string             `json:"name"`
-	TokenCollectionName *string             `json:"tokenCollectionName"`
-	Owner               GalleryUserOrWallet `json:"owner"`
-	ImageURL            *string             `json:"imageUrl"`
+type HTMLMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
 }
 
-func (ImageNft) IsNftInterface() {}
-func (ImageNft) IsNode()         {}
-func (ImageNft) IsNft()          {}
+func (HTMLMedia) IsMediaSubtype() {}
+func (HTMLMedia) IsMedia()        {}
+
+type ImageMedia struct {
+	PreviewUrls       *PreviewURLSet `json:"previewUrls"`
+	MediaURL          *string        `json:"mediaUrl"`
+	MediaType         *string        `json:"mediaType"`
+	ContentRenderUrls *ImageURLSet   `json:"contentRenderUrls"`
+}
+
+func (ImageMedia) IsMediaSubtype() {}
+func (ImageMedia) IsMedia()        {}
+
+type ImageURLSet struct {
+	Raw    *string `json:"raw"`
+	Small  *string `json:"small"`
+	Medium *string `json:"medium"`
+	Large  *string `json:"large"`
+}
+
+type InvalidMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
+}
+
+func (InvalidMedia) IsMediaSubtype() {}
+func (InvalidMedia) IsMedia()        {}
+
+type JSONMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
+}
+
+func (JSONMedia) IsMediaSubtype() {}
+func (JSONMedia) IsMedia()        {}
 
 type LoginPayload struct {
 	UserID *persist.DBID `json:"userId"`
@@ -322,6 +361,41 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type Nft struct {
+	ID               persist.DBID        `json:"id"`
+	CreationTime     *time.Time          `json:"creationTime"`
+	LastUpdated      *time.Time          `json:"lastUpdated"`
+	CollectorsNote   *string             `json:"collectorsNote"`
+	Media            MediaSubtype        `json:"media"`
+	TokenType        *TokenType          `json:"tokenType"`
+	Chain            *Chain              `json:"chain"`
+	Name             *string             `json:"name"`
+	Description      *string             `json:"description"`
+	TokenURI         *string             `json:"tokenUri"`
+	TokenID          *string             `json:"tokenId"`
+	Quantity         *string             `json:"quantity"`
+	Owner            GalleryUserOrWallet `json:"owner"`
+	OwnershipHistory []*OwnerAtBlock     `json:"ownershipHistory"`
+	TokenMetadata    *string             `json:"tokenMetadata"`
+	ContractAddress  *persist.Address    `json:"contractAddress"`
+	ExternalURL      *string             `json:"externalUrl"`
+	BlockNumber      *string             `json:"blockNumber"`
+}
+
+func (Nft) IsNode() {}
+
+type OwnerAtBlock struct {
+	Owner       GalleryUserOrWallet `json:"owner"`
+	BlockNumber *string             `json:"blockNumber"`
+}
+
+type PreviewURLSet struct {
+	Raw    *string `json:"raw"`
+	Small  *string `json:"small"`
+	Medium *string `json:"medium"`
+	Large  *string `json:"large"`
+}
+
 type RefreshOpenSeaNftsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -333,6 +407,26 @@ type RemoveUserAddressesPayload struct {
 }
 
 func (RemoveUserAddressesPayload) IsRemoveUserAddressesPayloadOrError() {}
+
+type TextMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
+}
+
+func (TextMedia) IsMediaSubtype() {}
+func (TextMedia) IsMedia()        {}
+
+type UnknownMedia struct {
+	PreviewUrls      *PreviewURLSet `json:"previewUrls"`
+	MediaURL         *string        `json:"mediaUrl"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderUrl"`
+}
+
+func (UnknownMedia) IsMediaSubtype() {}
+func (UnknownMedia) IsMedia()        {}
 
 type UpdateCollectionInfoInput struct {
 	CollectionID   persist.DBID `json:"collectionId"`
@@ -380,16 +474,22 @@ type UpdateUserInfoPayload struct {
 
 func (UpdateUserInfoPayload) IsUpdateUserInfoPayloadOrError() {}
 
-type VideoNft struct {
-	ID                  persist.DBID        `json:"id"`
-	Name                *string             `json:"name"`
-	TokenCollectionName *string             `json:"tokenCollectionName"`
-	Owner               GalleryUserOrWallet `json:"owner"`
+type VideoMedia struct {
+	PreviewUrls       *PreviewURLSet `json:"previewUrls"`
+	MediaURL          *string        `json:"mediaUrl"`
+	MediaType         *string        `json:"mediaType"`
+	ContentRenderUrls *VideoURLSet   `json:"contentRenderUrls"`
 }
 
-func (VideoNft) IsNftInterface() {}
-func (VideoNft) IsNode()         {}
-func (VideoNft) IsNft()          {}
+func (VideoMedia) IsMediaSubtype() {}
+func (VideoMedia) IsMedia()        {}
+
+type VideoURLSet struct {
+	Raw    *string `json:"raw"`
+	Small  *string `json:"small"`
+	Medium *string `json:"medium"`
+	Large  *string `json:"large"`
+}
 
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
@@ -405,8 +505,96 @@ type ViewerGallery struct {
 type Wallet struct {
 	ID      persist.DBID     `json:"id"`
 	Address *persist.Address `json:"address"`
-	Nfts    []Nft            `json:"nfts"`
+	Nfts    []*Nft           `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type Chain string
+
+const (
+	ChainEthereum Chain = "Ethereum"
+	ChainArbitrum Chain = "Arbitrum"
+	ChainPolygon  Chain = "Polygon"
+	ChainOptimism Chain = "Optimism"
+)
+
+var AllChain = []Chain{
+	ChainEthereum,
+	ChainArbitrum,
+	ChainPolygon,
+	ChainOptimism,
+}
+
+func (e Chain) IsValid() bool {
+	switch e {
+	case ChainEthereum, ChainArbitrum, ChainPolygon, ChainOptimism:
+		return true
+	}
+	return false
+}
+
+func (e Chain) String() string {
+	return string(e)
+}
+
+func (e *Chain) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Chain(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Chain", str)
+	}
+	return nil
+}
+
+func (e Chain) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type TokenType string
+
+const (
+	TokenTypeErc721  TokenType = "ERC721"
+	TokenTypeErc1155 TokenType = "ERC1155"
+	TokenTypeErc20   TokenType = "ERC20"
+)
+
+var AllTokenType = []TokenType{
+	TokenTypeErc721,
+	TokenTypeErc1155,
+	TokenTypeErc20,
+}
+
+func (e TokenType) IsValid() bool {
+	switch e {
+	case TokenTypeErc721, TokenTypeErc1155, TokenTypeErc20:
+		return true
+	}
+	return false
+}
+
+func (e TokenType) String() string {
+	return string(e)
+}
+
+func (e *TokenType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = TokenType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid TokenType", str)
+	}
+	return nil
+}
+
+func (e TokenType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
