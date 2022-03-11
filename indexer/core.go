@@ -43,8 +43,8 @@ func coreInit() (*gin.Engine, *Indexer) {
 	arweaveClient := rpc.NewArweaveClient()
 	tq := task.NewQueue()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash, foundationMintedEventHash, foundationTransferEventHash}
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events)
 
 	router := gin.Default()
 

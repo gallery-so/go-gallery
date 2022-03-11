@@ -51,6 +51,10 @@ const (
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
+	// foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
+	foundationMintedEventHash eventHash = "e2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
+	//foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
+	foundationTransferEventHash eventHash = "de55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
 )
 
 type tokenMetadata struct {
@@ -121,7 +125,7 @@ type Indexer struct {
 }
 
 // NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository, pChain persist.Chain, pEvents []eventHash, statsFileName string) *Indexer {
+func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository, pChain persist.Chain, pEvents []eventHash) *Indexer {
 	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
@@ -353,6 +357,40 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			})
 
 			logrus.Debugf("Processed transfer event in %s", time.Since(initial))
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
+
+			if len(pLog.Topics) < 4 {
+				continue
+			}
+
+			result = append(result, rpc.Transfer{
+				From:            persist.ZeroAddress,
+				To:              persist.Address(pLog.Topics[1].Hex()),
+				TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
+				Amount:          1,
+				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+				ContractAddress: persist.Address(pLog.Address.Hex()),
+				TokenType:       persist.TokenTypeERC721,
+			})
+
+			logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
+
+			if len(pLog.Topics) < 4 {
+				continue
+			}
+
+			result = append(result, rpc.Transfer{
+				From:            persist.Address(pLog.Topics[2].Hex()),
+				To:              persist.Address(pLog.Topics[3].Hex()),
+				TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
+				Amount:          1,
+				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+				ContractAddress: persist.Address(pLog.Address.Hex()),
+				TokenType:       persist.TokenTypeERC721,
+			})
+
+			logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
