@@ -246,7 +246,18 @@ func getUrlExtension(url string) string {
 }
 
 func getMediaForNft(nft persist.NFT) model.MediaSubtype {
-	ext := getUrlExtension(*getFirstNonEmptyString(nft.AnimationURL.String(), nft.ImageURL.String(), nft.ImageOriginalURL.String()))
+	switch {
+
+	}
+	ext := getUrlExtension(nft.AnimationURL.String())
+
+	if ext == "" {
+		ext = getUrlExtension(nft.ImageURL.String())
+	}
+
+	if ext == "" {
+		ext = getUrlExtension(nft.ImageOriginalURL.String())
+	}
 
 	switch ext {
 	case "svg":
