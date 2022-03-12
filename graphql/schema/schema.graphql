@@ -62,9 +62,18 @@ type VideoURLSet {
 }
 
 interface Media {
+  # Various sizes of preview images for the media
   previewURLs: PreviewURLSet
+
+  # The original source URL for the media (may be IPFS, etc)
   mediaURL: String
+
+  # The type of media, as determined by the backend. May be redundant given the approach we're using here
+  # (media subtypes implementing the Media interface)
   mediaType: String
+
+  # All Media types will also have something like contentRenderURL or contentRenderURLs,
+  # which are the URL(s) that should actually be used for rendering the media's content
 }
 
 type ImageMedia implements Media {
