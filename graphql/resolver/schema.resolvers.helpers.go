@@ -369,7 +369,12 @@ func getJsonMedia(nft persist.NFT) model.JSONMedia {
 }
 
 func getUnknownMedia(nft persist.NFT) model.UnknownMedia {
-	return model.UnknownMedia{}
+	return model.UnknownMedia{
+		PreviewURLs:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaType:        nil,
+		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+	}
 }
 
 func getInvalidMedia(nft persist.NFT) model.InvalidMedia {
