@@ -3,9 +3,11 @@ module github.com/mikeydub/go-gallery
 go 1.16
 
 require (
-	cloud.google.com/go/iam v0.3.0 // indirect
-	cloud.google.com/go/pubsub v1.19.0
-	cloud.google.com/go/secretmanager v1.3.0
+	cloud.google.com/go/cloudtasks v1.3.0
+	cloud.google.com/go/compute v1.5.0 // indirect
+	cloud.google.com/go/iam v0.2.0 // indirect
+	cloud.google.com/go/pubsub v1.18.0
+	cloud.google.com/go/secretmanager v1.2.0
 	cloud.google.com/go/storage v1.21.0
 	github.com/99designs/gqlgen v0.17.1
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
@@ -55,8 +57,9 @@ require (
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
 	google.golang.org/api v0.71.0
 	google.golang.org/appengine v1.6.7
-	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc v1.45.0
+	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf
+	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 )

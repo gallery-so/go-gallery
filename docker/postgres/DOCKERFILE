@@ -10,9 +10,6 @@ ARG PGPASSWORD=""
 ARG PGDATABASE=postgres
 ARG PGTESTUSER=benny
 ARG PGDATABASE=postgres
-# Note that the migrations in db/migrations will run before the migrations in
-# docker/postgres due to how the files are nanmed.
-COPY db/migrations/*up.sql /docker-entrypoint-initdb.d/
 COPY docker/postgres/01_init.sql /docker-entrypoint-initdb.d/01_init.sql
 COPY docker/postgres/03_init.sql /docker-entrypoint-initdb.d/03_init.sql
 RUN apt-get update && apt-get install git perl libdbi-perl libdbd-pg-perl -y

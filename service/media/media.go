@@ -317,7 +317,7 @@ outer:
 		}
 	}
 
-	if viper.GetString("ENV") == "development" || viper.GetString("ENV") == "production" {
+	if util.Contains([]string{"development", "sandbox-backend", "production"}, strings.ToLower(viper.GetString("ENV"))) {
 		downloadLock.Lock()
 		defer downloadLock.Unlock()
 	}
