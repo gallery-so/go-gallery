@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"image/gif"
 	"image/jpeg"
+	"image/png"
 	"net"
 	"net/http"
 	"os/exec"
@@ -21,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/nfnt/resize"
+	"github.com/qmuntal/gltf"
 	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
@@ -51,6 +54,8 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 	".gif":  persist.MediaTypeGIF,
 	".mp4":  persist.MediaTypeVideo,
 	".webm": persist.MediaTypeVideo,
+	".glb":  persist.MediaTypeAnimation,
+	".gltf": persist.MediaTypeAnimation,
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
@@ -373,6 +378,9 @@ outer:
 		}
 
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	case persist.MediaTypeUnknown:
+		mediaType = guessMediaType(bs)
+		fallthrough
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
@@ -411,6 +419,33 @@ func predictMediaType(pCtx context.Context, url string) (mediaType persist.Media
 		return persist.MediaFromContentType(contentType)
 	}
 	return persist.MediaTypeUnknown
+}
+func guessMediaType(bs []byte) persist.MediaType {
+
+	copy := bytes.NewBuffer(bs)
+	var doc gltf.Document
+	if err := gltf.NewDecoder(copy).Decode(&doc); err != nil {
+		return persist.MediaTypeAnimation
+	}
+	copy = bytes.NewBuffer(bs)
+	if _, err := gif.Decode(copy); err == nil {
+		return persist.MediaTypeGIF
+	}
+	copy = bytes.NewBuffer(bs)
+	if _, _, err := image.Decode(copy); err == nil {
+		return persist.MediaTypeImage
+	}
+	copy = bytes.NewBuffer(bs)
+	if _, err := png.Decode(copy); err == nil {
+		return persist.MediaTypeImage
+
+	}
+	copy = bytes.NewBuffer(bs)
+	if _, err := jpeg.Decode(copy); err == nil {
+		return persist.MediaTypeImage
+	}
+	return persist.MediaTypeUnknown
+
 }
 
 func thumbnailVideo(vid []byte) ([]byte, error) {

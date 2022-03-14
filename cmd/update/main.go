@@ -27,7 +27,7 @@ func main() {
 	pc := postgres.NewClient()
 
 	userRepo := postgres.NewUserRepository(pc)
-	tokenRepo := postgres.NewTokenRepository(pc)
+	tokenRepo := postgres.NewTokenRepository(pc, nil)
 	contractRepo := postgres.NewContractRepository(pc)
 	ethClient := rpc.NewEthClient()
 	ipfsClient := rpc.NewIPFSShell()

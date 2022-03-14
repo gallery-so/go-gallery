@@ -44,9 +44,10 @@ func main() {
 
 	pc := postgres.NewClient()
 
+	galleryRepo := postgres.NewGalleryRepository(pc, nil)
 	userRepo := postgres.NewUserRepository(pc)
-	nftRepo := postgres.NewNFTRepository(pc)
-	collRepo := postgres.NewCollectionRepository(pc)
+	nftRepo := postgres.NewNFTRepository(pc, galleryRepo)
+	collRepo := postgres.NewCollectionRepository(pc, galleryRepo)
 	for _, group := range groupings {
 		g := group
 		wp.Submit(func() {

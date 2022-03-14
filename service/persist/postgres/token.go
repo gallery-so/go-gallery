@@ -14,6 +14,7 @@ import (
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
 	db                                      *sql.DB
+	galleryRepo                             *GalleryTokenRepository
 	createStmt                              *sql.Stmt
 	getByWalletStmt                         *sql.Stmt
 	getByWalletPaginateStmt                 *sql.Stmt
@@ -39,7 +40,7 @@ type TokenRepository struct {
 }
 
 // NewTokenRepository creates a new TokenRepository
-func NewTokenRepository(db *sql.DB) *TokenRepository {
+func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -109,7 +110,33 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
-	return &TokenRepository{db: db, createStmt: createStmt, getByWalletStmt: getByWalletStmt, getByWalletPaginateStmt: getByWalletPaginateStmt, getUserAddressesStmt: getUserAddressesStmt, getByContractStmt: getByContractStmt, getByContractPaginateStmt: getByContractPaginateStmt, getByTokenIdentifiersStmt: getByTokenIdentifiersStmt, getByTokenIdentifiersPaginateStmt: getByTokenIdentifiersPaginateStmt, getByIDStmt: getByIDStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateMediaUnsafeStmt: updateMediaUnsafeStmt, updateInfoStmt: updateInfoStmt, updateMediaStmt: updateMediaStmt, updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt, updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt, mostRecentBlockStmt: mostRecentBlockStmt, countTokensStmt: countTokensStmt, upsertStmt: upsertStmt, deleteBalanceZeroStmt: deleteBalanceZeroStmt, deleteStmt: deleteStmt, getByTokenIDStmt: getByTokenIDStmt, getByTokenIDPaginateStmt: getByTokenIDPaginateStmt}
+	return &TokenRepository{
+		db:                                      db,
+		galleryRepo:                             galleryRepo,
+		createStmt:                              createStmt,
+		getByWalletStmt:                         getByWalletStmt,
+		getByWalletPaginateStmt:                 getByWalletPaginateStmt,
+		getUserAddressesStmt:                    getUserAddressesStmt,
+		getByContractStmt:                       getByContractStmt,
+		getByContractPaginateStmt:               getByContractPaginateStmt,
+		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
+		getByTokenIdentifiersPaginateStmt:       getByTokenIdentifiersPaginateStmt,
+		getByIDStmt:                             getByIDStmt,
+		updateInfoUnsafeStmt:                    updateInfoUnsafeStmt,
+		updateMediaUnsafeStmt:                   updateMediaUnsafeStmt,
+		updateInfoStmt:                          updateInfoStmt,
+		updateMediaStmt:                         updateMediaStmt,
+		updateInfoByTokenIdentifiersUnsafeStmt:  updateInfoByTokenIdentifiersUnsafeStmt,
+		updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt,
+		mostRecentBlockStmt:                     mostRecentBlockStmt,
+		countTokensStmt:                         countTokensStmt,
+		upsertStmt:                              upsertStmt,
+		deleteBalanceZeroStmt:                   deleteBalanceZeroStmt,
+		deleteStmt:                              deleteStmt,
+		getByTokenIDStmt:                        getByTokenIDStmt,
+		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
+	}
+
 }
 
 // CreateBulk creates many tokens in the database
@@ -474,7 +501,7 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUs
 	if rows == 0 {
 		return persist.ErrTokenNotFoundByID{ID: pID}
 	}
-	return nil
+	return t.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user

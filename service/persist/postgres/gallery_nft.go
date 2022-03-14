@@ -310,6 +310,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		return result, nil
 	}
 
+	goingToCache := false
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
@@ -320,6 +321,10 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
+		if time.Since(gallery.LastUpdated.Time()) > time.Hour*24 && !goingToCache {
+			defer g.cacheByUserID(pCtx, pUserID)
+			goingToCache = true
+		}
 	}
 	return result, nil
 
@@ -431,6 +436,9 @@ func (g *GalleryRepository) GetByChildCollectionID(pCtx context.Context, pID per
 
 // RefreshCache deletes the given key in the cache
 func (g *GalleryRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	return g.galleriesCache.Delete(pCtx, pUserID.String())
 }
 
@@ -482,6 +490,9 @@ func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pU
 }
 
 func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	err := g.RefreshCache(pCtx, pUserID)
 	if err != nil {
 		return err

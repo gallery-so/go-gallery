@@ -43,8 +43,8 @@ func coreInit() (*gin.Engine, *Indexer) {
 	arweaveClient := rpc.NewArweaveClient()
 	tq := task.NewQueue()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events, "stats.json")
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash, foundationMintedEventHash, foundationTransferEventHash}
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events)
 
 	router := gin.Default()
 
@@ -75,6 +75,6 @@ func setDefaults() {
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
 	pgClient := postgres.NewClient()
-
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient)
+	galleryRepo := postgres.NewGalleryTokenRepository(pgClient, nil)
+	return postgres.NewTokenRepository(pgClient, galleryRepo), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, galleryRepo)
 }

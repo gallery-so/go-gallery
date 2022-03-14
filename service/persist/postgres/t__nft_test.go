@@ -10,7 +10,7 @@ import (
 func TestNFTCreate_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, nil)
 
 	nft := persist.NFT{
 		Deleted:      false,
@@ -27,7 +27,7 @@ func TestNFTCreate_Success(t *testing.T) {
 func TestNFTGetByID_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, nil)
 
 	nft := persist.NFT{
 		Deleted:      false,
