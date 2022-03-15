@@ -10,6 +10,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
@@ -238,14 +239,17 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.GalleryToken, error) {
-	initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
-	if len(initial) > 0 {
-		var galleries []persist.GalleryToken
-		err := json.Unmarshal(initial, &galleries)
-		if err != nil {
-			return nil, err
+	if g.galleriesCache != nil {
+		initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
+		if len(initial) > 0 {
+			var galleries []persist.GalleryToken
+			err := json.Unmarshal(initial, &galleries)
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to unmarshal galleries cache for userID %s - cached: %s", pUserID, string(initial))
+			} else {
+				return galleries, nil
+			}
 		}
-		return galleries, nil
 	}
 	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
@@ -334,11 +338,12 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		}
 		result = append(result, gallery)
 	}
-	marshalled, err := json.Marshal(galleries)
-	if err != nil {
-		return nil, err
-	}
+
 	if g.galleriesCache != nil {
+		marshalled, err := json.Marshal(galleries)
+		if err != nil {
+			return nil, err
+		}
 		if err := g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 			return nil, err
 		}
