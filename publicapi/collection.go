@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -19,6 +20,19 @@ type CollectionAPI struct {
 	validator *validator.Validate
 	ethClient *ethclient.Client
 	pubsub    pubsub.PubSub
+}
+
+func (api CollectionAPI) GetCollection(ctx context.Context, collectionID persist.DBID) (*persist.Collection, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	collection, err := api.repos.CollectionRepository.GetByID(ctx, collectionID, false)
+
+	return &collection, err
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {

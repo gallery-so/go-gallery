@@ -517,6 +517,20 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 	return output, nil
 }
 
+func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
+	api := publicapi.For(ctx)
+
+	collection, err := api.Collection.GetCollection(ctx, id)
+
+	if err != nil {
+		message := ""
+
+		return model.ErrCollectionNotFound{Message: &message}, nil
+	}
+
+	return collectionToModel(ctx, *collection), nil
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)

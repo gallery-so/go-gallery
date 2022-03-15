@@ -19,6 +19,10 @@ type AuthorizationError interface {
 	IsAuthorizationError()
 }
 
+type CollectionByIDOrError interface {
+	IsCollectionByIDOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -155,6 +159,12 @@ func (ErrAuthenticationFailed) IsError()                        {}
 func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
 
+type ErrCollectionNotFound struct {
+	Message *string `json:"message"`
+}
+
+func (ErrCollectionNotFound) IsCollectionByIDOrError() {}
+
 type ErrDoesNotOwnRequiredNft struct {
 	Message string `json:"message"`
 }
@@ -253,7 +263,8 @@ type GalleryCollection struct {
 	Nfts           []*GalleryNft            `json:"nfts"`
 }
 
-func (GalleryCollection) IsNode() {}
+func (GalleryCollection) IsNode()                  {}
+func (GalleryCollection) IsCollectionByIDOrError() {}
 
 type GalleryCollectionLayout struct {
 	Columns    *int   `json:"columns"`

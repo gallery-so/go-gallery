@@ -88,6 +88,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrCollectionNotFound struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrDoesNotOwnRequiredNFT struct {
 		Message func(childComplexity int) int
 	}
@@ -259,6 +263,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		CollectionByID  func(childComplexity int, id persist.DBID) int
 		MembershipTiers func(childComplexity int, forceRefresh *bool) int
 		UserByUsername  func(childComplexity int, username string) int
 		Viewer          func(childComplexity int) int
@@ -371,6 +376,7 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
+	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
@@ -478,6 +484,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrAuthenticationFailed.Message(childComplexity), true
+
+	case "ErrCollectionNotFound.message":
+		if e.complexity.ErrCollectionNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrCollectionNotFound.Message(childComplexity), true
 
 	case "ErrDoesNotOwnRequiredNFT.message":
 		if e.complexity.ErrDoesNotOwnRequiredNFT.Message == nil {
@@ -1225,6 +1238,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreviewURLSet.Small(childComplexity), true
 
+	case "Query.collectionById":
+		if e.complexity.Query.CollectionByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_collectionById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CollectionByID(childComplexity, args["id"].(persist.DBID)), true
+
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
 			break
@@ -1518,7 +1543,10 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 var sources = []*ast.Source{
 	{Name: "graphql/schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
-directive @goField(forceResolver: Boolean, name: String) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+directive @goField(
+  forceResolver: Boolean
+  name: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 # Add @authRequired to any field that requires a user to be logged in. NOTE: Any field tagged with
 # @authRequired MUST return a union type that includes ErrNotAuthorized.
@@ -1556,7 +1584,15 @@ type Wallet implements Node {
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-union MediaSubtype = ImageMedia | VideoMedia | AudioMedia | TextMedia | HtmlMedia | JsonMedia | UnknownMedia | InvalidMedia
+union MediaSubtype =
+    ImageMedia
+  | VideoMedia
+  | AudioMedia
+  | TextMedia
+  | HtmlMedia
+  | JsonMedia
+  | UnknownMedia
+  | InvalidMedia
 
 type PreviewURLSet {
   raw: String
@@ -1580,9 +1616,18 @@ type VideoURLSet {
 }
 
 interface Media {
+  # Various sizes of preview images for the media
   previewURLs: PreviewURLSet
+
+  # The original source URL for the media (may be IPFS, etc)
   mediaURL: String
+
+  # The type of media, as determined by the backend. May be redundant given the approach we're using here
+  # (media subtypes implementing the Media interface)
   mediaType: String
+
+  # All Media types will also have something like contentRenderURL or contentRenderURLs,
+  # which are the URL(s) that should actually be used for rendering the media's content
 }
 
 type ImageMedia implements Media {
@@ -1746,10 +1791,17 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
+type ErrCollectionNotFound {
+  message: String
+}
+
+union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
+
 type Query {
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
+  collectionById(id: ID!): CollectionByIdOrError
 }
 
 input GalleryCollectionLayoutInput {
@@ -1765,13 +1817,19 @@ input CreateCollectionInput {
   layout: GalleryCollectionLayoutInput!
 }
 
-union CreateCollectionPayloadOrError = CreateCollectionPayload | ErrNotAuthorized | ErrInvalidInput
+union CreateCollectionPayloadOrError =
+    CreateCollectionPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type CreateCollectionPayload {
   collection: GalleryCollection
 }
 
-union DeleteCollectionPayloadOrError = DeleteCollectionPayload | ErrNotAuthorized | ErrInvalidInput
+union DeleteCollectionPayloadOrError =
+    DeleteCollectionPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type DeleteCollectionPayload {
   gallery: Gallery
@@ -1783,7 +1841,10 @@ input UpdateCollectionInfoInput {
   collectorsNote: String!
 }
 
-union UpdateCollectionInfoPayloadOrError = UpdateCollectionInfoPayload | ErrNotAuthorized | ErrInvalidInput
+union UpdateCollectionInfoPayloadOrError =
+    UpdateCollectionInfoPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
   collection: GalleryCollection
@@ -1795,7 +1856,10 @@ input UpdateCollectionNftsInput {
   layout: GalleryCollectionLayoutInput!
 }
 
-union UpdateCollectionNftsPayloadOrError = UpdateCollectionNftsPayload | ErrNotAuthorized | ErrInvalidInput
+union UpdateCollectionNftsPayloadOrError =
+    UpdateCollectionNftsPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateCollectionNftsPayload {
   collection: GalleryCollection
@@ -1806,19 +1870,29 @@ input UpdateGalleryCollectionsInput {
   collections: [ID!]!
 }
 
-union UpdateGalleryCollectionsPayloadOrError = UpdateGalleryCollectionsPayload | ErrNotAuthorized | ErrInvalidInput
+union UpdateGalleryCollectionsPayloadOrError =
+    UpdateGalleryCollectionsPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateGalleryCollectionsPayload {
   gallery: Gallery
 }
 
-union AddUserAddressPayloadOrError = AddUserAddressPayload | ErrAuthenticationFailed | ErrNotAuthorized | ErrInvalidInput
+union AddUserAddressPayloadOrError =
+    AddUserAddressPayload
+  | ErrAuthenticationFailed
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type AddUserAddressPayload {
   viewer: Viewer
 }
 
-union RemoveUserAddressesPayloadOrError = RemoveUserAddressesPayload | ErrNotAuthorized | ErrInvalidInput
+union RemoveUserAddressesPayloadOrError =
+    RemoveUserAddressesPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type RemoveUserAddressesPayload {
   viewer: Viewer
@@ -1829,13 +1903,18 @@ input UpdateUserInfoInput {
   bio: String!
 }
 
-union UpdateUserInfoPayloadOrError = UpdateUserInfoPayload | ErrNotAuthorized | ErrInvalidInput
+union UpdateUserInfoPayloadOrError =
+    UpdateUserInfoPayload
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
-union RefreshOpenSeaNftsPayloadOrError = RefreshOpenSeaNftsPayload | ErrNotAuthorized
+union RefreshOpenSeaNftsPayloadOrError =
+    RefreshOpenSeaNftsPayload
+  | ErrNotAuthorized
 
 type RefreshOpenSeaNftsPayload {
   viewer: Viewer
@@ -1860,7 +1939,10 @@ type ErrUserNotFound implements Error {
   message: String!
 }
 
-union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredNFT
+union AuthorizationError =
+    ErrNoCookie
+  | ErrInvalidToken
+  | ErrDoesNotOwnRequiredNFT
 
 type ErrNotAuthorized implements Error {
   message: String!
@@ -1901,13 +1983,21 @@ input GnosisSafeAuth {
   nonce: String!
 }
 
-union LoginPayloadOrError = LoginPayload | ErrUserNotFound | ErrAuthenticationFailed | ErrDoesNotOwnRequiredNFT
+union LoginPayloadOrError =
+    LoginPayload
+  | ErrUserNotFound
+  | ErrAuthenticationFailed
+  | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
   userId: ID
 }
 
-union CreateUserPayloadOrError = CreateUserPayload | ErrUserAlreadyExists | ErrAuthenticationFailed | ErrDoesNotOwnRequiredNFT
+union CreateUserPayloadOrError =
+    CreateUserPayload
+  | ErrUserAlreadyExists
+  | ErrAuthenticationFailed
+  | ErrDoesNotOwnRequiredNFT
 
 type CreateUserPayload {
   userId: ID
@@ -1916,21 +2006,37 @@ type CreateUserPayload {
 
 type Mutation {
   # Collection Mutations
-  createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: ID!): DeleteCollectionPayloadOrError @authRequired
-  updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
-  updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+  createCollection(
+    input: CreateCollectionInput!
+  ): CreateCollectionPayloadOrError @authRequired
+  deleteCollection(collectionId: ID!): DeleteCollectionPayloadOrError
+    @authRequired
+  updateCollectionInfo(
+    input: UpdateCollectionInfoInput!
+  ): UpdateCollectionInfoPayloadOrError @authRequired
+  updateCollectionNfts(
+    input: UpdateCollectionNftsInput!
+  ): UpdateCollectionNftsPayloadOrError @authRequired
 
   # Gallery Mutations
-  updateGalleryCollections(input: UpdateGalleryCollectionsInput!): UpdateGalleryCollectionsPayloadOrError @authRequired
+  updateGalleryCollections(
+    input: UpdateGalleryCollectionsInput!
+  ): UpdateGalleryCollectionsPayloadOrError @authRequired
 
   # User Mutations
-  addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
-  removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayloadOrError @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
+  addUserAddress(
+    address: Address!
+    authMechanism: AuthMechanism!
+  ): AddUserAddressPayloadOrError @authRequired
+  removeUserAddresses(
+    addresses: [Address!]!
+  ): RemoveUserAddressesPayloadOrError @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
+    @authRequired
 
   # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError @authRequired
+  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
+    @authRequired
 
   getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 
@@ -2146,6 +2252,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_collectionById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -2617,6 +2738,38 @@ func (ec *executionContext) _ErrAuthenticationFailed_message(ctx context.Context
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrCollectionNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrCollectionNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrCollectionNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredNFT_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDoesNotOwnRequiredNft) (ret graphql.Marshaler) {
@@ -6200,6 +6353,45 @@ func (ec *executionContext) _Query_membershipTiers(ctx context.Context, field gr
 	return ec.marshalOMembershipTier2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipTier(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_collectionById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_collectionById_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CollectionByID(rctx, args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.CollectionByIDOrError)
+	fc.Result = res
+	return ec.marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -8697,6 +8889,29 @@ func (ec *executionContext) _AuthorizationError(ctx context.Context, sel ast.Sel
 	}
 }
 
+func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.CollectionByIDOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
+	case model.GalleryCollection:
+		return ec._GalleryCollection(ctx, sel, &obj)
+	case *model.GalleryCollection:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryCollection(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _CreateCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CreateCollectionPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -9594,6 +9809,34 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
+var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "CollectionByIdOrError"}
+
+func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCollectionNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errCollectionNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrCollectionNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrCollectionNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errDoesNotOwnRequiredNFTImplementors = []string{"ErrDoesNotOwnRequiredNFT", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredNft) graphql.Marshaler {
@@ -9906,7 +10149,7 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryCollectionImplementors = []string{"GalleryCollection", "Node"}
+var galleryCollectionImplementors = []string{"GalleryCollection", "Node", "CollectionByIdOrError"}
 
 func (ec *executionContext) _GalleryCollection(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryCollection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryCollectionImplementors)
@@ -10993,6 +11236,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_membershipTiers(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "collectionById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_collectionById(ctx, field)
 				return res
 			}
 
@@ -12506,6 +12769,13 @@ func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgall
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.CollectionByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionByIdOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCreateCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateCollectionPayloadOrError) graphql.Marshaler {
