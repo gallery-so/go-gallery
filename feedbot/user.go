@@ -52,6 +52,16 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 		return nil
 	}
 
+	eventBefore, err := userEventRepo.GetEventBefore(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	// Don't send if the username is the same as before.
+	if eventBefore != nil && (event.Data.Username == eventBefore.Data.Username) {
+		return nil
+	}
+
 	payload, err := createMessage(
 		fmt.Sprintf("**%s** joined Gallery: %s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username,

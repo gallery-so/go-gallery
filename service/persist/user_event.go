@@ -38,4 +38,5 @@ type UserEventRepository interface {
 	Add(context.Context, UserEventRecord) (DBID, error)
 	Get(context.Context, DBID) (UserEventRecord, error)
 	GetEventsSince(context.Context, UserEventRecord, time.Time) ([]UserEventRecord, error)
+	GetEventBefore(context.Context, UserEventRecord) (*UserEventRecord, error)
 }

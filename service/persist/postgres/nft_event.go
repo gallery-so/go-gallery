@@ -13,6 +13,7 @@ type NftEventRepository struct {
 	createStmt                         *sql.Stmt
 	getByEventIDStmt                   *sql.Stmt
 	getMatchingEventsForUserAndNftStmt *sql.Stmt
+	getMatchingEventBeforeStmt         *sql.Stmt
 }
 
 func NewNftEventRepository(db *sql.DB) *NftEventRepository {
@@ -38,11 +39,20 @@ func NewNftEventRepository(db *sql.DB) *NftEventRepository {
 	)
 	checkNoErr(err)
 
+	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
+		`SELECT ID, USER_ID, NFT_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
+		 FROM nft_events
+		 WHERE USER_ID = $1 AND NFT_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4
+		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
+	)
+	checkNoErr(err)
+
 	return &NftEventRepository{
 		db:                                 db,
 		createStmt:                         createStmt,
 		getByEventIDStmt:                   getByEventIDStmt,
 		getMatchingEventsForUserAndNftStmt: getMatchingEventsForUserAndNftStmt,
+		getMatchingEventBeforeStmt:         getMatchingEventBeforeStmt,
 	}
 }
 
@@ -72,11 +82,24 @@ func (e *NftEventRepository) GetEventsSince(ctx context.Context, event persist.N
 	}
 	events := make([]persist.NftEventRecord, 0)
 	for res.Next() {
-		var event persist.NftEventRecord
-		if err := res.Scan(&event.ID, &event.UserID, &event.NftID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.NftID); err != nil {
+		var evt persist.NftEventRecord
+		if err := res.Scan(&evt.ID, &evt.UserID, &evt.NftID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.NftID); err != nil {
 			return nil, err
 		}
-		events = append(events, event)
+		events = append(events, evt)
 	}
 	return events, nil
+}
+
+func (e *NftEventRepository) GetEventBefore(ctx context.Context, event persist.NftEventRecord) (*persist.NftEventRecord, error) {
+	var evt persist.NftEventRecord
+	err := e.getMatchingEventBeforeStmt.QueryRowContext(ctx, event.ID).Scan(&evt.ID, &evt.UserID, &evt.NftID,
+		&evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.NftID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &evt, nil
 }

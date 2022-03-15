@@ -39,4 +39,5 @@ type NftEventRepository interface {
 	Add(context.Context, NftEventRecord) (DBID, error)
 	Get(context.Context, DBID) (NftEventRecord, error)
 	GetEventsSince(context.Context, NftEventRecord, time.Time) ([]NftEventRecord, error)
+	GetEventBefore(context.Context, NftEventRecord) (*NftEventRecord, error)
 }

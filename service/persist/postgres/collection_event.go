@@ -13,6 +13,7 @@ type CollectionEventRepository struct {
 	createStmt                               *sql.Stmt
 	getByEventIDStmt                         *sql.Stmt
 	getMatchingEventForUserAndCollectionStmt *sql.Stmt
+	getMatchingEventBeforeStmt               *sql.Stmt
 }
 
 func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
@@ -38,11 +39,20 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 	)
 	checkNoErr(err)
 
+	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
+		`SELECT ID, USER_ID, COLLECTION_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
+		 FROM collection_events
+		 WHERE USER_ID = $1 AND COLLECTION_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4
+		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
+	)
+	checkNoErr(err)
+
 	return &CollectionEventRepository{
 		db:                                       db,
 		createStmt:                               createStmt,
 		getByEventIDStmt:                         getByEventIDStmt,
 		getMatchingEventForUserAndCollectionStmt: getMatchingEventForUserAndCollectionStmt,
+		getMatchingEventBeforeStmt:               getMatchingEventBeforeStmt,
 	}
 }
 
@@ -71,11 +81,23 @@ func (e *CollectionEventRepository) GetEventsSince(ctx context.Context, event pe
 	}
 	events := make([]persist.CollectionEventRecord, 0)
 	for res.Next() {
-		var event persist.CollectionEventRecord
-		if err := res.Scan(&event.ID, &event.UserID, &event.CollectionID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.LastUpdated); err != nil {
+		var evt persist.CollectionEventRecord
+		if err := res.Scan(&evt.ID, &evt.UserID, &evt.CollectionID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated); err != nil {
 			return nil, err
 		}
-		events = append(events, event)
+		events = append(events, evt)
 	}
 	return events, nil
+}
+
+func (e *CollectionEventRepository) GetEventBefore(ctx context.Context, event persist.CollectionEventRecord) (*persist.CollectionEventRecord, error) {
+	var evt persist.CollectionEventRecord
+	err := e.getMatchingEventBeforeStmt.QueryRowContext(ctx, event.UserID, event.CollectionID, event.Code, event.CreationTime).Scan(&evt.ID, &evt.UserID, &evt.CollectionID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &evt, nil
 }

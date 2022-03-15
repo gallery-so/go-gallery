@@ -79,12 +79,22 @@ func handleCollectionCollectorsNoteAdded(ctx context.Context, userRepo persist.U
 		return nil
 	}
 
+	eventBefore, err := collectionEventRepo.GetEventBefore(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	// Don't send if the note is the same as before.
+	if eventBefore != nil && (event.Data.CollectorsNote == eventBefore.Data.CollectorsNote) {
+		return nil
+	}
+
 	user, err := userRepo.GetByID(ctx, event.UserID)
 	if err != nil {
 		return err
 	}
 	payload, err := createMessage(
-		fmt.Sprintf("**%s** updated their collection's details: %s/%s/%s",
+		fmt.Sprintf("**%s** added a collector's note to their collection: %s/%s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.CollectionID,
 		),
 	)
@@ -114,12 +124,37 @@ func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepos
 		return nil
 	}
 
+	eventBefore, err := collectionEventRepo.GetEventBefore(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	newTokensAdded := false
+	for _, i := range event.Data.NFTs {
+		contains := false
+		for _, j := range eventBefore.Data.NFTs {
+			if i == j {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			newTokensAdded = true
+			break
+		}
+	}
+
+	// Don't send if NFTs in collection is the same as before.
+	if eventBefore != nil && !newTokensAdded {
+		return nil
+	}
+
 	user, err := userRepo.GetByID(ctx, event.UserID)
 	if err != nil {
 		return err
 	}
 	payload, err := createMessage(
-		fmt.Sprintf("**%s** curated the NFT(s) in their collection: %s/%s/%s",
+		fmt.Sprintf("**%s** added NFT(s) to their collection: %s/%s/%s",
 			user.Username, viper.GetString("GALLERY_HOST"), user.Username, event.CollectionID,
 		),
 	)
