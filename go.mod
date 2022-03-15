@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	cloud.google.com/go/cloudtasks v1.3.0
-	cloud.google.com/go/compute v1.5.0 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/pubsub v1.19.0
 	cloud.google.com/go/secretmanager v1.3.0
@@ -53,8 +52,6 @@ require (
 	github.com/wealdtech/go-ens/v3 v3.5.2
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000 // indirect
-	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a // indirect
-	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
 	google.golang.org/api v0.72.0
 	google.golang.org/appengine v1.6.7
