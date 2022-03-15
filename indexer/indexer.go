@@ -52,9 +52,9 @@ const (
 	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 	// foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
-	foundationMintedEventHash eventHash = "e2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
+	foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
 	//foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
-	foundationTransferEventHash eventHash = "de55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
+	foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
 )
 
 type tokenMetadata struct {
