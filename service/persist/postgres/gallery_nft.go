@@ -322,7 +322,16 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 		result = append(result, gallery)
 		if time.Since(gallery.LastUpdated.Time()) > time.Hour*24 && !goingToCache {
-			defer g.cacheByUserID(pCtx, pUserID)
+			marshalled, err := json.Marshal(galleries)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				if g.galleriesCache == nil {
+					return
+				}
+				g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1)
+			}()
 			goingToCache = true
 		}
 	}
