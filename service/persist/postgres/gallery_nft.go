@@ -221,14 +221,17 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
-	initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
-	if len(initial) > 0 {
-		var galleries []persist.Gallery
-		err := json.Unmarshal(initial, &galleries)
-		if err != nil {
-			return nil, err
+	if g.galleriesCache != nil {
+		initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
+		if len(initial) > 0 {
+			var galleries []persist.Gallery
+			err := json.Unmarshal(initial, &galleries)
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to unmarshal cached galleries for user %s - cached: %s", pUserID, string(initial))
+			} else {
+				return galleries, nil
+			}
 		}
-		return galleries, nil
 	}
 	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
@@ -325,11 +328,11 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 
 	}
 
-	marshalled, err := json.Marshal(galleries)
-	if err != nil {
-		return nil, err
-	}
 	if g.galleriesCache != nil {
+		marshalled, err := json.Marshal(galleries)
+		if err != nil {
+			return nil, err
+		}
 		if err := g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 			return nil, err
 		}

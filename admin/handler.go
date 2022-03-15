@@ -28,6 +28,7 @@ func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethc
 
 	galleries := api.Group("/galleries")
 	galleries.GET("/get", getGalleries(stmts.galleryRepo))
+	galleries.GET("/refresh", refreshCache(stmts.galleryRepo))
 
 	snapshot := api.Group("/snapshot")
 	snapshot.GET("/get", getSnapshot(stg))
