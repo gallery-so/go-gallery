@@ -323,7 +323,6 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		return result, nil
 	}
 
-	goingToCache := false
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.CollectionToken, 0, len(collections))
@@ -334,9 +333,14 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
-		if time.Since(gallery.LastUpdated.Time()) > time.Hour*24 && !goingToCache {
-			defer g.cacheByUserID(pCtx, pUserID)
-			goingToCache = true
+	}
+	marshalled, err := json.Marshal(galleries)
+	if err != nil {
+		return nil, err
+	}
+	if g.galleriesCache != nil {
+		if err := g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
+			return nil, err
 		}
 	}
 	return result, nil
@@ -531,7 +535,7 @@ func (g *GalleryTokenRepository) cacheByUserID(pCtx context.Context, pUserID per
 	if err != nil {
 		return err
 	}
-	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 		return err
 	}
 	return nil

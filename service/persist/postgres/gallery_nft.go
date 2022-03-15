@@ -13,6 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const galleryCacheTime = time.Hour * 24 * 3
+
 // GalleryRepository is the repository for interacting with galleries in a postgres database
 type GalleryRepository struct {
 	db                            *sql.DB
@@ -310,7 +312,6 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		return result, nil
 	}
 
-	goingToCache := false
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
 		gallery.Collections = make([]persist.Collection, 0, len(collections))
@@ -321,11 +322,19 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
-		if time.Since(gallery.LastUpdated.Time()) > time.Hour*24 && !goingToCache {
-			defer g.cacheByUserID(pCtx, pUserID)
-			goingToCache = true
+
+	}
+
+	marshalled, err := json.Marshal(galleries)
+	if err != nil {
+		return nil, err
+	}
+	if g.galleriesCache != nil {
+		if err := g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
+			return nil, err
 		}
 	}
+
 	return result, nil
 
 }
@@ -506,7 +515,7 @@ func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.
 		return err
 	}
 	logrus.Infof("Caching gallery %s: %s", pUserID, marshalled)
-	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 		return err
 	}
 	return nil
