@@ -86,8 +86,8 @@ Run a migration on dev:
 # Apply an up migration.
 migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
 
-# Undo a migration.
-migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down
+# Undo the last migration.
+migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down 1
 ```
 
 Run a migration locally:

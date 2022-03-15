@@ -48,6 +48,16 @@ func handleNftCollectorsNoteAdded(ctx context.Context, userRepo persist.UserRepo
 		return nil
 	}
 
+	eventBefore, err := nftEventRepo.GetEventBefore(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	// Don't send if the note is the same as before.
+	if eventBefore != nil && (event.Data.CollectorsNote == eventBefore.Data.CollectorsNote) {
+		return nil
+	}
+
 	user, err := userRepo.GetByID(ctx, event.UserID)
 	if err != nil {
 		return err

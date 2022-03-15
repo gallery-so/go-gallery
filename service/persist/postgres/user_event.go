@@ -13,6 +13,7 @@ type UserEventRepository struct {
 	createStmt                   *sql.Stmt
 	getByEventIDStmt             *sql.Stmt
 	getMatchingEventsForUserStmt *sql.Stmt
+	getMatchingEventBeforeStmt   *sql.Stmt
 }
 
 func NewUserEventRepository(db *sql.DB) *UserEventRepository {
@@ -38,11 +39,20 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 	)
 	checkNoErr(err)
 
+	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
+		`SELECT ID, USER_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
+		 FROM user_events
+		 WHERE USER_ID = $1 AND EVENT_CODE = $2 AND LAST_UPDATED < $3
+		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
+	)
+	checkNoErr(err)
+
 	return &UserEventRepository{
 		db:                           db,
 		createStmt:                   createStmt,
 		getByEventIDStmt:             getByEventIDStmt,
 		getMatchingEventsForUserStmt: getMatchingEventsForUserStmt,
+		getMatchingEventBeforeStmt:   getMatchingEventBeforeStmt,
 	}
 }
 
@@ -71,11 +81,23 @@ func (e *UserEventRepository) GetEventsSince(ctx context.Context, event persist.
 	}
 	events := make([]persist.UserEventRecord, 0)
 	for res.Next() {
-		var event persist.UserEventRecord
-		if err := res.Scan(&event.ID, &event.UserID, &event.Version, &event.Code, &event.Data, &event.CreationTime, &event.LastUpdated); err != nil {
+		var evt persist.UserEventRecord
+		if err := res.Scan(&evt.ID, &evt.UserID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated); err != nil {
 			return nil, err
 		}
-		events = append(events, event)
+		events = append(events, evt)
 	}
 	return events, nil
+}
+
+func (e *UserEventRepository) GetEventBefore(ctx context.Context, event persist.UserEventRecord) (*persist.UserEventRecord, error) {
+	var evt persist.UserEventRecord
+	err := e.getMatchingEventBeforeStmt.QueryRowContext(ctx, event.UserID, event.Code, event.CreationTime).Scan(&evt.ID, &evt.UserID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &evt, nil
 }
