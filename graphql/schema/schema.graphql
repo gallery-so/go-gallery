@@ -436,7 +436,7 @@ input AuthMechanism {
 input EthereumEoaAuth {
   address: Address!
   nonce: String!
-  signature: String!
+  signature: String! @scrub
 }
 
 input GnosisSafeAuth {
