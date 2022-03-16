@@ -52,6 +52,7 @@ type ResolverRoot interface {
 
 type DirectiveRoot struct {
 	AuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	Scrub        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -1554,6 +1555,10 @@ directive @goField(
 # If we need more control over auth in the future, this directive can be updated to take
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+# Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
+# other sensitive data)
+directive @scrub on INPUT_FIELD_DEFINITION
 
 scalar Time
 scalar Address

@@ -12,6 +12,10 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+# Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
+# other sensitive data)
+directive @scrub on INPUT_FIELD_DEFINITION
+
 scalar Time
 scalar Address
 

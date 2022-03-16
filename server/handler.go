@@ -45,8 +45,11 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 	// TODO: Resolver probably doesn't need repos or ethClient once the publicAPI is done
 	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
+	config.Directives.Scrub = graphql.ScrubDirectiveHandler
 
-	h := handler.NewDefaultServer(generated.NewExecutableSchema(config))
+	schema := generated.NewExecutableSchema(config)
+	h := handler.NewDefaultServer(schema)
+	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
 
 	return func(c *gin.Context) {
 		// TODO: Remove dataloader here
