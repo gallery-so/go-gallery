@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/pubsub v1.18.0
 	cloud.google.com/go/secretmanager v1.2.0
 	cloud.google.com/go/storage v1.21.0
-	github.com/99designs/gqlgen v0.15.1
+	github.com/99designs/gqlgen v0.17.1
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
@@ -48,15 +48,14 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/vektah/dataloaden v0.3.0
-	github.com/vektah/gqlparser/v2 v2.3.1
+	github.com/vektah/gqlparser/v2 v2.4.1
 	github.com/wealdtech/go-ens/v3 v3.5.2
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
-	golang.org/x/sys v0.0.0-20220224120231-95c6836cb0e7 // indirect
+	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
-	golang.org/x/tools v0.1.9 // indirect
 	google.golang.org/api v0.70.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf
