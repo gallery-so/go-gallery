@@ -1,11 +1,15 @@
 package server
 
 import (
+	"context"
+	"fmt"
+
 	"cloud.google.com/go/storage"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -18,7 +22,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
@@ -50,7 +57,37 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(config))
 
+	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
+		gc := util.GinContextFromContext(ctx)
+		if hub := sentrygin.GetHubFromContext(gc); hub != nil {
+			hub.Recover(err)
+		}
+
+		return gqlerror.Errorf("internal server error")
+	})
+
 	return func(c *gin.Context) {
+		hub := sentrygin.GetHubFromContext(c)
+		if hub != nil {
+			sentry.SetSentryAuthContext(c, hub)
+		}
+
+		defer func() {
+			if hub != nil {
+				for i, err := range c.Errors {
+					errCtx := sentry.SentryErrorContext{StackIndex: i}
+
+					if mappedErr := graphql.GraphqlErrType(err); mappedErr != nil {
+						errCtx.Mapped = true
+						errCtx.MappedTo = fmt.Sprintf("&T", mappedErr)
+					}
+
+					hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
+					hub.CaptureException(err)
+				}
+			}
+		}()
+
 		// TODO: Remove dataloader here
 		dataloader.AddTo(c, repos)
 		event.AddTo(c, repos)
