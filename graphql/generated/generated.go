@@ -126,12 +126,14 @@ type ComplexityRoot struct {
 
 	Gallery struct {
 		Collections func(childComplexity int) int
+		Dbid        func(childComplexity int) int
 		ID          func(childComplexity int) int
 		Owner       func(childComplexity int) int
 	}
 
 	GalleryCollection struct {
 		CollectorsNote func(childComplexity int) int
+		Dbid           func(childComplexity int) int
 		Gallery        func(childComplexity int) int
 		Hidden         func(childComplexity int) int
 		ID             func(childComplexity int) int
@@ -154,6 +156,7 @@ type ComplexityRoot struct {
 
 	GalleryUser struct {
 		Bio                 func(childComplexity int) int
+		Dbid                func(childComplexity int) int
 		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
@@ -202,6 +205,7 @@ type ComplexityRoot struct {
 
 	MembershipOwner struct {
 		Address     func(childComplexity int) int
+		Dbid        func(childComplexity int) int
 		ID          func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
@@ -209,6 +213,7 @@ type ComplexityRoot struct {
 
 	MembershipTier struct {
 		AssetURL func(childComplexity int) int
+		Dbid     func(childComplexity int) int
 		ID       func(childComplexity int) int
 		Name     func(childComplexity int) int
 		Owners   func(childComplexity int) int
@@ -236,6 +241,7 @@ type ComplexityRoot struct {
 		CollectorsNote   func(childComplexity int) int
 		ContractAddress  func(childComplexity int) int
 		CreationTime     func(childComplexity int) int
+		Dbid             func(childComplexity int) int
 		Description      func(childComplexity int) int
 		ExternalURL      func(childComplexity int) int
 		ID               func(childComplexity int) int
@@ -570,6 +576,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Gallery.Collections(childComplexity), true
 
+	case "Gallery.dbid":
+		if e.complexity.Gallery.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Gallery.Dbid(childComplexity), true
+
 	case "Gallery.id":
 		if e.complexity.Gallery.ID == nil {
 			break
@@ -590,6 +603,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryCollection.CollectorsNote(childComplexity), true
+
+	case "GalleryCollection.dbid":
+		if e.complexity.GalleryCollection.Dbid == nil {
+			break
+		}
+
+		return e.complexity.GalleryCollection.Dbid(childComplexity), true
 
 	case "GalleryCollection.gallery":
 		if e.complexity.GalleryCollection.Gallery == nil {
@@ -681,6 +701,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Bio(childComplexity), true
+
+	case "GalleryUser.dbid":
+		if e.complexity.GalleryUser.Dbid == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Dbid(childComplexity), true
 
 	case "GalleryUser.galleries":
 		if e.complexity.GalleryUser.Galleries == nil {
@@ -871,6 +898,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MembershipOwner.Address(childComplexity), true
 
+	case "MembershipOwner.dbid":
+		if e.complexity.MembershipOwner.Dbid == nil {
+			break
+		}
+
+		return e.complexity.MembershipOwner.Dbid(childComplexity), true
+
 	case "MembershipOwner.id":
 		if e.complexity.MembershipOwner.ID == nil {
 			break
@@ -898,6 +932,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MembershipTier.AssetURL(childComplexity), true
+
+	case "MembershipTier.dbid":
+		if e.complexity.MembershipTier.Dbid == nil {
+			break
+		}
+
+		return e.complexity.MembershipTier.Dbid(childComplexity), true
 
 	case "MembershipTier.id":
 		if e.complexity.MembershipTier.ID == nil {
@@ -1105,6 +1146,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Nft.CreationTime(childComplexity), true
+
+	case "Nft.dbid":
+		if e.complexity.Nft.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Nft.Dbid(childComplexity), true
 
 	case "Nft.description":
 		if e.complexity.Nft.Description == nil {
@@ -1562,6 +1610,7 @@ directive @scrub on INPUT_FIELD_DEFINITION
 
 scalar Time
 scalar Address
+scalar DBID
 
 interface Node {
   id: ID!
@@ -1573,6 +1622,7 @@ interface Error {
 
 type GalleryUser implements Node {
   id: ID!
+  dbid: DBID!
   username: String
   bio: String
   wallets: [Wallet]
@@ -1714,6 +1764,7 @@ enum Chain {
 
 type Nft implements Node {
   id: ID!
+  dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   collectorsNote: String
@@ -1752,6 +1803,7 @@ type GalleryCollectionLayout {
 
 type GalleryCollection implements Node {
   id: ID!
+  dbid: DBID!
   version: Int
   name: String
   collectorsNote: String
@@ -1763,12 +1815,14 @@ type GalleryCollection implements Node {
 
 type Gallery implements Node {
   id: ID!
+  dbid: DBID!
   owner: GalleryUser @goField(forceResolver: true)
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
 type MembershipOwner implements Node {
   id: ID!
+  dbid: DBID!
   address: Address
   user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
@@ -1776,6 +1830,7 @@ type MembershipOwner implements Node {
 
 type MembershipTier implements Node {
   id: ID!
+  dbid: DBID!
   name: String
   assetUrl: String
   tokenId: String
@@ -1806,7 +1861,7 @@ type Query {
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
-  collectionById(id: ID!): CollectionByIdOrError
+  collectionById(id: DBID!): CollectionByIdOrError
 }
 
 input GalleryCollectionLayoutInput {
@@ -1815,10 +1870,10 @@ input GalleryCollectionLayoutInput {
 }
 
 input CreateCollectionInput {
-  galleryId: ID!
+  galleryId: DBID!
   name: String!
   collectorsNote: String!
-  nfts: [ID!]!
+  nfts: [DBID!]!
   layout: GalleryCollectionLayoutInput!
 }
 
@@ -1841,7 +1896,7 @@ type DeleteCollectionPayload {
 }
 
 input UpdateCollectionInfoInput {
-  collectionId: ID!
+  collectionId: DBID!
   name: String!
   collectorsNote: String!
 }
@@ -1856,8 +1911,8 @@ type UpdateCollectionInfoPayload {
 }
 
 input UpdateCollectionNftsInput {
-  collectionId: ID!
-  nfts: [ID!]!
+  collectionId: DBID!
+  nfts: [DBID!]!
   layout: GalleryCollectionLayoutInput!
 }
 
@@ -1871,8 +1926,8 @@ type UpdateCollectionNftsPayload {
 }
 
 input UpdateGalleryCollectionsInput {
-  galleryId: ID!
-  collections: [ID!]!
+  galleryId: DBID!
+  collections: [DBID!]!
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
@@ -1980,7 +2035,7 @@ input AuthMechanism {
 input EthereumEoaAuth {
   address: Address!
   nonce: String!
-  signature: String!
+  signature: String! @scrub
 }
 
 input GnosisSafeAuth {
@@ -1995,7 +2050,7 @@ union LoginPayloadOrError =
   | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
-  userId: ID
+  userId: DBID
 }
 
 union CreateUserPayloadOrError =
@@ -2005,8 +2060,8 @@ union CreateUserPayloadOrError =
   | ErrDoesNotOwnRequiredNFT
 
 type CreateUserPayload {
-  userId: ID
-  galleryId: ID
+  userId: DBID
+  galleryId: DBID
 }
 
 type Mutation {
@@ -2014,7 +2069,7 @@ type Mutation {
   createCollection(
     input: CreateCollectionInput!
   ): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: ID!): DeleteCollectionPayloadOrError
+  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
     @authRequired
   updateCollectionInfo(
     input: UpdateCollectionInfoInput!
@@ -2116,7 +2171,7 @@ func (ec *executionContext) field_Mutation_deleteCollection_args(ctx context.Con
 	var arg0 persist.DBID
 	if tmp, ok := rawArgs["collectionId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
-		arg0, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -2266,7 +2321,7 @@ func (ec *executionContext) field_Query_collectionById_args(ctx context.Context,
 	var arg0 persist.DBID
 	if tmp, ok := rawArgs["id"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -2643,7 +2698,7 @@ func (ec *executionContext) _CreateUserPayload_userId(ctx context.Context, field
 	}
 	res := resTmp.(*persist.DBID)
 	fc.Result = res
-	return ec.marshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateUserPayload_galleryId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
@@ -2675,7 +2730,7 @@ func (ec *executionContext) _CreateUserPayload_galleryId(ctx context.Context, fi
 	}
 	res := resTmp.(*persist.DBID)
 	fc.Result = res
-	return ec.marshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCollectionPayload) (ret graphql.Marshaler) {
@@ -3157,9 +3212,44 @@ func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Gallery_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Gallery_owner(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
@@ -3256,9 +3346,44 @@ func (ec *executionContext) _GalleryCollection_id(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryCollection_dbid(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryCollection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryCollection_version(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
@@ -3579,9 +3704,9 @@ func (ec *executionContext) _GalleryNft_id(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.DBID)
+	res := resTmp.(model.GqlID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryNft_nft(ctx context.Context, field graphql.CollectedField, obj *model.GalleryNft) (ret graphql.Marshaler) {
@@ -3678,9 +3803,44 @@ func (ec *executionContext) _GalleryUser_id(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_dbid(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_username(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -4512,7 +4672,7 @@ func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field grap
 	}
 	res := resTmp.(*persist.DBID)
 	fc.Result = res
-	return ec.marshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipOwner_id(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
@@ -4545,9 +4705,44 @@ func (ec *executionContext) _MembershipOwner_id(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MembershipOwner_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MembershipOwner",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipOwner_address(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
@@ -4676,9 +4871,44 @@ func (ec *executionContext) _MembershipTier_id(ctx context.Context, field graphq
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MembershipTier_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipTier) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MembershipTier",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipTier_name(ctx context.Context, field graphql.CollectedField, obj *model.MembershipTier) (ret graphql.Marshaler) {
@@ -5487,9 +5717,44 @@ func (ec *executionContext) _Nft_id(ctx context.Context, field graphql.Collected
 		}
 		return graphql.Null
 	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Nft_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Nft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(persist.DBID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
@@ -7298,9 +7563,9 @@ func (ec *executionContext) _Wallet_id(ctx context.Context, field graphql.Collec
 		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.DBID)
+	res := resTmp.(model.GqlID)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Wallet_address(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
@@ -8540,7 +8805,7 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
-			it.GalleryID, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			it.GalleryID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8564,7 +8829,7 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nfts"))
-			it.Nfts, err = ec.unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			it.Nfts, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8611,9 +8876,23 @@ func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, o
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-			it.Signature, err = ec.unmarshalNString2string(ctx, v)
+			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalNString2string(ctx, v) }
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				if ec.directives.Scrub == nil {
+					return nil, errors.New("directive scrub is not implemented")
+				}
+				return ec.directives.Scrub(ctx, obj, directive0)
+			}
+
+			tmp, err := directive1(ctx)
 			if err != nil {
-				return it, err
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(string); ok {
+				it.Signature = data
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
 	}
@@ -8696,7 +8975,7 @@ func (ec *executionContext) unmarshalInputUpdateCollectionInfoInput(ctx context.
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
-			it.CollectionID, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			it.CollectionID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8735,7 +9014,7 @@ func (ec *executionContext) unmarshalInputUpdateCollectionNftsInput(ctx context.
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
-			it.CollectionID, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			it.CollectionID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8743,7 +9022,7 @@ func (ec *executionContext) unmarshalInputUpdateCollectionNftsInput(ctx context.
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nfts"))
-			it.Nfts, err = ec.unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			it.Nfts, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8774,7 +9053,7 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
-			it.GalleryID, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			it.GalleryID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8782,7 +9061,7 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collections"))
-			it.Collections, err = ec.unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			it.Collections, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10109,6 +10388,16 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Gallery_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "owner":
 			field := field
 
@@ -10167,6 +10456,16 @@ func (ec *executionContext) _GalleryCollection(ctx context.Context, sel ast.Sele
 		case "id":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryCollection_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryCollection_dbid(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10347,6 +10646,16 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 		case "id":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryUser_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUser_dbid(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10703,6 +11012,16 @@ func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MembershipOwner_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "address":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._MembershipOwner_address(ctx, field, obj)
@@ -10758,6 +11077,16 @@ func (ec *executionContext) _MembershipTier(ctx context.Context, sel ast.Selecti
 		case "id":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._MembershipTier_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MembershipTier_dbid(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10931,6 +11260,16 @@ func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj 
 		case "id":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Nft_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Nft_dbid(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12290,18 +12629,13 @@ func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikey
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNGalleryCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayoutInput(ctx context.Context, v interface{}) (*model.GalleryCollectionLayoutInput, error) {
-	res, err := ec.unmarshalInputGalleryCollectionLayoutInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (persist.DBID, error) {
+func (ec *executionContext) unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (persist.DBID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.DBID(tmp)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, sel ast.SelectionSet, v persist.DBID) graphql.Marshaler {
+func (ec *executionContext) marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, sel ast.SelectionSet, v persist.DBID) graphql.Marshaler {
 	res := graphql.MarshalString(string(v))
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -12311,7 +12645,7 @@ func (ec *executionContext) marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋ
 	return res
 }
 
-func (ec *executionContext) unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx context.Context, v interface{}) ([]persist.DBID, error) {
+func (ec *executionContext) unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx context.Context, v interface{}) ([]persist.DBID, error) {
 	var vSlice []interface{}
 	if v != nil {
 		vSlice = graphql.CoerceList(v)
@@ -12320,7 +12654,7 @@ func (ec *executionContext) unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	res := make([]persist.DBID, len(vSlice))
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, vSlice[i])
+		res[i], err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}
@@ -12328,10 +12662,10 @@ func (ec *executionContext) unmarshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res, nil
 }
 
-func (ec *executionContext) marshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.DBID) graphql.Marshaler {
+func (ec *executionContext) marshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.DBID) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	for i := range v {
-		ret[i] = ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, sel, v[i])
+		ret[i] = ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, sel, v[i])
 	}
 
 	for _, e := range ret {
@@ -12341,6 +12675,27 @@ func (ec *executionContext) marshalNID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgallery
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNGalleryCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayoutInput(ctx context.Context, v interface{}) (*model.GalleryCollectionLayoutInput, error) {
+	res, err := ec.unmarshalInputGalleryCollectionLayoutInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, v interface{}) (model.GqlID, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := model.GqlID(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, sel ast.SelectionSet, v model.GqlID) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
@@ -12797,6 +13152,23 @@ func (ec *executionContext) marshalOCreateUserPayloadOrError2githubᚗcomᚋmike
 	return ec._CreateUserPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (*persist.DBID, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.DBID(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, sel ast.SelectionSet, v *persist.DBID) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalString(string(*v))
+	return res
+}
+
 func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteCollectionPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -12990,23 +13362,6 @@ func (ec *executionContext) unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydub�
 	}
 	res, err := ec.unmarshalInputGnosisSafeAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (*persist.DBID, error) {
-	if v == nil {
-		return nil, nil
-	}
-	tmp, err := graphql.UnmarshalString(v)
-	res := persist.DBID(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, sel ast.SelectionSet, v *persist.DBID) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	res := graphql.MarshalString(string(*v))
-	return res
 }
 
 func (ec *executionContext) marshalOImageURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx context.Context, sel ast.SelectionSet, v *model.ImageURLSet) graphql.Marshaler {

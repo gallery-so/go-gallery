@@ -46,9 +46,12 @@ models:
   Address:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Address
-  ID:
+  DBID:
     model:
       - github.com/mikeydub/go-gallery/service/persist.DBID
+  ID:
+    model:
+      - github.com/mikeydub/go-gallery/graphql/model.GqlID
       - github.com/99designs/gqlgen/graphql.ID
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Int64

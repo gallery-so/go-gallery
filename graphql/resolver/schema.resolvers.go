@@ -18,7 +18,7 @@ import (
 )
 
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.ID)
+	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -28,11 +28,11 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 }
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
-	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.ID)
+	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.ID)
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.Gall
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(obj.ID)
+	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 			nftModel := nftToModel(ctx, r.Resolver, fullNft)
 
 			output[i] = &model.GalleryNft{
-				ID:         nft.ID,
+				ID:         model.GqlID(nft.ID), // TODO: Type-specific ID here
 				Nft:        &nftModel,
 				Collection: obj,
 			}
@@ -76,11 +76,11 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
-	return resolveGalleriesByUserID(ctx, r.Resolver, obj.ID)
+	return resolveGalleriesByUserID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.ID)
+	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
@@ -460,7 +460,7 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error) {

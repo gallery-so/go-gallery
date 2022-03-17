@@ -18,6 +18,7 @@ directive @scrub on INPUT_FIELD_DEFINITION
 
 scalar Time
 scalar Address
+scalar DBID
 
 interface Node {
   id: ID!
@@ -27,8 +28,10 @@ interface Error {
   message: String!
 }
 
+
 type GalleryUser implements Node {
   id: ID!
+  dbid: DBID!
   username: String
   bio: String
   wallets: [Wallet]
@@ -170,6 +173,7 @@ enum Chain {
 
 type Nft implements Node {
   id: ID!
+  dbid: DBID!
   creationTime: Time
   lastUpdated: Time
   collectorsNote: String
@@ -208,6 +212,7 @@ type GalleryCollectionLayout {
 
 type GalleryCollection implements Node {
   id: ID!
+  dbid: DBID!
   version: Int
   name: String
   collectorsNote: String
@@ -219,12 +224,14 @@ type GalleryCollection implements Node {
 
 type Gallery implements Node {
   id: ID!
+  dbid: DBID!
   owner: GalleryUser @goField(forceResolver: true)
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
 type MembershipOwner implements Node {
   id: ID!
+  dbid: DBID!
   address: Address
   user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
@@ -232,6 +239,7 @@ type MembershipOwner implements Node {
 
 type MembershipTier implements Node {
   id: ID!
+  dbid: DBID!
   name: String
   assetUrl: String
   tokenId: String
@@ -262,7 +270,7 @@ type Query {
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
-  collectionById(id: ID!): CollectionByIdOrError
+  collectionById(id: DBID!): CollectionByIdOrError
 }
 
 input GalleryCollectionLayoutInput {
@@ -271,10 +279,10 @@ input GalleryCollectionLayoutInput {
 }
 
 input CreateCollectionInput {
-  galleryId: ID!
+  galleryId: DBID!
   name: String!
   collectorsNote: String!
-  nfts: [ID!]!
+  nfts: [DBID!]!
   layout: GalleryCollectionLayoutInput!
 }
 
@@ -297,7 +305,7 @@ type DeleteCollectionPayload {
 }
 
 input UpdateCollectionInfoInput {
-  collectionId: ID!
+  collectionId: DBID!
   name: String!
   collectorsNote: String!
 }
@@ -312,8 +320,8 @@ type UpdateCollectionInfoPayload {
 }
 
 input UpdateCollectionNftsInput {
-  collectionId: ID!
-  nfts: [ID!]!
+  collectionId: DBID!
+  nfts: [DBID!]!
   layout: GalleryCollectionLayoutInput!
 }
 
@@ -327,8 +335,8 @@ type UpdateCollectionNftsPayload {
 }
 
 input UpdateGalleryCollectionsInput {
-  galleryId: ID!
-  collections: [ID!]!
+  galleryId: DBID!
+  collections: [DBID!]!
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
@@ -451,7 +459,7 @@ union LoginPayloadOrError =
   | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
-  userId: ID
+  userId: DBID
 }
 
 union CreateUserPayloadOrError =
@@ -461,8 +469,8 @@ union CreateUserPayloadOrError =
   | ErrDoesNotOwnRequiredNFT
 
 type CreateUserPayload {
-  userId: ID
-  galleryId: ID
+  userId: DBID
+  galleryId: DBID
 }
 
 type Mutation {
@@ -470,7 +478,7 @@ type Mutation {
   createCollection(
     input: CreateCollectionInput!
   ): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: ID!): DeleteCollectionPayloadOrError
+  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
     @authRequired
   updateCollectionInfo(
     input: UpdateCollectionInfoInput!
