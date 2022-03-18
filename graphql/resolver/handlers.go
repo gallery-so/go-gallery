@@ -79,12 +79,6 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 	}
 }
 
-func ScrubDirectiveHandler(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-	// No need for explicit handling of the @scrub directive here.
-	// We handle it elsewhere by walking the query document.
-	return next(ctx)
-}
-
 func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 	// Change the TextFormatter so newlines will be preserved in log fields.
 	// Otherwise, they get converted to the literal string \n

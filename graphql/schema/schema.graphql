@@ -16,6 +16,16 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
 
+# All types that implement Node must have a unique GqlID set in their "id" field. For types with
+# a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
+# so those types will automatically have a MakeGqlID function generated on them. Types without a
+# dbid field, or types that need multiple inputs to create a unique ID that can be used to refetch
+# the node in the future, must use the @gqlId directive to explicitly state the fields that will
+# be used to generate the ID. If a named field exists on the object and is a string or has a string
+# as its underlying type (i.e. "type Xyz string"), that type will be used when generating parameters
+# for the MakeGqlID function. Otherwise, the specified field name will be added as a string parameter.
+directive @gqlId(fields:[String!]!) on OBJECT
+
 scalar Time
 scalar Address
 scalar DBID
@@ -28,7 +38,6 @@ interface Error {
   message: String!
 }
 
-
 type GalleryUser implements Node {
   id: ID!
   dbid: DBID!
@@ -39,7 +48,7 @@ type GalleryUser implements Node {
   isAuthenticatedUser: Boolean
 }
 
-type Wallet implements Node {
+type Wallet implements Node @gqlId(fields: ["address"]) {
   id: ID!
   address: Address
   # TODO: Do we paginate these currently?
@@ -199,7 +208,7 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type GalleryNft {
+type GalleryNft implements Node @gqlId(fields:["nftId", "collectionId"]) {
   id: ID!
   nft: Nft
   collection: GalleryCollection

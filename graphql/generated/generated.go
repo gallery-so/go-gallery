@@ -52,7 +52,6 @@ type ResolverRoot interface {
 
 type DirectiveRoot struct {
 	AuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
-	Scrub        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -1608,6 +1607,16 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
 
+# All types that implement Node must have a unique GqlID set in their "id" field. For types with
+# a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
+# so those types will automatically have a MakeGqlID function generated on them. Types without a
+# dbid field, or types that need multiple inputs to create a unique ID that can be used to refetch
+# the node in the future, must use the @gqlId directive to explicitly state the fields that will
+# be used to generate the ID. If a named field exists on the object and is a string or has a string
+# as its underlying type (i.e. "type Xyz string"), that type will be used when generating parameters
+# for the MakeGqlID function. Otherwise, the specified field name will be added as a string parameter.
+directive @gqlId(fields:[String!]!) on OBJECT
+
 scalar Time
 scalar Address
 scalar DBID
@@ -1620,7 +1629,6 @@ interface Error {
   message: String!
 }
 
-
 type GalleryUser implements Node {
   id: ID!
   dbid: DBID!
@@ -1631,7 +1639,7 @@ type GalleryUser implements Node {
   isAuthenticatedUser: Boolean
 }
 
-type Wallet implements Node {
+type Wallet implements Node @gqlId(fields: ["address"]) {
   id: ID!
   address: Address
   # TODO: Do we paginate these currently?
@@ -1791,7 +1799,7 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type GalleryNft {
+type GalleryNft implements Node @gqlId(fields:["nftId", "collectionId"]) {
   id: ID!
   nft: Nft
   collection: GalleryCollection
@@ -8919,23 +8927,9 @@ func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, o
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalNString2string(ctx, v) }
-			directive1 := func(ctx context.Context) (interface{}, error) {
-				if ec.directives.Scrub == nil {
-					return nil, errors.New("directive scrub is not implemented")
-				}
-				return ec.directives.Scrub(ctx, obj, directive0)
-			}
-
-			tmp, err := directive1(ctx)
+			it.Signature, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
-				return it, graphql.ErrorOnPath(ctx, err)
-			}
-			if data, ok := tmp.(string); ok {
-				it.Signature = data
-			} else {
-				err := fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
-				return it, graphql.ErrorOnPath(ctx, err)
+				return it, err
 			}
 		}
 	}
@@ -9639,6 +9633,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Nft(ctx, sel, obj)
+	case model.GalleryNft:
+		return ec._GalleryNft(ctx, sel, &obj)
+	case *model.GalleryNft:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryNft(ctx, sel, obj)
 	case model.GalleryCollection:
 		return ec._GalleryCollection(ctx, sel, &obj)
 	case *model.GalleryCollection:
@@ -10631,7 +10632,7 @@ func (ec *executionContext) _GalleryCollectionLayout(ctx context.Context, sel as
 	return out
 }
 
-var galleryNftImplementors = []string{"GalleryNft"}
+var galleryNftImplementors = []string{"GalleryNft", "Node"}
 
 func (ec *executionContext) _GalleryNft(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryNft) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryNftImplementors)

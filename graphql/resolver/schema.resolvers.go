@@ -63,12 +63,14 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 
 		if err == nil {
 			nftModel := nftToModel(ctx, r.Resolver, fullNft)
-
-			output[i] = &model.GalleryNft{
-				ID:         model.GqlID(nft.ID), // TODO: Type-specific ID here
+			galleryNft := &model.GalleryNft{
 				Nft:        &nftModel,
 				Collection: obj,
 			}
+
+			galleryNft.ID = galleryNft.MakeGqlID(string(galleryNft.Nft.Dbid), string(galleryNft.Collection.Dbid))
+
+			output[i] = galleryNft
 		}
 	}
 

@@ -284,6 +284,8 @@ type GalleryNft struct {
 	Collection *GalleryCollection `json:"collection"`
 }
 
+func (GalleryNft) IsNode() {}
+
 type GalleryUser struct {
 	ID                  GqlID        `json:"id"`
 	Dbid                persist.DBID `json:"dbid"`

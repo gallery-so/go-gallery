@@ -141,8 +141,7 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 		version := collection.Version.Int()
 		hidden := collection.Hidden.Bool()
 
-		output[i] = &model.GalleryCollection{
-			ID:             model.GqlID(collection.ID),
+		galleryCollection := &model.GalleryCollection{
 			Dbid:           collection.ID,
 			Version:        &version,
 			Name:           util.StringToPointer(collection.Name.String()),
@@ -152,6 +151,9 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, gall
 			Hidden:         &hidden,
 			Nfts:           nil, // handled by dedicated resolver
 		}
+
+		galleryCollection.ID = galleryCollection.MakeGqlID(collection.ID)
+		output[i] = galleryCollection
 	}
 
 	return output, nil
@@ -163,12 +165,12 @@ func galleryToModel(gallery persist.Gallery) *model.Gallery {
 
 func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
 	gallery := model.Gallery{
-		ID:          model.GqlID(galleryID),
 		Dbid:        galleryID,
 		Owner:       nil, // handled by dedicated resolver
 		Collections: nil, // handled by dedicated resolver
 	}
 
+	gallery.ID = gallery.MakeGqlID(galleryID)
 	return &gallery
 }
 
@@ -187,8 +189,7 @@ func userToModel(ctx context.Context, r *Resolver, user persist.User) (*model.Ga
 	gc := util.GinContextFromContext(ctx)
 	isAuthenticated := auth.GetUserAuthedFromCtx(gc)
 
-	output := &model.GalleryUser{
-		ID:                  model.GqlID(user.ID),
+	galleryUser := &model.GalleryUser{
 		Dbid:                user.ID,
 		Username:            util.StringToPointer(user.Username.String()),
 		Bio:                 util.StringToPointer(user.Bio.String()),
@@ -197,7 +198,8 @@ func userToModel(ctx context.Context, r *Resolver, user persist.User) (*model.Ga
 		IsAuthenticatedUser: &isAuthenticated,
 	}
 
-	return output, nil
+	galleryUser.ID = galleryUser.MakeGqlID(user.ID)
+	return galleryUser, nil
 }
 
 // addressesToModels converts a slice of persist.Address to a slice of model.Wallet
@@ -394,7 +396,6 @@ func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 	chainEthereum := model.ChainEthereum
 
 	output := model.Nft{
-		ID:               model.GqlID(nft.ID),
 		Dbid:             nft.ID,
 		CreationTime:     &creationTime,
 		LastUpdated:      &lastUpdated,
@@ -415,6 +416,7 @@ func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 		BlockNumber:      nil, // TODO: later
 	}
 
+	output.ID = output.MakeGqlID(nft.ID)
 	return output
 }
 
@@ -426,8 +428,7 @@ func collectionToModel(ctx context.Context, collection persist.Collection) *mode
 	// The Gallery->Collections path currently fills out the Gallery field on each Collection it returns,
 	// and switching to a resolver here means switching to a resolver there. Not a big deal, just remember
 	// to prime the "GalleryByCollectionId" cache with results from the "collections by gallery" lookup.
-	return &model.GalleryCollection{
-		ID:             model.GqlID(collection.ID),
+	output := &model.GalleryCollection{
 		Dbid:           collection.ID,
 		Version:        &version,
 		Name:           util.StringToPointer(collection.Name.String()),
@@ -437,6 +438,9 @@ func collectionToModel(ctx context.Context, collection persist.Collection) *mode
 		Hidden:         &hidden,
 		Nfts:           nil, // handled by dedicated resolver
 	}
+
+	output.ID = output.MakeGqlID(collection.ID)
+	return output
 }
 
 func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) model.MembershipTier {
@@ -446,14 +450,16 @@ func membershipTierToModel(ctx context.Context, membershipTier persist.Membershi
 		owners[i] = &ownerModel
 	}
 
-	return model.MembershipTier{
-		ID:       model.GqlID(membershipTier.ID),
+	output := model.MembershipTier{
 		Dbid:     membershipTier.ID,
 		Name:     util.StringToPointer(membershipTier.Name.String()),
 		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
 		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
 		Owners:   owners,
 	}
+
+	output.ID = output.MakeGqlID(membershipTier.ID)
+	return output
 }
 
 func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) model.MembershipOwner {
@@ -462,13 +468,15 @@ func membershipOwnerToModel(ctx context.Context, membershipOwner persist.Members
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	return model.MembershipOwner{
-		ID:          model.GqlID(membershipOwner.UserID),
+	output := model.MembershipOwner{
 		Dbid:        membershipOwner.UserID,
 		Address:     &membershipOwner.Address,
 		User:        nil, // handled by dedicated resolver
 		PreviewNfts: previewNfts,
 	}
+
+	output.ID = output.MakeGqlID(membershipOwner.UserID)
+	return output
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
