@@ -79,7 +79,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 
 					if mappedErr := graphql.GraphqlErrType(err); mappedErr != nil {
 						errCtx.Mapped = true
-						errCtx.MappedTo = fmt.Sprintf("&T", mappedErr)
+						errCtx.MappedTo = fmt.Sprintf("%T", mappedErr)
 					}
 
 					hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
