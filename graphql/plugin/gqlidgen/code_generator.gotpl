@@ -1,5 +1,6 @@
 {{ reserveImport "fmt" }}
 {{ reserveImport "strings" }}
+{{ reserveImport "context" }}
 
 {{ range $import := .AddedImports }}
 	{{ reserveImport $import }}
@@ -26,11 +27,11 @@ func (r *{{$node.Name}}) ID() GqlID {
 
 type NodeFetcher struct {
     {{- range $node := .NodeImplementors }}
-    On{{$node.Name}} func({{range $index, $arg := $node.Args}}{{if $index}},{{end}}{{$arg}} {{index $node.Types $index}}{{end}}) (*{{$node.Name}}, error)
+    On{{$node.Name}} func(ctx context.Context, {{range $index, $arg := $node.Args}}{{if $index}},{{end}}{{$arg}} {{index $node.Types $index}}{{end}}) (*{{$node.Name}}, error)
     {{- end }}
 }
 
-func (n *NodeFetcher) GetNodeByGqlID(id GqlID) (Node, error) {
+func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
     parts := strings.Split(string(id), ":")
     if len(parts) == 1 {
         return nil, ErrInvalidIDFormat{message: "no ID components specified after type name"}
@@ -45,7 +46,7 @@ func (n *NodeFetcher) GetNodeByGqlID(id GqlID) (Node, error) {
         if len(ids) != {{len $node.Args}} {
             return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'{{$node.Name}}' type requires {{len $node.Args}} ID component(s) (%d component(s) supplied)", len(ids))}
         }
-        return n.On{{$node.Name}}({{range $index, $type := $node.Types}}{{if $index}},{{end}}{{$type}}(ids[{{$index}}]){{end}})
+        return n.On{{$node.Name}}(ctx, {{range $index, $type := $node.Types}}{{if $index}},{{end}}{{$type}}(ids[{{$index}}]){{end}})
     {{- end }}
     }
 

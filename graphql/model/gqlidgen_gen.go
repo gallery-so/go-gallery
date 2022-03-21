@@ -3,6 +3,7 @@
 package model
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -52,17 +53,17 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnGallery           func(dbid persist.DBID) (*Gallery, error)
-	OnGalleryCollection func(dbid persist.DBID) (*GalleryCollection, error)
-	OnGalleryNft        func(nftId string, collectionId string) (*GalleryNft, error)
-	OnGalleryUser       func(dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipOwner   func(dbid persist.DBID) (*MembershipOwner, error)
-	OnMembershipTier    func(dbid persist.DBID) (*MembershipTier, error)
-	OnNft               func(dbid persist.DBID) (*Nft, error)
-	OnWallet            func(address persist.Address) (*Wallet, error)
+	OnGallery           func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
+	OnGalleryCollection func(ctx context.Context, dbid persist.DBID) (*GalleryCollection, error)
+	OnGalleryNft        func(ctx context.Context, nftId string, collectionId string) (*GalleryNft, error)
+	OnGalleryUser       func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipOwner   func(ctx context.Context, dbid persist.DBID) (*MembershipOwner, error)
+	OnMembershipTier    func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnNft               func(ctx context.Context, dbid persist.DBID) (*Nft, error)
+	OnWallet            func(ctx context.Context, address persist.Address) (*Wallet, error)
 }
 
-func (n *NodeFetcher) GetNodeByGqlID(id GqlID) (Node, error) {
+func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
 	parts := strings.Split(string(id), ":")
 	if len(parts) == 1 {
 		return nil, ErrInvalidIDFormat{message: "no ID components specified after type name"}
@@ -76,42 +77,42 @@ func (n *NodeFetcher) GetNodeByGqlID(id GqlID) (Node, error) {
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnGallery(persist.DBID(ids[0]))
+		return n.OnGallery(ctx, persist.DBID(ids[0]))
 	case "GalleryCollection":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryCollection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnGalleryCollection(persist.DBID(ids[0]))
+		return n.OnGalleryCollection(ctx, persist.DBID(ids[0]))
 	case "GalleryNft":
 		if len(ids) != 2 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryNft' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnGalleryNft(string(ids[0]), string(ids[1]))
+		return n.OnGalleryNft(ctx, string(ids[0]), string(ids[1]))
 	case "GalleryUser":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryUser' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnGalleryUser(persist.DBID(ids[0]))
+		return n.OnGalleryUser(ctx, persist.DBID(ids[0]))
 	case "MembershipOwner":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipOwner' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnMembershipOwner(persist.DBID(ids[0]))
+		return n.OnMembershipOwner(ctx, persist.DBID(ids[0]))
 	case "MembershipTier":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnMembershipTier(persist.DBID(ids[0]))
+		return n.OnMembershipTier(ctx, persist.DBID(ids[0]))
 	case "Nft":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Nft' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnNft(persist.DBID(ids[0]))
+		return n.OnNft(ctx, persist.DBID(ids[0]))
 	case "Wallet":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnWallet(persist.Address(ids[0]))
+		return n.OnWallet(ctx, persist.Address(ids[0]))
 	}
 
 	return nil, ErrInvalidIDFormat{typeName}
