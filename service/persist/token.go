@@ -591,9 +591,7 @@ func (m TokenMetadata) Value() (driver.Value, error) {
 		return nil, err
 	}
 
-	clean := strings.Map(cleanString, string(val))
-
-	return []byte(strings.ToValidUTF8(strings.ReplaceAll(clean, "\\u0000", ""), "")), nil
+	return []byte(strings.ToValidUTF8(strings.ReplaceAll(string(val), "\\u0000", ""), "")), nil
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type
