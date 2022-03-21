@@ -258,7 +258,6 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewReader(ctx)
 	if err == nil {
 		defer reader.Close()
-		logsTo = make([]types.Log, 0, 8000)
 		err = json.NewDecoder(reader).Decode(&logsTo)
 		if err != nil {
 			panic(err)

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,8 +30,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+var keepAliveTimeout = 600 * time.Second
 var client = &http.Client{
 	Timeout: time.Second * 30,
+	Transport: &http.Transport{
+		Dial: (&net.Dialer{
+			KeepAlive: keepAliveTimeout,
+		}).Dial,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+	},
 }
 
 // Transfer represents a Transfer from the RPC response
@@ -115,24 +124,13 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*1)
 	defer cancel()
-	bs, err := GetDataFromURI(ctx, turi, ipfsClient, arweaveClient)
+	var meta persist.TokenMetadata
+	err := DecodeMetadataFromURI(ctx, turi, &meta, ipfsClient, arweaveClient)
 	if err != nil {
-		return persist.TokenMetadata{}, err
+		return nil, err
 	}
 
-	var metadata persist.TokenMetadata
-	switch turi.Type() {
-	case persist.URITypeBase64SVG, persist.URITypeSVG:
-		metadata = persist.TokenMetadata{"image": string(bs)}
-	default:
-		err = json.Unmarshal(bs, &metadata)
-		if err != nil {
-			return persist.TokenMetadata{}, err
-		}
-
-	}
-
-	return metadata, nil
+	return meta, nil
 
 }
 
@@ -192,11 +190,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
-		defer resp.Body.Close()
-
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
 		if err != nil {
@@ -231,6 +228,97 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
+	}
+
+}
+
+// DecodeMetadataFromURI calls URI and decodes the data into a metadata map
+func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *persist.TokenMetadata, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
+
+	d, _ := ctx.Deadline()
+	logrus.Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	asString := turi.String()
+
+	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())
+
+	switch turi.Type() {
+	case persist.URITypeBase64JSON:
+		// decode the base64 encoded json
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+		}
+
+		return json.Unmarshal(removeBOM(decoded), into)
+	case persist.URITypeBase64SVG:
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+		}
+		into = &persist.TokenMetadata{"image": string(decoded)}
+		return nil
+	case persist.URITypeIPFS:
+		path := strings.ReplaceAll(asString, "ipfs://", "")
+		path = strings.ReplaceAll(path, "ipfs/", "")
+		path = strings.Split(path, "?")[0]
+
+		it, err := ipfsClient.Cat(path)
+		if err != nil {
+			bs, nextErr := getIPFSPI(ctx, path)
+			if nextErr == nil {
+				return json.Unmarshal(bs, into)
+			}
+
+			return fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
+		}
+		defer it.Close()
+		return json.NewDecoder(it).Decode(into)
+	case persist.URITypeArweave:
+		path := strings.ReplaceAll(asString, "arweave://", "")
+		path = strings.ReplaceAll(path, "ar://", "")
+		result, err := getArweaveData(arweaveClient, path)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(result, into)
+	case persist.URITypeHTTP:
+
+		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
+		if err != nil {
+			return fmt.Errorf("error creating request: %s", err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("error getting data from http: %s", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return ErrHTTP{Status: resp.StatusCode, URL: asString}
+		}
+		return json.NewDecoder(resp.Body).Decode(into)
+	case persist.URITypeIPFSAPI:
+		parsedURL, err := url.Parse(asString)
+		if err != nil {
+			return err
+		}
+		query := parsedURL.Query().Get("arg")
+		it, err := ipfsClient.Cat(query)
+		if err != nil {
+			return err
+		}
+		defer it.Close()
+		return json.NewDecoder(it).Decode(into)
+	case persist.URITypeJSON, persist.URITypeSVG:
+		idx := strings.IndexByte(asString, '{')
+		if idx == -1 {
+			return json.Unmarshal(removeBOM([]byte(asString)), into)
+		}
+		return json.Unmarshal(removeBOM([]byte(asString[idx:])), into)
+
+	default:
+		return fmt.Errorf("unknown token URI type: %s", turi.Type())
 	}
 
 }
