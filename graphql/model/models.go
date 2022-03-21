@@ -1,6 +1,9 @@
 package model
 
-import "github.com/mikeydub/go-gallery/service/persist"
+import (
+	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist"
+)
 
 type GqlID string
 
@@ -15,4 +18,20 @@ func (r *GalleryNft) GetGqlIDField_CollectionID() string {
 type HelperGalleryNftData struct {
 	NftId        persist.DBID
 	CollectionId persist.DBID
+}
+
+type ErrInvalidIDFormat struct {
+	message string
+}
+
+func (e ErrInvalidIDFormat) Error() string {
+	return fmt.Sprintf("invalid ID format: %s", e.message)
+}
+
+type ErrInvalidIDType struct {
+	typeName string
+}
+
+func (e ErrInvalidIDType) Error() string {
+	return fmt.Sprintf("no fetch method found for ID type '%s'", e.typeName)
 }

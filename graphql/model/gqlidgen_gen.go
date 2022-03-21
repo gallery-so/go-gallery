@@ -4,6 +4,9 @@ package model
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 func (r *Gallery) ID() GqlID {
@@ -45,5 +48,92 @@ func (r *Nft) ID() GqlID {
 }
 
 func (r *Wallet) ID() GqlID {
-	return GqlID(fmt.Sprintf("Wallet:%s", r.Address))
+	return GqlID(fmt.Sprintf("Wallet:%s", *r.Address))
+}
+
+type NodeFetcher struct {
+	OnGallery           func(dbid persist.DBID) (*Gallery, error)
+	OnGalleryCollection func(dbid persist.DBID) (*GalleryCollection, error)
+	OnGalleryNft        func(nftId string, collectionId string) (*GalleryNft, error)
+	OnGalleryUser       func(dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipOwner   func(dbid persist.DBID) (*MembershipOwner, error)
+	OnMembershipTier    func(dbid persist.DBID) (*MembershipTier, error)
+	OnNft               func(dbid persist.DBID) (*Nft, error)
+	OnWallet            func(address persist.Address) (*Wallet, error)
+}
+
+func (n *NodeFetcher) GetNodeByGqlID(id GqlID) (Node, error) {
+	parts := strings.Split(string(id), ":")
+	if len(parts) == 1 {
+		return nil, ErrInvalidIDFormat{message: "no ID components specified after type name"}
+	}
+
+	typeName := parts[0]
+	ids := parts[1:]
+
+	switch typeName {
+	case "Gallery":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnGallery(persist.DBID(ids[0]))
+	case "GalleryCollection":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryCollection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnGalleryCollection(persist.DBID(ids[0]))
+	case "GalleryNft":
+		if len(ids) != 2 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryNft' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnGalleryNft(string(ids[0]), string(ids[1]))
+	case "GalleryUser":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryUser' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnGalleryUser(persist.DBID(ids[0]))
+	case "MembershipOwner":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipOwner' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnMembershipOwner(persist.DBID(ids[0]))
+	case "MembershipTier":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnMembershipTier(persist.DBID(ids[0]))
+	case "Nft":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Nft' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnNft(persist.DBID(ids[0]))
+	case "Wallet":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnWallet(persist.Address(ids[0]))
+	}
+
+	return nil, ErrInvalidIDFormat{typeName}
+}
+
+func (n *NodeFetcher) ValidateHandlers() {
+	switch {
+	case n.OnGallery == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGallery")
+	case n.OnGalleryCollection == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryCollection")
+	case n.OnGalleryNft == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryNft")
+	case n.OnGalleryUser == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
+	case n.OnMembershipOwner == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipOwner")
+	case n.OnMembershipTier == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
+	case n.OnNft == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnNft")
+	case n.OnWallet == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnWallet")
+	}
 }

@@ -83,7 +83,9 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 }
 
 type nodeImplementor struct {
-	Parameters              string
+	Types                   []string
+	TypeIsPointer           []bool
+	Args                    []string
 	Packages                []string
 	Name                    string
 	Implementation          string
@@ -193,6 +195,7 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 
 	var packages []string
 	var types []string
+	var typeIsPointer []bool
 	var requiresMethod []bool
 
 	for _, arg := range args {
@@ -203,6 +206,7 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 
 		var packageName string
 		var typeName string
+		var isPointer bool
 		var argRequiresMethod bool
 
 		field := getFieldForArg(object, arg)
@@ -210,9 +214,10 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 		if field == nil || !isStringType(field) {
 			packageName = ""
 			typeName = "string"
+			isPointer = false
 			argRequiresMethod = true
 		} else {
-			packageName, typeName = getTypeInfo(field, modelPackage)
+			packageName, typeName, isPointer = getTypeInfo(field, modelPackage)
 			argRequiresMethod = false
 		}
 
@@ -221,6 +226,7 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 		}
 
 		types = append(types, typeName)
+		typeIsPointer = append(typeIsPointer, isPointer)
 		requiresMethod = append(requiresMethod, argRequiresMethod)
 	}
 
@@ -236,10 +242,12 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 	}
 
 	ni := nodeImplementor{
-		Name:     object.Name,
-		Packages: packages,
-		//Parameters:     parameters,
-		Implementation:          getIdImplementation(object.Name, args, requiresMethod),
+		Name:                    object.Name,
+		Packages:                packages,
+		Types:                   types,
+		TypeIsPointer:           typeIsPointer,
+		Args:                    args,
+		Implementation:          getIdImplementation(object.Name, args, typeIsPointer, requiresMethod),
 		HasBindingMethods:       len(bindingMethodSignatures) > 0,
 		BindingMethodSignatures: bindingMethodSignatures,
 	}
@@ -247,7 +255,7 @@ func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImp
 	return ni, nil
 }
 
-func getIdImplementation(objectName string, args []string, requiresMethod []bool) string {
+func getIdImplementation(objectName string, args []string, typeIsPointer []bool, requiresMethod []bool) string {
 	placeholders := "%s"
 	if len(args) > 1 {
 		placeholders += strings.Repeat(":%s", len(args)-1)
@@ -262,6 +270,10 @@ func getIdImplementation(objectName string, args []string, requiresMethod []bool
 		} else {
 			implementationArgs[i] = "r." + goArg
 		}
+
+		if typeIsPointer[i] {
+			implementationArgs[i] = "*" + implementationArgs[i]
+		}
 	}
 
 	return "fmt.Sprintf(\"" + objectName + ":" + placeholders + "\", " + strings.Join(implementationArgs, ", ") + ")"
@@ -275,9 +287,9 @@ func isStringType(field *codegen.Field) bool {
 	return field.TypeReference.GO.Underlying().String() == "string"
 }
 
-func getTypeInfo(field *codegen.Field, modelPackage string) (packageName string, typeName string) {
+func getTypeInfo(field *codegen.Field, modelPackage string) (packageName string, typeName string, isPointer bool) {
 	goType := field.TypeReference.GO.String()
-	isPointer := field.TypeReference.IsPtr()
+	isPointer = field.TypeReference.IsPtr()
 
 	if isPointer {
 		goType = goType[1:]
@@ -302,11 +314,7 @@ func getTypeInfo(field *codegen.Field, modelPackage string) (packageName string,
 		}
 	}
 
-	if isPointer {
-		typeName = "*" + typeName
-	}
-
-	return packageName, typeName
+	return packageName, typeName, isPointer
 }
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
