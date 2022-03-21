@@ -4,38 +4,46 @@ package model
 
 import (
 	"fmt"
-
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-func (r *Gallery) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("Gallery:%s", dbid))
+func (r *Gallery) ID() GqlID {
+	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
 }
 
-func (r *GalleryCollection) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("GalleryCollection:%s", dbid))
+func (r *GalleryCollection) ID() GqlID {
+	return GqlID(fmt.Sprintf("GalleryCollection:%s", r.Dbid))
 }
 
-func (r *GalleryNft) MakeGqlID(nftId string, collectionId string) GqlID {
-	return GqlID(fmt.Sprintf("GalleryNft:%s:%s", nftId, collectionId))
+func (r *GalleryNft) ID() GqlID {
+	//-----------------------------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------------------------
+	// Some fields specified by @goGqlId require manual binding because one of the following is true:
+	// (a) the field does not exist on the GalleryNft type, or
+	// (b) the field exists but is not a string type
+	//-----------------------------------------------------------------------------------------------
+	// Please create binding methods on the GalleryNft type with the following signatures:
+	// func (r *GalleryNft) GetGqlIDField_NftID() string
+	// func (r *GalleryNft) GetGqlIDField_CollectionID() string
+	//-----------------------------------------------------------------------------------------------
+	return GqlID(fmt.Sprintf("GalleryNft:%s:%s", r.GetGqlIDField_NftID(), r.GetGqlIDField_CollectionID()))
 }
 
-func (r *GalleryUser) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("GalleryUser:%s", dbid))
+func (r *GalleryUser) ID() GqlID {
+	return GqlID(fmt.Sprintf("GalleryUser:%s", r.Dbid))
 }
 
-func (r *MembershipOwner) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("MembershipOwner:%s", dbid))
+func (r *MembershipOwner) ID() GqlID {
+	return GqlID(fmt.Sprintf("MembershipOwner:%s", r.Dbid))
 }
 
-func (r *MembershipTier) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("MembershipTier:%s", dbid))
+func (r *MembershipTier) ID() GqlID {
+	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
 
-func (r *Nft) MakeGqlID(dbid persist.DBID) GqlID {
-	return GqlID(fmt.Sprintf("Nft:%s", dbid))
+func (r *Nft) ID() GqlID {
+	return GqlID(fmt.Sprintf("Nft:%s", r.Dbid))
 }
 
-func (r *Wallet) MakeGqlID(address *persist.Address) GqlID {
-	return GqlID(fmt.Sprintf("Wallet:%s", address))
+func (r *Wallet) ID() GqlID {
+	return GqlID(fmt.Sprintf("Wallet:%s", r.Address))
 }

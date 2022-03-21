@@ -2,30 +2,35 @@ package gqlidgen
 
 import (
 	"fmt"
-	"path"
-	"strings"
-	"syscall"
-
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/plugin"
+	"io/ioutil"
+	"path"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
 )
 
-const filename = "gqlidgen_gen.go"
+const outputFileName = "gqlidgen_gen.go"
+const configMutatorTemplate = "config_mutator.gotpl"
+const codeGeneratorTemplate = "code_generator.gotpl"
+const bindingMethodPrefix = "GetGqlIDField_"
 
 func New(modelDir string, modelPackage string) plugin.Plugin {
 	return &Plugin{
-		filePath:     path.Join(modelDir, filename),
-		modelDir:     modelDir,
-		modelPackage: modelPackage,
+		outputFilePath: path.Join(modelDir, outputFileName),
+		modelDir:       modelDir,
+		modelPackage:   modelPackage,
 	}
 }
 
 type Plugin struct {
-	filePath     string
-	modelDir     string
-	modelPackage string
+	outputFilePath string
+	modelDir       string
+	modelPackage   string
 }
 
 var (
@@ -37,16 +42,49 @@ func (m *Plugin) Name() string {
 	return "gqlidgen"
 }
 
+// MutateConfig will generate stub ID() implementations for any type in the schema that
+// implements the Node interface. This is necessary because gqlgen needs to see that
+// an ID() method exists in order to bind to it, but that binding step happens before
+// gqlgen invokes code generation callbacks, so the real ID() implementations we
+// generate in GenerateCode() below won't exist yet.
 func (m *Plugin) MutateConfig(cfg *config.Config) error {
-	_ = syscall.Unlink(m.filePath)
-	return nil
+	_ = syscall.Unlink(m.outputFilePath)
+
+	implementors := make([]string, 0)
+
+	for typeName, interfaces := range cfg.Schema.Implements {
+		for _, i := range interfaces {
+			if i.Name == "Node" {
+				implementors = append(implementors, typeName)
+				break
+			}
+		}
+	}
+
+	templateStr, err := readTemplateFile(configMutatorTemplate)
+	if err != nil {
+		return err
+	}
+
+	return templates.Render(templates.Options{
+		PackageName: m.modelPackage,
+		Template:    templateStr,
+		Filename:    m.outputFilePath,
+		Data: &ConfigMutateTemplateData{
+			NodeImplementors: implementors,
+		},
+		GeneratedHeader: true,
+		Packages:        cfg.Packages,
+	})
 }
 
 type nodeImplementor struct {
-	Parameters     string
-	Packages       []string
-	Name           string
-	Implementation string
+	Parameters              string
+	Packages                []string
+	Name                    string
+	Implementation          string
+	HasBindingMethods       bool
+	BindingMethodSignatures []string
 }
 
 func (m *Plugin) getNodeImplementors(objects []*codegen.Object) []nodeImplementor {
@@ -59,7 +97,7 @@ func (m *Plugin) getNodeImplementors(objects []*codegen.Object) []nodeImplemento
 				if err == nil {
 					nodeImplementors = append(nodeImplementors, implementor)
 				} else {
-					fmt.Printf("error: failed to generate gqlId bindings for Node implementor '%s': %s\n", object.Name, err)
+					fmt.Printf("error: failed to generate goGqlId bindings for Node implementor '%s': %s\n", object.Name, err)
 				}
 			}
 		}
@@ -77,11 +115,11 @@ func (m *Plugin) getGqlIdArgs(object *codegen.Object, directive *codegen.Directi
 			continue
 		}
 
-		fmt.Printf("warning: generating gqlId bindings for Node implementor '%s': @gqlId parameter '%s' not recognized\n", object.Name, arg.Name)
+		fmt.Printf("warning: generating goGqlId bindings for Node implementor '%s': @goGqlId parameter '%s' not recognized\n", object.Name, arg.Name)
 	}
 
 	if fieldsArg == nil {
-		return nil, fmt.Errorf("@gqlId must include 'fields' argument")
+		return nil, fmt.Errorf("@goGqlId must include 'fields' argument")
 	}
 
 	var fieldNames []string
@@ -91,19 +129,30 @@ func (m *Plugin) getGqlIdArgs(object *codegen.Object, directive *codegen.Directi
 			if argStr, ok := arg.(string); ok {
 				fieldNames = append(fieldNames, argStr)
 			} else {
-				return nil, fmt.Errorf("@gqlId parameter 'fields' must be an array of strings")
+				return nil, fmt.Errorf("@goGqlId parameter 'fields' must be an array of strings")
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("@gqlId parameter 'fields' must be an array of strings")
+		return nil, fmt.Errorf("@goGqlId parameter 'fields' must be an array of strings")
+	}
+
+	uniqueMap := make(map[string]bool)
+
+	for _, fieldName := range fieldNames {
+		lower := strings.ToLower(fieldName)
+		if uniqueMap[lower] {
+			return nil, fmt.Errorf("'fields' arguments must be unique (duplicate entry: '%s')", fieldName)
+		}
+		uniqueMap[lower] = true
 	}
 
 	return fieldNames, nil
 }
 
 func (m *Plugin) getFieldForArg(object *codegen.Object, arg string) *codegen.Field {
+	lowerArg := strings.ToLower(arg)
 	for _, field := range object.Fields {
-		if arg == field.Name {
+		if lowerArg == strings.ToLower(field.Name) {
 			return field
 		}
 	}
@@ -117,7 +166,7 @@ func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor,
 	foundDirective := false
 
 	for _, directive := range object.Directives {
-		if directive.Name == "gqlId" {
+		if directive.Name == "goGqlId" {
 			args, err = m.getGqlIdArgs(object, directive)
 			if err != nil {
 				return nodeImplementor{}, err
@@ -128,10 +177,10 @@ func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor,
 	}
 
 	if !foundDirective {
-		// No explicit @gqlId directive -- see if the object has a dbid field
+		// No explicit @goGqlId directive -- see if the object has a dbid field
 		field := m.getFieldForArg(object, "dbid")
 		if field == nil {
-			err := fmt.Errorf("could not generate default implementation (no 'dbid' field found) -- use @gqlId directive to bind fields explicitly")
+			err := fmt.Errorf("could not generate default implementation (no 'dbid' field found) -- use @goGqlId directive to bind fields explicitly")
 			return nodeImplementor{}, err
 		}
 
@@ -139,47 +188,79 @@ func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor,
 	}
 
 	var packages []string
-	var params []string
-	var typedParams []string
+	var types []string
+	var requiresMethod []bool
 
 	for _, arg := range args {
+		if strings.ToLower(arg) == "id" {
+			err := fmt.Errorf("@goGqlId directive may not reference 'id' field because this would cause an infite loop -- @goGqlId's purpose is to generate an implementation for 'id'")
+			return nodeImplementor{}, err
+		}
+
 		var packageName string
 		var typeName string
-		var param string
+		var argRequiresMethod bool
 
 		field := m.getFieldForArg(object, arg)
-		if field == nil {
-			packageName, typeName = "", "string"
-			param = arg
+
+		if field == nil || !isStringType(field) {
+			packageName = ""
+			typeName = "string"
+			argRequiresMethod = true
 		} else {
 			packageName, typeName = m.getTypeInfo(field)
-			param = field.Name
+			argRequiresMethod = false
 		}
 
 		if packageName != "" {
 			packages = append(packages, packageName)
 		}
 
-		params = append(params, param)
-		typedParams = append(typedParams, fmt.Sprintf("%s %s", param, typeName))
+		types = append(types, typeName)
+		requiresMethod = append(requiresMethod, argRequiresMethod)
 	}
 
-	placeholders := "%s"
-	if len(params) > 1 {
-		placeholders += strings.Repeat(":%s", len(params)-1)
-	}
+	var bindingMethodSignatures []string
 
-	parameters := "(" + strings.Join(typedParams, ", ") + ")"
-	implementation := "return GqlID(fmt.Sprintf(\"" + object.Name + ":" + placeholders + "\", " + strings.Join(params, ", ") + "))"
+	for i, b := range requiresMethod {
+		if !b {
+			continue
+		}
+
+		signature := fmt.Sprintf("func (r *%s) %s%s() string", object.Name, bindingMethodPrefix, templates.ToGo(args[i]))
+		bindingMethodSignatures = append(bindingMethodSignatures, signature)
+	}
 
 	ni := nodeImplementor{
-		Name:           object.Name,
-		Packages:       packages,
-		Parameters:     parameters,
-		Implementation: implementation,
+		Name:     object.Name,
+		Packages: packages,
+		//Parameters:     parameters,
+		Implementation:          getIdImplementation(object.Name, args, requiresMethod),
+		HasBindingMethods:       len(bindingMethodSignatures) > 0,
+		BindingMethodSignatures: bindingMethodSignatures,
 	}
 
 	return ni, nil
+}
+
+func getIdImplementation(objectName string, args []string, requiresMethod []bool) string {
+	placeholders := "%s"
+	if len(args) > 1 {
+		placeholders += strings.Repeat(":%s", len(args)-1)
+	}
+
+	implementationArgs := make([]string, len(args))
+
+	for i, arg := range args {
+		goArg := templates.ToGo(arg)
+		if requiresMethod[i] {
+			implementationArgs[i] = "r." + bindingMethodPrefix + goArg + "()"
+		} else {
+			implementationArgs[i] = "r." + goArg
+		}
+	}
+
+	return "fmt.Sprintf(\"" + objectName + ":" + placeholders + "\", " + strings.Join(implementationArgs, ", ") + ")"
 }
 
 func isStringType(field *codegen.Field) bool {
@@ -192,21 +273,10 @@ func isStringType(field *codegen.Field) bool {
 
 func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName string) {
 	goType := field.TypeReference.GO.String()
-
 	isPointer := field.TypeReference.IsPtr()
+
 	if isPointer {
 		goType = goType[1:]
-	}
-
-	// If the underlying type is a string, we can do easy conversions and add some
-	// convenient type safety in our generated code. If the underlying type isn't a
-	// string, the caller will have to do their own conversions.
-	if !isStringType(field) {
-		goType = "string"
-		if isPointer {
-			goType = "*string"
-		}
-		return "", goType
 	}
 
 	if dotIndex := strings.LastIndex(goType, "."); dotIndex == -1 {
@@ -236,8 +306,6 @@ func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName
 }
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
-	pkgName := "model"
-
 	implementors := m.getNodeImplementors(data.Objects)
 	var addedImports []string
 	seenImports := make(map[string]bool)
@@ -253,10 +321,16 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 		//fmt.Printf("Name: %s\nParameters: %s\nImplementation: %s\nPackages: %v\n\n", i.Name, i.Parameters, i.Implementation, i.Packages)
 	}
 
+	templateStr, err := readTemplateFile(codeGeneratorTemplate)
+	if err != nil {
+		return err
+	}
+
 	return templates.Render(templates.Options{
-		PackageName: pkgName,
-		Filename:    m.filePath,
-		Data: &TemplateData{
+		PackageName: m.modelPackage,
+		Template:    templateStr,
+		Filename:    m.outputFilePath,
+		Data: &CodegenTemplateData{
 			Data:             data,
 			AddedImports:     addedImports,
 			NodeImplementors: implementors,
@@ -266,8 +340,21 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 	})
 }
 
-type TemplateData struct {
+type ConfigMutateTemplateData struct {
+	NodeImplementors []string
+}
+
+type CodegenTemplateData struct {
 	*codegen.Data
 	AddedImports     []string
 	NodeImplementors []nodeImplementor
+}
+
+func readTemplateFile(filename string) (string, error) {
+	_, callerFile, _, _ := runtime.Caller(1)
+	rootDir := filepath.Dir(callerFile)
+	templatePath := filepath.Join(rootDir, filename)
+
+	data, err := ioutil.ReadFile(templatePath)
+	return string(data), err
 }

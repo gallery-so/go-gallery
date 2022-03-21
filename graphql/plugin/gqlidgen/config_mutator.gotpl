@@ -1,0 +1,6 @@
+{{- range $node := .NodeImplementors }}
+    func (r *{{$node}}) ID() GqlID {
+        // Auto-generated stub. Should automatically be replaced by a real implementation during codegen,
+        // unless something went wrong.
+    }
+{{ end }}

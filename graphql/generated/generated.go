@@ -1609,13 +1609,18 @@ directive @scrub on INPUT_FIELD_DEFINITION
 
 # All types that implement Node must have a unique GqlID set in their "id" field. For types with
 # a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
-# so those types will automatically have a MakeGqlID function generated on them. Types without a
-# dbid field, or types that need multiple inputs to create a unique ID that can be used to refetch
-# the node in the future, must use the @gqlId directive to explicitly state the fields that will
-# be used to generate the ID. If a named field exists on the object and is a string or has a string
-# as its underlying type (i.e. "type Xyz string"), that type will be used when generating parameters
-# for the MakeGqlID function. Otherwise, the specified field name will be added as a string parameter.
-directive @gqlId(fields:[String!]!) on OBJECT
+# so those types will automatically have an ID function generated for them (which gqlgen will find
+# and bind to). Types without a dbid field, or types that need multiple inputs to create a unique ID
+# that can be used to refetch the node in the future, must use the @goGqlId directive to explicitly
+# state the fields that will be used to generate the ID. If a named field exists on the object and is
+# a string-based type, that field will be used as part of the ID automatically. Otherwise, a manual
+# getter method will need to be implemented to retrieve that component of the GqlID.
+directive @goGqlId(fields:[String!]!) on OBJECT
+
+# Injects a "Helper<TypeName>Data" struct embed into a generated type. Useful for adding backend-only
+# helper data necessary to resolve queries, while keeping that data out of the schema and invisible
+# to clients.
+directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
@@ -1639,7 +1644,7 @@ type GalleryUser implements Node {
   isAuthenticatedUser: Boolean
 }
 
-type Wallet implements Node @gqlId(fields: ["address"]) {
+type Wallet implements Node @goGqlId(fields: ["address"]) {
   id: ID!
   address: Address
   # TODO: Do we paginate these currently?
@@ -1799,7 +1804,7 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type GalleryNft implements Node @gqlId(fields:["nftId", "collectionId"]) {
+type GalleryNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
   id: ID!
   nft: Nft
   collection: GalleryCollection
@@ -3187,14 +3192,14 @@ func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.Colle
 		Object:     "Gallery",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3321,14 +3326,14 @@ func (ec *executionContext) _GalleryCollection_id(ctx context.Context, field gra
 		Object:     "GalleryCollection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3679,14 +3684,14 @@ func (ec *executionContext) _GalleryNft_id(ctx context.Context, field graphql.Co
 		Object:     "GalleryNft",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3778,14 +3783,14 @@ func (ec *executionContext) _GalleryUser_id(ctx context.Context, field graphql.C
 		Object:     "GalleryUser",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4680,14 +4685,14 @@ func (ec *executionContext) _MembershipOwner_id(ctx context.Context, field graph
 		Object:     "MembershipOwner",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4846,14 +4851,14 @@ func (ec *executionContext) _MembershipTier_id(ctx context.Context, field graphq
 		Object:     "MembershipTier",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5692,14 +5697,14 @@ func (ec *executionContext) _Nft_id(ctx context.Context, field graphql.Collected
 		Object:     "Nft",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7538,14 +7543,14 @@ func (ec *executionContext) _Wallet_id(ctx context.Context, field graphql.Collec
 		Object:     "Wallet",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)

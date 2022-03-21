@@ -245,7 +245,6 @@ type EthereumEoaAuth struct {
 }
 
 type Gallery struct {
-	ID          GqlID                `json:"id"`
 	Dbid        persist.DBID         `json:"dbid"`
 	Owner       *GalleryUser         `json:"owner"`
 	Collections []*GalleryCollection `json:"collections"`
@@ -254,7 +253,6 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryCollection struct {
-	ID             GqlID                    `json:"id"`
 	Dbid           persist.DBID             `json:"dbid"`
 	Version        *int                     `json:"version"`
 	Name           *string                  `json:"name"`
@@ -279,7 +277,7 @@ type GalleryCollectionLayoutInput struct {
 }
 
 type GalleryNft struct {
-	ID         GqlID              `json:"id"`
+	HelperGalleryNftData
 	Nft        *Nft               `json:"nft"`
 	Collection *GalleryCollection `json:"collection"`
 }
@@ -287,7 +285,6 @@ type GalleryNft struct {
 func (GalleryNft) IsNode() {}
 
 type GalleryUser struct {
-	ID                  GqlID        `json:"id"`
 	Dbid                persist.DBID `json:"dbid"`
 	Username            *string      `json:"username"`
 	Bio                 *string      `json:"bio"`
@@ -359,7 +356,6 @@ type LoginPayload struct {
 func (LoginPayload) IsLoginPayloadOrError() {}
 
 type MembershipOwner struct {
-	ID          GqlID            `json:"id"`
 	Dbid        persist.DBID     `json:"dbid"`
 	Address     *persist.Address `json:"address"`
 	User        *GalleryUser     `json:"user"`
@@ -369,7 +365,6 @@ type MembershipOwner struct {
 func (MembershipOwner) IsNode() {}
 
 type MembershipTier struct {
-	ID       GqlID              `json:"id"`
 	Dbid     persist.DBID       `json:"dbid"`
 	Name     *string            `json:"name"`
 	AssetURL *string            `json:"assetUrl"`
@@ -380,7 +375,6 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	ID               GqlID               `json:"id"`
 	Dbid             persist.DBID        `json:"dbid"`
 	CreationTime     *time.Time          `json:"creationTime"`
 	LastUpdated      *time.Time          `json:"lastUpdated"`
@@ -522,7 +516,6 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	ID      GqlID            `json:"id"`
 	Address *persist.Address `json:"address"`
 	Nfts    []*Nft           `json:"nfts"`
 }

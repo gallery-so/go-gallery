@@ -1,0 +1,24 @@
+{{ reserveImport "fmt" }}
+
+{{ range $import := .AddedImports }}
+	{{ reserveImport $import }}
+{{end}}
+
+{{- range $node := .NodeImplementors }}
+func (r *{{$node.Name}}) ID() GqlID {
+    {{- if $node.HasBindingMethods}}
+    //-----------------------------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------------------------
+    // Some fields specified by @goGqlId require manual binding because one of the following is true:
+    // (a) the field does not exist on the {{$node.Name}} type, or
+    // (b) the field exists but is not a string type
+    //-----------------------------------------------------------------------------------------------
+    // Please create binding methods on the {{$node.Name}} type with the following signatures:
+        {{- range $signature := $node.BindingMethodSignatures}}
+    // {{$signature}}
+        {{- end }}
+    //-----------------------------------------------------------------------------------------------
+    {{- end }}
+    return GqlID({{$node.Implementation}})
+}
+{{ end }}

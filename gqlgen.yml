@@ -63,7 +63,9 @@ models:
       - github.com/99designs/gqlgen/graphql.Int32
 
 directives:
-  gqlId:
+  goGqlId:
+    skip_runtime: true
+  goEmbedHelper:
     skip_runtime: true
   scrub:
     skip_runtime: true
