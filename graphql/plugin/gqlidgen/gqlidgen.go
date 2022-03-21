@@ -91,13 +91,13 @@ type nodeImplementor struct {
 	BindingMethodSignatures []string
 }
 
-func (m *Plugin) getNodeImplementors(objects []*codegen.Object) []nodeImplementor {
+func getNodeImplementors(objects []*codegen.Object, modelPackage string) []nodeImplementor {
 	nodeImplementors := make([]nodeImplementor, 0)
 
 	for _, object := range objects {
 		for _, implements := range object.Implements {
 			if implements.Name == "Node" {
-				implementor, err := m.createNodeImplementor(object)
+				implementor, err := createNodeImplementor(object, modelPackage)
 				if err == nil {
 					nodeImplementors = append(nodeImplementors, implementor)
 				} else {
@@ -110,7 +110,7 @@ func (m *Plugin) getNodeImplementors(objects []*codegen.Object) []nodeImplemento
 	return nodeImplementors
 }
 
-func (m *Plugin) getGqlIdArgs(object *codegen.Object, directive *codegen.Directive) ([]string, error) {
+func getGqlIdArgs(object *codegen.Object, directive *codegen.Directive) ([]string, error) {
 	var fieldsArg *codegen.FieldArgument
 
 	for _, arg := range directive.Args {
@@ -153,7 +153,7 @@ func (m *Plugin) getGqlIdArgs(object *codegen.Object, directive *codegen.Directi
 	return fieldNames, nil
 }
 
-func (m *Plugin) getFieldForArg(object *codegen.Object, arg string) *codegen.Field {
+func getFieldForArg(object *codegen.Object, arg string) *codegen.Field {
 	lowerArg := strings.ToLower(arg)
 	for _, field := range object.Fields {
 		if lowerArg == strings.ToLower(field.Name) {
@@ -164,14 +164,14 @@ func (m *Plugin) getFieldForArg(object *codegen.Object, arg string) *codegen.Fie
 	return nil
 }
 
-func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor, error) {
+func createNodeImplementor(object *codegen.Object, modelPackage string) (nodeImplementor, error) {
 	var args []string
 	var err error
 	foundDirective := false
 
 	for _, directive := range object.Directives {
 		if directive.Name == "goGqlId" {
-			args, err = m.getGqlIdArgs(object, directive)
+			args, err = getGqlIdArgs(object, directive)
 			if err != nil {
 				return nodeImplementor{}, err
 			}
@@ -182,7 +182,7 @@ func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor,
 
 	if !foundDirective {
 		// No explicit @goGqlId directive -- see if the object has a dbid field
-		field := m.getFieldForArg(object, "dbid")
+		field := getFieldForArg(object, "dbid")
 		if field == nil {
 			err := fmt.Errorf("could not generate default implementation (no 'dbid' field found) -- use @goGqlId directive to bind fields explicitly")
 			return nodeImplementor{}, err
@@ -205,14 +205,14 @@ func (m *Plugin) createNodeImplementor(object *codegen.Object) (nodeImplementor,
 		var typeName string
 		var argRequiresMethod bool
 
-		field := m.getFieldForArg(object, arg)
+		field := getFieldForArg(object, arg)
 
 		if field == nil || !isStringType(field) {
 			packageName = ""
 			typeName = "string"
 			argRequiresMethod = true
 		} else {
-			packageName, typeName = m.getTypeInfo(field)
+			packageName, typeName = getTypeInfo(field, modelPackage)
 			argRequiresMethod = false
 		}
 
@@ -275,7 +275,7 @@ func isStringType(field *codegen.Field) bool {
 	return field.TypeReference.GO.Underlying().String() == "string"
 }
 
-func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName string) {
+func getTypeInfo(field *codegen.Field, modelPackage string) (packageName string, typeName string) {
 	goType := field.TypeReference.GO.String()
 	isPointer := field.TypeReference.IsPtr()
 
@@ -296,7 +296,7 @@ func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName
 	}
 
 	if dotIndex := strings.Index(typeName, "."); dotIndex != -1 {
-		if typeName[:dotIndex] == m.modelPackage {
+		if typeName[:dotIndex] == modelPackage {
 			typeName = typeName[dotIndex+1:]
 			packageName = ""
 		}
@@ -310,7 +310,7 @@ func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName
 }
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
-	implementors := m.getNodeImplementors(data.Objects)
+	implementors := getNodeImplementors(data.Objects, m.modelPackage)
 
 	if len(implementors) == 0 {
 		return nil
