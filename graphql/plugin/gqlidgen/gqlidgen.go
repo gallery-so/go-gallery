@@ -61,6 +61,10 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 		}
 	}
 
+	if len(implementors) == 0 {
+		return nil
+	}
+
 	templateStr, err := readTemplateFile(configMutatorTemplate)
 	if err != nil {
 		return err
@@ -307,6 +311,11 @@ func (m *Plugin) getTypeInfo(field *codegen.Field) (packageName string, typeName
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
 	implementors := m.getNodeImplementors(data.Objects)
+
+	if len(implementors) == 0 {
+		return nil
+	}
+
 	var addedImports []string
 	seenImports := make(map[string]bool)
 
