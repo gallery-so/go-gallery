@@ -77,8 +77,8 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 				for i, err := range c.Errors {
 					errCtx := sentry.SentryErrorContext{StackIndex: i}
 
-					if mappedErr := graphql.GraphqlErrType(err); mappedErr != nil {
-						errCtx.Mapped = true
+					if mappedErr, mapped := graphql.ErrorToGraphqlType(err); mapped {
+						errCtx.Mapped = mapped
 						errCtx.MappedTo = fmt.Sprintf("%T", mappedErr)
 					}
 

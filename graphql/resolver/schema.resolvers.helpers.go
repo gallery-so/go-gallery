@@ -19,8 +19,11 @@ import (
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
-func GraphqlErrType(err error) (mappedErr model.Error) {
+// errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
+// If no matching type is found, ok will return false
+func ErrorToGraphqlType(err error) (gqlError model.Error, ok bool) {
 	message := err.Error()
+	var mappedErr model.Error = nil
 
 	// TODO: Add model.ErrNotAuthorized mapping once auth handling is moved to the publicapi layer
 
@@ -38,15 +41,10 @@ func GraphqlErrType(err error) (mappedErr model.Error) {
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 	}
 
-	return mappedErr
-}
-
-// errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
-// If no matching type is found, ok will return false
-func (r *Resolver) errorToGraphqlType(err error) (gqlError model.Error, ok bool) {
-	if mappedErr := GraphqlErrType(err); mappedErr != nil {
+	if mappedErr != nil {
 		return mappedErr, true
 	}
+
 	return nil, false
 }
 

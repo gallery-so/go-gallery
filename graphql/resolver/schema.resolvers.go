@@ -97,7 +97,7 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.CreateCollectionPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.CreateCollectionPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -133,7 +133,7 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.DeleteCollectionPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.DeleteCollectionPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -171,7 +171,7 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.UpdateCollectionInfoPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.UpdateCollectionInfoPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -206,7 +206,7 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.UpdateCollectionNftsPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.UpdateCollectionNftsPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -245,7 +245,7 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.UpdateGalleryCollectionsPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.UpdateGalleryCollectionsPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -279,7 +279,7 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.AddUserAddressPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.AddUserAddressPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -312,7 +312,7 @@ func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.RemoveUserAddressesPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.RemoveUserAddressesPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -340,7 +340,7 @@ func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.Updat
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.UpdateUserInfoPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.UpdateUserInfoPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -368,7 +368,7 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses str
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.RefreshOpenSeaNftsPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.RefreshOpenSeaNftsPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -398,7 +398,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Add
 
 	if err != nil {
 		// Map known errors to GraphQL return types
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.GetAuthNoncePayloadOrError); ok {
 				return returnType, nil
 			}
@@ -416,7 +416,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.CreateUserPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.CreateUserPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -444,7 +444,7 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.LoginPayloadOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.LoginPayloadOrError); ok {
 				return returnType, nil
 			}
@@ -476,7 +476,7 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (mo
 
 	// Map known errors to GraphQL return types
 	remapError := func(err error) (model.UserByUsernameOrError, error) {
-		if errorType, ok := r.errorToGraphqlType(err); ok {
+		if errorType, ok := ErrorToGraphqlType(err); ok {
 			if returnType, ok := errorType.(model.UserByUsernameOrError); ok {
 				return returnType, nil
 			}
