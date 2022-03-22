@@ -3,8 +3,11 @@ package publicapi
 import (
 	"context"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/event"
@@ -17,11 +20,14 @@ import (
 )
 
 type UserAPI struct {
-	repos     *persist.Repositories
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
-	pubsub    pubsub.PubSub
+	repos         *persist.Repositories
+	loaders       *dataloader.Loaders
+	validator     *validator.Validate
+	ethClient     *ethclient.Client
+	ipfsClient    *shell.Shell
+	arweaveClient *goar.Client
+	storageClient *storage.Client
+	pubsub        pubsub.PubSub
 }
 
 func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, authenticator auth.Authenticator) error {
@@ -82,7 +88,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
-	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient)
+	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
 }
 
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
