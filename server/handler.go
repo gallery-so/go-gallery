@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/storage"
+	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -25,7 +26,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
-	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
@@ -63,7 +63,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 			hub.Recover(err)
 		}
 
-		return gqlerror.Errorf("internal server error")
+		return gqlgen.DefaultRecover(ctx, err)
 	})
 
 	return func(c *gin.Context) {
