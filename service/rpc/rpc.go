@@ -84,7 +84,7 @@ func NewEthClient() *ethclient.Client {
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 5)
+	sh.SetTimeout(time.Second * 10)
 	return sh
 }
 
