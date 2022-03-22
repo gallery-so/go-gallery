@@ -5,6 +5,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -20,14 +21,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 	graphqlGroup := router.Group("/glry/graphql")
 
 	nftHandlersInit(apiGroupV1, repos, ethClient, stg, psub)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, stg, psub)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, arweaveClient, stg, psub)
 	graphqlHandlersInit(graphqlGroup, repos, ethClient, psub)
 
 	return router
@@ -120,7 +121,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
@@ -154,6 +155,7 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, eth
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.UserRepository, ethClient), updateTokenByID(repos.TokenRepository))
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.UserRepository, ethClient), getUnassignedTokensForUser(repos.CollectionTokenRepository, repos.TokenRepository, ipfsClient, ethClient))
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshUnassignedTokensForUser(repos.CollectionTokenRepository))
+	nftsGroup.GET("/metadata/refresh", refreshMetadataForToken(repos.TokenRepository, ethClient, ipfsClient, arweaveClient, stg))
 
 	proxy := parent.Group("/proxy")
 	proxy.GET("/snapshot", proxySnapshot(stg))
