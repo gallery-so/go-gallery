@@ -325,11 +325,10 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			gallery.Collections = append(gallery.Collections, coll)
 		}
 		result = append(result, gallery)
-
 	}
 
 	if g.galleriesCache != nil {
-		marshalled, err := json.Marshal(galleries)
+		marshalled, err := json.Marshal(result)
 		if err != nil {
 			return nil, err
 		}

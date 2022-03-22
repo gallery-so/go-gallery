@@ -340,7 +340,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 	}
 
 	if g.galleriesCache != nil {
-		marshalled, err := json.Marshal(galleries)
+		marshalled, err := json.Marshal(result)
 		if err != nil {
 			return nil, err
 		}
