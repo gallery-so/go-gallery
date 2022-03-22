@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -57,7 +58,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), rpc.NewEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), newGCPPubSub())
+	return handlersInit(router, newRepos(pqClient), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), newGCPPubSub())
 }
 
 func newStorageClient() *storage.Client {
@@ -136,6 +137,14 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
 		NftEventRepository:        postgres.NewNftEventRepository(db),
 	}
+}
+
+func newEthClient() *ethclient.Client {
+	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
+	if err != nil {
+		panic(err)
+	}
+	return client
 }
 
 func newGCPPubSub() pubsub.PubSub {
