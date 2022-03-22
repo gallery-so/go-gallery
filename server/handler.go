@@ -5,6 +5,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -20,21 +21,21 @@ import (
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 	graphqlGroup := router.Group("/glry/graphql")
 
-	nftHandlersInit(apiGroupV1, repos, ethClient, stg, psub)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, stg, psub)
-	graphqlHandlersInit(graphqlGroup, repos, ethClient, psub)
+	nftHandlersInit(apiGroupV1, repos, ethClient, stg, ipfsClient, arweaveClient, stg, psub)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, arweaveClient, stg, psub)
+	graphqlHandlersInit(graphqlGroup, repos, ethClient, ipfsClient, arweaveClient, stg, psub)
 
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
-	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient, pubsub))
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) {
+	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, ethClient, ipfsClient, arweaveClient, storageClient, pubsub))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
@@ -42,7 +43,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, e
 	}
 }
 
-func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) gin.HandlerFunc {
+func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) gin.HandlerFunc {
 	// TODO: Resolver probably doesn't need repos or ethClient once the publicAPI is done
 	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
@@ -53,7 +54,7 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, pu
 		// TODO: Remove dataloader here
 		dataloader.AddTo(c, repos)
 		event.AddTo(c, repos)
-		publicapi.AddTo(c, repos, ethClient, pubsub)
+		publicapi.AddTo(c, repos, ethClient, ipfsClient, arweaveClient, storageClient, pubsub)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }
@@ -93,7 +94,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories,
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
 }
 
-func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, psub pubsub.PubSub) {
+func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, psub pubsub.PubSub) {
 
 	usersGroup := parent.Group("/users")
 
@@ -113,14 +114,14 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddresses(repos.UserRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.UserRepository))
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.UserRepository))
-	usersGroup.GET("/membership", getMembershipTiersREST(repos.MembershipRepository, repos.UserRepository, repos.GalleryRepository, ethClient))
+	usersGroup.GET("/membership", getMembershipTiersREST(repos.MembershipRepository, repos.UserRepository, repos.GalleryRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	usersGroup.POST("/create", createUser(repos.UserRepository, repos.NonceRepository, repos.GalleryRepository, psub, ethClient))
 	usersGroup.GET("/previews", getNFTPreviews(repos.GalleryRepository, repos.UserRepository))
 	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, stg *storage.Client, psub pubsub.PubSub) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
@@ -154,6 +155,7 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, eth
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.UserRepository, ethClient), updateTokenByID(repos.TokenRepository))
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.UserRepository, ethClient), getUnassignedTokensForUser(repos.CollectionTokenRepository, repos.TokenRepository, ipfsClient, ethClient))
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshUnassignedTokensForUser(repos.CollectionTokenRepository))
+	nftsGroup.GET("/metadata/refresh", refreshMetadataForToken(repos.TokenRepository, ethClient, ipfsClient, arweaveClient, stg))
 
 	proxy := parent.Group("/proxy")
 	proxy.GET("/snapshot", proxySnapshot(stg))
@@ -162,11 +164,11 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, eth
 
 }
 
-func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, stg *storage.Client, psub pubsub.PubSub) {
+func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, stg *storage.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, psub pubsub.PubSub) {
 
 	// AUTH
 
-	authHandlersInitNFT(parent, repos, ethClient, psub)
+	authHandlersInitNFT(parent, repos, ethClient, ipfsClient, arweaveClient, stg, psub)
 
 	// GALLERIES
 

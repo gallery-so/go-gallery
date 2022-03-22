@@ -11,13 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -58,7 +58,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 		panic(err)
 	}
 
-	return handlersInit(router, newRepos(pqClient), newEthClient(), newIPFSShell(), newStorageClient(), newGCPPubSub())
+	return handlersInit(router, newRepos(pqClient), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), newGCPPubSub())
 }
 
 func newStorageClient() *storage.Client {
@@ -145,12 +145,6 @@ func newEthClient() *ethclient.Client {
 		panic(err)
 	}
 	return client
-}
-
-func newIPFSShell() *shell.Shell {
-	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 15)
-	return sh
 }
 
 func newGCPPubSub() pubsub.PubSub {
