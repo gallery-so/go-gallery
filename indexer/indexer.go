@@ -33,6 +33,8 @@ import (
 
 var defaultStartingBlock persist.BlockNumber = 5000000
 
+var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
+
 const defaultWorkerPoolSize = 8
 
 const defaultWorkerPoolWaitSize = 25
@@ -200,15 +202,14 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	startTime := time.Now()
 	i.isListening = false
 	uris := make(chan tokenURI)
-	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []transfersAtBlock)
 
 	go i.processLogs(transfers, start, topics)
-	go i.processTransfers(transfers, uris, metadatas, owners, previousOwners, balances)
-	i.processTokens(uris, metadatas, owners, previousOwners, balances)
+	go i.processTransfers(transfers, uris, owners, previousOwners, balances)
+	i.processTokens(uris, owners, previousOwners, balances)
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
 	}
@@ -258,7 +259,6 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewReader(ctx)
 	if err == nil {
 		defer reader.Close()
-		logsTo = make([]types.Log, 0, 8000)
 		err = json.NewDecoder(reader).Decode(&logsTo)
 		if err != nil {
 			panic(err)
@@ -332,10 +332,6 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 
 func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Transfer {
 
-	erc1155ABI, err := contracts.IERC1155MetaData.GetAbi()
-	if err != nil {
-		panic(err)
-	}
 	result := make([]rpc.Transfer, 0, len(pLogs)*2)
 	for _, pLog := range pLogs {
 		initial := time.Now()
@@ -491,9 +487,8 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
-	defer close(metadatas)
 	defer close(owners)
 	defer close(previousOwners)
 	defer close(balances)
@@ -507,11 +502,9 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 		}
 
 		logrus.Debugf("Processing %d transfers", len(transfers))
-		it := make([]transfersAtBlock, len(transfers))
-		copy(it, transfers)
+		submit := transfers
 		wp.Submit(func() {
-			submit := it
-			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, nil, false, false)
+			processTransfers(i, submit, uris, nil, owners, previousOwners, balances, nil, false, false)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -536,10 +529,8 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 		}
 
 		logrus.Debugf("Processing %d transfers", len(transfers))
-		it := make([]transfersAtBlock, len(transfers))
-		copy(it, transfers)
+		submit := transfers
 		wp.Submit(func() {
-			submit := it
 			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, medias, true, true)
 		})
 	}
@@ -575,12 +566,12 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers, to persist.Address, from persist.Address, contractAddress persist.Address, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
 	if sideEffects {
 		wg.Add(1)
 	}
 	if optionalFields {
-		wg.Add(1)
+		wg.Add(2)
 	}
 	switch persist.TokenType(transfer.TokenType) {
 	case persist.TokenTypeERC721:
@@ -625,27 +616,53 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 		panic("unknown token type")
 	}
 
-	go func() {
-		uriReplaced := getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
+	var uri persist.TokenURI
+	var metadata persist.TokenMetadata
 
-		metadata, uriReplaced := getMetadata(contractAddress, uriReplaced, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
-		go func() {
-			defer wg.Done()
-			uris <- tokenURI{key, uriReplaced}
-		}()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	ct, tid, err := key.GetParts()
+	if err != nil {
+		logrus.WithError(err).Errorf("error getting parts of %s", key)
+		storeErr(err, "ERR-PARTS", from, key, transfer.BlockNumber, i.storageClient)
+		panic(err)
+	}
+	ts, _ := i.tokenRepo.GetByTokenIdentifiers(ctx, tid, ct, 1, 0)
+	if ts != nil && len(ts) > 0 {
+		first := ts[0]
+		if first.TokenURI != "" {
+			uri = persist.TokenURI(first.TokenURI)
+		}
+		if first.TokenMetadata != nil && len(first.TokenMetadata) > 0 {
+			metadata = persist.TokenMetadata(first.TokenMetadata)
+		}
+	}
+
+	if uri == "" {
+		uri = getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
+	}
+
+	go func() {
+		defer wg.Done()
+		uris <- tokenURI{key, uri}
+	}()
+
+	if optionalFields {
+		if metadata == nil {
+			metadata, uri = getMetadata(contractAddress, uri, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
+		}
 		go func() {
 			defer wg.Done()
 			if len(metadata) > 0 {
 				metadatas <- tokenMetadata{key, metadata}
 			}
 		}()
-		if optionalFields {
-			go func() {
-				defer wg.Done()
-				findOptionalFields(i, key, to, from, uriReplaced, metadata, medias)
-			}()
-		}
-	}()
+		go func() {
+			defer wg.Done()
+			findOptionalFields(i, key, to, from, uri, metadata, medias)
+		}()
+	}
 
 	wg.Wait()
 }
@@ -808,10 +825,10 @@ func getMetadata(contractAddress persist.Address, uriReplaced persist.TokenURI, 
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
+func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
 
 	wg := &sync.WaitGroup{}
-	wg.Add(5)
+	wg.Add(4)
 	ownersMap := map[persist.TokenIdentifiers]ownerAtBlock{}
 	previousOwnersMap := map[persist.TokenIdentifiers][]ownerAtBlock{}
 	balancesMap := map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock{}
@@ -820,7 +837,6 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 
 	go receiveBalances(wg, balances, balancesMap, i.tokenRepo)
 	go receiveOwners(wg, owners, ownersMap, i.tokenRepo)
-	go receiveMetadatas(wg, metadatas, metadatasMap)
 	go receiveURIs(wg, uris, urisMap)
 	go receivePreviousOwners(wg, previousOwners, previousOwnersMap, i.tokenRepo)
 	wg.Wait()
