@@ -55,8 +55,8 @@ type updateTokenByIDInput struct {
 }
 
 type refreshMetadataInput struct {
-	TokenID         persist.TokenID `form:"token_id"`
-	ContractAddress persist.Address `form:"contract_address"`
+	TokenID         persist.TokenID `form:"token_id,required"`
+	ContractAddress persist.Address `form:"contract_address,required"`
 }
 
 type refreshMetadataOutput struct {
