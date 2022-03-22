@@ -25,7 +25,7 @@ import (
 var MembershipTierIDs = []persist.TokenID{"4", "1", "3", "5", "6", "8"}
 
 // PremiumCards is the contract address for the premium membership cards
-const PremiumCards persist.Address = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"
+const PremiumCards persist.Address = "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"
 
 // UpdateMembershipTiers fetches all membership cards for all token IDs
 func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
@@ -43,6 +43,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 			return nil, fmt.Errorf("Failed to get owners for token: %s, %v", v, err)
 		}
 		if len(owners) == 0 {
+			logrus.Errorf("No owners found for token: %s", v)
 			continue
 		}
 		go func(id persist.TokenID, o []persist.Address) {
@@ -294,7 +295,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 		addr := o
 		wp.Submit(func() {
 			logrus.Debugf("Processing event for ID %s %+v %d", id, addr, i)
-			if addr != persist.ZeroAddress {
+			if addr.String() != persist.ZeroAddress.String() {
 				logrus.Debug("Event is to real address")
 				// does to have the NFT?
 				membershipOwner := fillMembershipOwner(ctx, addr, id, ethClient, userRepository, galleryRepository)
