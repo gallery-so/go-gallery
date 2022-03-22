@@ -32,7 +32,7 @@ type alchemyNFTMetadata struct {
 func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.Address) ([]persist.Address, error) {
 	alchemyURL := viper.GetString("CONTRACT_INTERACTION_URL") + "/getOwnersForToken"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, tid), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, fmt.Sprintf("0x0%s", tid)), nil)
 	if err != nil {
 		return nil, err
 	}
