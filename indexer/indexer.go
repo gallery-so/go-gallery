@@ -203,14 +203,13 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	i.isListening = false
 	uris := make(chan tokenURI)
 	balances := make(chan tokenBalances)
-	metadata := make(chan tokenMetadata)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []transfersAtBlock)
 
 	go i.processLogs(transfers, start, topics)
-	go i.processTransfers(transfers, uris, metadata, owners, previousOwners, balances)
-	i.processTokens(uris, metadata, owners, previousOwners, balances)
+	go i.processTransfers(transfers, uris, owners, previousOwners, balances)
+	i.processTokens(uris, owners, previousOwners, balances)
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
 	}
@@ -488,12 +487,11 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
 	defer close(owners)
 	defer close(previousOwners)
 	defer close(balances)
-	defer close(metadatas)
 
 	wp := workerpool.New(20)
 
@@ -506,7 +504,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 		logrus.Debugf("Processing %d transfers", len(transfers))
 		submit := transfers
 		wp.Submit(func() {
-			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, nil, false, false)
+			processTransfers(i, submit, uris, nil, owners, previousOwners, balances, nil, false, false)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -568,12 +566,12 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers, to persist.Address, from persist.Address, contractAddress persist.Address, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
 	if sideEffects {
 		wg.Add(1)
 	}
 	if optionalFields {
-		wg.Add(1)
+		wg.Add(2)
 	}
 	switch persist.TokenType(transfer.TokenType) {
 	case persist.TokenTypeERC721:
@@ -645,21 +643,21 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 		uri = getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
 	}
 
-	if metadata == nil {
-		metadata, uri = getMetadata(contractAddress, uri, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
-	}
 	go func() {
 		defer wg.Done()
 		uris <- tokenURI{key, uri}
 	}()
-	go func() {
-		defer wg.Done()
-		if len(metadata) > 0 {
-			metadatas <- tokenMetadata{key, metadata}
-		}
-	}()
 
 	if optionalFields {
+		if metadata == nil {
+			metadata, uri = getMetadata(contractAddress, uri, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
+		}
+		go func() {
+			defer wg.Done()
+			if len(metadata) > 0 {
+				metadatas <- tokenMetadata{key, metadata}
+			}
+		}()
 		go func() {
 			defer wg.Done()
 			findOptionalFields(i, key, to, from, uri, metadata, medias)
@@ -827,10 +825,10 @@ func getMetadata(contractAddress persist.Address, uriReplaced persist.TokenURI, 
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
+func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
 
 	wg := &sync.WaitGroup{}
-	wg.Add(5)
+	wg.Add(4)
 	ownersMap := map[persist.TokenIdentifiers]ownerAtBlock{}
 	previousOwnersMap := map[persist.TokenIdentifiers][]ownerAtBlock{}
 	balancesMap := map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock{}
@@ -841,7 +839,6 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, metadatas <-chan tokenMeta
 	go receiveOwners(wg, owners, ownersMap, i.tokenRepo)
 	go receiveURIs(wg, uris, urisMap)
 	go receivePreviousOwners(wg, previousOwners, previousOwnersMap, i.tokenRepo)
-	go receiveMetadatas(wg, metadatas, metadatasMap)
 	wg.Wait()
 
 	logrus.Info("Done recieving field data, converting fields into tokens...")
