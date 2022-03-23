@@ -20,7 +20,7 @@ import (
 )
 
 const loadersKey = "graphql.dataloaders"
-const defaultMaxBatch = 100
+const defaultMaxBatch = 1 // Disable batching until loading functions support it
 const defaultWaitTime = 1 * time.Millisecond
 
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
