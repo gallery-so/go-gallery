@@ -51,7 +51,7 @@ func run() {
 
 	userIDs := getAllUsers(ctx, pgClient)
 
-	usersToNewCollections := getNewCollections(ctx, pgClient, userIDs, nftRepo, userRepo, collectionRepo, tokenRepo, ethClient, ipfsClient, arweaveClient)
+	usersToNewCollections := getNewCollections(ctx, pgClient, userIDs, nftRepo, userRepo, collectionRepo, tokenRepo, galleryRepo, ethClient, ipfsClient, arweaveClient)
 
 	updateCollections(ctx, pgClient, usersToNewCollections)
 }
@@ -87,7 +87,7 @@ type userIDCollsTuple struct {
 	newCollsToNFTs map[persist.DBID][]persist.DBID
 }
 
-func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persist.DBID][]persist.Address, nftRepo *postgres.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, tokenRepo *postgres.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) map[persist.DBID]map[persist.DBID][]persist.DBID {
+func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persist.DBID][]persist.Address, nftRepo *postgres.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, tokenRepo *postgres.TokenRepository, galleryRepo *postgres.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) map[persist.DBID]map[persist.DBID][]persist.DBID {
 	usersToNewCollections := map[persist.DBID]map[persist.DBID][]persist.DBID{}
 	receivedColls := make(chan userIDCollsTuple)
 
@@ -154,7 +154,7 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 								matchingAsset, err := findMatchingAsset(assets, fullNFT)
 								if err != nil {
 									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo)
 									if err != nil {
 										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
 									} else {
@@ -183,7 +183,7 @@ func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persis
 								matchingAsset, err := findMatchingAsset(assets, fullNFT)
 								if err != nil {
 									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo)
 									if err != nil {
 										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
 									} else {

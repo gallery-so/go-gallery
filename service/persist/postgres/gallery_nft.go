@@ -516,7 +516,6 @@ func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.
 	if err != nil {
 		return err
 	}
-	logrus.Infof("Caching gallery %s: %s", pUserID, marshalled)
 	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 		return err
 	}

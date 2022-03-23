@@ -204,28 +204,18 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 }
 
 // GetByOpenseaID gets a NFT by its Opensea ID and owner address
-func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.Address) ([]persist.NFT, error) {
-	rows, err := n.getByOpenseaIDStmt.QueryContext(pCtx, pOpenseaID, pWalletAddress)
+func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.Address) (persist.NFT, error) {
+	var nft persist.NFT
+	err := n.getByOpenseaIDStmt.QueryRowContext(pCtx, pOpenseaID, pWalletAddress).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	nfts := make([]persist.NFT, 0, 25)
-	for rows.Next() {
-		var nft persist.NFT
-		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
-		if err != nil {
-			return nil, err
+		if err == sql.ErrNoRows {
+			// TODO custom error here
+			return persist.NFT{}, fmt.Errorf("NFT not found by Opensea ID %d", pOpenseaID)
 		}
-		nfts = append(nfts, nft)
+		return persist.NFT{}, err
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return nfts, nil
+	return nft, nil
 }
 
 // UpdateByID updates a NFT by its ID
