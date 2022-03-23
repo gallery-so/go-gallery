@@ -298,7 +298,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	}
 	if err := res.Err(); err != nil {
 		return persist.Collection{}, err
-	} // TODO: Does the above not find empty collections, and that's why we check again without attempting to unnest?
+	}
 	if collection.ID == "" {
 		collection.NFTs = []persist.CollectionNFT{}
 		err := rawStmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
@@ -316,6 +316,26 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 
 	collection.NFTs = nfts
 
+	return collection, nil
+}
+
+// GetByIDRaw gets a collection by its ID
+func (c *CollectionRepository) GetByIDRaw(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
+	var stmt *sql.Stmt
+	if pShowHidden {
+		stmt = c.getByIDOwnerRawStmt
+	} else {
+		stmt = c.getByIDRawStmt
+	}
+
+	var collection persist.Collection
+	err := stmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+		}
+		return persist.Collection{}, err
+	}
 	return collection, nil
 }
 

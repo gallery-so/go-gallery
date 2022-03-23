@@ -204,7 +204,7 @@ func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, r *persist
 		errors := make([]error, len(collectionIds))
 
 		for i, collectionId := range collectionIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByChildCollectionID(ctx, collectionId)
+			galleries[i], errors[i] = r.GalleryRepository.GetByChildCollectionIDRaw(ctx, collectionId)
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
@@ -246,7 +246,7 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *pers
 
 		for i, collectionId := range collectionIds {
 			// Always return hidden collections; the frontend will filter them out as needed.
-			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, collectionId, true)
+			collections[i], errors[i] = r.CollectionRepository.GetByIDRaw(ctx, collectionId, true)
 		}
 
 		return collections, errors
