@@ -7,8 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -86,6 +88,14 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
+	// Send event
+	nftIDs := make([]persist.DBID, len(createdCollection.NFTs))
+	for i, nft := range createdCollection.NFTs {
+		nftIDs[i] = nft.ID
+	}
+	collectionData := persist.CollectionEvent{NFTs: nftIDs, CollectorsNote: createdCollection.CollectorsNote}
+	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
+
 	return &createdCollection, nil
 }
 
@@ -129,6 +139,10 @@ func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID pers
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
+	// Send event
+	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
+	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
+
 	return api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
 }
 
@@ -160,5 +174,22 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 
 	backupGalleriesForUser(ctx, userID, api.repos)
 
+	// Send event
+	collectionData := persist.CollectionEvent{NFTs: nfts}
+	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
+
 	return nil
+}
+
+func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
+	gc := util.GinContextFromContext(ctx)
+	collectionHandlers := event.For(gc).Collection
+	evt := persist.CollectionEventRecord{
+		UserID:       userID,
+		CollectionID: collectionID,
+		Code:         eventCode,
+		Data:         collectionData,
+	}
+
+	collectionHandlers.Dispatch(evt)
 }

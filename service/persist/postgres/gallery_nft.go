@@ -13,6 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const galleryCacheTime = time.Hour * 24 * 3
+
 // GalleryRepository is the repository for interacting with galleries in a postgres database
 type GalleryRepository struct {
 	db                            *sql.DB
@@ -219,14 +221,17 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 
 // GetByUserID returns the galleries owned by the given userID
 func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
-	initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
-	if len(initial) > 0 {
-		var galleries []persist.Gallery
-		err := json.Unmarshal(initial, &galleries)
-		if err != nil {
-			return nil, err
+	if g.galleriesCache != nil {
+		initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
+		if len(initial) > 0 {
+			var galleries []persist.Gallery
+			err := json.Unmarshal(initial, &galleries)
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to unmarshal cached galleries for user %s - cached: %s", pUserID, string(initial))
+			} else {
+				return galleries, nil
+			}
 		}
-		return galleries, nil
 	}
 	rows, err := g.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	if err != nil {
@@ -321,6 +326,17 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 		result = append(result, gallery)
 	}
+
+	if g.galleriesCache != nil {
+		marshalled, err := json.Marshal(result)
+		if err != nil {
+			return nil, err
+		}
+		if err := g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
+			return nil, err
+		}
+	}
+
 	return result, nil
 
 }
@@ -446,6 +462,9 @@ func (g *GalleryRepository) GetByChildCollectionIDRaw(pCtx context.Context, pID 
 
 // RefreshCache deletes the given key in the cache
 func (g *GalleryRepository) RefreshCache(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	return g.galleriesCache.Delete(pCtx, pUserID.String())
 }
 
@@ -497,6 +516,9 @@ func addUnaccountedForCollections(pCtx context.Context, g *GalleryRepository, pU
 }
 
 func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.DBID) error {
+	if g.galleriesCache == nil {
+		return nil
+	}
 	err := g.RefreshCache(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -510,7 +532,7 @@ func (g *GalleryRepository) cacheByUserID(pCtx context.Context, pUserID persist.
 		return err
 	}
 	logrus.Infof("Caching gallery %s: %s", pUserID, marshalled)
-	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, -1); err != nil {
+	if err = g.galleriesCache.Set(pCtx, pUserID.String(), marshalled, galleryCacheTime); err != nil {
 		return err
 	}
 	return nil

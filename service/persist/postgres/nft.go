@@ -17,6 +17,7 @@ var insertNFTsSQL = `INSERT INTO nfts (ID, DELETED, VERSION, NAME, DESCRIPTION, 
 // NFTRepository is a repository that stores collections in a postgres database
 type NFTRepository struct {
 	db                           *sql.DB
+	galleryRepo                  *GalleryRepository
 	createStmt                   *sql.Stmt
 	getByAddressesStmt           *sql.Stmt
 	getByIDStmt                  *sql.Stmt
@@ -30,7 +31,7 @@ type NFTRepository struct {
 }
 
 // NewNFTRepository creates a new persist.NFTPostgresRepository
-func NewNFTRepository(db *sql.DB) *NFTRepository {
+func NewNFTRepository(db *sql.DB, galleryRepo *GalleryRepository) *NFTRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -66,6 +67,7 @@ func NewNFTRepository(db *sql.DB) *NFTRepository {
 
 	return &NFTRepository{
 		db:                           db,
+		galleryRepo:                  galleryRepo,
 		createStmt:                   createStmt,
 		getByAddressesStmt:           getByAddressesStmt,
 		getByIDStmt:                  getByIDStmt,
@@ -297,7 +299,7 @@ func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUser
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
 
-	return nil
+	return n.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
 // UpdateByIDUnsafe updates a NFT by its ID without ensure the NFT is owned by the user

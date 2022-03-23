@@ -65,6 +65,37 @@ func TestGetTokenByID_NotFoundError(t *testing.T) {
 	assert.NotEmpty(fmt.Sprintf("token not found by ID:: %s", nonexistentNftID), body.Error)
 }
 
+func TestRefreshMetadata_Success(t *testing.T) {
+	assert := setupTest(t, 2)
+
+	// seed DB with nft
+	name := "very cool nft"
+	token := persist.Token{
+		Name:            persist.NullString(name),
+		CollectorsNote:  "this is a bad note",
+		OwnerAddress:    tc.user1.address,
+		ContractAddress: "0xb74bf94049d2c01f8805b8b15db0909168cabf46",
+		TokenID:         "2ad",
+		TokenURI:        "https://bad-uri.com",
+	}
+	_, err := tc.repos.TokenRepository.Create(context.Background(), token)
+	assert.Nil(err)
+
+	resp, err := http.Get(fmt.Sprintf("%s/nfts/metadata/refresh?token_id=%s&contract_address=%s", tc.serverURL, token.TokenID, token.ContractAddress))
+	assert.Nil(err)
+	assertValidJSONResponse(assert, resp)
+
+	type RefreshResponse struct {
+		Nft   persist.Token `json:"token"`
+		Error string        `json:"error"`
+	}
+	body := &RefreshResponse{}
+	util.UnmarshallBody(body, resp.Body)
+	assert.Empty(body.Error)
+	assert.Equal(name, body.Nft.Name.String())
+	assert.NotEqual(token.TokenURI, body.Nft.TokenURI)
+}
+
 func TestUpdateTokenByID_Success(t *testing.T) {
 	assert := setupTest(t, 2)
 

@@ -16,6 +16,10 @@ type getGalleriesInput struct {
 	UserID persist.DBID `form:"user_id"`
 }
 
+type refreshCacheInput struct {
+	UserID persist.DBID `form:"user_id,required"`
+}
+
 func getGalleries(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -46,5 +50,22 @@ func getGalleries(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, galleries)
+	}
+}
+
+func refreshCache(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input refreshCacheInput
+		if err := c.ShouldBindQuery(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		if err := galleryRepo.RefreshCache(c, input.UserID); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

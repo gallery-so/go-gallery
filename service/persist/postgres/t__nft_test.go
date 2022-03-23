@@ -10,38 +10,32 @@ import (
 func TestNFTCreate_Success(t *testing.T) {
 	a, db := setupTest(t)
 
-	nftRepo := NewNFTRepository(db)
+	nftRepo := NewNFTRepository(db, nil)
 
 	nft := persist.NFT{
 		Deleted:      false,
 		Version:      1,
 		OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
 		Name:         "name",
-	}
+		CollectorsNote: `I
+		like
+		line
+		breaks
+		😨
+		[oh yeah](https://shoobiedoobie.com)
+		<>
+		{\""\"}
 
-	_, err := nftRepo.Create(context.Background(), nft)
-	a.NoError(err)
-
-}
-
-func TestNFTGetByID_Success(t *testing.T) {
-	a, db := setupTest(t)
-
-	nftRepo := NewNFTRepository(db)
-
-	nft := persist.NFT{
-		Deleted:      false,
-		Version:      1,
-		OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
-		Name:         "name",
+		*#%&^%$#@!
+		`,
 	}
 
 	id, err := nftRepo.Create(context.Background(), nft)
 	a.NoError(err)
-
 	nft2, err := nftRepo.GetByID(context.Background(), id)
 	a.NoError(err)
 	a.Equal(id, nft2.ID)
 	a.Equal(nft.OwnerAddress, nft2.OwnerAddress)
 	a.Equal(nft.Name, nft2.Name)
+	a.Equal(nft.CollectorsNote, nft2.CollectorsNote)
 }

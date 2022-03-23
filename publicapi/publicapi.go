@@ -3,9 +3,13 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -26,7 +30,7 @@ type PublicAPI struct {
 	Nft        *NftAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, pubsub pubsub.PubSub) {
+func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) {
 	loaders := dataloader.NewLoaders(ctx, repos)
 	validator := newValidator()
 
@@ -36,7 +40,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.C
 		validator:  validator,
 		Collection: &CollectionAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
 		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
-		User:       &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		User:       &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
 		Nft:        &NftAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
 	}
 

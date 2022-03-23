@@ -4,8 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -20,7 +23,7 @@ type getMembershipTiersResponse struct {
 	Tiers []persist.MembershipTier `json:"tiers"`
 }
 
-func getMembershipTiersREST(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getMembershipTiersREST(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input getMembershipTiersInput
 		if err := c.ShouldBindQuery(&input); err != nil {
@@ -28,7 +31,7 @@ func getMembershipTiersREST(membershipRepository persist.MembershipRepository, u
 			return
 		}
 
-		membershipTiers, err := membership.GetMembershipTiers(c, input.ForceRefresh, membershipRepository, userRepository, galleryRepository, ethClient)
+		membershipTiers, err := membership.GetMembershipTiers(c, input.ForceRefresh, membershipRepository, userRepository, galleryRepository, ethClient, ipfsClient, arweaveClient, storageClient)
 
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)

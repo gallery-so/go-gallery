@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/segmentio/ksuid"
 )
+
+var cleanString = func(r rune) rune {
+	if unicode.IsGraphic(r) || unicode.IsPrint(r) {
+		return r
+	}
+	return -1
+}
 
 // DBID represents a database ID
 type DBID string
@@ -45,6 +53,9 @@ type Repositories struct {
 	ContractRepository        ContractRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
+	UserEventRepository       UserEventRepository
+	NftEventRepository        NftEventRepository
+	CollectionEventRepository CollectionEventRepository
 }
 
 // GenerateID generates a application-wide unique ID
@@ -179,7 +190,7 @@ func (n NullString) Value() (driver.Value, error) {
 	if n.String() == "" {
 		return "", nil
 	}
-	return strings.ToValidUTF8(n.String(), ""), nil
+	return strings.ToValidUTF8(strings.ReplaceAll(n.String(), "\\u0000", ""), ""), nil
 }
 
 // Scan implements the database/sql Scanner interface for the NullString type

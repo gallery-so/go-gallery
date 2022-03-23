@@ -7,8 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/opensea"
@@ -22,30 +25,34 @@ import (
 var MembershipTierIDs = []persist.TokenID{"4", "1", "3", "5", "6", "8"}
 
 // PremiumCards is the contract address for the premium membership cards
-const PremiumCards persist.Address = "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698"
+const PremiumCards persist.Address = "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"
 
 // UpdateMembershipTiers fetches all membership cards for all token IDs
-func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
-		events, err := OpenseaFetchMembershipCards(PremiumCards, persist.TokenID(v), 0, 0)
+		md, err := getTokenMetadata(ctx, v, PremiumCards, ipfsClient, arweaveClient, stg)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to fetch membership cards for token: %s, %v", v, err)
+			return nil, fmt.Errorf("Failed to get token metadata for token: %s, %v", v, err)
 		}
-		if len(events) == 0 {
+		owners, err := getOwnersForToken(ctx, v, PremiumCards)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get owners for token: %s, %v", v, err)
+		}
+		if len(owners) == 0 {
+			logrus.Errorf("No owners found for token: %s", v)
 			continue
 		}
-		time.Sleep(time.Second)
-		go func(id persist.TokenID, events []opensea.Event) {
-			tier, err := processEvents(ctx, id, events, ethClient, userRepository, galleryRepository, membershipRepository)
+		go func(id persist.TokenID, o []persist.Address) {
+			tier, err := processOwners(ctx, id, md, o, ethClient, userRepository, galleryRepository, membershipRepository)
 			if err != nil {
 				logrus.Errorf("Failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
-		}(v, events)
+		}(v, owners)
 	}
 
 	for i := 0; i < len(MembershipTierIDs); i++ {
@@ -55,22 +62,25 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 }
 
 // UpdateMembershipTier fetches all membership cards for a token ID
-func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	_, err := processCurrentTier(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %v", pTokenID, err)
 	}
-	events, err := OpenseaFetchMembershipCards(PremiumCards, pTokenID, 0, 0)
+	md, err := getTokenMetadata(ctx, pTokenID, PremiumCards, ipfsClient, arweaveClient, stg)
 	if err != nil {
-		return persist.MembershipTier{}, fmt.Errorf("Failed to fetch membership cards for token: %s, %v", pTokenID, err)
+		return persist.MembershipTier{}, fmt.Errorf("Failed to get token metadata for token: %s, %v", pTokenID, err)
 	}
-	if len(events) == 0 {
-		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
+	owners, err := getOwnersForToken(ctx, pTokenID, PremiumCards)
+	if err != nil {
+		return persist.MembershipTier{}, fmt.Errorf("Failed to get owners for token: %s, %v", pTokenID, err)
 	}
-
-	return processEvents(ctx, pTokenID, events, ethClient, userRepository, galleryRepository, membershipRepository)
+	if len(owners) == 0 {
+		return persist.MembershipTier{}, fmt.Errorf("No owners found for token: %s", pTokenID)
+	}
+	return processOwners(ctx, pTokenID, md, owners, ethClient, userRepository, galleryRepository, membershipRepository)
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
@@ -266,30 +276,29 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 	return tier, nil
 }
 
-func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Event, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository) (persist.MembershipTier, error) {
+func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTMetadata, owners []persist.Address, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
-	asset := events[0].Asset
-	tier.Name = persist.NullString(asset.Name)
-	tier.AssetURL = persist.NullString(asset.ImageURL)
+	tier.Name = persist.NullString(metadata.Name)
+	tier.AssetURL = persist.NullString(metadata.Image)
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
-	tier.Owners = make([]persist.MembershipOwner, 0, len(events))
+	tier.Owners = make([]persist.MembershipOwner, 0, len(owners))
 
 	ownersChan := make(chan persist.MembershipOwner)
 	wp := workerpool.New(10)
-	for i, e := range events {
-		event := e
+	for i, o := range owners {
+		addr := o
 		wp.Submit(func() {
-			logrus.Debugf("Processing event for ID %s %+v %d", id, event.ToAccount.Address, i)
-			if event.ToAccount.Address != persist.ZeroAddress {
+			logrus.Debugf("Processing event for ID %s %+v %d", id, addr, i)
+			if addr.String() != persist.ZeroAddress.String() {
 				logrus.Debug("Event is to real address")
 				// does to have the NFT?
-				membershipOwner := fillMembershipOwner(ctx, event.ToAccount.Address, id, ethClient, userRepository, galleryRepository)
+				membershipOwner := fillMembershipOwner(ctx, addr, id, ethClient, userRepository, galleryRepository)
 				logrus.Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
 				ownersChan <- membershipOwner
 				return
@@ -301,7 +310,7 @@ func processEvents(ctx context.Context, id persist.TokenID, events []opensea.Eve
 	}
 	receivedOwners := map[persist.Address]bool{}
 	receivedUsers := map[string]bool{}
-	for i := 0; i < len(events); i++ {
+	for i := 0; i < len(owners); i++ {
 		owner := <-ownersChan
 		if receivedOwners[owner.Address] || owner.Address == "" {
 			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
@@ -436,8 +445,9 @@ func OrderMembershipTiers(pTiers []persist.MembershipTier) []persist.MembershipT
 	return result
 }
 
+// GetMembershipTiers returns the most recent membership tiers and potentially updates tiers
 func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository,
-	galleryRepository persist.GalleryRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+	galleryRepository persist.GalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
 
 	if forceRefresh {
 		logrus.Infof("Force refresh - updating membership tiers")
@@ -461,7 +471,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 			for _, tierID := range MembershipTierIDs {
 				if ok := tiers[tierID]; !ok {
 					logrus.Infof("Tier not found - updating membership tier %s", tierID)
-					newTier, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
+					newTier, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient, ipfsClient, arweaveClient, stg)
 					if err != nil {
 						return nil, err
 					}
@@ -481,7 +491,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 		if len(tiersToUpdate) > 0 {
 			go func() {
 				for _, tierID := range tiersToUpdate {
-					_, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient)
+					_, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, ethClient, ipfsClient, arweaveClient, stg)
 					if err != nil {
 						logrus.WithError(err).Errorf("Failed to update membership tier %s", tierID)
 					}
@@ -493,7 +503,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 	}
 
 	logrus.Infof("No tiers found - updating membership tiers")
-	membershipTiers, err := UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, ethClient)
+	membershipTiers, err := UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
 		return nil, err
 	}
