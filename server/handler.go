@@ -92,7 +92,13 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 
 				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
 					for _, mappedErr := range gqlErrCtx.Errors() {
-						errCtx := sentry.SentryErrorContext{Mapped: true, MappedTo: fmt.Sprintf("%T", mappedErr.GqlModel)}
+						errCtx := sentry.SentryErrorContext{}
+
+						if mappedErr.Model != nil {
+							errCtx.Mapped = true
+							errCtx.MappedTo = fmt.Sprintf("%T", mappedErr.Model)
+						}
+
 						hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
 						hub.CaptureException(mappedErr.Error)
 					}
