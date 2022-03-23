@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -34,7 +35,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	getCurrentBackupsStmt, err := db.PrepareContext(ctx, `SELECT ID,CREATED_AT FROM backups WHERE GALLERY_ID = $1 AND DELETED = false ORDER BY CREATED_AT ASC;`)
 	checkNoErr(err)
 
-	getGalleryIDStmt, err := db.PrepareContext(ctx, `SELECT ID FROM galleries WHERE OWNER_USER_ID = $1 LIMIT 1;`)
+	getGalleryIDStmt, err := db.PrepareContext(ctx, `SELECT ID FROM galleries WHERE OWNER_USER_ID = $1 AND DELETED = false LIMIT 1;`)
 	checkNoErr(err)
 
 	getBackupsStmt, err := db.PrepareContext(ctx, `SELECT ID,CREATED_AT,VERSION,GALLERY_ID,GALLERY FROM backups WHERE GALLERY_ID = $1 AND DELETED = false ORDER BY CREATED_AT ASC;`)
@@ -162,19 +163,19 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 	var galleryID persist.DBID
 	err := b.getGalleryIDStmt.QueryRowContext(pCtx, pUserID).Scan(&galleryID)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get gallery id for user %s: %w", pUserID, err)
 	}
 
 	var backup persist.Backup
 	err = b.getBackupByIDStmt.QueryRowContext(pCtx, pBackupID).Scan(&backup.ID, &backup.CreationTime, &backup.Version, &backup.GalleryID, &backup.Gallery)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get backup %s: %w", pBackupID, err)
 	}
 
 	var addresses []persist.Address
 	err = b.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get user addresses for user %s: %w", pUserID, err)
 	}
 
 	tx, err := b.db.BeginTx(pCtx, nil)
@@ -194,7 +195,7 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 			var owns bool
 			err = b.ownsNFTStmt.QueryRowContext(pCtx, pq.Array(addresses), nft.ID).Scan(&owns)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not check if user owns nft %s: %w", nft.ID, err)
 			}
 			if owns {
 				result = append(result, nft.ID)

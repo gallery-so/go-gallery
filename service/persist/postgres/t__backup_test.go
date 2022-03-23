@@ -6,6 +6,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 func TestBackupRestore_Success(t *testing.T) {
@@ -29,6 +30,7 @@ func TestBackupRestore_Success(t *testing.T) {
 	userID, err := userRepo.Create(context.Background(), user)
 	a.NoError(err)
 
+	logrus.Infof("userID: %s", userID)
 	nfts := []persist.NFT{
 		{
 			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
@@ -65,6 +67,8 @@ func TestBackupRestore_Success(t *testing.T) {
 	g, err := galleryRepo.GetByID(context.Background(), id)
 	a.NoError(err)
 
+	logrus.Infof("gallery owner %s", g.OwnerUserID)
+
 	err = backupRepo.Insert(context.Background(), g)
 	a.NoError(err)
 
@@ -92,7 +96,7 @@ func TestBackupRestore_Success(t *testing.T) {
 	})
 	a.NoError(err)
 
-	err = backupRepo.Restore(context.Background(), userID, backups[0].ID)
+	err = backupRepo.Restore(context.Background(), backups[0].ID, userID)
 	a.NoError(err)
 
 	galleries, err := galleryRepo.GetByUserID(context.Background(), userID)
