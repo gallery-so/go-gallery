@@ -32,10 +32,11 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			switch authError {
 			case auth.ErrNoCookie:
 				gqlModel = model.ErrNoCookie{Message: errorMsg}
+				addError(ctx, authError, gqlModel)
 			case auth.ErrInvalidJWT:
 				gqlModel = model.ErrInvalidToken{Message: errorMsg}
+				addError(ctx, authError, gqlModel)
 			default:
-				gc.Error(authError)
 				return nil, authError
 			}
 
@@ -51,7 +52,6 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			user, err := dataloader.For(ctx).UserByUserId.Load(userID)
 
 			if err != nil {
-				gc.Error(err)
 				return nil, err
 			}
 

@@ -66,7 +66,18 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 		return gqlgen.DefaultRecover(ctx, err)
 	})
 
+	h.AroundResponses(func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		response := next(ctx)
+		gc := util.GinContextFromContext(ctx)
+		for _, err := range response.Errors {
+			gc.Error(err)
+		}
+		return response
+	})
+
 	return func(c *gin.Context) {
+		c.Set(graphql.GraphQLErrorsKey, &graphql.GraphQLErrorContext{})
+
 		hub := sentrygin.GetHubFromContext(c)
 		if hub != nil {
 			sentry.SetSentryAuthContext(c, hub)
@@ -74,16 +85,17 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 
 		defer func() {
 			if hub != nil {
-				for i, err := range c.Errors {
-					errCtx := sentry.SentryErrorContext{StackIndex: i}
-
-					if mappedErr, mapped := graphql.ErrorToGraphqlType(err); mapped {
-						errCtx.Mapped = mapped
-						errCtx.MappedTo = fmt.Sprintf("%T", mappedErr)
-					}
-
-					hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
+				for _, err := range c.Errors {
+					hub.Scope().SetContext(sentry.ErrorSentryContextName, sentry.SentryErrorContext{})
 					hub.CaptureException(err)
+				}
+
+				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
+					for _, mappedErr := range gqlErrCtx.Errors() {
+						errCtx := sentry.SentryErrorContext{Mapped: true, MappedTo: fmt.Sprintf("%T", mappedErr.GqlModel)}
+						hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
+						hub.CaptureException(mappedErr.Error)
+					}
 				}
 			}
 		}()

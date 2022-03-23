@@ -170,10 +170,10 @@ func newGCPPubSub() pubsub.PubSub {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
-		log.Info("skipping sentry init")
-		return
-	}
+	// if viper.GetString("ENV") == "local" {
+	// 	log.Info("skipping sentry init")
+	// 	return
+	// }
 
 	log.Info("initializing sentry...")
 

@@ -19,9 +19,8 @@ type SentryAuthContext struct {
 }
 
 type SentryErrorContext struct {
-	Mapped     bool
-	MappedTo   string
-	StackIndex int
+	Mapped   bool
+	MappedTo string
 }
 
 func SetSentryAuthContext(gc *gin.Context, hub *sentry.Hub) {
