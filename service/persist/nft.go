@@ -113,7 +113,7 @@ type NFTRepository interface {
 	GetByAddresses(context.Context, []Address) ([]NFT, error)
 	GetByID(context.Context, DBID) (NFT, error)
 	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
-	GetByOpenseaID(context.Context, NullInt64, Address) ([]NFT, error)
+	GetByOpenseaID(context.Context, NullInt64, Address) (NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	BulkUpsert(context.Context, []NFT) ([]DBID, error)

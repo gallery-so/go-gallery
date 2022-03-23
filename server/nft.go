@@ -148,7 +148,7 @@ func refreshUnassignedNftsForUser(collectionRepository persist.CollectionReposit
 	}
 }
 
-func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) gin.HandlerFunc {
+func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -177,12 +177,12 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 				return
 			}
 			if !ownsWallet {
-				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{userID, addresses})
+				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses})
 				return
 			}
 		}
 
-		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo)
+		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

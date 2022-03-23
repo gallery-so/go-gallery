@@ -54,7 +54,7 @@ func main() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour/2)
 			go func() {
 				defer cancel()
-				err = admin.RefreshOpensea(ctx, admin.RefreshNFTsInput{Addresses: g}, userRepo, nftRepo, collRepo)
+				err = admin.RefreshOpensea(ctx, admin.RefreshNFTsInput{Addresses: g}, userRepo, nftRepo, collRepo, galleryRepo)
 				if err != nil {
 					logrus.Errorf("Error refreshing opensea: %s", err)
 				}
