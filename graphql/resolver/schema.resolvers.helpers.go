@@ -376,11 +376,6 @@ func getInvalidMedia(nft persist.NFT) model.InvalidMedia {
 	return model.InvalidMedia{}
 }
 
-// TODO: Temporary helper method. VERY SLOW. Will be replaced by optimized lookups before being used in production.
-func collectionNftToNft(ctx context.Context, nft persist.CollectionNFT) (persist.NFT, error) {
-	return dataloader.For(ctx).NftByNftId.Load(nft.ID)
-}
-
 func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
 	creationTime := nft.CreationTime.Time()
 	lastUpdated := nft.LastUpdatedTime.Time()

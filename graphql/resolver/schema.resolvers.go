@@ -41,13 +41,11 @@ func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.Gall
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(obj.Dbid)
+	nfts, err := dataloader.For(ctx).NftsByCollectionId.Load(obj.Dbid)
 
 	if err != nil {
 		return nil, err
 	}
-
-	nfts := collection.NFTs
 
 	output := make([]*model.GalleryNft, len(nfts))
 	for i, nft := range nfts {
@@ -59,13 +57,11 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 		// that reads from the same NFT database but just grabs less data. With GraphQL, clients will select the data
 		// they want.
 
-		fullNft, err := collectionNftToNft(ctx, nft)
-
 		if err == nil {
-			nftModel := nftToModel(ctx, r.Resolver, fullNft)
+			nftModel := nftToModel(ctx, r.Resolver, nft)
 			galleryNft := &model.GalleryNft{
 				HelperGalleryNftData: model.HelperGalleryNftData{
-					NftId:        fullNft.ID,
+					NftId:        nft.ID,
 					CollectionId: obj.Dbid,
 				},
 				Nft:        &nftModel,

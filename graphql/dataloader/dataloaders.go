@@ -6,6 +6,7 @@
 //go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.Collection
 //go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.Collection
 //go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.NFT
+//go:generate go run github.com/vektah/dataloaden NftsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.NFT
 //go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/service/persist.NFT
 
 package dataloader
@@ -37,6 +38,7 @@ type Loaders struct {
 	CollectionsByUserId      CollectionsLoaderByID
 	NftByNftId               NftLoaderByID
 	NftsByAddress            NftsLoaderByAddress
+	NftsByCollectionId       NftsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
@@ -100,6 +102,12 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByAddress(ctx, loaders, r),
+	}
+
+	loaders.NftsByCollectionId = NftsLoaderByID{
+		maxBatch: defaultMaxBatch,
+		wait:     defaultWaitTime,
+		fetch:    loadNftsByCollectionId(ctx, loaders, r),
 	}
 
 	return loaders
@@ -278,6 +286,19 @@ func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.R
 	}
 }
 
+func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.NFT, []error) {
+	return func(nftIds []persist.DBID) ([]persist.NFT, []error) {
+		nfts := make([]persist.NFT, len(nftIds))
+		errors := make([]error, len(nftIds))
+
+		for i, nftId := range nftIds {
+			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, nftId)
+		}
+
+		return nfts, errors
+	}
+}
+
 func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.Address) ([][]persist.NFT, []error) {
 	return func(addresses []persist.Address) ([][]persist.NFT, []error) {
 		nfts := make([][]persist.NFT, len(addresses))
@@ -298,13 +319,20 @@ func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 	}
 }
 
-func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.NFT, []error) {
-	return func(nftIds []persist.DBID) ([]persist.NFT, []error) {
-		nfts := make([]persist.NFT, len(nftIds))
-		errors := make([]error, len(nftIds))
+func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.NFT, []error) {
+	return func(collectionIds []persist.DBID) ([][]persist.NFT, []error) {
+		nfts := make([][]persist.NFT, len(collectionIds))
+		errors := make([]error, len(collectionIds))
 
-		for i, nftId := range nftIds {
-			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, nftId)
+		for i, collectionId := range collectionIds {
+			nfts[i], errors[i] = r.NftRepository.GetByCollectionID(ctx, collectionId)
+
+			// Add results to the NftByNftId loader's cache
+			if errors[i] == nil {
+				for _, nft := range nfts[i] {
+					loaders.NftByNftId.Prime(nft.ID, nft)
+				}
+			}
 		}
 
 		return nfts, errors
