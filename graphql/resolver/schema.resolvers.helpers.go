@@ -123,15 +123,7 @@ func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.D
 }
 
 func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
-	// TODO: Update this to query for collections by gallery ID, instead of querying for a user and returning
-	// all of their collections. The result is the same right now, since a user only has one gallery.
-
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(galleryID)
-	if err != nil {
-		return nil, err
-	}
-
-	collections, err := dataloader.For(ctx).CollectionsByUserId.Load(gallery.OwnerUserID)
+	collections, err := dataloader.For(ctx).CollectionsByGalleryId.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}

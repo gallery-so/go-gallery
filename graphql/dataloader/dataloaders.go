@@ -14,7 +14,6 @@ package dataloader
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"time"
@@ -35,7 +34,7 @@ type Loaders struct {
 	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
 	CollectionByCollectionId CollectionLoaderByID
-	CollectionsByUserId      CollectionsLoaderByID
+	CollectionsByGalleryId   CollectionsLoaderByID
 	NftByNftId               NftLoaderByID
 	NftsByAddress            NftsLoaderByAddress
 	NftsByCollectionId       NftsLoaderByID
@@ -86,10 +85,10 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 		fetch:    loadCollectionByCollectionId(ctx, loaders, r),
 	}
 
-	loaders.CollectionsByUserId = CollectionsLoaderByID{
+	loaders.CollectionsByGalleryId = CollectionsLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
-		fetch:    loadCollectionsByUserId(ctx, loaders, r),
+		fetch:    loadCollectionsByGalleryId(ctx, loaders, r),
 	}
 
 	loaders.NftByNftId = NftLoaderByID{
@@ -245,34 +244,23 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *pers
 		collections := make([]persist.Collection, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
-		gc := util.GinContextFromContext(ctx)
-		authed := auth.GetUserAuthedFromCtx(gc)
-
 		for i, collectionId := range collectionIds {
-			// Worth fixing in the future: "authed" actually checks whether the current user is logged in, so
-			// any logged-in user can see another user's hidden collections. We'd probably want to move the
-			// auth check into GetByID to see who owns the collection and determine whether it can be returned
-			// to the requesting user.
-			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, collectionId, authed)
+			// Always return hidden collections; the frontend will filter them out as needed.
+			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, collectionId, true)
 		}
 
 		return collections, errors
 	}
 }
 
-func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Collection, []error) {
-	return func(userIds []persist.DBID) ([][]persist.Collection, []error) {
-		collections := make([][]persist.Collection, len(userIds))
-		errors := make([]error, len(userIds))
+func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Collection, []error) {
+	return func(galleryIds []persist.DBID) ([][]persist.Collection, []error) {
+		collections := make([][]persist.Collection, len(galleryIds))
+		errors := make([]error, len(galleryIds))
 
-		gc := util.GinContextFromContext(ctx)
-		authedUserId := auth.GetUserIDFromCtx(gc)
-
-		for i, userId := range userIds {
-			// GraphQL best practices would suggest moving this auth logic into the DB fetching layer
-			// so it's applied consistently for all callers. It's probably worth doing at some point.
-			showHidden := userId == authedUserId
-			collections[i], errors[i] = r.CollectionRepository.GetByUserID(ctx, userId, showHidden)
+		for i, galleryId := range galleryIds {
+			// Always return hidden collections; the frontend will filter them out as needed.
+			collections[i], errors[i] = r.CollectionRepository.GetByGalleryIDRaw(ctx, galleryId, true)
 
 			// Add results to the CollectionByCollectionId loader's cache
 			if errors[i] == nil {

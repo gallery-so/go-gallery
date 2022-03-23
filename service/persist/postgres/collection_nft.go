@@ -21,6 +21,8 @@ type CollectionRepository struct {
 	getByUserIDRawStmt           *sql.Stmt
 	getByIDOwnerStmt             *sql.Stmt
 	getByIDOwnerRawStmt          *sql.Stmt
+	getByGalleryIDRawStmt        *sql.Stmt
+	getByGalleryIDOwnerRawStmt   *sql.Stmt
 	getByIDStmt                  *sql.Stmt
 	getByIDRawStmt               *sql.Stmt
 	updateInfoStmt               *sql.Stmt
@@ -79,6 +81,20 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
+	getByGalleryIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
+	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
+	LEFT JOIN collections c ON c.id = coll_id AND c.DELETED = false AND c.HIDDEN = false
+	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord;`)
+	checkNoErr(err)
+
+	getByGalleryIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
+	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
+	LEFT JOIN collections c ON c.id = coll_id AND c.DELETED = false
+	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord;`)
+	checkNoErr(err)
+
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
@@ -127,7 +143,7 @@ func NewCollectionRepository(db *sql.DB) *CollectionRepository {
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt}
+	return &CollectionRepository{db: db, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByGalleryIDRawStmt: getByGalleryIDRawStmt, getByGalleryIDOwnerRawStmt: getByGalleryIDOwnerRawStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt}
 }
 
 // Create creates a new collection in the database
@@ -214,6 +230,38 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 	return result, nil
 }
 
+// GetByGalleryIDRaw returns all collections owned by a user
+func (c *CollectionRepository) GetByGalleryIDRaw(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
+	var stmt *sql.Stmt
+	if pShowHidden {
+		stmt = c.getByGalleryIDOwnerRawStmt
+	} else {
+		stmt = c.getByGalleryIDRawStmt
+	}
+	res, err := stmt.QueryContext(pCtx, pUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	collections := make([]persist.Collection, 0, 10)
+	for res.Next() {
+		var collection persist.Collection
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
+		if err != nil {
+			return nil, err
+		}
+
+		collections = append(collections, collection)
+	}
+
+	if err := res.Err(); err != nil {
+		return nil, err
+	}
+
+	return collections, nil
+}
+
 // GetByID returns a collection by its ID
 func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
 	var stmt *sql.Stmt
@@ -250,7 +298,7 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 	}
 	if err := res.Err(); err != nil {
 		return persist.Collection{}, err
-	}
+	} // TODO: Does the above not find empty collections, and that's why we check again without attempting to unnest?
 	if collection.ID == "" {
 		collection.NFTs = []persist.CollectionNFT{}
 		err := rawStmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
