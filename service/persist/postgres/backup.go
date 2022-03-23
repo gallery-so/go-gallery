@@ -87,7 +87,7 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 	}
 	defer res.Close()
 
-	currentBackups := map[persist.DBID]persist.CreationTime{}
+	currentBackups := []persist.Backup{}
 	for res.Next() {
 		var id persist.DBID
 		var createdAt persist.CreationTime
@@ -95,31 +95,30 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		if err != nil {
 			return err
 		}
-		currentBackups[id] = createdAt
+		currentBackups = append(currentBackups, persist.Backup{ID: id, CreationTime: createdAt})
 	}
 
 	if err = res.Err(); err != nil {
 		return err
 	}
 
-	doInsert := true
-	for id, createdAt := range currentBackups {
-		if time.Since(createdAt.Time()) > time.Hour*24*5 {
-			_, err = b.deleteBackupStmt.ExecContext(pCtx, id)
-			if err != nil {
-				return err
-			}
-		}
-		if time.Since(createdAt.Time()) < time.Hour*24*7 {
-			doInsert = false
+	if len(currentBackups) > 0 {
+		last := currentBackups[len(currentBackups)-1]
+		if time.Since(last.CreationTime.Time()) < time.Hour*12 {
+			return nil
 		}
 	}
 
-	if doInsert {
-		_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
+	if len(currentBackups) > 4 {
+		_, err = b.deleteBackupStmt.ExecContext(pCtx, currentBackups[0].ID)
 		if err != nil {
 			return err
 		}
+	}
+
+	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
+	if err != nil {
+		return err
 	}
 
 	return nil
