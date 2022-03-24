@@ -100,8 +100,12 @@ type errNoSingleNFTForOpenseaID struct {
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
 func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
-	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository) error {
+	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) error {
 
+	err := galleryRepo.RefreshCache(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
@@ -115,8 +119,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 		return err
 	}
 
-	// update other user's collections and this user's collection so that they and ONLY they can display these
-	// specific NFTs while also ensuring that NFTs they don't own don't list them as the owner
+	// ensure NFTs that a user used to own are no longer in their gallery
 	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
 		return fmt.Errorf("failed to claim NFTs: %w", err)
 	}
@@ -400,8 +403,8 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 	}
 
 	dbNFT, _ := nftRepo.GetByOpenseaID(pCtx, persist.NullInt64(nft.ID), pWalletAddress)
-	if dbNFT != nil && len(dbNFT) == 1 {
-		result.ID = dbNFT[0].ID
+	if dbNFT.ID != "" {
+		result.ID = dbNFT.ID
 	}
 
 	return result

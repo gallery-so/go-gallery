@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -19,7 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
@@ -28,6 +31,8 @@ import (
 // Init initializes the server
 func Init() {
 	setDefaults()
+
+	initSentry()
 
 	router := CoreInit(postgres.NewClient())
 
@@ -47,7 +52,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
+	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -70,7 +75,7 @@ func newStorageClient() *storage.Client {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
-		logrus.Errorf("error creating storage client: %v", err)
+		log.Errorf("error creating storage client: %v", err)
 	}
 	return s
 }
@@ -106,11 +111,16 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 10) // Set low for debugging
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
+	viper.SetDefault("SENTRY_DSN", "")
 
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
 		panic("ADMIN_PASS must be set")
+	}
+
+	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
+		panic("SENTRY_DSN must be set")
 	}
 }
 
@@ -157,4 +167,40 @@ func newGCPPubSub() pubsub.PubSub {
 	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
 	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
 	return client
+}
+
+func initSentry() {
+	if viper.GetString("ENV") == "local" {
+		log.Info("skipping sentry init")
+		return
+	}
+
+	log.Info("initializing sentry...")
+
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              viper.GetString("SENTRY_DSN"),
+		Environment:      viper.GetString("ENV"),
+		AttachStacktrace: true,
+		BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+			if event.Request == nil {
+				return event
+			}
+
+			var scrubbed []string
+			for _, c := range strings.Split(event.Request.Cookies, "; ") {
+				if !strings.HasPrefix(c, auth.JWTCookieKey) {
+					scrubbed = append(scrubbed, c)
+				}
+			}
+			cookies := strings.Join(scrubbed, "; ")
+
+			event.Request.Cookies = cookies
+			event.Request.Headers["Cookie"] = cookies
+			return event
+		},
+	})
+
+	if err != nil {
+		log.Fatalf("failed to start sentry: %s", err)
+	}
 }

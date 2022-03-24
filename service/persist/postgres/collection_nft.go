@@ -9,6 +9,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 // CollectionRepository is the repository for interacting with collections in a postgres database
@@ -37,6 +38,10 @@ type CollectionRepository struct {
 	getUserAddressesStmt         *sql.Stmt
 	getUnassignedNFTsStmt        *sql.Stmt
 	checkOwnNFTsStmt             *sql.Stmt
+	getOpenseaIDForNFTStmt       *sql.Stmt
+	deleteNFTStmt                *sql.Stmt
+	updateOwnerAddressStmt       *sql.Stmt
+	getOwnerAddressStmt          *sql.Stmt
 }
 
 // NewCollectionRepository creates a new CollectionRepository
@@ -144,7 +149,19 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByGalleryIDRawStmt: getByGalleryIDRawStmt, getByGalleryIDOwnerRawStmt: getByGalleryIDOwnerRawStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt}
+	getOpenseaIDForNFTStmt, err := db.PrepareContext(ctx, `SELECT OPENSEA_ID FROM nfts WHERE ID = $1;`)
+	checkNoErr(err)
+
+	deleteNFTStmt, err := db.PrepareContext(ctx, `DELETE FROM nfts WHERE ID = $1;`)
+	checkNoErr(err)
+
+	updateOwnerAddressStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET OWNER_ADDRESS = $1 WHERE ID = $2;`)
+	checkNoErr(err)
+
+	getOwnerAddressStmt, err := db.PrepareContext(ctx, `SELECT OWNER_ADDRESS FROM nfts WHERE ID = $1;`)
+	checkNoErr(err)
+
+	return &CollectionRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, getByGalleryIDRawStmt: getByGalleryIDRawStmt, getByGalleryIDOwnerRawStmt: getByGalleryIDOwnerRawStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt, getOpenseaIDForNFTStmt: getOpenseaIDForNFTStmt, deleteNFTStmt: deleteNFTStmt, updateOwnerAddressStmt: updateOwnerAddressStmt, getOwnerAddressStmt: getOwnerAddressStmt}
 }
 
 // Create creates a new collection in the database
@@ -400,33 +417,90 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 	}
 	defer nftsToRemove.Close()
 
-	nftsToRemoveIDs := []persist.DBID{}
+	removing := map[persist.DBID]persist.NullInt64{}
 	for nftsToRemove.Next() {
 		var id persist.DBID
-		var openseaID int64
+		var openseaID persist.NullInt64
 
 		err = nftsToRemove.Scan(&id, &openseaID)
 		if err != nil {
 			return err
 		}
-		nftsToRemoveIDs = append(nftsToRemoveIDs, id)
+		removing[id] = openseaID
 	}
 
 	if err := nftsToRemove.Err(); err != nil {
 		return err
 	}
 
-	_, err = c.deleteNFTsStmt.ExecContext(pCtx, pq.Array(nftsToRemoveIDs))
+	newOpenseaIDs := map[persist.DBID]persist.NullInt64{}
+	for _, id := range pUpdate.NFTs {
+		var openseaID persist.NullInt64
+		err := c.getOpenseaIDForNFTStmt.QueryRowContext(pCtx, id).Scan(&openseaID)
+		if err != nil {
+			return err
+		}
+		newOpenseaIDs[id] = openseaID
+	}
+
+	tx, err := c.db.BeginTx(pCtx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	deleteManyStmt := tx.StmtContext(pCtx, c.deleteNFTsStmt)
+	deleteStmt := tx.StmtContext(pCtx, c.deleteNFTStmt)
+	removeFromCollStmt := tx.StmtContext(pCtx, c.removeNFTFromCollectionsStmt)
+	updateOwnerStmt := tx.StmtContext(pCtx, c.updateOwnerAddressStmt)
+
+	nftsToRemoveIDs := make([]persist.DBID, 0, len(removing))
+
+	for removeID, removeOpenseaID := range removing {
+		remove := true
+		for id, openseaID := range newOpenseaIDs {
+			if removeOpenseaID == openseaID {
+				remove = false
+
+				var newAddress persist.NullString
+				err := c.getOwnerAddressStmt.QueryRowContext(pCtx, id).Scan(&newAddress)
+				if err != nil {
+					return err
+				}
+
+				_, err = deleteStmt.ExecContext(pCtx, id)
+				if err != nil {
+					return err
+				}
+
+				_, err = updateOwnerStmt.ExecContext(pCtx, newAddress, removeID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if remove {
+			nftsToRemoveIDs = append(nftsToRemoveIDs, removeID)
+		}
+	}
+
+	_, err = deleteManyStmt.ExecContext(pCtx, pq.Array(nftsToRemoveIDs))
 	if err != nil {
 		return err
 	}
 
 	for _, nft := range nftsToRemoveIDs {
-		_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft, pUserID)
+		logrus.Infof("removing nft %s from collections for %s because no longer owns NFT", nft, pUserID)
+		_, err := removeFromCollStmt.ExecContext(pCtx, nft, pUserID)
 		if err != nil {
 			return err
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
 	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
@@ -482,6 +556,7 @@ func (c *CollectionRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pU
 	for _, coll := range colls {
 		for _, nft := range coll.NFTs {
 			if !containsAddress(addresses, nft.OwnerAddress) {
+				logrus.Infof("removing nft %s from collections for %s because NFT is of old address", nft.ID, pUserID)
 				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
 				if err != nil {
 					return err
