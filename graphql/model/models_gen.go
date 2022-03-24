@@ -160,10 +160,12 @@ func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
 
 type ErrCollectionNotFound struct {
-	Message *string `json:"message"`
+	Message string `json:"message"`
 }
 
-func (ErrCollectionNotFound) IsCollectionByIDOrError() {}
+func (ErrCollectionNotFound) IsError()                          {}
+func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
+func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
 
 type ErrDoesNotOwnRequiredNft struct {
 	Message string `json:"message"`

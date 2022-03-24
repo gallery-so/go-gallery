@@ -133,21 +133,25 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	// Make sure the collection exists before trying to delete it
+	_, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
-	galleryID := gallery.ID
+	// Get the collection's parent gallery before deleting the collection
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	if err != nil {
+		return remapError(err)
+	}
 
 	err = api.Collection.DeleteCollection(ctx, collectionID)
 	if err != nil {
 		return remapError(err)
 	}
 
-	dataloader.For(ctx).GalleryByGalleryId.Clear(galleryID)
-	gallery, err = dataloader.For(ctx).GalleryByGalleryId.Load(galleryID)
-
+	// Deleting a collection marks the collection as "deleted" but doesn't alter the gallery,
+	// so we don't need to refetch the gallery before returning it here
 	output := &model.DeleteCollectionPayload{
 		Gallery: galleryToModel(gallery),
 	}
@@ -503,14 +507,24 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 }
 
 func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.CollectionByIDOrError, error) {
+		if errorType, ok := errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.CollectionByIDOrError); ok {
+				addError(ctx, err, errorType)
+				return returnType, nil
+			}
+		}
+
+		return nil, err
+	}
+
 	api := publicapi.For(ctx)
 
 	collection, err := api.Collection.GetCollection(ctx, id)
 
 	if err != nil {
-		message := ""
-
-		return model.ErrCollectionNotFound{Message: &message}, nil
+		return remapError(err)
 	}
 
 	return collectionToModel(ctx, *collection), nil

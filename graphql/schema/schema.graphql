@@ -274,8 +274,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
-type ErrCollectionNotFound {
-  message: String
+type ErrCollectionNotFound implements Error {
+  message: String!
 }
 
 union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
@@ -313,6 +313,7 @@ union DeleteCollectionPayloadOrError =
     DeleteCollectionPayload
   | ErrNotAuthorized
   | ErrInvalidInput
+  | ErrCollectionNotFound
 
 type DeleteCollectionPayload {
   gallery: Gallery

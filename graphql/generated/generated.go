@@ -1865,8 +1865,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
-type ErrCollectionNotFound {
-  message: String
+type ErrCollectionNotFound implements Error {
+  message: String!
 }
 
 union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
@@ -1904,6 +1904,7 @@ union DeleteCollectionPayloadOrError =
     DeleteCollectionPayload
   | ErrNotAuthorized
   | ErrInvalidInput
+  | ErrCollectionNotFound
 
 type DeleteCollectionPayload {
   gallery: Gallery
@@ -2824,11 +2825,14 @@ func (ec *executionContext) _ErrCollectionNotFound_message(ctx context.Context, 
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrDoesNotOwnRequiredNFT_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDoesNotOwnRequiredNft) (ret graphql.Marshaler) {
@@ -9330,6 +9334,13 @@ func (ec *executionContext) _DeleteCollectionPayloadOrError(ctx context.Context,
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -9339,6 +9350,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -10142,7 +10160,7 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
-var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "CollectionByIdOrError"}
+var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "DeleteCollectionPayloadOrError"}
 
 func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCollectionNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCollectionNotFoundImplementors)
@@ -10159,6 +10177,9 @@ func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.
 
 			out.Values[i] = innerFunc(ctx)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
