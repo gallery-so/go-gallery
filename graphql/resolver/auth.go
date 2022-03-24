@@ -3,6 +3,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -31,8 +32,10 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			switch authError {
 			case auth.ErrNoCookie:
 				gqlModel = model.ErrNoCookie{Message: errorMsg}
+				addError(ctx, authError, gqlModel)
 			case auth.ErrInvalidJWT:
 				gqlModel = model.ErrInvalidToken{Message: errorMsg}
+				addError(ctx, authError, gqlModel)
 			default:
 				return nil, authError
 			}

@@ -1,11 +1,16 @@
 package server
 
 import (
+	"context"
+	"fmt"
+
 	"cloud.google.com/go/storage"
+	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -18,6 +23,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub"
+	"github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
@@ -50,7 +57,55 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(config))
 
+	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
+		gc := util.GinContextFromContext(ctx)
+		if hub := sentrygin.GetHubFromContext(gc); hub != nil {
+			hub.Recover(err)
+		}
+
+		return gqlgen.DefaultRecover(ctx, err)
+	})
+
+	h.AroundResponses(func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		response := next(ctx)
+		gc := util.GinContextFromContext(ctx)
+		for _, err := range response.Errors {
+			gc.Error(err)
+		}
+		return response
+	})
+
 	return func(c *gin.Context) {
+		c.Set(graphql.GraphQLErrorsKey, &graphql.GraphQLErrorContext{})
+
+		hub := sentrygin.GetHubFromContext(c)
+		if hub != nil {
+			sentry.SetSentryAuthContext(c, hub)
+		}
+
+		defer func() {
+			if hub != nil {
+				for _, err := range c.Errors {
+					hub.Scope().SetContext(sentry.ErrorSentryContextName, sentry.SentryErrorContext{})
+					hub.CaptureException(err)
+				}
+
+				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
+					for _, mappedErr := range gqlErrCtx.Errors() {
+						errCtx := sentry.SentryErrorContext{}
+
+						if mappedErr.Model != nil {
+							errCtx.Mapped = true
+							errCtx.MappedTo = fmt.Sprintf("%T", mappedErr.Model)
+						}
+
+						hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
+						hub.CaptureException(mappedErr.Error)
+					}
+				}
+			}
+		}()
+
 		// TODO: Remove dataloader here
 		dataloader.AddTo(c, repos)
 		event.AddTo(c, repos)
