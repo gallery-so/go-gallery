@@ -78,7 +78,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.ID = $1 AND g.DELETED = false;`)
 	checkNoErr(err)
 
-	getByChildCollectionIDRawStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,OWNER_USER_ID,CREATED_AT,LAST_UPDATED FROM galleries WHERE COLLECTIONS @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
+	getByChildCollectionIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g, collections c WHERE $1 = ANY(g.COLLECTIONS) AND g.DELETED = false AND c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
