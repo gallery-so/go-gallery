@@ -23,6 +23,7 @@ type TokenID string
 
 // Assets is a list of NFTs from OpenSea
 type Assets struct {
+	Next   string  `json:"next"`
 	Assets []Asset `json:"assets"`
 }
 
@@ -98,6 +99,11 @@ type errNoSingleNFTForOpenseaID struct {
 	openseaID int
 }
 
+// ErrNoAssetsForWallets is returned when opensea returns an empty array of assets for a wallet address
+type ErrNoAssetsForWallets struct {
+	Wallets []persist.Address
+}
+
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
 func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
 	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) error {
@@ -116,7 +122,22 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 
 	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
-		return err
+		if e, ok := err.(ErrNoAssetsForWallets); ok {
+			logrus.Debugf("no assets found for wallet %v", e.Wallets)
+			for i, address := range pOwnerWalletAddresses {
+				for _, wallet := range e.Wallets {
+					if address == wallet {
+						if i+1 > len(pOwnerWalletAddresses) {
+							pOwnerWalletAddresses = pOwnerWalletAddresses[:i]
+						} else {
+							pOwnerWalletAddresses = append(pOwnerWalletAddresses[:i], pOwnerWalletAddresses[i+1:]...)
+						}
+					}
+				}
+			}
+		} else {
+			return err
+		}
 	}
 
 	// ensure NFTs that a user used to own are no longer in their gallery
@@ -132,9 +153,14 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 
 // UpdateAssetsForWallet is a pipeline for getting assets for a wallet
 func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.DBID, error) {
+	var returnErr error
 	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch assets for wallets %v: %w", pOwnerWalletAddresses, err)
+		if e, ok := err.(ErrNoAssetsForWallets); ok {
+			returnErr = e
+		} else {
+			return nil, fmt.Errorf("failed to fetch assets for wallets %v: %w", pOwnerWalletAddresses, err)
+		}
 	}
 	logrus.Debugf("found %d assets for wallets %v", len(asDBNfts), pOwnerWalletAddresses)
 
@@ -143,7 +169,7 @@ func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist
 		return nil, fmt.Errorf("failed to bulk upsert NFTs: %w", err)
 	}
 	logrus.Debugf("bulk upserted %d NFTs", len(ids))
-	return ids, nil
+	return ids, returnErr
 }
 
 func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
@@ -152,20 +178,20 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
 		go func(wa persist.Address) {
-			assets, err := FetchAssetsForWallet(pCtx, wa, 0, 0, nil)
+			assets, err := FetchAssetsForWallet(pCtx, wa, "", 0, nil)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 				return
 			}
 			if len(assets) == 0 {
 				time.Sleep(time.Second)
-				assets, err = FetchAssetsForWallet(pCtx, wa, 0, 0, nil)
+				assets, err = FetchAssetsForWallet(pCtx, wa, "", 0, nil)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
 					return
 				}
 				if len(assets) == 0 {
-					errChan <- fmt.Errorf("no assets found for wallet address: %s", wa)
+					errChan <- ErrNoAssetsForWallets{Wallets: []persist.Address{wa}}
 					return
 				}
 			}
@@ -178,20 +204,31 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 		}(walletAddress)
 	}
 
+	var notFoundError error
 	for i := 0; i < len(pWalletAddresses); i++ {
 		select {
 		case nfts := <-nftsChan:
 			result = append(result, nfts...)
 		case err := <-errChan:
-			return nil, err
+			if e, ok := err.(ErrNoAssetsForWallets); ok {
+				if notFoundError == nil {
+					notFoundError = e
+				} else {
+					it := notFoundError.(ErrNoAssetsForWallets)
+					it.Wallets = append(it.Wallets, e.Wallets...)
+					notFoundError = it
+				}
+			} else {
+				return nil, err
+			}
 		}
 	}
 
-	return result, nil
+	return result, notFoundError
 }
 
 // FetchAssetsForWallet recursively fetches all assets for a wallet
-func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -199,20 +236,14 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 
 	result := []Asset{}
 
-	if pOffset > 20000 {
-		return result, fmt.Errorf("failed to fetch assets for wallet %s: too many results", pWalletAddress)
-	}
-
 	dir := "desc"
-	offset := pOffset
-	if pOffset > 10000 {
-		dir = "asc"
-		offset = pOffset - 10050
+
+	logrus.Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
+
+	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&limit=%d", pWalletAddress, dir, 50)
+	if pCursor != "" {
+		urlStr = fmt.Sprintf("%s&cursor=%s", urlStr, pCursor)
 	}
-
-	logrus.Debugf("Fetching assets for wallet %s with offset %d, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, offset, retry, dir, len(alreadyReceived))
-
-	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&offset=%d&limit=%d", pWalletAddress, dir, offset, 50)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
 	if err != nil {
@@ -229,7 +260,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssetsForWallet(pCtx, pWalletAddress, pOffset, retry+1, alreadyReceived)
+				return FetchAssetsForWallet(pCtx, pWalletAddress, pCursor, retry+1, alreadyReceived)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded")
 		}
@@ -246,6 +277,8 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 		return nil, err
 	}
 
+	nextCursor := response.Next
+
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
@@ -254,13 +287,13 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 			continue
 		}
 		result = append(result, asset)
-		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%d|len-%d|dir-%s", asset.ID, pOffset, len(result), dir)
+		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
 	}
 	if doneReceiving {
 		return result, nil
 	}
 	if len(response.Assets) == 50 {
-		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, pOffset+50, 0, alreadyReceived)
+		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, nextCursor, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}
@@ -413,6 +446,10 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft As
 
 func (e errNoSingleNFTForOpenseaID) Error() string {
 	return fmt.Sprintf("no single NFT found for opensea id %d", e.openseaID)
+}
+
+func (e ErrNoAssetsForWallets) Error() string {
+	return fmt.Sprintf("no assets found for wallet: %v", e.Wallets)
 }
 
 func (t TokenID) String() string {
