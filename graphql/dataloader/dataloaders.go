@@ -184,7 +184,7 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Re
 		errors := make([]error, len(galleryIds))
 
 		for i, galleryId := range galleryIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByID(ctx, galleryId)
+			galleries[i], errors[i] = r.GalleryRepository.GetByIDRaw(ctx, galleryId)
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
