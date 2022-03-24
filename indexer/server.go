@@ -272,7 +272,7 @@ func ValidateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepositor
 
 	openseaAssets := make([]opensea.Asset, 0, len(currentNFTs))
 	for _, address := range user.Addresses {
-		assets, err := opensea.FetchAssetsForWallet(c, address, 0, 0, nil)
+		assets, err := opensea.FetchAssetsForWallet(c, address, "", 0, nil)
 		if err != nil {
 			return ValidateUsersNFTsOutput{}, err
 		}
