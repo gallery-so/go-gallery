@@ -85,15 +85,15 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	getByGalleryIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
 	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
-	LEFT JOIN collections c ON c.id = coll_id AND c.DELETED = false AND c.HIDDEN = false
-	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord;`)
+	LEFT JOIN collections c ON c.id = coll_id
+	WHERE g.ID = $1 AND g.DELETED = false AND c.DELETED = false AND c.HIDDEN = false ORDER BY coll_ord;`)
 	checkNoErr(err)
 
 	getByGalleryIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
 	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
-	LEFT JOIN collections c ON c.id = coll_id AND c.DELETED = false
-	WHERE g.ID = $1 AND g.DELETED = false ORDER BY coll_ord;`)
+	LEFT JOIN collections c ON c.id = coll_id
+	WHERE g.ID = $1 AND g.DELETED = false AND c.DELETED = false ORDER BY coll_ord;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
