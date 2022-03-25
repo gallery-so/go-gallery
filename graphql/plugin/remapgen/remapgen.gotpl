@@ -1,0 +1,18 @@
+var typeConversionMap = map[string]func(object interface{}) (objectAsType interface{}, ok bool){
+{{- range $type := .Types}}
+    "{{$type}}": func(object interface{}) (interface{}, bool) {
+        obj, ok := object.({{$type|go}})
+        return obj, ok
+    },
+{{ end }}
+}
+
+func ConvertToModelType(object interface{}, gqlTypeName string) (objectAsType interface{}, ok bool) {
+    if conversionFunc, ok := typeConversionMap[gqlTypeName]; ok {
+        if convertedObj, ok := conversionFunc(object); ok {
+            return convertedObj, true
+        }
+    }
+
+    return nil, false
+}

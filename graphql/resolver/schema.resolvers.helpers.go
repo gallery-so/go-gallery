@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -23,7 +22,7 @@ var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 // errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
 // If no matching type is found, ok will return false
-func errorToGraphqlType(err error) (gqlError model.Error, ok bool) {
+func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gqlModel interface{}, ok bool) {
 	message := err.Error()
 	var mappedErr model.Error = nil
 
@@ -46,7 +45,10 @@ func errorToGraphqlType(err error) (gqlError model.Error, ok bool) {
 	}
 
 	if mappedErr != nil {
-		return mappedErr, true
+		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
+			addError(ctx, err, converted)
+			return converted, true
+		}
 	}
 
 	return nil, false
