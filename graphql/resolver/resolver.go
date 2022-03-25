@@ -6,7 +6,7 @@ import (
 )
 
 // Add gqlgen to "go generate"
-//go:generate go run github.com/99designs/gqlgen generate
+//go:generate go run generate.go
 
 // This file will not be regenerated automatically.
 //

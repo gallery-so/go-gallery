@@ -82,7 +82,9 @@ type CollectionUpdateDeletedInput struct {
 type CollectionRepository interface {
 	Create(context.Context, CollectionDB) (DBID, error)
 	GetByUserID(context.Context, DBID, bool) ([]Collection, error)
+	GetByGalleryIDRaw(context.Context, DBID, bool) ([]Collection, error)
 	GetByID(context.Context, DBID, bool) (Collection, error)
+	GetByIDRaw(context.Context, DBID, bool) (Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateNFTs(context.Context, DBID, DBID, CollectionUpdateNftsInput) error
 	ClaimNFTs(context.Context, DBID, []Address, CollectionUpdateNftsInput) error

@@ -78,7 +78,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	getByIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g WHERE g.ID = $1 AND g.DELETED = false;`)
 	checkNoErr(err)
 
-	getByChildCollectionIDRawStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,OWNER_USER_ID,CREATED_AT,LAST_UPDATED FROM galleries WHERE COLLECTIONS @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
+	getByChildCollectionIDRawStmt, err := db.PrepareContext(ctx, `SELECT g.ID,g.VERSION,g.OWNER_USER_ID,g.CREATED_AT,g.LAST_UPDATED FROM galleries g, collections c WHERE $1 = ANY(g.COLLECTIONS) AND g.DELETED = false AND c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
 	checkOwnCollectionsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM collections WHERE ID = ANY($1) AND OWNER_USER_ID = $2;`)
@@ -434,15 +434,30 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 	return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
 }
 
-// GetByChildCollectionID returns the gallery that contains the collection with the given ID
-func (g *GalleryRepository) GetByChildCollectionID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
-	res := persist.Gallery{}
-	err := g.getByChildCollectionIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
+// GetByIDRaw returns the gallery with the given ID
+func (g *GalleryRepository) GetByIDRaw(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
+	gallery := persist.Gallery{}
+	err := g.getByIDRawStmt.QueryRowContext(pCtx, pID).Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
+		}
 		return persist.Gallery{}, err
 	}
+	return gallery, nil
+}
 
-	return g.GetByID(pCtx, res.ID)
+// GetByChildCollectionIDRaw returns the gallery that contains the collection with the given ID
+func (g *GalleryRepository) GetByChildCollectionIDRaw(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
+	gallery := persist.Gallery{}
+	err := g.getByChildCollectionIDRawStmt.QueryRowContext(pCtx, pID).Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
+		}
+		return persist.Gallery{}, err
+	}
+	return gallery, nil
 }
 
 // RefreshCache deletes the given key in the cache

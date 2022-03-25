@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -13,9 +12,6 @@ import (
 )
 
 const maxCollectionsPerGallery = 1000
-
-// TODO: Convert this to a validation error
-var errTooManyCollectionsInGallery = errors.New(fmt.Sprintf("maximum of %d collections in a gallery", maxCollectionsPerGallery))
 
 type GalleryAPI struct {
 	repos     *persist.Repositories
@@ -29,14 +25,9 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":   {galleryID, "required"},
-		"collections": {collections, "required,unique"},
+		"collections": {collections, fmt.Sprintf("required,unique,max=%d", maxCollectionsPerGallery)},
 	}); err != nil {
 		return err
-	}
-
-	if len(collections) > maxCollectionsPerGallery {
-		// TODO: Validation error
-		return errTooManyCollectionsInGallery
 	}
 
 	userID, err := getAuthenticatedUser(ctx)

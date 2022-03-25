@@ -67,7 +67,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
-		"bio":      {bio, "required,medium"},
+		"bio":      {bio, "required,bio"},
 	}); err != nil {
 		return err
 	}

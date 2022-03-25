@@ -55,7 +55,9 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
 
-	h := handler.NewDefaultServer(generated.NewExecutableSchema(config))
+	schema := generated.NewExecutableSchema(config)
+	h := handler.NewDefaultServer(schema)
+	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		gc := util.GinContextFromContext(ctx)

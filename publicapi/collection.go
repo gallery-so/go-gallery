@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -17,9 +16,6 @@ import (
 
 const maxNftsPerCollection = 1000
 
-// TODO: Convert this to a validation error, and enforce in all potential contexts here
-var errTooManyNFTsInCollection = errors.New(fmt.Sprintf("maximum of %d NFTs in a collection", maxNftsPerCollection))
-
 type CollectionAPI struct {
 	repos     *persist.Repositories
 	loaders   *dataloader.Loaders
@@ -28,13 +24,26 @@ type CollectionAPI struct {
 	pubsub    pubsub.PubSub
 }
 
+func (api CollectionAPI) GetCollection(ctx context.Context, collectionID persist.DBID) (*persist.Collection, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	collection, err := api.repos.CollectionRepository.GetByID(ctx, collectionID, false)
+
+	return &collection, err
+}
+
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"galleryID": {galleryID, "required"},
-		// TODO: Validate name length
-		"collectorsNote": {collectorsNote, "medium"},
-		"nfts":           {nfts, "required,unique"},
+		"galleryID":      {galleryID, "required"},
+		"name":           {name, "collection_name"},
+		"collectorsNote": {collectorsNote, "collection_note"},
+		"nfts":           {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
 	}); err != nil {
 		return nil, err
 	}
@@ -110,8 +119,8 @@ func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID pers
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID":   {collectionID, "required"},
-		"name":           {name, "required"}, // TODO: Validate length
-		"collectorsNote": {collectorsNote, "required,medium"},
+		"name":           {name, "required,collection_name"},
+		"collectorsNote": {collectorsNote, "required,collection_note"},
 	}); err != nil {
 		return err
 	}
@@ -141,7 +150,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"nfts":         {nfts, "required,unique"},
+		"nfts":         {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
 	}); err != nil {
 		return err
 	}
@@ -149,10 +158,6 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	layout, err := persist.ValidateLayout(layout, nfts)
 	if err != nil {
 		return err
-	}
-
-	if len(nfts) > maxNftsPerCollection {
-		return errTooManyNFTsInCollection
 	}
 
 	userID, err := getAuthenticatedUser(ctx)

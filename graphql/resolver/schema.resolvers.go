@@ -5,6 +5,7 @@ package graphql
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
@@ -17,7 +18,7 @@ import (
 )
 
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.ID)
+	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -27,11 +28,11 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 }
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
-	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.ID)
+	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.ID)
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -40,13 +41,11 @@ func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.Gall
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(obj.ID)
+	nfts, err := dataloader.For(ctx).NftsByCollectionId.Load(obj.Dbid)
 
 	if err != nil {
 		return nil, err
 	}
-
-	nfts := collection.NFTs
 
 	output := make([]*model.GalleryNft, len(nfts))
 	for i, nft := range nfts {
@@ -58,17 +57,18 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 		// that reads from the same NFT database but just grabs less data. With GraphQL, clients will select the data
 		// they want.
 
-		genericNft := model.GenericNft{
-			ID:                  nft.ID,
-			Name:                util.StringToPointer(nft.Name.String()),
-			TokenCollectionName: util.StringToPointer(nft.TokenCollectionName.String()),
-			Owner:               nil, // handled by dedicated resolver
-		}
+		if err == nil {
+			nftModel := nftToModel(ctx, r.Resolver, nft)
+			galleryNft := &model.GalleryNft{
+				HelperGalleryNftData: model.HelperGalleryNftData{
+					NftId:        nft.ID,
+					CollectionId: obj.Dbid,
+				},
+				Nft:        &nftModel,
+				Collection: obj,
+			}
 
-		output[i] = &model.GalleryNft{
-			ID:         nft.ID,
-			Nft:        genericNft,
-			Collection: obj,
+			output[i] = galleryNft
 		}
 	}
 
@@ -76,19 +76,11 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
-	return resolveGalleriesByUserID(ctx, r.Resolver, obj.ID)
-}
-
-func (r *genericNftResolver) Owner(ctx context.Context, obj *model.GenericNft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
-}
-
-func (r *imageNftResolver) Owner(ctx context.Context, obj *model.ImageNft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+	return resolveGalleriesByUserID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.ID)
+	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
@@ -141,21 +133,25 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	// Make sure the collection exists before trying to delete it
+	_, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
 	if err != nil {
-		return nil, err
+		return remapError(err)
 	}
 
-	galleryID := gallery.ID
+	// Get the collection's parent gallery before deleting the collection
+	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	if err != nil {
+		return remapError(err)
+	}
 
 	err = api.Collection.DeleteCollection(ctx, collectionID)
 	if err != nil {
 		return remapError(err)
 	}
 
-	dataloader.For(ctx).GalleryByGalleryId.Clear(galleryID)
-	gallery, err = dataloader.For(ctx).GalleryByGalleryId.Load(galleryID)
-
+	// Deleting a collection marks the collection as "deleted" but doesn't alter the gallery,
+	// so we don't need to refetch the gallery before returning it here
 	output := &model.DeleteCollectionPayload{
 		Gallery: galleryToModel(gallery),
 	}
@@ -454,6 +450,14 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 	return output, nil
 }
 
+func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
+	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.Dbid)
+}
+
+func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error) {
 	return resolveViewer(ctx), nil
 }
@@ -502,8 +506,28 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 	return output, nil
 }
 
-func (r *videoNftResolver) Owner(ctx context.Context, obj *model.VideoNft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.ID)
+func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
+	// Map known errors to GraphQL return types
+	remapError := func(err error) (model.CollectionByIDOrError, error) {
+		if errorType, ok := errorToGraphqlType(err); ok {
+			if returnType, ok := errorType.(model.CollectionByIDOrError); ok {
+				addError(ctx, err, errorType)
+				return returnType, nil
+			}
+		}
+
+		return nil, err
+	}
+
+	api := publicapi.For(ctx)
+
+	collection, err := api.Collection.GetCollection(ctx, id)
+
+	if err != nil {
+		return remapError(err)
+	}
+
+	return collectionToModel(ctx, *collection), nil
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
@@ -532,16 +556,17 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
-func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]model.Nft, error) {
+func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
 	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]model.Nft, len(nfts))
+	output := make([]*model.Nft, len(nfts))
 	for i, nft := range nfts {
-		output[i] = nftToModel(ctx, r.Resolver, nft)
+		nftModel := nftToModel(ctx, r.Resolver, nft)
+		output[i] = &nftModel
 	}
 
 	return output, nil
@@ -558,12 +583,6 @@ func (r *Resolver) GalleryCollection() generated.GalleryCollectionResolver {
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
-// GenericNft returns generated.GenericNftResolver implementation.
-func (r *Resolver) GenericNft() generated.GenericNftResolver { return &genericNftResolver{r} }
-
-// ImageNft returns generated.ImageNftResolver implementation.
-func (r *Resolver) ImageNft() generated.ImageNftResolver { return &imageNftResolver{r} }
-
 // MembershipOwner returns generated.MembershipOwnerResolver implementation.
 func (r *Resolver) MembershipOwner() generated.MembershipOwnerResolver {
 	return &membershipOwnerResolver{r}
@@ -572,11 +591,14 @@ func (r *Resolver) MembershipOwner() generated.MembershipOwnerResolver {
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
+// Nft returns generated.NftResolver implementation.
+func (r *Resolver) Nft() generated.NftResolver { return &nftResolver{r} }
+
+// OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
+func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
+
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
-
-// VideoNft returns generated.VideoNftResolver implementation.
-func (r *Resolver) VideoNft() generated.VideoNftResolver { return &videoNftResolver{r} }
 
 // Viewer returns generated.ViewerResolver implementation.
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
@@ -587,11 +609,10 @@ func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r}
 type galleryResolver struct{ *Resolver }
 type galleryCollectionResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
-type genericNftResolver struct{ *Resolver }
-type imageNftResolver struct{ *Resolver }
 type membershipOwnerResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type nftResolver struct{ *Resolver }
+type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-type videoNftResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }

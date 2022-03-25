@@ -21,6 +21,7 @@ type NFTRepository struct {
 	createStmt                   *sql.Stmt
 	getByAddressesStmt           *sql.Stmt
 	getByIDStmt                  *sql.Stmt
+	getByCollectionIDStmt        *sql.Stmt
 	getByContractDataStmt        *sql.Stmt
 	getByOpenseaIDStmt           *sql.Stmt
 	getUserAddressesStmt         *sql.Stmt
@@ -41,6 +42,9 @@ func NewNFTRepository(db *sql.DB, galleryRepo *GalleryRepository) *NFTRepository
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE ID = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByCollectionIDStmt, err := db.PrepareContext(ctx, `SELECT n.ID,n.DELETED,n.VERSION,n.CREATED_AT,n.LAST_UPDATED,n.NAME,n.DESCRIPTION,n.EXTERNAL_URL,n.CREATOR_ADDRESS,n.CREATOR_NAME,n.OWNER_ADDRESS,n.MULTIPLE_OWNERS,n.CONTRACT,n.OPENSEA_ID,n.OPENSEA_TOKEN_ID,n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.IMAGE_ORIGINAL_URL,n.ANIMATION_URL,n.ANIMATION_ORIGINAL_URL,n.TOKEN_COLLECTION_NAME,n.COLLECTORS_NOTE FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft_id, nft_ord) LEFT JOIN nfts n ON n.ID = nft_id WHERE c.ID = $1 AND c.DELETED = false AND n.DELETED = false ORDER BY nft_ord;`)
 	checkNoErr(err)
 
 	getByContractDataStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts WHERE CONTRACT ->> 'contract_address' = $1 AND OPENSEA_TOKEN_ID = $2 AND DELETED = false;`)
@@ -67,6 +71,7 @@ func NewNFTRepository(db *sql.DB, galleryRepo *GalleryRepository) *NFTRepository
 		createStmt:                   createStmt,
 		getByAddressesStmt:           getByAddressesStmt,
 		getByIDStmt:                  getByIDStmt,
+		getByCollectionIDStmt:        getByCollectionIDStmt,
 		getByContractDataStmt:        getByContractDataStmt,
 		getByOpenseaIDStmt:           getByOpenseaStmt,
 		getUserAddressesStmt:         getUserAddressesStmt,
@@ -135,6 +140,31 @@ func (n *NFTRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) 
 		return nil, err
 	}
 	return n.GetByAddresses(pCtx, pAddresses)
+}
+
+// GetByCollectionID gets all NFTs in a collection
+func (n *NFTRepository) GetByCollectionID(pCtx context.Context, pCollectionID persist.DBID) ([]persist.NFT, error) {
+	rows, err := n.getByCollectionIDStmt.QueryContext(pCtx, pCollectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	nfts := make([]persist.NFT, 0, 25)
+	for rows.Next() {
+		var nft persist.NFT
+		err = rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
+		if err != nil {
+			return nil, err
+		}
+		nfts = append(nfts, nft)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return nfts, nil
 }
 
 // GetByAddresses gets all NFTs owned by a set of addresses

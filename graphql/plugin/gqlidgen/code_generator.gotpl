@@ -1,0 +1,63 @@
+{{ reserveImport "fmt" }}
+{{ reserveImport "strings" }}
+{{ reserveImport "context" }}
+
+{{ range $import := .AddedImports }}
+	{{ reserveImport $import }}
+{{end}}
+
+{{- range $node := .NodeImplementors }}
+func (r *{{$node.Name}}) ID() GqlID {
+    {{- if $node.HasBindingMethods}}
+    //-----------------------------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------------------------
+    // Some fields specified by @goGqlId require manual binding because one of the following is true:
+    // (a) the field does not exist on the {{$node.Name}} type, or
+    // (b) the field exists but is not a string type
+    //-----------------------------------------------------------------------------------------------
+    // Please create binding methods on the {{$node.Name}} type with the following signatures:
+        {{- range $signature := $node.BindingMethodSignatures}}
+    // {{$signature}}
+        {{- end }}
+    //-----------------------------------------------------------------------------------------------
+    {{- end }}
+    return GqlID({{$node.Implementation}})
+}
+{{ end }}
+
+type NodeFetcher struct {
+    {{- range $node := .NodeImplementors }}
+    On{{$node.Name}} func(ctx context.Context, {{range $index, $arg := $node.Args}}{{if $index}},{{end}}{{$arg}} {{index $node.Types $index}}{{end}}) (*{{$node.Name}}, error)
+    {{- end }}
+}
+
+func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
+    parts := strings.Split(string(id), ":")
+    if len(parts) == 1 {
+        return nil, ErrInvalidIDFormat{message: "no ID components specified after type name"}
+    }
+
+    typeName := parts[0]
+    ids := parts[1:]
+
+    switch typeName {
+    {{- range $node := .NodeImplementors }}
+    case "{{$node.Name}}":
+        if len(ids) != {{len $node.Args}} {
+            return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'{{$node.Name}}' type requires {{len $node.Args}} ID component(s) (%d component(s) supplied)", len(ids))}
+        }
+        return n.On{{$node.Name}}(ctx, {{range $index, $type := $node.Types}}{{if $index}},{{end}}{{$type}}(ids[{{$index}}]){{end}})
+    {{- end }}
+    }
+
+    return nil, ErrInvalidIDFormat{typeName}
+}
+
+func (n *NodeFetcher) ValidateHandlers() {
+    switch {
+    {{- range $node := .NodeImplementors }}
+    case n.On{{$node.Name}} == nil:
+        panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.On{{$node.Name}}")
+    {{- end }}
+    }
+}

@@ -23,6 +23,8 @@ type CollectionRepository struct {
 	getByUserIDRawStmt           *sql.Stmt
 	getByIDOwnerStmt             *sql.Stmt
 	getByIDOwnerRawStmt          *sql.Stmt
+	getByGalleryIDRawStmt        *sql.Stmt
+	getByGalleryIDOwnerRawStmt   *sql.Stmt
 	getByIDStmt                  *sql.Stmt
 	getByIDRawStmt               *sql.Stmt
 	updateInfoStmt               *sql.Stmt
@@ -85,6 +87,20 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
 
+	getByGalleryIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
+	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
+	LEFT JOIN collections c ON c.id = coll_id
+	WHERE g.ID = $1 AND g.DELETED = false AND c.DELETED = false AND c.HIDDEN = false ORDER BY coll_ord;`)
+	checkNoErr(err)
+
+	getByGalleryIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
+	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM galleries g,
+	unnest(g.collections) WITH ORDINALITY AS u(coll_id, coll_ord)
+	LEFT JOIN collections c ON c.id = coll_id
+	WHERE g.ID = $1 AND g.DELETED = false AND c.DELETED = false ORDER BY coll_ord;`)
+	checkNoErr(err)
+
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,n.ID,n.OWNER_ADDRESS,
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
@@ -145,7 +161,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	getOwnerAddressStmt, err := db.PrepareContext(ctx, `SELECT OWNER_ADDRESS FROM nfts WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &CollectionRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt, getOpenseaIDForNFTStmt: getOpenseaIDForNFTStmt, deleteNFTStmt: deleteNFTStmt, updateOwnerAddressStmt: updateOwnerAddressStmt, getOwnerAddressStmt: getOwnerAddressStmt}
+	return &CollectionRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByUserIDStmt: getByUserIDStmt, getByIDOwnerStmt: getByIDOwnerStmt, getByIDStmt: getByIDStmt, getByGalleryIDRawStmt: getByGalleryIDRawStmt, getByGalleryIDOwnerRawStmt: getByGalleryIDOwnerRawStmt, updateInfoStmt: updateInfoStmt, updateHiddenStmt: updateHiddenStmt, updateNFTsStmt: updateNFTsStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getByIDRawStmt: getByIDRawStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByUserIDRawStmt: getByUserIDRawStmt, getOpenseaIDForNFTStmt: getOpenseaIDForNFTStmt, deleteNFTStmt: deleteNFTStmt, updateOwnerAddressStmt: updateOwnerAddressStmt, getOwnerAddressStmt: getOwnerAddressStmt}
 }
 
 // Create creates a new collection in the database
@@ -235,6 +251,38 @@ func (c *CollectionRepository) GetByUserID(pCtx context.Context, pUserID persist
 	return result, nil
 }
 
+// GetByGalleryIDRaw returns all collections owned by a user
+func (c *CollectionRepository) GetByGalleryIDRaw(pCtx context.Context, pUserID persist.DBID, pShowHidden bool) ([]persist.Collection, error) {
+	var stmt *sql.Stmt
+	if pShowHidden {
+		stmt = c.getByGalleryIDOwnerRawStmt
+	} else {
+		stmt = c.getByGalleryIDRawStmt
+	}
+	res, err := stmt.QueryContext(pCtx, pUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	collections := make([]persist.Collection, 0, 10)
+	for res.Next() {
+		var collection persist.Collection
+		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
+		if err != nil {
+			return nil, err
+		}
+
+		collections = append(collections, collection)
+	}
+
+	if err := res.Err(); err != nil {
+		return nil, err
+	}
+
+	return collections, nil
+}
+
 // GetByID returns a collection by its ID
 func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
 	var stmt *sql.Stmt
@@ -289,6 +337,26 @@ func (c *CollectionRepository) GetByID(pCtx context.Context, pID persist.DBID, p
 
 	collection.NFTs = nfts
 
+	return collection, nil
+}
+
+// GetByIDRaw gets a collection by its ID
+func (c *CollectionRepository) GetByIDRaw(pCtx context.Context, pID persist.DBID, pShowHidden bool) (persist.Collection, error) {
+	var stmt *sql.Stmt
+	if pShowHidden {
+		stmt = c.getByIDOwnerRawStmt
+	} else {
+		stmt = c.getByIDRawStmt
+	}
+
+	var collection persist.Collection
+	err := stmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
+		}
+		return persist.Collection{}, err
+	}
 	return collection, nil
 }
 

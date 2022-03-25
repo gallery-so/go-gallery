@@ -6,6 +6,7 @@
 //go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.Collection
 //go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.Collection
 //go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/service/persist.NFT
+//go:generate go run github.com/vektah/dataloaden NftsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/service/persist.NFT
 //go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/service/persist.NFT
 
 package dataloader
@@ -13,14 +14,13 @@ package dataloader
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"time"
 )
 
 const loadersKey = "graphql.dataloaders"
-const defaultMaxBatch = 100
+const defaultMaxBatch = 1 // Disable batching until loading functions support it
 const defaultWaitTime = 1 * time.Millisecond
 
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
@@ -34,9 +34,10 @@ type Loaders struct {
 	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
 	CollectionByCollectionId CollectionLoaderByID
-	CollectionsByUserId      CollectionsLoaderByID
+	CollectionsByGalleryId   CollectionsLoaderByID
 	NftByNftId               NftLoaderByID
 	NftsByAddress            NftsLoaderByAddress
+	NftsByCollectionId       NftsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
@@ -84,10 +85,10 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 		fetch:    loadCollectionByCollectionId(ctx, loaders, r),
 	}
 
-	loaders.CollectionsByUserId = CollectionsLoaderByID{
+	loaders.CollectionsByGalleryId = CollectionsLoaderByID{
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
-		fetch:    loadCollectionsByUserId(ctx, loaders, r),
+		fetch:    loadCollectionsByGalleryId(ctx, loaders, r),
 	}
 
 	loaders.NftByNftId = NftLoaderByID{
@@ -100,6 +101,12 @@ func NewLoaders(ctx context.Context, r *persist.Repositories) *Loaders {
 		maxBatch: defaultMaxBatch,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByAddress(ctx, loaders, r),
+	}
+
+	loaders.NftsByCollectionId = NftsLoaderByID{
+		maxBatch: defaultMaxBatch,
+		wait:     defaultWaitTime,
+		fetch:    loadNftsByCollectionId(ctx, loaders, r),
 	}
 
 	return loaders
@@ -177,7 +184,7 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Re
 		errors := make([]error, len(galleryIds))
 
 		for i, galleryId := range galleryIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByID(ctx, galleryId)
+			galleries[i], errors[i] = r.GalleryRepository.GetByIDRaw(ctx, galleryId)
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
@@ -197,7 +204,7 @@ func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, r *persist
 		errors := make([]error, len(collectionIds))
 
 		for i, collectionId := range collectionIds {
-			galleries[i], errors[i] = r.GalleryRepository.GetByChildCollectionID(ctx, collectionId)
+			galleries[i], errors[i] = r.GalleryRepository.GetByChildCollectionIDRaw(ctx, collectionId)
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
@@ -237,34 +244,23 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, r *pers
 		collections := make([]persist.Collection, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
-		gc := util.GinContextFromContext(ctx)
-		authed := auth.GetUserAuthedFromCtx(gc)
-
 		for i, collectionId := range collectionIds {
-			// Worth fixing in the future: "authed" actually checks whether the current user is logged in, so
-			// any logged-in user can see another user's hidden collections. We'd probably want to move the
-			// auth check into GetByID to see who owns the collection and determine whether it can be returned
-			// to the requesting user.
-			collections[i], errors[i] = r.CollectionRepository.GetByID(ctx, collectionId, authed)
+			// Always return hidden collections; the frontend will filter them out as needed.
+			collections[i], errors[i] = r.CollectionRepository.GetByIDRaw(ctx, collectionId, true)
 		}
 
 		return collections, errors
 	}
 }
 
-func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Collection, []error) {
-	return func(userIds []persist.DBID) ([][]persist.Collection, []error) {
-		collections := make([][]persist.Collection, len(userIds))
-		errors := make([]error, len(userIds))
+func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.Collection, []error) {
+	return func(galleryIds []persist.DBID) ([][]persist.Collection, []error) {
+		collections := make([][]persist.Collection, len(galleryIds))
+		errors := make([]error, len(galleryIds))
 
-		gc := util.GinContextFromContext(ctx)
-		authedUserId := auth.GetUserIDFromCtx(gc)
-
-		for i, userId := range userIds {
-			// GraphQL best practices would suggest moving this auth logic into the DB fetching layer
-			// so it's applied consistently for all callers. It's probably worth doing at some point.
-			showHidden := userId == authedUserId
-			collections[i], errors[i] = r.CollectionRepository.GetByUserID(ctx, userId, showHidden)
+		for i, galleryId := range galleryIds {
+			// Always return hidden collections; the frontend will filter them out as needed.
+			collections[i], errors[i] = r.CollectionRepository.GetByGalleryIDRaw(ctx, galleryId, true)
 
 			// Add results to the CollectionByCollectionId loader's cache
 			if errors[i] == nil {
@@ -275,6 +271,19 @@ func loadCollectionsByUserId(ctx context.Context, loaders *Loaders, r *persist.R
 		}
 
 		return collections, errors
+	}
+}
+
+func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.NFT, []error) {
+	return func(nftIds []persist.DBID) ([]persist.NFT, []error) {
+		nfts := make([]persist.NFT, len(nftIds))
+		errors := make([]error, len(nftIds))
+
+		for i, nftId := range nftIds {
+			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, nftId)
+		}
+
+		return nfts, errors
 	}
 }
 
@@ -298,13 +307,20 @@ func loadNftsByAddress(ctx context.Context, loaders *Loaders, r *persist.Reposit
 	}
 }
 
-func loadNftByNftId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([]persist.NFT, []error) {
-	return func(nftIds []persist.DBID) ([]persist.NFT, []error) {
-		nfts := make([]persist.NFT, len(nftIds))
-		errors := make([]error, len(nftIds))
+func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, r *persist.Repositories) func([]persist.DBID) ([][]persist.NFT, []error) {
+	return func(collectionIds []persist.DBID) ([][]persist.NFT, []error) {
+		nfts := make([][]persist.NFT, len(collectionIds))
+		errors := make([]error, len(collectionIds))
 
-		for i, nftId := range nftIds {
-			nfts[i], errors[i] = r.NftRepository.GetByID(ctx, nftId)
+		for i, collectionId := range collectionIds {
+			nfts[i], errors[i] = r.NftRepository.GetByCollectionID(ctx, collectionId)
+
+			// Add results to the NftByNftId loader's cache
+			if errors[i] == nil {
+				for _, nft := range nfts[i] {
+					loaders.NftByNftId.Prime(nft.ID, nft)
+				}
+			}
 		}
 
 		return nfts, errors
