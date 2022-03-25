@@ -9,6 +9,7 @@ import (
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/mikeydub/go-gallery/graphql/plugin/gqlidgen"
 	"github.com/mikeydub/go-gallery/graphql/plugin/modelgen_custom"
+	"github.com/mikeydub/go-gallery/graphql/plugin/remapgen"
 	"os"
 )
 
@@ -22,6 +23,7 @@ func main() {
 	err = api.Generate(cfg,
 		api.ReplacePlugin(modelgen_custom.New()),
 		api.AddPlugin(gqlidgen.New(cfg.Model.Dir(), cfg.Model.Package)),
+		api.AddPlugin(remapgen.New(cfg.Model.Dir(), cfg.Model.Package)),
 	)
 
 	if err != nil {

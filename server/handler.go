@@ -1,10 +1,9 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
-
-	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -58,6 +57,8 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
 	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
+	h.AroundFields(graphql.RemapErrors)
+	h.AroundResponses(graphql.AddErrorsToGin)
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		gc := util.GinContextFromContext(ctx)
@@ -66,15 +67,6 @@ func graphqlHandler(repos *persist.Repositories, ethClient *ethclient.Client, ip
 		}
 
 		return gqlgen.DefaultRecover(ctx, err)
-	})
-
-	h.AroundResponses(func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-		response := next(ctx)
-		gc := util.GinContextFromContext(ctx)
-		for _, err := range response.Errors {
-			gc.Error(err)
-		}
-		return response
 	})
 
 	return func(c *gin.Context) {

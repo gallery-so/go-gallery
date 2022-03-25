@@ -19,6 +19,37 @@ import (
 	"strings"
 )
 
+func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+	response := next(ctx)
+	gc := util.GinContextFromContext(ctx)
+	for _, err := range response.Errors {
+		gc.Error(err)
+	}
+	return response
+}
+
+func RemapErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
+	res, err = next(ctx)
+
+	if err == nil {
+		return res, err
+	}
+
+	fc := gqlgen.GetFieldContext(ctx)
+	typeName := fc.Field.Field.Definition.Type.NamedType
+
+	// If a resolver returns an error that can be mapped to that resolver's expected GQL type,
+	// remap it and return the appropriate GQL model instead of an error. This is common for
+	// union types where the result could be an object or a set of errors.
+	if fc.IsResolver {
+		if remapped, ok := errorToGraphqlType(ctx, err, typeName); ok {
+			return remapped, nil
+		}
+	}
+
+	return res, err
+}
+
 func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
