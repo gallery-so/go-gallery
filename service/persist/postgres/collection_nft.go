@@ -152,7 +152,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	getOpenseaIDForNFTStmt, err := db.PrepareContext(ctx, `SELECT OPENSEA_ID FROM nfts WHERE ID = $1;`)
 	checkNoErr(err)
 
-	deleteNFTStmt, err := db.PrepareContext(ctx, `DELETE FROM nfts WHERE ID = $1;`)
+	deleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
 	updateOwnerAddressStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET OWNER_ADDRESS = $1 WHERE ID = $2;`)
