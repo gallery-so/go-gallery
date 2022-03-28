@@ -27,6 +27,8 @@ type BackupRepository struct {
 	updateGalleryStmt        *sql.Stmt
 }
 
+const maxBackups = 50
+
 // NewBackupRepository creates a new postgres repository for interacting with backed up versions of galleries
 func NewBackupRepository(db *sql.DB) *BackupRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -102,17 +104,61 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		return err
 	}
 
+	// skip insert if we've created a backup very recently
 	if len(currentBackups) > 0 {
 		last := currentBackups[len(currentBackups)-1]
-		if time.Since(last.CreationTime.Time()) < time.Hour*12 {
+		if time.Since(last.CreationTime.Time()) < time.Minute*5 {
 			return nil
 		}
 	}
 
-	if len(currentBackups) > 4 {
+	// delete oldest backup if we're above max capacity
+	if len(currentBackups) > maxBackups {
 		_, err = b.deleteBackupStmt.ExecContext(pCtx, currentBackups[0].ID)
 		if err != nil {
 			return err
+		}
+	}
+
+	// prune backups
+	if len(currentBackups) > 0 {
+		day := time.Hour * 24
+		week := day * 7
+
+		prev := currentBackups[0]
+		prevCreationTime := prev.CreationTime.Time()
+		for i := 1; i < len(currentBackups); i++ {
+			curr := currentBackups[i]
+			currCreationTime := curr.CreationTime.Time()
+
+			// if two backups are over a week old but within a day apart, keep the older one
+			if time.Since(prevCreationTime) > week &&
+				time.Since(currCreationTime) > week &&
+				currCreationTime.Sub(prevCreationTime) < day {
+				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
+				continue
+			}
+
+			// if two backups are under a week old, but over a day old, and within an hour apart, keep the older one
+			if time.Since(prevCreationTime) < week &&
+				time.Since(currCreationTime) < week &&
+				time.Since(prevCreationTime) > day &&
+				time.Since(currCreationTime) > day &&
+				currCreationTime.Sub(prevCreationTime) < time.Hour {
+				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
+				continue
+			}
+
+			// if two backups are within a day old but within 5 minutes apart, keep the older one
+			if time.Since(prevCreationTime) < day &&
+				time.Since(currCreationTime) < day &&
+				currCreationTime.Sub(prevCreationTime) < time.Minute*5 {
+				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
+				continue
+			}
+
+			prev = curr
+			prevCreationTime = currCreationTime
 		}
 	}
 
