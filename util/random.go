@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -25,4 +26,9 @@ func RandHexString(n int) string {
 		b[i] = hex[rand.Intn(len(hex))]
 	}
 	return string(b)
+}
+
+// RandEthAddress returns a random ethereum address
+func RandEthAddress() string {
+	return fmt.Sprintf("0x%s", RandHexString(40))
 }

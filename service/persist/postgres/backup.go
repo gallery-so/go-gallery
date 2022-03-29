@@ -27,6 +27,8 @@ type BackupRepository struct {
 	updateGalleryStmt        *sql.Stmt
 }
 
+const maxBackups = 50
+
 // NewBackupRepository creates a new postgres repository for interacting with backed up versions of galleries
 func NewBackupRepository(db *sql.DB) *BackupRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -47,7 +49,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	deleteBackupStmt, err := db.PrepareContext(ctx, `DELETE FROM backups WHERE ID = $1;`)
 	checkNoErr(err)
 
-	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY) VALUES ($1, $2, $3, $4);`)
+	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY, CREATED_AT) VALUES ($1, $2, $3, $4, $5);`)
 	checkNoErr(err)
 
 	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
@@ -102,21 +104,62 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		return err
 	}
 
+	// skip insert if we've created a backup very recently
 	if len(currentBackups) > 0 {
 		last := currentBackups[len(currentBackups)-1]
-		if time.Since(last.CreationTime.Time()) < time.Hour*12 {
+		if time.Since(last.CreationTime.Time()) < time.Minute*5 {
 			return nil
 		}
 	}
 
-	if len(currentBackups) > 4 {
+	// delete oldest backup if we're above max capacity
+	if len(currentBackups) > maxBackups {
 		_, err = b.deleteBackupStmt.ExecContext(pCtx, currentBackups[0].ID)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
+	// Backup pruning rules:
+	// - backups in the past 24 hours should be stored no more often than every 5 minutes
+	// - backups in the past 7 days should be stored no more often than every 1 hour
+	// - backups beyond the past 7 days should be stored no more often than every 1 day
+	if len(currentBackups) >= 2 {
+		day := time.Hour * 24
+		week := day * 7
+
+		curr := currentBackups[len(currentBackups)-1]
+		currCreationTime := curr.CreationTime.Time()
+
+		// iterate from latest to oldest backup
+		for i := len(currentBackups) - 2; i >= 0; i-- {
+			prev := currentBackups[i]
+			prevCreationTime := prev.CreationTime.Time()
+
+			// backups in the past day and are within 5 mins of each other
+			updatedInPastDay := time.Since(currCreationTime) <= day &&
+				currCreationTime.Sub(prevCreationTime) < 5*time.Minute
+			// backups in the past week and are within 1 hour of each other
+			updatedInPastWeek := time.Since(currCreationTime) > day &&
+				time.Since(currCreationTime) <= week &&
+				currCreationTime.Sub(prevCreationTime) < time.Hour
+			// backups older than 1 week and are within 1 day of each other
+			updatedOverWeekAgo := time.Since(currCreationTime) > week &&
+				currCreationTime.Sub(prevCreationTime) < day
+
+			if updatedInPastDay || updatedInPastWeek || updatedOverWeekAgo {
+				b.deleteBackupStmt.ExecContext(pCtx, prev.ID)
+				// continue statement here ensures that `curr` remains anchored
+				// for the next comparison, avoiding a cascade
+				continue
+			}
+
+			curr = prev
+			currCreationTime = prevCreationTime
+		}
+	}
+
+	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery, persist.CreationTime(time.Now()))
 	if err != nil {
 		return err
 	}

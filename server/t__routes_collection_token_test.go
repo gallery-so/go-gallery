@@ -366,9 +366,9 @@ func createCollectionInDbForUserIDToken(assert *assert.Assertions, collectionNam
 
 func seedTokens(assert *assert.Assertions) []persist.DBID {
 	nfts := []persist.Token{
-		{CollectorsNote: "asd", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
-		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
-		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40)))},
+		{CollectorsNote: "asd", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(util.RandEthAddress())},
+		{CollectorsNote: "bbb", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(util.RandEthAddress())},
+		{CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, TokenID: persist.TokenID(util.RandHexString(10)), ContractAddress: persist.Address(util.RandEthAddress())},
 	}
 	nftIDs, err := tc.repos.TokenRepository.CreateBulk(context.Background(), nfts)
 	assert.Nil(err)
