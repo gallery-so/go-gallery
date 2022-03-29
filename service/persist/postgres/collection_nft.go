@@ -57,7 +57,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
-	LEFT JOIN nfts n ON n.ID = nft
+	LEFT JOIN nfts n ON n.ID = nft AND n.DELETED = false
 	WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
@@ -69,7 +69,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM collections c,unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
-	LEFT JOIN nfts n ON n.ID = nft 
+	LEFT JOIN nfts n ON n.ID = nft AND n.DELETED = false
 	WHERE c.OWNER_USER_ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 	getByUserIDRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND c.HIDDEN = false;`)
@@ -80,7 +80,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME, 
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
-	LEFT JOIN nfts n ON n.ID = nft
+	LEFT JOIN nfts n ON n.ID = nft AND n.DELETED = false
 	WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
@@ -106,7 +106,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	n.MULTIPLE_OWNERS,n.NAME,n.CONTRACT,n.TOKEN_COLLECTION_NAME,n.CREATOR_ADDRESS,n.CREATOR_NAME,
 	n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.ANIMATION_ORIGINAL_URL,n.ANIMATION_URL,n.CREATED_AT 
 	FROM collections c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality)
-	LEFT JOIN nfts n ON n.ID = nft
+	LEFT JOIN nfts n ON n.ID = nft AND n.DELETED = false
 	WHERE c.ID = $1 AND c.HIDDEN = false AND c.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 

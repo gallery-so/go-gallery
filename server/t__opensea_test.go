@@ -71,7 +71,7 @@ func TestOpenseaSync_Success(t *testing.T) {
 	collID, err := tc.repos.CollectionRepository.Create(ctx, coll)
 	assert.NoError(err)
 
-	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository)
+	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
 	assert.NoError(err)
 
 	time.Sleep(time.Second * 3)
@@ -148,7 +148,7 @@ func TestOpenseaMultiAddressSync_Success(t *testing.T) {
 	collID, err := tc.repos.CollectionRepository.Create(ctx, coll)
 	assert.NoError(err)
 
-	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository)
+	err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
 	assert.NoError(err)
 
 	time.Sleep(time.Second * 3)
