@@ -120,6 +120,10 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		}
 	}
 
+	// Backup pruning rules:
+	// - backups in the past 24 hours should be stored no more often than every 5 minutes
+	// - backups in the past 7 days should be stored no more often than every 1 hour
+	// - backups beyond the past 7 days should be stored no more often than every 1 day
 	if len(currentBackups) >= 2 {
 		day := time.Hour * 24
 		week := day * 7
