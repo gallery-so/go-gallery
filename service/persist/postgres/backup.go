@@ -49,7 +49,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	deleteBackupStmt, err := db.PrepareContext(ctx, `DELETE FROM backups WHERE ID = $1;`)
 	checkNoErr(err)
 
-	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY) VALUES ($1, $2, $3, $4);`)
+	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY, CREATED_AT) VALUES ($1, $2, $3, $4, $5);`)
 	checkNoErr(err)
 
 	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
@@ -139,7 +139,7 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 				continue
 			}
 
-			// if two backups are under a week old, but over a day old, and within an hour apart, keep the older one
+			// if two backups are under a week old, over a day old, and within an hour apart, keep the older one
 			if time.Since(prevCreationTime) < week &&
 				time.Since(currCreationTime) < week &&
 				time.Since(prevCreationTime) > day &&
@@ -162,7 +162,7 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		}
 	}
 
-	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery)
+	_, err = b.insertBackupStmt.ExecContext(pCtx, persist.GenerateID(), pGallery.ID, pGallery.Version, pGallery, persist.CreationTime(time.Now()))
 	if err != nil {
 		return err
 	}
