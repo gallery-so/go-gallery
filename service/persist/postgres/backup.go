@@ -120,45 +120,38 @@ func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery
 		}
 	}
 
-	// prune backups
-	if len(currentBackups) > 0 {
+	if len(currentBackups) >= 2 {
 		day := time.Hour * 24
 		week := day * 7
 
-		prev := currentBackups[0]
-		prevCreationTime := prev.CreationTime.Time()
-		for i := 1; i < len(currentBackups); i++ {
-			curr := currentBackups[i]
-			currCreationTime := curr.CreationTime.Time()
+		curr := currentBackups[len(currentBackups)-1]
+		currCreationTime := curr.CreationTime.Time()
 
-			// if two backups are over a week old but within a day apart, keep the older one
-			if time.Since(prevCreationTime) > week &&
-				time.Since(currCreationTime) > week &&
-				currCreationTime.Sub(prevCreationTime) < day {
-				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
+		// iterate from latest to oldest backup
+		for i := len(currentBackups) - 2; i >= 0; i-- {
+			prev := currentBackups[i]
+			prevCreationTime := prev.CreationTime.Time()
+
+			// backups in the past day and are within 5 mins of each other
+			updatedInPastDay := time.Since(currCreationTime) <= day &&
+				currCreationTime.Sub(prevCreationTime) < 5*time.Minute
+			// backups in the past week and are within 1 hour of each other
+			updatedInPastWeek := time.Since(currCreationTime) > day &&
+				time.Since(currCreationTime) <= week &&
+				currCreationTime.Sub(prevCreationTime) < time.Hour
+			// backups older than 1 week and are within 1 day of each other
+			updatedOverWeekAgo := time.Since(currCreationTime) > week &&
+				currCreationTime.Sub(prevCreationTime) < day
+
+			if updatedInPastDay || updatedInPastWeek || updatedOverWeekAgo {
+				b.deleteBackupStmt.ExecContext(pCtx, prev.ID)
+				// continue statement here ensures that `curr` remains anchored
+				// for the next comparison, avoiding a cascade
 				continue
 			}
 
-			// if two backups are under a week old, over a day old, and within an hour apart, keep the older one
-			if time.Since(prevCreationTime) < week &&
-				time.Since(currCreationTime) < week &&
-				time.Since(prevCreationTime) > day &&
-				time.Since(currCreationTime) > day &&
-				currCreationTime.Sub(prevCreationTime) < time.Hour {
-				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
-				continue
-			}
-
-			// if two backups are within a day old but within 5 minutes apart, keep the older one
-			if time.Since(prevCreationTime) < day &&
-				time.Since(currCreationTime) < day &&
-				currCreationTime.Sub(prevCreationTime) < time.Minute*5 {
-				b.deleteBackupStmt.ExecContext(pCtx, curr.ID)
-				continue
-			}
-
-			prev = curr
-			prevCreationTime = currCreationTime
+			curr = prev
+			currCreationTime = prevCreationTime
 		}
 	}
 
