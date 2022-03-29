@@ -30,6 +30,7 @@ type statements struct {
 	nftRepo     persist.NFTRepository
 	userRepo    persist.UserRepository
 	collRepo    persist.CollectionRepository
+	backupRepo  persist.BackupRepository
 }
 
 func newStatements(db *sql.DB) *statements {
@@ -96,6 +97,7 @@ func newStatements(db *sql.DB) *statements {
 		nftRepo:     postgres.NewNFTRepository(db, galleryRepo),
 		userRepo:    postgres.NewUserRepository(db),
 		collRepo:    postgres.NewCollectionRepository(db, galleryRepo),
+		backupRepo:  postgres.NewBackupRepository(db),
 	}
 
 }

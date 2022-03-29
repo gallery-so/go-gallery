@@ -89,7 +89,7 @@ func ownsGeneral(ethClient *ethclient.Client) gin.HandlerFunc {
 	}
 }
 
-func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) gin.HandlerFunc {
+func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input RefreshNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -100,7 +100,7 @@ func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserReposito
 			util.ErrResponse(c, http.StatusBadRequest, errGetNFTsInput)
 			return
 		}
-		err := RefreshOpensea(c, input, userRepo, nftRepo, collRepo, galleryRepo)
+		err := RefreshOpensea(c, input, userRepo, nftRepo, collRepo, galleryRepo, backupRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -111,7 +111,7 @@ func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserReposito
 }
 
 // RefreshOpensea refreshes the opensea data for the given user ids and addresses
-func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.UserRepository, nftRepo persist.NFTRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) error {
+func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.UserRepository, nftRepo persist.NFTRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
 	logrus.Debugf("refreshOpensea input: %+v", input)
 	if input.UserIDs != nil && len(input.UserIDs) > 0 {
 		for _, userID := range input.UserIDs {
@@ -119,7 +119,7 @@ func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.
 			if err != nil {
 				return err
 			}
-			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo, galleryRepo)
+			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
 			if err != nil {
 				return err
 			}
