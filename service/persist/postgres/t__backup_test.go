@@ -193,7 +193,9 @@ func TestPrune_Success(t *testing.T) {
 		for i := 0; i < len(backups)-1; i++ {
 			backup := backups[i]
 			// queried results are returned in reverse of insert order
-			a.True(time.Time(backup.CreationTime).Equal(tc.expected[len(tc.expected)-1-i]))
+			actualCreationTime := time.Time(backup.CreationTime).Round(time.Second)
+			expectedCreationTime := tc.expected[len(tc.expected)-1-i].Round(time.Second)
+			a.True(actualCreationTime.Equal(expectedCreationTime))
 		}
 	}
 }
