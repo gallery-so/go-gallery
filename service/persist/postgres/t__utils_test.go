@@ -7,6 +7,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,12 +41,12 @@ func createMockGallery(t *testing.T, a *assert.Assertions, db *sql.DB) (persist.
 	userRepo := NewUserRepository(db)
 	backupRepo := NewBackupRepository(db)
 
+	address := util.RandEthAddress()
+
 	user := persist.User{
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
-		},
+		Addresses:          []persist.Address{persist.Address(address)},
 	}
 
 	userID, err := userRepo.Create(context.Background(), user)
@@ -53,12 +54,12 @@ func createMockGallery(t *testing.T, a *assert.Assertions, db *sql.DB) (persist.
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+			OwnerAddress: persist.Address(address),
 			Name:         "name",
 			OpenseaID:    1,
 		},
 		{
-			OwnerAddress: "0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+			OwnerAddress: persist.Address(address),
 			Name:         "blah blah",
 			OpenseaID:    10,
 		},

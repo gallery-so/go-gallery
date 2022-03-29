@@ -413,19 +413,19 @@ func addTokensToTokensRepo(s suite.Suite, tokenRepo persist.TokenRepository, wal
 			Name:            "NFT1",
 			ID:              "id1",
 			TokenID:         persist.TokenID(util.RandHexString(10)),
-			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+			ContractAddress: persist.Address(util.RandEthAddress()),
 		},
 		{
 			OwnerAddress:    wallet.address,
 			Name:            "NFT2",
 			ID:              "id2",
-			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+			ContractAddress: persist.Address(util.RandEthAddress()),
 		},
 		{
 			OwnerAddress:    wallet.address,
 			Name:            "NFT3",
 			ID:              "id3",
-			ContractAddress: persist.Address(fmt.Sprintf("0x%s", util.RandHexString(40))),
+			ContractAddress: persist.Address(util.RandEthAddress()),
 		},
 	}
 	tokenIDs, err := tokenRepo.CreateBulk(context.Background(), tokens)
