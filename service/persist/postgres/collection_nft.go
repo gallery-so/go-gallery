@@ -122,7 +122,7 @@ func NewCollectionRepository(db *sql.DB, galleryRepo *GalleryRepository) *Collec
 	updateNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
 	checkNoErr(err)
 
-	nftsToRemoveStmt, err := db.PrepareContext(ctx, `SELECT ID,OPENSEA_ID FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`)
+	nftsToRemoveStmt, err := db.PrepareContext(ctx, `SELECT ID,OPENSEA_ID FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2) AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteNFTsStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET DELETED = true WHERE ID = ANY($1)`)
