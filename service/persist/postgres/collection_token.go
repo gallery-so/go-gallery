@@ -52,8 +52,8 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 		c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 		FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
-		JOIN tokens n ON n.ID = nft AND n.DELETED = false
-		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
+		JOIN tokens n ON n.ID = nft
+		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND n.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 	getByUserIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false;`)
 	checkNoErr(err)
@@ -62,8 +62,8 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
 	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 	FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
-	JOIN tokens n ON n.ID = nft AND n.DELETED = false
-	WHERE c.ID = $1 AND c.DELETED = false ORDER BY ordinality;`)
+	JOIN tokens n ON n.ID = nft
+	WHERE c.ID = $1 AND c.DELETED = false AND n.DELETED = false ORDER BY ordinality;`)
 	checkNoErr(err)
 
 	getByIDOwnerRawStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.DELETED,c.COLLECTORS_NOTE,c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED FROM collections_v2 c WHERE c.ID = $1 AND c.DELETED = false;`)
