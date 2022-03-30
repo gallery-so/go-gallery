@@ -590,6 +590,13 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 			previousOwners <- prevOwner
 		}()
 
+		if sideEffects {
+			go func() {
+				defer wg.Done()
+				runTransferSideEffects(i, contractAddress, tokenID, to, from, tokenBalances{})
+			}()
+		}
+
 	case persist.TokenTypeERC1155:
 		wg.Add(1)
 
@@ -728,12 +735,14 @@ func updateCollections(ctx context.Context, contractAddress persist.Address, tok
 	update := map[persist.DBID]persist.CollectionToken{}
 	for _, coll := range colls {
 		didUpdate := false
-		for i, nft := range coll.NFTs {
-			if nft.ContractAddress.String() == contractAddress.String() && nft.TokenID.String() == tokenID.String() {
-				coll.NFTs = append(coll.NFTs[:i], coll.NFTs[i+1:]...)
+		new := coll.NFTs[:0]
+		for _, nft := range coll.NFTs {
+			if nft.ContractAddress.String() != contractAddress.String() || nft.TokenID.String() != tokenID.String() {
+				new = append(new, nft)
 				didUpdate = true
 			}
 		}
+		coll.NFTs = new
 		if didUpdate {
 			update[coll.ID] = coll
 		}

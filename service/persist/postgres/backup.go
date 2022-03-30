@@ -22,6 +22,7 @@ type BackupRepository struct {
 
 	getUserAddressesStmt *sql.Stmt
 	ownsNFTStmt          *sql.Stmt
+	undeleteNFTStmt      *sql.Stmt
 
 	updateCollectionNFTsStmt *sql.Stmt
 	updateGalleryStmt        *sql.Stmt
@@ -64,6 +65,9 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $2 WHERE ID = $1;`)
 	checkNoErr(err)
 
+	undeleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET DELETED = false WHERE ID = $1;`)
+	checkNoErr(err)
+
 	return &BackupRepository{
 		db:                    db,
 		getCurrentBackupsStmt: getCurrentBackupsStmt,
@@ -75,6 +79,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 
 		getUserAddressesStmt: getUserAddressesStmt,
 		ownsNFTStmt:          ownsNFTStmt,
+		undeleteNFTStmt:      undeleteNFTStmt,
 
 		updateCollectionNFTsStmt: updateCollectionNFTsStmt,
 		updateGalleryStmt:        updateGalleryStmt,
@@ -228,6 +233,7 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 
 	updateNFTs := tx.StmtContext(pCtx, b.updateCollectionNFTsStmt)
 	updateGallery := tx.StmtContext(pCtx, b.updateGalleryStmt)
+	undelete := tx.StmtContext(pCtx, b.undeleteNFTStmt)
 
 	collIDs := make([]persist.DBID, 0, len(backup.Gallery.Collections))
 	for _, coll := range backup.Gallery.Collections {
@@ -241,6 +247,10 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 			}
 			if owns {
 				result = append(result, nft.ID)
+				_, err = undelete.ExecContext(pCtx, nft.ID)
+				if err != nil {
+					return fmt.Errorf("could not undelete nft %s: %w", nft.ID, err)
+				}
 			}
 		}
 		_, err = updateNFTs.ExecContext(pCtx, coll.ID, pq.Array(result))

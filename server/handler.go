@@ -1,9 +1,10 @@
 package server
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -246,7 +247,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethCl
 
 	nftsGroup.GET("/get", middleware.AuthOptional(), getNftByID(repos.NftRepository))
 	nftsGroup.GET("/user_get", middleware.AuthOptional(), getNftsForUser(repos.NftRepository))
-	nftsGroup.GET("/opensea/get", middleware.AuthRequired(repos.UserRepository, ethClient), getNftsFromOpensea(repos.NftRepository, repos.UserRepository, repos.CollectionRepository, repos.GalleryRepository))
+	nftsGroup.GET("/opensea/get", middleware.AuthRequired(repos.UserRepository, ethClient), getNftsFromOpensea(repos.NftRepository, repos.UserRepository, repos.CollectionRepository, repos.GalleryRepository, repos.BackupRepository))
 	nftsGroup.POST("/opensea/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshOpenseaNFTsREST(repos.NftRepository, repos.UserRepository))
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.UserRepository, ethClient), updateNftByID(repos.NftRepository))
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.UserRepository, ethClient), getUnassignedNftsForUser(repos.CollectionRepository))

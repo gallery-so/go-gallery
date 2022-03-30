@@ -106,12 +106,25 @@ type ErrNoAssetsForWallets struct {
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
 func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
-	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository) error {
+	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
 
 	err := galleryRepo.RefreshCache(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
+
+	galleries, err := galleryRepo.GetByUserID(pCtx, pUserID)
+	if err != nil {
+		return err
+	}
+
+	for _, gallery := range galleries {
+		err = backupRepo.Insert(pCtx, gallery)
+		if err != nil {
+			return err
+		}
+	}
+
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return fmt.Errorf("failed to get user by id %s: %w", pUserID, err)

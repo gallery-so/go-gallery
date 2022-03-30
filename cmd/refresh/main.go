@@ -48,13 +48,14 @@ func main() {
 	userRepo := postgres.NewUserRepository(pc)
 	nftRepo := postgres.NewNFTRepository(pc, galleryRepo)
 	collRepo := postgres.NewCollectionRepository(pc, galleryRepo)
+	backupRepo := postgres.NewBackupRepository(pc)
 	for _, group := range groupings {
 		g := group
 		wp.Submit(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour/2)
 			go func() {
 				defer cancel()
-				err = admin.RefreshOpensea(ctx, admin.RefreshNFTsInput{Addresses: g}, userRepo, nftRepo, collRepo, galleryRepo)
+				err = admin.RefreshOpensea(ctx, admin.RefreshNFTsInput{Addresses: g}, userRepo, nftRepo, collRepo, galleryRepo, backupRepo)
 				if err != nil {
 					logrus.Errorf("Error refreshing opensea: %s", err)
 				}
