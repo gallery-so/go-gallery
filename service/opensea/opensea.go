@@ -123,20 +123,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		if e, ok := err.(ErrNoAssetsForWallets); ok {
-			logrus.Debugf("no assets found for wallet %v", e.Wallets)
-			filtered := pOwnerWalletAddresses[:0]
-		OUTER:
-			for _, address := range pOwnerWalletAddresses {
-				for _, wallet := range e.Wallets {
-					if address == wallet {
-						continue OUTER
-					}
-				}
-
-				filtered = append(filtered, address)
-			}
-
-			pOwnerWalletAddresses = filtered
+			logrus.Debugf("no assets found for wallets %v", e.Wallets)
 		} else {
 			return err
 		}
