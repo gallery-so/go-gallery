@@ -17,7 +17,11 @@ type getGalleriesInput struct {
 }
 
 type refreshCacheInput struct {
-	UserID persist.DBID `form:"user_id,required"`
+	UserID persist.DBID `form:"user_id" binding:"required"`
+}
+
+type backupGalleriesInput struct {
+	UserID persist.DBID `form:"user_id" binding:"required"`
 }
 
 func getGalleries(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
@@ -64,6 +68,31 @@ func refreshCache(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 		if err := galleryRepo.RefreshCache(c, input.UserID); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
+		}
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func backupGalleries(galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input backupGalleriesInput
+		if err := c.ShouldBindQuery(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		galleries, err := galleryRepo.GetByUserID(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		for _, gallery := range galleries {
+			if err := backupRepo.Insert(c, gallery); err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
