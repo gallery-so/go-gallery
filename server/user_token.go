@@ -4,12 +4,14 @@ import (
 	"errors"
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -104,7 +106,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, psub pubsub.PubSub, ethClient *ethclient.Client) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -114,7 +116,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 			return
 		}
 
-		output, err := user.CreateUserToken(c, input, userRepository, nonceRepository, galleryRepository, ethClient, psub)
+		output, err := user.CreateUserToken(c, input, userRepository, nonceRepository, galleryRepository, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -124,7 +126,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 
 	}
 }
-func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client, psub pubsub.PubSub) gin.HandlerFunc {
+func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -150,7 +152,47 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			EthClient:  ethClient,
 		}
 
-		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository, psub)
+		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		output := user.AddUserAddressOutput{
+			SignatureValid: true,
+		}
+
+		c.JSON(http.StatusOK, output)
+
+	}
+}
+func addUserAddressToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		input := user.AddUserAddressesInput{}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		userID := auth.GetUserIDFromCtx(c)
+		if userID == "" {
+			util.ErrResponse(c, http.StatusBadRequest, errUserIDNotInCtx)
+			return
+		}
+
+		authenticator := auth.EthereumNonceAuthenticator{
+			Address:    input.Address,
+			Nonce:      input.Nonce,
+			Signature:  input.Signature,
+			WalletType: input.WalletType,
+			UserRepo:   userRepository,
+			NonceRepo:  nonceRepository,
+			EthClient:  ethClient,
+		}
+
+		err := user.AddAddressToUserToken(c, userID, input.Address, authenticator, userRepository, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
