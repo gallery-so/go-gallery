@@ -80,6 +80,10 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authed := auth.GetUserAuthedFromCtx(c)
 		if !authed {
+			err := auth.GetAuthErrorFromCtx(c)
+			if err != http.ErrNoCookie {
+				auth.SetJWTCookie(c, "")
+			}
 			c.JSON(http.StatusNoContent, util.SuccessResponse{Success: false})
 			return
 		}
@@ -94,6 +98,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 			status := http.StatusInternalServerError
 			switch err.(type) {
 			case persist.ErrUserNotFound:
+				auth.SetJWTCookie(c, "")
 				status = http.StatusNotFound
 			}
 			util.ErrResponse(c, status, err)
