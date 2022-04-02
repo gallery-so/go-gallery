@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -21,6 +22,7 @@ import (
 
 type UserAPI struct {
 	repos         *persist.Repositories
+	queries       *sqlc.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate
 	ethClient     *ethclient.Client
@@ -28,6 +30,54 @@ type UserAPI struct {
 	arweaveClient *goar.Client
 	storageClient *storage.Client
 	pubsub        pubsub.PubSub
+}
+
+func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	user, err := api.loaders.UserByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"username": {username, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	user, err := api.loaders.UserByUsername.Load(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.Address) (*sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"address": {address, "required,eth_addr"},
+	}); err != nil {
+		return nil, err
+	}
+
+	user, err := api.loaders.UserByAddress.Load(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
 
 func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, authenticator auth.Authenticator) error {

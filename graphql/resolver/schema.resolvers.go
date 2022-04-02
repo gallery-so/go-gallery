@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -18,7 +17,7 @@ import (
 )
 
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.Dbid)
+	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -28,20 +27,20 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 }
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
-	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.Dbid)
+	return resolveCollectionsByGalleryID(ctx, r.Resolver, obj.Dbid)
 }
 
 func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.Dbid)
+	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
 
-	return galleryToModel(gallery), nil
+	return galleryToModel(*gallery), nil
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	nfts, err := dataloader.For(ctx).NftsByCollectionId.Load(obj.Dbid)
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -110,13 +109,13 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 	api := publicapi.For(ctx)
 
 	// Make sure the collection exists before trying to delete it
-	_, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
+	_, err := api.Collection.GetCollectionById(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the collection's parent gallery before deleting the collection
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	gallery, err := api.Gallery.GetGalleryByCollectionId(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 	// Deleting a collection marks the collection as "deleted" but doesn't alter the gallery,
 	// so we don't need to refetch the gallery before returning it here
 	output := &model.DeleteCollectionPayload{
-		Gallery: galleryToModel(gallery),
+		Gallery: galleryToModel(*gallery),
 	}
 
 	return output, nil
@@ -144,14 +143,14 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 		return nil, err
 	}
 
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: field collection
 	output := &model.UpdateCollectionInfoPayload{
-		Collection: collectionToModel(ctx, collection),
+		Collection: collectionToModel(ctx, *collection),
 	}
 
 	return output, nil
@@ -170,14 +169,14 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 		return nil, err
 	}
 
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateCollectionNftsPayload{
-		Collection: collectionToModel(ctx, collection),
+		Collection: collectionToModel(ctx, *collection),
 	}
 
 	return output, nil
@@ -191,14 +190,14 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 		return nil, err
 	}
 
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(input.GalleryID)
+	gallery, err := api.Gallery.GetGalleryById(ctx, input.GalleryID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateGalleryCollectionsPayload{
-		Gallery: galleryToModel(gallery),
+		Gallery: galleryToModel(*gallery),
 	}
 
 	return output, nil
@@ -357,7 +356,7 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
 	api := publicapi.For(ctx)
 
-	collection, err := api.Collection.GetCollection(ctx, id)
+	collection, err := api.Collection.GetCollectionById(ctx, id)
 
 	if err != nil {
 		return nil, err
@@ -393,7 +392,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
-	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByOwnerAddress(ctx, *obj.Address)
 
 	if err != nil {
 		return nil, err

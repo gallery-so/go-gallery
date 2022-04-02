@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // GalleriesLoaderByIDConfig captures the config to create a new GalleriesLoaderByID
 type GalleriesLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([][]persist.Gallery, []error)
+	Fetch func(keys []persist.DBID) ([][]sqlc.Gallery, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +34,7 @@ func NewGalleriesLoaderByID(config GalleriesLoaderByIDConfig) *GalleriesLoaderBy
 // GalleriesLoaderByID batches and caches requests
 type GalleriesLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([][]persist.Gallery, []error)
+	fetch func(keys []persist.DBID) ([][]sqlc.Gallery, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +45,7 @@ type GalleriesLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID][]persist.Gallery
+	cache map[persist.DBID][]sqlc.Gallery
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,25 +57,25 @@ type GalleriesLoaderByID struct {
 
 type galleriesLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    [][]persist.Gallery
+	data    [][]sqlc.Gallery
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Gallery by key, batching and caching will be applied automatically
-func (l *GalleriesLoaderByID) Load(key persist.DBID) ([]persist.Gallery, error) {
+func (l *GalleriesLoaderByID) Load(key persist.DBID) ([]sqlc.Gallery, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Gallery.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Gallery, error) {
+func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.Gallery, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]persist.Gallery, error) {
+		return func() ([]sqlc.Gallery, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +86,10 @@ func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Gall
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]persist.Gallery, error) {
+	return func() ([]sqlc.Gallery, error) {
 		<-batch.done
 
-		var data []persist.Gallery
+		var data []sqlc.Gallery
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +114,14 @@ func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Gall
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.Gallery, []error) {
-	results := make([]func() ([]persist.Gallery, error), len(keys))
+func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.Gallery, []error) {
+	results := make([]func() ([]sqlc.Gallery, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	gallerys := make([][]persist.Gallery, len(keys))
+	gallerys := make([][]sqlc.Gallery, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		gallerys[i], errors[i] = thunk()
@@ -131,13 +132,13 @@ func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.Gallery,
 // LoadAllThunk returns a function that when called will block waiting for a Gallerys.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]persist.Gallery, []error) {
-	results := make([]func() ([]persist.Gallery, error), len(keys))
+func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Gallery, []error) {
+	results := make([]func() ([]sqlc.Gallery, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]persist.Gallery, []error) {
-		gallerys := make([][]persist.Gallery, len(keys))
+	return func() ([][]sqlc.Gallery, []error) {
+		gallerys := make([][]sqlc.Gallery, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			gallerys[i], errors[i] = thunk()
@@ -149,13 +150,13 @@ func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]pers
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GalleriesLoaderByID) Prime(key persist.DBID, value []persist.Gallery) bool {
+func (l *GalleriesLoaderByID) Prime(key persist.DBID, value []sqlc.Gallery) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]persist.Gallery, len(value))
+		cpy := make([]sqlc.Gallery, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -170,9 +171,9 @@ func (l *GalleriesLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *GalleriesLoaderByID) unsafeSet(key persist.DBID, value []persist.Gallery) {
+func (l *GalleriesLoaderByID) unsafeSet(key persist.DBID, value []sqlc.Gallery) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID][]persist.Gallery{}
+		l.cache = map[persist.DBID][]sqlc.Gallery{}
 	}
 	l.cache[key] = value
 }

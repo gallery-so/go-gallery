@@ -3,10 +3,10 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -85,7 +85,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		if viper.GetBool("REQUIRE_NFTS") {
-			user, err := dataloader.For(ctx).UserByUserId.Load(userID)
+			user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 
 			if err != nil {
 				return nil, err

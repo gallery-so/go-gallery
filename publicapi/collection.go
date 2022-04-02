@@ -3,9 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
-
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -18,13 +18,14 @@ const maxNftsPerCollection = 1000
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
+	queries   *sqlc.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 	pubsub    pubsub.PubSub
 }
 
-func (api CollectionAPI) GetCollection(ctx context.Context, collectionID persist.DBID) (*persist.Collection, error) {
+func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*sqlc.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -32,12 +33,31 @@ func (api CollectionAPI) GetCollection(ctx context.Context, collectionID persist
 		return nil, err
 	}
 
-	collection, err := api.repos.CollectionRepository.GetByID(ctx, collectionID, false)
+	collection, err := api.loaders.CollectionByCollectionId.Load(collectionID)
+	if err != nil {
+		return nil, err
+	}
 
-	return &collection, err
+	return &collection, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*persist.Collection, error) {
+func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]sqlc.Collection, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	collections, err := api.loaders.CollectionsByGalleryId.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return collections, nil
+}
+
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
@@ -80,20 +100,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
-	// TODO: Get a shallow collection instead of a fully unnested one. Can we roll these into a single struct with
-	// multiple fields (nftIds, nfts) and assume it's not hydrated if nfts is null? And then maybe include a parameter
-	// for whether to hydrate the hierarchy or not?
-	createdCollection, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
+	createdCollection, err := api.loaders.CollectionByCollectionId.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Send event
-	nftIDs := make([]persist.DBID, len(createdCollection.NFTs))
-	for i, nft := range createdCollection.NFTs {
-		nftIDs[i] = nft.ID
-	}
-	collectionData := persist.CollectionEvent{NFTs: nftIDs, CollectorsNote: createdCollection.CollectorsNote}
+	collectionData := persist.CollectionEvent{NFTs: createdCollection.Nfts, CollectorsNote: persist.NullString(createdCollection.CollectorsNote.String)}
 	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
 
 	return &createdCollection, nil

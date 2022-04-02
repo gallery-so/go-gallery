@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // NftsLoaderByIDConfig captures the config to create a new NftsLoaderByID
 type NftsLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([][]persist.NFT, []error)
+	Fetch func(keys []persist.DBID) ([][]sqlc.Nft, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +34,7 @@ func NewNftsLoaderByID(config NftsLoaderByIDConfig) *NftsLoaderByID {
 // NftsLoaderByID batches and caches requests
 type NftsLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([][]persist.NFT, []error)
+	fetch func(keys []persist.DBID) ([][]sqlc.Nft, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +45,7 @@ type NftsLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID][]persist.NFT
+	cache map[persist.DBID][]sqlc.Nft
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,25 +57,25 @@ type NftsLoaderByID struct {
 
 type nftsLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    [][]persist.NFT
+	data    [][]sqlc.Nft
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a NFT by key, batching and caching will be applied automatically
-func (l *NftsLoaderByID) Load(key persist.DBID) ([]persist.NFT, error) {
+// Load a Nft by key, batching and caching will be applied automatically
+func (l *NftsLoaderByID) Load(key persist.DBID) ([]sqlc.Nft, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a NFT.
+// LoadThunk returns a function that when called will block waiting for a Nft.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *NftsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.NFT, error) {
+func (l *NftsLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.Nft, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]persist.NFT, error) {
+		return func() ([]sqlc.Nft, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +86,10 @@ func (l *NftsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.NFT, erro
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]persist.NFT, error) {
+	return func() ([]sqlc.Nft, error) {
 		<-batch.done
 
-		var data []persist.NFT
+		var data []sqlc.Nft
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,49 +114,49 @@ func (l *NftsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.NFT, erro
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *NftsLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.NFT, []error) {
-	results := make([]func() ([]persist.NFT, error), len(keys))
+func (l *NftsLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.Nft, []error) {
+	results := make([]func() ([]sqlc.Nft, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	nFTs := make([][]persist.NFT, len(keys))
+	nfts := make([][]sqlc.Nft, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		nFTs[i], errors[i] = thunk()
+		nfts[i], errors[i] = thunk()
 	}
-	return nFTs, errors
+	return nfts, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a NFTs.
+// LoadAllThunk returns a function that when called will block waiting for a Nfts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *NftsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]persist.NFT, []error) {
-	results := make([]func() ([]persist.NFT, error), len(keys))
+func (l *NftsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Nft, []error) {
+	results := make([]func() ([]sqlc.Nft, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]persist.NFT, []error) {
-		nFTs := make([][]persist.NFT, len(keys))
+	return func() ([][]sqlc.Nft, []error) {
+		nfts := make([][]sqlc.Nft, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			nFTs[i], errors[i] = thunk()
+			nfts[i], errors[i] = thunk()
 		}
-		return nFTs, errors
+		return nfts, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *NftsLoaderByID) Prime(key persist.DBID, value []persist.NFT) bool {
+func (l *NftsLoaderByID) Prime(key persist.DBID, value []sqlc.Nft) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]persist.NFT, len(value))
+		cpy := make([]sqlc.Nft, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -170,9 +171,9 @@ func (l *NftsLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *NftsLoaderByID) unsafeSet(key persist.DBID, value []persist.NFT) {
+func (l *NftsLoaderByID) unsafeSet(key persist.DBID, value []sqlc.Nft) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID][]persist.NFT{}
+		l.cache = map[persist.DBID][]sqlc.Nft{}
 	}
 	l.cache[key] = value
 }

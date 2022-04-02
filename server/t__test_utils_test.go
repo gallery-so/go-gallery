@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -26,6 +27,7 @@ import (
 )
 
 var db *sql.DB
+var pgx *pgxpool.Pool
 
 type TestConfig struct {
 	server              *httptest.Server
@@ -97,11 +99,15 @@ func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
 		db = postgres.NewClient()
 	}
 
-	return initializeTestServer(db, a, v)
+	if pgx == nil {
+		pgx = postgres.NewPgxClient()
+	}
+
+	return initializeTestServer(db, pgx, a, v)
 }
 
-func initializeTestServer(db *sql.DB, a *assert.Assertions, v int) *TestConfig {
-	router := CoreInit(db)
+func initializeTestServer(db *sql.DB, pgx *pgxpool.Pool, a *assert.Assertions, v int) *TestConfig {
+	router := CoreInit(db, pgx)
 	router.POST("/fake-cookie", fakeCookie)
 	ts = httptest.NewServer(router)
 

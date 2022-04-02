@@ -1,0 +1,43 @@
+version: 1
+packages:
+  - path: "db/sqlc"
+    name: "sqlc"
+    engine: "postgresql"
+    schema: "db/migrations/"
+    queries: "db/queries"
+    sql_package: "pgx/v4"
+    output_db_file_name: "db_gen.go"
+    output_models_file_name: "models_gen.go"
+
+# Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
+# the override should come _before_ the * entry
+overrides:
+
+# Users
+  - column: "users.addresses"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.AddressList"
+
+# Galleries
+  - column: "galleries.collections"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+
+# Collections
+  - column: "collections.nfts"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+  - column: "collections.layout"
+    go_type: { "type": "TokenLayout" } # Required format when the type is in the same package as the generated code
+
+# Nfts
+  - column: "nfts.contract"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
+
+# Wildcards
+# Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+  - column: "*.id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "*.owner_user_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "*.owner_address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+  - column: "*.creator_address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
