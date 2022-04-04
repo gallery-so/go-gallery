@@ -14,6 +14,7 @@ import (
 type statements struct {
 	getUserByIDStmt       *sql.Stmt
 	getUserByUsernameStmt *sql.Stmt
+	getUserByAddressStmt  *sql.Stmt
 	deleteUserStmt        *sql.Stmt
 	getGalleriesRawStmt   *sql.Stmt
 	deleteGalleryStmt     *sql.Stmt
@@ -43,6 +44,8 @@ func newStatements(db *sql.DB) *statements {
 
 	getUserByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESSES, BIO, USERNAME, USERNAME_IDEMPOTENT, LAST_UPDATED, CREATED_AT FROM USERS WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
+
+	getUserByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESSES, BIO, USERNAME, USERNAME_IDEMPOTENT, LAST_UPDATED, CREATED_AT FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false;`)
 
 	deleteUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
@@ -81,6 +84,7 @@ func newStatements(db *sql.DB) *statements {
 	return &statements{
 		getUserByIDStmt:       getUserByIDStmt,
 		getUserByUsernameStmt: getUserByUsernameStmt,
+		getUserByAddressStmt:  getUserByAddressStmt,
 		deleteUserStmt:        deleteUserStmt,
 		getGalleriesRawStmt:   getGalleriesRawStmt,
 		deleteGalleryStmt:     deleteGalleryStmt,

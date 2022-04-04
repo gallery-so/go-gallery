@@ -18,8 +18,9 @@ var errMustProvideUserIdentifier = fmt.Errorf("must provide either ID or usernam
 var errNoGalleries = errors.New("no galleries found for first user")
 
 type getUserInput struct {
-	ID       persist.DBID `form:"id"`
-	Username string       `form:"username"`
+	ID       persist.DBID    `form:"id"`
+	Username string          `form:"username"`
+	Address  persist.Address `form:"address"`
 }
 type deleteUserInput struct {
 	ID persist.DBID `json:"id" binding:"required"`
@@ -48,7 +49,7 @@ type createUserOutput struct {
 	GalleryID persist.DBID `json:"gallery_id"`
 }
 
-func getUser(getUserByIDStmt, getUserByUsername *sql.Stmt) gin.HandlerFunc {
+func getUser(getUserByIDStmt, getUserByUsername, getUserByAddress *sql.Stmt) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		var input getUserInput
@@ -63,6 +64,8 @@ func getUser(getUserByIDStmt, getUserByUsername *sql.Stmt) gin.HandlerFunc {
 			err = getUserByIDStmt.QueryRowContext(c, input.ID).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
 		} else if input.Username != "" {
 			err = getUserByUsername.QueryRowContext(c, input.Username).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
+		} else if input.Address != "" {
+			err = getUserByAddress.QueryRowContext(c, input.Address).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
 		} else {
 			util.ErrResponse(c, http.StatusBadRequest, errMustProvideUserIdentifier)
 			return
