@@ -19,8 +19,9 @@ import (
 	"time"
 )
 
-const defaultMaxBatch = 1 // Disable batching until loading functions support it
-const defaultWaitTime = 1 * time.Millisecond
+const defaultMaxBatchOne = 100 // Default for queries that return a single result
+const defaultMaxBatchMany = 10 // Default for queries that return many results
+const defaultWaitTime = 2 * time.Millisecond
 
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
 // a single request, nor should they be shared between requests (since the data returned is
@@ -43,67 +44,67 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 	loaders := &Loaders{}
 
 	loaders.UserByUserId = UserLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUserId(ctx, loaders, q),
 	}
 
 	loaders.UserByUsername = UserLoaderByString{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUsername(ctx, loaders, q),
 	}
 
 	loaders.UserByAddress = UserLoaderByAddress{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByAddress(ctx, loaders, q),
 	}
 
 	loaders.GalleryByGalleryId = GalleryLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleryByGalleryId(ctx, loaders, q),
 	}
 
 	loaders.GalleryByCollectionId = GalleryLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleryByCollectionId(ctx, loaders, q),
 	}
 
 	loaders.GalleriesByUserId = GalleriesLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadGalleriesByUserId(ctx, loaders, q),
 	}
 
 	loaders.CollectionByCollectionId = CollectionLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadCollectionByCollectionId(ctx, loaders, q),
 	}
 
 	loaders.CollectionsByGalleryId = CollectionsLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadCollectionsByGalleryId(ctx, loaders, q),
 	}
 
 	loaders.NftByNftId = NftLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadNftByNftId(ctx, loaders, q),
 	}
 
 	loaders.NftsByOwnerAddress = NftsLoaderByAddress{
-		maxBatch: defaultMaxBatch,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByOwnerAddress(ctx, loaders, q),
 	}
 
 	loaders.NftsByCollectionId = NftsLoaderByID{
-		maxBatch: defaultMaxBatch,
+		maxBatch: 5,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByCollectionId(ctx, loaders, q),
 	}
@@ -116,11 +117,9 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 		users := make([]sqlc.User, len(userIds))
 		errors := make([]error, len(userIds))
 
-		for i, userId := range userIds {
-			user, err := q.GetUserById(ctx, userId)
-
+		q.GetUserByIdBatch(ctx, userIds).QueryRow(func(i int, user sqlc.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{UserID: userId}
+				err = persist.ErrUserNotFound{UserID: userIds[i]}
 			}
 
 			// Add results to other loaders' caches
@@ -132,7 +131,7 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 			}
 
 			users[i], errors[i] = user, err
-		}
+		})
 
 		return users, errors
 	}
@@ -143,11 +142,9 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 		users := make([]sqlc.User, len(usernames))
 		errors := make([]error, len(usernames))
 
-		for i, username := range usernames {
-			user, err := q.GetUserByUsername(ctx, username)
-
+		q.GetUserByUsernameBatch(ctx, usernames).QueryRow(func(i int, user sqlc.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{Username: username}
+				err = persist.ErrUserNotFound{Username: usernames[i]}
 			}
 
 			// Add results to other loaders' caches
@@ -159,7 +156,7 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			}
 
 			users[i], errors[i] = user, err
-		}
+		})
 
 		return users, errors
 	}
@@ -170,10 +167,14 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) f
 		users := make([]sqlc.User, len(addresses))
 		errors := make([]error, len(addresses))
 
+		addressStrings := make([]string, len(addresses))
 		for i, address := range addresses {
-			user, err := q.GetUserByAddress(ctx, address.String())
+			addressStrings[i] = address.String()
+		}
+
+		q.GetUserByAddressBatch(ctx, addressStrings).QueryRow(func(i int, user sqlc.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{Address: address}
+				err = persist.ErrUserNotFound{Address: addresses[i]}
 			}
 
 			// Add results to other loaders' caches
@@ -183,7 +184,7 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) f
 			}
 
 			users[i], errors[i] = user, err
-		}
+		})
 
 		return users, errors
 	}
@@ -194,10 +195,12 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 		galleries := make([]sqlc.Gallery, len(galleryIds))
 		errors := make([]error, len(galleryIds))
 
-		for i, galleryId := range galleryIds {
-			galleries[i], errors[i] = q.GetGalleryById(ctx, galleryId)
+		q.GetGalleryByIdBatch(ctx, galleryIds).QueryRow(func(i int, g sqlc.Gallery, err error) {
+			galleries[i] = g
+			errors[i] = err
+
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrGalleryNotFoundByID{ID: galleryId}
+				errors[i] = persist.ErrGalleryNotFoundByID{ID: galleryIds[i]}
 			}
 
 			// Add results to other loaders' caches
@@ -206,7 +209,7 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 					loaders.GalleryByCollectionId.Prime(collection, galleries[i])
 				}
 			}
-		}
+		})
 
 		return galleries, errors
 	}
@@ -217,17 +220,19 @@ func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Qu
 		galleries := make([]sqlc.Gallery, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
-		for i, collectionId := range collectionIds {
-			galleries[i], errors[i] = q.GetGalleryByCollectionId(ctx, collectionId)
+		q.GetGalleryByCollectionIdBatch(ctx, collectionIds).QueryRow(func(i int, g sqlc.Gallery, err error) {
+			galleries[i] = g
+			errors[i] = err
+
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrGalleryNotFoundByCollectionID{ID: collectionId}
+				errors[i] = persist.ErrGalleryNotFoundByCollectionID{ID: collectionIds[i]}
 			}
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
 				loaders.GalleryByGalleryId.Prime(galleries[i].ID, galleries[i])
 			}
-		}
+		})
 
 		return galleries, errors
 	}
@@ -238,8 +243,9 @@ func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		galleries := make([][]sqlc.Gallery, len(userIds))
 		errors := make([]error, len(userIds))
 
-		for i, userId := range userIds {
-			galleries[i], errors[i] = q.GetGalleriesByUserId(ctx, userId)
+		q.GetGalleriesByUserIdBatch(ctx, userIds).Query(func(i int, g []sqlc.Gallery, err error) {
+			galleries[i] = g
+			errors[i] = err
 
 			// Add results to other loaders' caches
 			if errors[i] == nil {
@@ -250,7 +256,7 @@ func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 					}
 				}
 			}
-		}
+		})
 
 		return galleries, errors
 	}
@@ -261,12 +267,14 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc
 		collections := make([]sqlc.Collection, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
-		for i, collectionId := range collectionIds {
-			collections[i], errors[i] = q.GetCollectionById(ctx, collectionId)
+		q.GetCollectionByIdBatch(ctx, collectionIds).QueryRow(func(i int, c sqlc.Collection, err error) {
+			collections[i] = c
+			errors[i] = err
+
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrCollectionNotFoundByID{ID: collectionId}
+				errors[i] = persist.ErrCollectionNotFoundByID{ID: collectionIds[i]}
 			}
-		}
+		})
 
 		return collections, errors
 	}
@@ -277,8 +285,9 @@ func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Q
 		collections := make([][]sqlc.Collection, len(galleryIds))
 		errors := make([]error, len(galleryIds))
 
-		for i, galleryId := range galleryIds {
-			collections[i], errors[i] = q.GetCollectionsByGalleryId(ctx, galleryId)
+		q.GetCollectionsByGalleryIdBatch(ctx, galleryIds).Query(func(i int, c []sqlc.Collection, err error) {
+			collections[i] = c
+			errors[i] = err
 
 			// Add results to the CollectionByCollectionId loader's cache
 			if errors[i] == nil {
@@ -286,7 +295,7 @@ func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Q
 					loaders.CollectionByCollectionId.Prime(collection.ID, collection)
 				}
 			}
-		}
+		})
 
 		return collections, errors
 	}
@@ -297,12 +306,14 @@ func loadNftByNftId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 		nfts := make([]sqlc.Nft, len(nftIds))
 		errors := make([]error, len(nftIds))
 
-		for i, nftId := range nftIds {
-			nfts[i], errors[i] = q.GetNftById(ctx, nftId)
+		q.GetNftByIdBatch(ctx, nftIds).QueryRow(func(i int, n sqlc.Nft, err error) {
+			nfts[i] = n
+			errors[i] = err
+
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrNFTNotFoundByID{ID: nftId}
+				errors[i] = persist.ErrNFTNotFoundByID{ID: nftIds[i]}
 			}
-		}
+		})
 
 		return nfts, errors
 	}
@@ -313,8 +324,9 @@ func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 		nfts := make([][]sqlc.Nft, len(addresses))
 		errors := make([]error, len(addresses))
 
-		for i, address := range addresses {
-			nfts[i], errors[i] = q.GetNftsByOwnerAddress(ctx, address)
+		q.GetNftsByOwnerAddressBatch(ctx, addresses).Query(func(i int, n []sqlc.Nft, err error) {
+			nfts[i] = n
+			errors[i] = err
 
 			// Add results to the NftByNftId loader's cache
 			if errors[i] == nil {
@@ -322,7 +334,7 @@ func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 					loaders.NftByNftId.Prime(nft.ID, nft)
 				}
 			}
-		}
+		})
 
 		return nfts, errors
 	}
@@ -333,8 +345,9 @@ func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 		nfts := make([][]sqlc.Nft, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
-		for i, collectionId := range collectionIds {
-			nfts[i], errors[i] = q.GetNftsByCollectionId(ctx, collectionId)
+		q.GetNftsByCollectionIdBatch(ctx, collectionIds).Query(func(i int, n []sqlc.Nft, err error) {
+			nfts[i] = n
+			errors[i] = err
 
 			// Add results to the NftByNftId loader's cache
 			if errors[i] == nil {
@@ -342,7 +355,7 @@ func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 					loaders.NftByNftId.Prime(nft.ID, nft)
 				}
 			}
-		}
+		})
 
 		return nfts, errors
 	}
