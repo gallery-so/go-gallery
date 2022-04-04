@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -48,6 +49,8 @@ func coreInit() (*gin.Engine, *Indexer) {
 
 	router := gin.Default()
 
+	router.Use(middleware.HandleCORS())
+
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
@@ -69,6 +72,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 
 	viper.AutomaticEnv()
 }

@@ -26,10 +26,10 @@ type deleteUserInput struct {
 }
 
 type updateUserInput struct {
-	ID        persist.DBID `json:"id" binding:"required"`
-	Username  string       `json:"username" binding:"required"`
-	Bio       string       `json:"bio" binding:"required"`
-	Addresses []string     `json:"addresses" binding:"required"`
+	ID        persist.DBID      `json:"id" binding:"required"`
+	Username  string            `json:"username" binding:"required"`
+	Bio       string            `json:"bio"`
+	Addresses []persist.Address `json:"addresses" binding:"required"`
 }
 
 type mergeUserInput struct {
