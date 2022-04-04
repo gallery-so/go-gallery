@@ -9,7 +9,7 @@ SELECT * FROM collections WHERE id = $1 AND deleted = false;
 -- name: GetCollectionsByGalleryId :many
 SELECT c.* FROM galleries g, unnest(g.collections)
     WITH ORDINALITY AS x(coll_id, coll_ord)
-    LEFT JOIN collections c ON c.id = x.coll_id
+    INNER JOIN collections c ON c.id = x.coll_id
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord;
 
 -- name: GetGalleryById :one
@@ -25,7 +25,10 @@ SELECT * FROM galleries WHERE owner_user_id = $1 AND deleted = false;
 SELECT * FROM nfts WHERE id = $1 AND deleted = false;
 
 -- name: GetNftsByCollectionId :many
-SELECT n.* FROM collections c, unnest(c.nfts) WITH ORDINALITY AS x(nft_id, nft_ord) LEFT JOIN nfts n ON n.id = x.nft_id WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
+SELECT n.* FROM collections c, unnest(c.nfts)
+    WITH ORDINALITY AS x(nft_id, nft_ord)
+    INNER JOIN nfts n ON n.id = x.nft_id
+    WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
 
 -- name: GetNftsByOwnerAddress :many
 SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
