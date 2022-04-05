@@ -170,7 +170,8 @@ func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.Galle
 
 	whitespace := make([]*int, len(layout.Whitespace))
 	for i, w := range layout.Whitespace {
-		whitespace[i] = &w
+		ws := w
+		whitespace[i] = &ws
 	}
 
 	output := model.GalleryCollectionLayout{
