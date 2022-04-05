@@ -94,7 +94,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, 
 		return err
 	}
 
-	return user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository, api.pubsub)
+	return user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
 }
 
 func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) error {

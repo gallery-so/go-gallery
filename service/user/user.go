@@ -1,15 +1,15 @@
 package user
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
+	"github.com/everFinance/goar"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/model"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -17,11 +17,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
@@ -94,7 +92,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUserToken creates a JWT token for the user
-func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, ethClient *ethclient.Client, psub pubsub.PubSub) (CreateUserOutput, error) {
+func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (CreateUserOutput, error) {
 
 	output := &CreateUserOutput{}
 
@@ -136,20 +134,12 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 	output.UserID = userID
 
 	defer func() {
-		// user has been created successfully, shoot out a pubsub to notify any service that needs it as well as
+		// user has been created successfully
 		// validate that the user's NFTs are valid and have cached media content
-		if viper.GetString("ENV") != "local" {
-			go func() {
-				err := publishUserSignup(pCtx, output.UserID, userRepo, psub)
-				if err != nil {
-					logrus.WithError(err).Error("failed to publish user signup")
-				}
-			}()
-		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := validateNFTsForUser(ctx, userID)
+			err := validateNFTsForUser(ctx, userID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("validateNFTsForUser")
 			}
@@ -157,7 +147,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pInput.Address)
+			err := ensureMediaContent(ctx, pInput.Address, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
@@ -217,26 +207,6 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		// user has been created successfully, validate that the user's NFTs are valid and have cached media content
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := validateNFTsForUser(ctx, userID)
-			if err != nil {
-				logrus.WithError(err).Error("validateNFTsForUser")
-			}
-		}()
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := ensureMediaContent(ctx, address)
-			if err != nil {
-				logrus.WithError(err).Error("ensureMediaForUser")
-			}
-		}()
-	}()
 
 	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
@@ -305,7 +275,33 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 
 // AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
 func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, addressAuth auth.Authenticator,
-	userRepo persist.UserRepository, psub pubsub.PubSub) error {
+	userRepo persist.UserRepository) error {
+
+	authResult, err := addressAuth.Authenticate(pCtx)
+	if err != nil {
+		return err
+	}
+
+	addressUserID := authResult.UserID
+
+	if addressUserID != "" {
+		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
+	}
+
+	if !containsAddress(authResult.Addresses, pAddress) {
+		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
+	}
+
+	if err = userRepo.AddAddresses(pCtx, pUserID, []persist.Address{pAddress}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddAddressToUserToken adds a single address to a user in the DB because a signature needs to be provided and validated per address
+func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, addressAuth auth.Authenticator,
+	userRepo persist.UserRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
@@ -323,20 +319,13 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persi
 	}
 
 	defer func() {
-		// user has successfully added an address, shoot out a pubsub to notify any service that needs it as well as
+		// user has successfully added an address
 		// validate that the user's NFTs are valid and have cached media content
-		if viper.GetString("ENV") != "local" {
-			go func() {
-				err := publishUserAddAddress(pCtx, pUserID, pAddress, psub)
-				if err != nil {
-					logrus.WithError(err).Error("failed to publish user signup")
-				}
-			}()
-		}
+
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := validateNFTsForUser(ctx, pUserID)
+			err := validateNFTsForUser(ctx, pUserID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("validateNFTsForUser")
 			}
@@ -344,7 +333,7 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persi
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pAddress)
+			err := ensureMediaContent(ctx, pAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
@@ -483,118 +472,32 @@ func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo
 
 }
 
-func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID) error {
-	endpoint := viper.GetString("INDEXER_HOST") + "/nfts/validate"
+func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo persist.UserRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 	input := indexer.ValidateUsersNFTsInput{
 		UserID: pUserID,
 	}
-	client := &http.Client{}
-	deadline, ok := pCtx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(time.Second * 10)
-	}
-	client.Timeout = time.Until(deadline)
 
-	body, err := json.Marshal(input)
+	_, err := indexer.ValidateNFTs(pCtx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
+		logrus.Errorf("Error validating user NFTs %s: %s", pUserID, err)
 		return err
 	}
-
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(body))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	output := indexer.ValidateUsersNFTsOutput{}
-	err = json.NewDecoder(resp.Body).Decode(&output)
-	if err != nil {
-		return err
-	}
-
-	if !output.Success {
-		return errors.New(output.Message)
-	}
-
 	return nil
 }
 
-func ensureMediaContent(pCtx context.Context, pAddress persist.Address) error {
-	endpoint := viper.GetString("INDEXER_HOST") + "/media/update"
+func ensureMediaContent(pCtx context.Context, pAddress persist.Address, tokenRepo persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+
 	input := indexer.UpdateMediaInput{
 		OwnerAddress: pAddress,
 	}
-	client := &http.Client{}
-	deadline, ok := pCtx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(time.Second * 10)
-	}
-	client.Timeout = time.Until(deadline)
 
-	body, err := json.Marshal(input)
+	err := indexer.UpdateMedia(pCtx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
+		logrus.Errorf("Error ensuring media content for address %s: %s", pAddress, err)
 		return err
-	}
-
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(body))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	output := util.SuccessResponse{}
-	err = json.NewDecoder(resp.Body).Decode(&output)
-	if err != nil {
-		return err
-	}
-
-	if !output.Success {
-		return errCouldNotEnsureMediaForAddress{address: pAddress}
-	}
-
-	return nil
-}
-
-func publishUserSignup(pCtx context.Context, pUserID persist.DBID, userRepository persist.UserRepository, psub pubsub.PubSub) error {
-	user, err := userRepository.GetByID(pCtx, pUserID)
-	if err == nil {
-		asJSON, err := json.Marshal(user)
-		if err == nil {
-			psub.Publish(pCtx, viper.GetString("SIGNUP_TOPIC"), asJSON, true)
-		} else {
-			return fmt.Errorf("error marshalling user: %v", err)
-		}
-	} else {
-		return fmt.Errorf("error getting user: %v", err)
 	}
 	return nil
-}
 
-func publishUserAddAddress(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, psub pubsub.PubSub) error {
-	input := AddAddressPubSubInput{
-		UserID:  pUserID,
-		Address: pAddress,
-	}
-	asJSON, err := json.Marshal(input)
-	if err == nil {
-		psub.Publish(pCtx, viper.GetString("ADD_ADDRESS_TOPIC"), asJSON, true)
-	} else {
-		return fmt.Errorf("error marshalling user: %v", err)
-	}
-
-	return nil
 }
 
 type ErrUserAlreadyExists struct {
