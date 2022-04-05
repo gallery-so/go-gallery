@@ -20,6 +20,25 @@ import (
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
+var nodeFetcher = model.NodeFetcher{
+	OnGallery:           resolveGalleryByGalleryID,
+	OnGalleryCollection: resolveGalleryCollectionByCollectionID,
+
+	OnGalleryNft: func(ctx context.Context, nftId string, collectionId string) (*model.GalleryNft, error) {
+		return resolveGalleryNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	},
+
+	OnGalleryUser:     resolveGalleryUserByUserID,
+	OnMembershipOwner: nil,
+	OnMembershipTier:  nil,
+	OnNft:             resolveNftByNftID,
+	OnWallet:          resolveWalletByAddress,
+}
+
+func init() {
+	//nodeFetcher.ValidateHandlers()
+}
+
 // errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
 // If no matching type is found, ok will return false
 func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gqlModel interface{}, ok bool) {
@@ -82,37 +101,37 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	return nil, errNoAuthMechanismFound
 }
 
-func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID persist.DBID) (*model.GalleryUser, error) {
+func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, *user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByUsername(ctx context.Context, r *Resolver, username string) (*model.GalleryUser, error) {
+func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, *user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address persist.Address) (*model.GalleryUser, error) {
+func resolveGalleryUserByAddress(ctx context.Context, address persist.Address) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, *user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.DBID) ([]*model.Gallery, error) {
+func resolveGalleriesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Gallery, error) {
 	galleries, err := publicapi.For(ctx).Gallery.GetGalleriesByUserId(ctx, userID)
 
 	if err != nil {
@@ -121,13 +140,22 @@ func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.D
 
 	var output = make([]*model.Gallery, len(galleries))
 	for i, gallery := range galleries {
-		output[i] = galleryToModel(gallery)
+		output[i] = galleryToModel(ctx, gallery)
 	}
 
 	return output, nil
 }
 
-func resolveCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
+func resolveGalleryCollectionByCollectionID(ctx context.Context, collectionID persist.DBID) (*model.GalleryCollection, error) {
+	collection, err := publicapi.For(ctx).Collection.GetCollectionById(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectionToModel(ctx, *collection), nil
+}
+
+func resolveGalleryCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
 	collections, err := publicapi.For(ctx).Collection.GetCollectionsByGalleryId(ctx, galleryID)
 	if err != nil {
 		return nil, err
@@ -135,31 +163,100 @@ func resolveCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID p
 
 	var output = make([]*model.GalleryCollection, len(collections))
 	for i, collection := range collections {
-		version := int(collection.Version.Int32)
-		hidden := collection.Hidden
-
-		output[i] = &model.GalleryCollection{
-			Dbid:           collection.ID,
-			Version:        &version,
-			Name:           util.StringToPointer(collection.Name.String),
-			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String),
-			Gallery:        galleryIDToGalleryModel(galleryID),
-			Layout:         layoutToModel(ctx, collection.Layout),
-			Hidden:         &hidden,
-			Nfts:           nil, // handled by dedicated resolver
-		}
+		output[i] = collectionToModel(ctx, collection)
 	}
 
 	return output, nil
 }
 
-func galleryToModel(gallery sqlc.Gallery) *model.Gallery {
-	return galleryIDToGalleryModel(gallery.ID)
+func resolveGalleryNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.GalleryNft, error) {
+	nft, err := resolveNftByNftID(ctx, nftID)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := resolveGalleryCollectionByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	galleryNft := &model.GalleryNft{
+		HelperGalleryNftData: model.HelperGalleryNftData{
+			NftId:        nftID,
+			CollectionId: collectionID,
+		},
+		Nft:        nft,
+		Collection: collection,
+	}
+
+	return galleryNft, nil
 }
 
-func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
-	return &model.Gallery{
+func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
+	gallery := &model.Gallery{
 		Dbid:        galleryID,
+		Owner:       nil, // handled by dedicated resolver
+		Collections: nil, // handled by dedicated resolver
+	}
+
+	return gallery, nil
+}
+
+func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, error) {
+	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nftToModel(ctx, *nft), nil
+}
+
+func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (model.GalleryUserOrWallet, error) {
+	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveGalleryUserOrWalletByAddress(ctx, nft.OwnerAddress)
+}
+
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.Address) (model.GalleryUserOrWallet, error) {
+	owner, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
+
+	if err == nil {
+		return userToModel(ctx, *owner), nil
+	}
+
+	if _, ok := err.(persist.ErrUserNotFound); ok {
+		return resolveWalletByAddress(ctx, address)
+	}
+
+	return nil, err
+}
+
+func resolveWalletByAddress(ctx context.Context, address persist.Address) (*model.Wallet, error) {
+	wallet := model.Wallet{
+		Address: &address,
+		Nfts:    nil, // handled by dedicated resolver
+	}
+
+	return &wallet, nil
+}
+
+func resolveViewer(ctx context.Context) *model.Viewer {
+	viewer := &model.Viewer{
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}
+
+	return viewer
+}
+
+func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
+	return &model.Gallery{
+		Dbid:        gallery.ID,
 		Owner:       nil, // handled by dedicated resolver
 		Collections: nil, // handled by dedicated resolver
 	}
@@ -171,71 +268,106 @@ func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.GalleryC
 		whitespace[i] = &w
 	}
 
-	output := model.GalleryCollectionLayout{
+	return &model.GalleryCollectionLayout{
 		Columns:    &layout.Columns,
 		Whitespace: whitespace,
 	}
-
-	return &output
 }
 
 // userToModel converts a sqlc.User to a model.User
-func userToModel(ctx context.Context, r *Resolver, user sqlc.User) (*model.GalleryUser, error) {
+func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	gc := util.GinContextFromContext(ctx)
-	isAuthenticated := auth.GetUserAuthedFromCtx(gc)
+	isAuthenticatedUser := auth.GetUserAuthedFromCtx(gc) && auth.GetUserIDFromCtx(gc) == user.ID
 
-	galleryUser := &model.GalleryUser{
+	wallets := make([]*model.Wallet, len(user.Addresses))
+	for i, address := range user.Addresses {
+		wallets[i] = addressToModel(ctx, address)
+	}
+
+	return &model.GalleryUser{
 		Dbid:                user.ID,
 		Username:            &user.Username.String,
 		Bio:                 &user.Bio.String,
-		Wallets:             addressesToModels(ctx, r, user.Addresses),
+		Wallets:             wallets,
 		Galleries:           nil, // handled by dedicated resolver
-		IsAuthenticatedUser: &isAuthenticated,
+		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
-
-	return galleryUser, nil
 }
 
-// addressesToModels converts a slice of persist.Address to a slice of model.Wallet
-func addressesToModels(ctx context.Context, r *Resolver, addresses []persist.Address) []*model.Wallet {
-	wallets := make([]*model.Wallet, len(addresses))
-	for i, address := range addresses {
-		wallets[i] = &model.Wallet{
-			Address: &address,
-			Nfts:    nil, // handled by dedicated resolver
-		}
+func addressToModel(ctx context.Context, address persist.Address) *model.Wallet {
+	return &model.Wallet{
+		Address: &address,
+		Nfts:    nil, // handled by dedicated resolver
 	}
-
-	return wallets
 }
 
-func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId persist.DBID) (model.GalleryUserOrWallet, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftId)
+func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.GalleryCollection {
+	version := int(collection.Version.Int32)
 
-	if err != nil {
-		return nil, err
+	return &model.GalleryCollection{
+		Dbid:           collection.ID,
+		Version:        &version,
+		Name:           util.StringToPointer(collection.Name.String),
+		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String),
+		Gallery:        nil, // handled by dedicated resolver
+		Layout:         layoutToModel(ctx, collection.Layout),
+		Hidden:         &collection.Hidden,
+		Nfts:           nil, // handled by dedicated resolver
 	}
-
-	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress)
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address persist.Address) (model.GalleryUserOrWallet, error) {
-	owner, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
-
-	if err == nil {
-		return userToModel(ctx, r, *owner)
+func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
+	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
+	for i, owner := range membershipTier.Owners {
+		owners[i] = membershipOwnerToModel(ctx, owner)
 	}
 
-	if _, ok := err.(persist.ErrUserNotFound); ok {
-		wallet := model.Wallet{
-			Address: &address,
-			Nfts:    nil, // handled by dedicated resolver
-		}
+	return &model.MembershipTier{
+		Dbid:     membershipTier.ID,
+		Name:     util.StringToPointer(membershipTier.Name.String()),
+		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
+		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
+		Owners:   owners,
+	}
+}
 
-		return wallet, nil
+func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
+	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
+	for i, nft := range membershipOwner.PreviewNFTs {
+		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	return nil, err
+	return &model.MembershipOwner{
+		Dbid:        membershipOwner.UserID,
+		Address:     &membershipOwner.Address,
+		User:        nil, // handled by dedicated resolver
+		PreviewNfts: previewNfts,
+	}
+}
+
+func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
+	chainEthereum := model.ChainEthereum
+
+	return &model.Nft{
+		Dbid:             nft.ID,
+		CreationTime:     &nft.CreatedAt,
+		LastUpdated:      &nft.LastUpdated,
+		CollectorsNote:   &nft.CollectorsNote.String,
+		Media:            getMediaForNft(nft),
+		TokenType:        nil,            // TODO: later
+		Chain:            &chainEthereum, // Everything's Ethereum right now
+		Name:             &nft.Name.String,
+		Description:      &nft.Description.String,
+		TokenURI:         nil, // TODO: later
+		TokenID:          &nft.OpenseaTokenID.String,
+		Quantity:         nil, // TODO: later
+		Owner:            nil, // handled by dedicated resolver
+		OwnershipHistory: nil, // TODO: later
+		TokenMetadata:    nil, // TODO: later
+		ContractAddress:  &nft.Contract.ContractAddress,
+		ExternalURL:      &nft.ExternalUrl.String,
+		BlockNumber:      nil, // TODO: later
+	}
 }
 
 func getUrlExtension(url string) string {
@@ -375,88 +507,4 @@ func getUnknownMedia(nft sqlc.Nft) model.UnknownMedia {
 
 func getInvalidMedia(nft sqlc.Nft) model.InvalidMedia {
 	return model.InvalidMedia{}
-}
-
-func nftToModel(ctx context.Context, r *Resolver, nft sqlc.Nft) model.Nft {
-	chainEthereum := model.ChainEthereum
-
-	return model.Nft{
-		Dbid:             nft.ID,
-		CreationTime:     &nft.CreatedAt,
-		LastUpdated:      &nft.LastUpdated,
-		CollectorsNote:   &nft.CollectorsNote.String,
-		Media:            getMediaForNft(nft),
-		TokenType:        nil,            // TODO: later
-		Chain:            &chainEthereum, // Everything's Ethereum right now
-		Name:             &nft.Name.String,
-		Description:      &nft.Description.String,
-		TokenURI:         nil, // TODO: later
-		TokenID:          &nft.OpenseaTokenID.String,
-		Quantity:         nil, // TODO: later
-		Owner:            nil, // handled by dedicated resolver
-		OwnershipHistory: nil, // TODO: later
-		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  &nft.Contract.ContractAddress,
-		ExternalURL:      &nft.ExternalUrl.String,
-		BlockNumber:      nil, // TODO: later
-	}
-}
-
-func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.GalleryCollection {
-	version := int(collection.Version.Int32)
-	hidden := collection.Hidden
-
-	// TODO: Should we be filling this collection's gallery out, or leaving it to a resolver?
-	// The Gallery->Collections path currently fills out the Gallery field on each Collection it returns,
-	// and switching to a resolver here means switching to a resolver there. Not a big deal, just remember
-	// to prime the "GalleryByCollectionId" cache with results from the "collections by gallery" lookup.
-	return &model.GalleryCollection{
-		Dbid:           collection.ID,
-		Version:        &version,
-		Name:           util.StringToPointer(collection.Name.String),
-		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String),
-		Gallery:        nil, // handled by dedicated resolver
-		Layout:         layoutToModel(ctx, collection.Layout),
-		Hidden:         &hidden,
-		Nfts:           nil, // handled by dedicated resolver
-	}
-}
-
-func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) model.MembershipTier {
-	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
-	for i, owner := range membershipTier.Owners {
-		ownerModel := membershipOwnerToModel(ctx, owner)
-		owners[i] = &ownerModel
-	}
-
-	return model.MembershipTier{
-		Dbid:     membershipTier.ID,
-		Name:     util.StringToPointer(membershipTier.Name.String()),
-		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
-		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
-		Owners:   owners,
-	}
-}
-
-func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) model.MembershipOwner {
-	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
-	for i, nft := range membershipOwner.PreviewNFTs {
-		previewNfts[i] = util.StringToPointer(nft.String())
-	}
-
-	return model.MembershipOwner{
-		Dbid:        membershipOwner.UserID,
-		Address:     &membershipOwner.Address,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
-	}
-}
-
-func resolveViewer(ctx context.Context) *model.Viewer {
-	viewer := &model.Viewer{
-		User:            nil, // handled by dedicated resolver
-		ViewerGalleries: nil, // handled by dedicated resolver
-	}
-
-	return viewer
 }
