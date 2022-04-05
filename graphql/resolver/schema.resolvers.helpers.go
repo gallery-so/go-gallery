@@ -307,8 +307,8 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.G
 	return &model.GalleryCollection{
 		Dbid:           collection.ID,
 		Version:        &version,
-		Name:           util.StringToPointer(collection.Name.String),
-		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String),
+		Name:           &collection.Name.String,
+		CollectorsNote: &collection.CollectorsNote.String,
 		Gallery:        nil, // handled by dedicated resolver
 		Layout:         layoutToModel(ctx, collection.Layout),
 		Hidden:         &collection.Hidden,
@@ -446,10 +446,10 @@ func getImageMedia(nft sqlc.Nft) model.ImageMedia {
 
 func getVideoMedia(nft sqlc.Nft) model.VideoMedia {
 	videoUrls := model.VideoURLSet{
-		Raw:    util.StringToPointer(nft.AnimationOriginalUrl.String),
-		Small:  util.StringToPointer(nft.AnimationUrl.String),
-		Medium: util.StringToPointer(nft.AnimationUrl.String),
-		Large:  util.StringToPointer(nft.AnimationUrl.String),
+		Raw:    &nft.AnimationOriginalUrl.String,
+		Small:  &nft.AnimationUrl.String,
+		Medium: &nft.AnimationUrl.String,
+		Large:  &nft.AnimationUrl.String,
 	}
 
 	return model.VideoMedia{
@@ -465,7 +465,7 @@ func getAudioMedia(nft sqlc.Nft) model.AudioMedia {
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationUrl.String),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
@@ -474,7 +474,7 @@ func getTextMedia(nft sqlc.Nft) model.TextMedia {
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationUrl.String),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
@@ -483,7 +483,7 @@ func getHtmlMedia(nft sqlc.Nft) model.HTMLMedia {
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationUrl.String),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
@@ -492,7 +492,7 @@ func getJsonMedia(nft sqlc.Nft) model.JSONMedia {
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationUrl.String),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
