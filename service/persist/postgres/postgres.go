@@ -13,17 +13,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NewClient creates a new postgres client
-func NewClient() *sql.DB {
+func getSqlConnectionString() string {
 	dbUser := viper.GetString("POSTGRES_USER")
 	dbPwd := viper.GetString("POSTGRES_PASSWORD")
 	dbName := viper.GetString("POSTGRES_DB")
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+}
 
-	db, err := sql.Open("pgx", psqlInfo)
+// NewClient creates a new postgres client
+func NewClient() *sql.DB {
+	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)
@@ -38,18 +40,10 @@ func NewClient() *sql.DB {
 	return db
 }
 
-// NewPgxClient creates a new postgres client
+// NewPgxClient creates a new postgres client via pgx
 func NewPgxClient() *pgxpool.Pool {
-	dbUser := viper.GetString("POSTGRES_USER")
-	dbPwd := viper.GetString("POSTGRES_PASSWORD")
-	dbName := viper.GetString("POSTGRES_DB")
-	dbHost := viper.GetString("POSTGRES_HOST")
-	dbPort := viper.GetInt("POSTGRES_PORT")
-
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
-
 	ctx := context.Background()
-	db, err := pgxpool.Connect(ctx, psqlInfo)
+	db, err := pgxpool.Connect(ctx, getSqlConnectionString())
 	if err != nil {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)

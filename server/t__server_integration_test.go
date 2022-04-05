@@ -112,11 +112,11 @@ func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *Integrat
 	if err != nil {
 		log.Fatalf("could not connect to docker: %s", err)
 	}
-	pg, pgClient := initPostgres(pool)
+	pg, pgClient, pgxClient := initPostgres(pool)
 	rd := initRedis(pool)
 
 	return &IntegrationTestConfig{
-		TestConfig:    initializeTestServer(pgClient, a, version),
+		TestConfig:    initializeTestServer(pgClient, pgxClient, a, version),
 		pool:          pool,
 		pgResource:    pg,
 		redisResource: rd,
