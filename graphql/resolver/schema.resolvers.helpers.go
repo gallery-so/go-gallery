@@ -325,9 +325,11 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.G
 }
 
 func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
-	for i, owner := range membershipTier.Owners {
-		owners[i] = persistMembershipOwnerToModel(ctx, owner)
+	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	for _, owner := range membershipTier.Owners {
+		if owner.UserID != "" {
+			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+		}
 	}
 
 	return &model.MembershipTier{
@@ -340,9 +342,11 @@ func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *mod
 }
 
 func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
-	for i, owner := range membershipTier.Owners {
-		owners[i] = persistMembershipOwnerToModel(ctx, owner)
+	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	for _, owner := range membershipTier.Owners {
+		if owner.UserID != "" {
+			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+		}
 	}
 
 	return &model.MembershipTier{
