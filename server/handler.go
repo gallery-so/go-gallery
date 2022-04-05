@@ -22,13 +22,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, psub pubsub.PubSub) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
@@ -36,13 +35,13 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 
 	nftHandlersInit(apiGroupV1, repos, ethClient, stg, ipfsClient, arweaveClient, stg)
 	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, arweaveClient, stg)
-	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, psub)
+	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg)
 
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) {
-	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, pubsub))
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
@@ -50,7 +49,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 	}
 }
 
-func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) gin.HandlerFunc {
+func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	// TODO: Resolver probably doesn't need repos or ethClient once the publicAPI is done
 	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
@@ -102,7 +101,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 		}()
 
 		event.AddTo(c, repos)
-		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, pubsub)
+		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient)
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

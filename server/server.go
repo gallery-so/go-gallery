@@ -17,8 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/pubsub"
-	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/validate"
 	log "github.com/sirupsen/logrus"
@@ -26,7 +24,6 @@ import (
 	"google.golang.org/api/option"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Init initializes the server
@@ -63,7 +60,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	if err := redis.ClearCache(); err != nil {
 		panic(err)
 	}
-	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), newGCPPubSub())
+	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient())
 }
 
 func newStorageClient() *storage.Client {
@@ -154,18 +151,6 @@ func newEthClient() *ethclient.Client {
 	if err != nil {
 		panic(err)
 	}
-	return client
-}
-
-func newGCPPubSub() pubsub.PubSub {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
-	defer cancel()
-	client, err := gcp.NewPubSub(ctx)
-	if err != nil {
-		panic(err)
-	}
-	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
-	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
 	return client
 }
 

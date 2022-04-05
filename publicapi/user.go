@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -29,7 +28,6 @@ type UserAPI struct {
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
 	storageClient *storage.Client
-	pubsub        pubsub.PubSub
 }
 
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.User, error) {

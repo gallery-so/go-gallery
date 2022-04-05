@@ -8,7 +8,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -20,7 +19,6 @@ type GalleryAPI struct {
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
-	pubsub    pubsub.PubSub
 }
 
 func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*sqlc.Gallery, error) {
