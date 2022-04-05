@@ -23,20 +23,18 @@ var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 var nodeFetcher = model.NodeFetcher{
 	OnGallery:           resolveGalleryByGalleryID,
 	OnGalleryCollection: resolveGalleryCollectionByCollectionID,
+	OnGalleryUser:       resolveGalleryUserByUserID,
+	OnMembershipTier:    resolveMembershipTierByMembershipId,
+	OnNft:               resolveNftByNftID,
+	OnWallet:            resolveWalletByAddress,
 
 	OnGalleryNft: func(ctx context.Context, nftId string, collectionId string) (*model.GalleryNft, error) {
 		return resolveGalleryNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
 	},
-
-	OnGalleryUser:     resolveGalleryUserByUserID,
-	OnMembershipOwner: nil,
-	OnMembershipTier:  nil,
-	OnNft:             resolveNftByNftID,
-	OnWallet:          resolveWalletByAddress,
 }
 
 func init() {
-	//nodeFetcher.ValidateHandlers()
+	nodeFetcher.ValidateHandlers()
 }
 
 // errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
@@ -254,6 +252,16 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 	return viewer
 }
 
+func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
+	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return membershipToModel(ctx, *tier), nil
+}
+
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 	return &model.Gallery{
 		Dbid:        gallery.ID,
@@ -316,10 +324,25 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.G
 	}
 }
 
-func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
+func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
 	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
 	for i, owner := range membershipTier.Owners {
-		owners[i] = membershipOwnerToModel(ctx, owner)
+		owners[i] = persistMembershipOwnerToModel(ctx, owner)
+	}
+
+	return &model.MembershipTier{
+		Dbid:     membershipTier.ID,
+		Name:     &membershipTier.Name.String,
+		AssetURL: &membershipTier.AssetUrl.String,
+		TokenID:  &membershipTier.TokenID.String,
+		Owners:   owners,
+	}
+}
+
+func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
+	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
+	for i, owner := range membershipTier.Owners {
+		owners[i] = persistMembershipOwnerToModel(ctx, owner)
 	}
 
 	return &model.MembershipTier{
@@ -331,7 +354,7 @@ func membershipTierToModel(ctx context.Context, membershipTier persist.Membershi
 	}
 }
 
-func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
+func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
 	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
 	for i, nft := range membershipOwner.PreviewNFTs {
 		previewNfts[i] = util.StringToPointer(nft.String())

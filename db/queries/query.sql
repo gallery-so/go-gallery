@@ -75,3 +75,9 @@ SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
 
 -- name: GetNftsByOwnerAddressBatch :batchmany
 SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
+
+-- name: GetMembershipByMembershipId :one
+SELECT * FROM membership WHERE id = $1 AND deleted = false;
+
+-- name: GetMembershipByMembershipIdBatch :batchone
+SELECT * FROM membership WHERE id = $1 AND deleted = false;

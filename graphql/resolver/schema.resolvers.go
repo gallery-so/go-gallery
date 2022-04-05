@@ -332,7 +332,7 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 
 	output := make([]*model.MembershipTier, len(tiers))
 	for i, tier := range tiers {
-		output[i] = membershipTierToModel(ctx, tier)
+		output[i] = persistMembershipTierToModel(ctx, tier)
 	}
 
 	return output, nil

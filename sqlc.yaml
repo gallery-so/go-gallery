@@ -31,6 +31,10 @@ overrides:
   - column: "nfts.contract"
     go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
 
+# Membership
+  - column: "membership.owners"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.MembershipOwnerList"
+
 # Wildcards
 # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"

@@ -36,10 +36,6 @@ func (r *GalleryUser) ID() GqlID {
 	return GqlID(fmt.Sprintf("GalleryUser:%s", r.Dbid))
 }
 
-func (r *MembershipOwner) ID() GqlID {
-	return GqlID(fmt.Sprintf("MembershipOwner:%s", r.Dbid))
-}
-
 func (r *MembershipTier) ID() GqlID {
 	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
@@ -57,7 +53,6 @@ type NodeFetcher struct {
 	OnGalleryCollection func(ctx context.Context, dbid persist.DBID) (*GalleryCollection, error)
 	OnGalleryNft        func(ctx context.Context, nftId string, collectionId string) (*GalleryNft, error)
 	OnGalleryUser       func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipOwner   func(ctx context.Context, dbid persist.DBID) (*MembershipOwner, error)
 	OnMembershipTier    func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
 	OnNft               func(ctx context.Context, dbid persist.DBID) (*Nft, error)
 	OnWallet            func(ctx context.Context, address persist.Address) (*Wallet, error)
@@ -93,11 +88,6 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryUser' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnGalleryUser(ctx, persist.DBID(ids[0]))
-	case "MembershipOwner":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipOwner' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnMembershipOwner(ctx, persist.DBID(ids[0]))
 	case "MembershipTier":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -128,8 +118,6 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryNft")
 	case n.OnGalleryUser == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
-	case n.OnMembershipOwner == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipOwner")
 	case n.OnMembershipTier == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
 	case n.OnNft == nil:

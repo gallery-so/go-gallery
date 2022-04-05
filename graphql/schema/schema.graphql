@@ -243,8 +243,7 @@ type Gallery implements Node {
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
-type MembershipOwner implements Node {
-  id: ID!
+type MembershipOwner {
   dbid: DBID!
   address: Address
   user: GalleryUser @goField(forceResolver: true)

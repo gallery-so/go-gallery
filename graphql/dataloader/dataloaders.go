@@ -8,6 +8,7 @@
 //go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Nft
 //go:generate go run github.com/vektah/dataloaden NftsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Nft
 //go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/db/sqlc.Nft
+//go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Membership
 
 package dataloader
 
@@ -38,6 +39,7 @@ type Loaders struct {
 	NftByNftId               NftLoaderByID
 	NftsByOwnerAddress       NftsLoaderByAddress
 	NftsByCollectionId       NftsLoaderByID
+	MembershipByMembershipId MembershipLoaderById
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -107,6 +109,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadNftsByCollectionId(ctx, loaders, q),
+	}
+
+	loaders.MembershipByMembershipId = MembershipLoaderById{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadMembershipByMembershipId(ctx, loaders, q),
 	}
 
 	return loaders
@@ -391,5 +399,26 @@ func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 		})
 
 		return nfts, errors
+	}
+}
+
+func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Membership, []error) {
+	return func(membershipIds []persist.DBID) ([]sqlc.Membership, []error) {
+		memberships := make([]sqlc.Membership, len(membershipIds))
+		errors := make([]error, len(membershipIds))
+
+		b := q.GetMembershipByMembershipIdBatch(ctx, membershipIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, m sqlc.Membership, err error) {
+			memberships[i] = m
+			errors[i] = err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrMembershipNotFoundByID{ID: membershipIds[i]}
+			}
+		})
+
+		return memberships, errors
 	}
 }

@@ -143,6 +143,27 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 	return i, err
 }
 
+const getMembershipByMembershipId = `-- name: GetMembershipByMembershipId :one
+SELECT id, deleted, version, created_at, last_updated, token_id, name, asset_url, owners FROM membership WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DBID) (Membership, error) {
+	row := q.db.QueryRow(ctx, getMembershipByMembershipId, id)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.TokenID,
+		&i.Name,
+		&i.AssetUrl,
+		&i.Owners,
+	)
+	return i, err
+}
+
 const getNftById = `-- name: GetNftById :one
 SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE id = $1 AND deleted = false
 `

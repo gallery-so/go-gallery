@@ -205,7 +205,6 @@ type ComplexityRoot struct {
 	MembershipOwner struct {
 		Address     func(childComplexity int) int
 		Dbid        func(childComplexity int) int
-		ID          func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
 	}
@@ -905,13 +904,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MembershipOwner.Dbid(childComplexity), true
-
-	case "MembershipOwner.id":
-		if e.complexity.MembershipOwner.ID == nil {
-			break
-		}
-
-		return e.complexity.MembershipOwner.ID(childComplexity), true
 
 	case "MembershipOwner.previewNfts":
 		if e.complexity.MembershipOwner.PreviewNfts == nil {
@@ -1848,8 +1840,7 @@ type Gallery implements Node {
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
-type MembershipOwner implements Node {
-  id: ID!
+type MembershipOwner {
   dbid: DBID!
   address: Address
   user: GalleryUser @goField(forceResolver: true)
@@ -4706,41 +4697,6 @@ func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field grap
 	res := resTmp.(*persist.DBID)
 	fc.Result = res
 	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _MembershipOwner_id(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "MembershipOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipOwner_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
@@ -9746,13 +9702,6 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Gallery(ctx, sel, obj)
-	case model.MembershipOwner:
-		return ec._MembershipOwner(ctx, sel, &obj)
-	case *model.MembershipOwner:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._MembershipOwner(ctx, sel, obj)
 	case model.MembershipTier:
 		return ec._MembershipTier(ctx, sel, &obj)
 	case *model.MembershipTier:
@@ -11131,7 +11080,7 @@ func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.Selection
 	return out
 }
 
-var membershipOwnerImplementors = []string{"MembershipOwner", "Node"}
+var membershipOwnerImplementors = []string{"MembershipOwner"}
 
 func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.SelectionSet, obj *model.MembershipOwner) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, membershipOwnerImplementors)
@@ -11141,16 +11090,6 @@ func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.Select
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("MembershipOwner")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MembershipOwner_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._MembershipOwner_dbid(ctx, field, obj)

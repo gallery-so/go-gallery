@@ -141,6 +141,22 @@ func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([
 	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
 }
 
+func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*sqlc.Membership, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"membershipID": {membershipID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	membership, err := api.loaders.MembershipByMembershipId.Load(membershipID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &membership, nil
+}
+
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User

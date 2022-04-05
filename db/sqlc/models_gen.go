@@ -134,7 +134,7 @@ type Membership struct {
 	TokenID     sql.NullString
 	Name        sql.NullString
 	AssetUrl    sql.NullString
-	Owners      []pgtype.JSONB
+	Owners      persist.MembershipOwnerList
 }
 
 type Nft struct {
