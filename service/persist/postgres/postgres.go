@@ -31,7 +31,7 @@ func NewClient() *sql.DB {
 		panic(err)
 	}
 
-	db.SetMaxOpenConns(100)
+	db.SetMaxOpenConns(50)
 
 	err = db.Ping()
 	if err != nil {
@@ -49,7 +49,9 @@ func NewPgxClient() *pgxpool.Pool {
 		panic(err)
 	}
 
-	db.Config().MaxConns = 100
+	// Split 50/50 with existing database/sql implementation so we don't go over the GCP limit
+	// for incoming connections. Once we remove database/sql, this can go back up to 100.
+	db.Config().MaxConns = 50
 
 	err = db.Ping(ctx)
 	if err != nil {
