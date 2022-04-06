@@ -168,8 +168,15 @@ func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
 func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.GalleryCollectionLayout {
 	columns := layout.Columns.Int()
 
+	whitespace := make([]*int, len(layout.Whitespace))
+	for i, w := range layout.Whitespace {
+		ws := w
+		whitespace[i] = &ws
+	}
+
 	output := model.GalleryCollectionLayout{
-		Columns: &columns,
+		Columns:    &columns,
+		Whitespace: whitespace,
 	}
 
 	return &output
