@@ -22,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/ory/dockertest"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -128,23 +129,6 @@ func initializeTestServer(db *sql.DB, pgx *pgxpool.Pool, a *assert.Assertions, v
 	}
 }
 
-// Should be called at the end of every integration test
-func teardown() {
-	log.Info("tearing down test suite...")
-	tc.server.Close()
-	clearDB()
-	tc.galleriesCache.Close(true)
-	tc.galleriesCacheToken.Close(true)
-}
-
-func clearDB() {
-	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
-	_, err := db.Exec(dropSQL)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal(http.StatusOK, resp.StatusCode, "Status should be 200")
 }
@@ -161,9 +145,30 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 }
 
 func setupTest(t *testing.T, v int) *assert.Assertions {
+	setDefaults()
+
 	a := assert.New(t)
-	tc = initializeTestEnv(a, v)
-	t.Cleanup(teardown)
+
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("could not connect to docker: %s", err)
+	}
+
+	pg, pgClient := initPostgres(pool)
+	rd := initRedis(pool)
+
+	tc = initializeTestServer(pgClient, a, v)
+
+	t.Cleanup(func() {
+		for _, r := range []*dockertest.Resource{pg, rd} {
+			if err := pool.Purge(r); err != nil {
+				log.Fatalf("could not purge resource: %s", err)
+			}
+		}
+
+		tc.server.Close()
+	})
+
 	return assert.New(t)
 }
 
