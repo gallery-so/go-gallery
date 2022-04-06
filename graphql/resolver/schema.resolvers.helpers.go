@@ -273,6 +273,7 @@ func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.GalleryCollectionLayout {
 	whitespace := make([]*int, len(layout.Whitespace))
 	for i, w := range layout.Whitespace {
+		w := w
 		whitespace[i] = &w
 	}
 
