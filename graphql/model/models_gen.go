@@ -23,6 +23,10 @@ type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
 
+type CollectionNftByIDOrError interface {
+	IsCollectionNftByIDOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -157,7 +161,8 @@ type CollectionNft struct {
 	Collection *Collection `json:"collection"`
 }
 
-func (CollectionNft) IsNode() {}
+func (CollectionNft) IsNode()                     {}
+func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
@@ -201,6 +206,7 @@ type ErrCollectionNotFound struct {
 
 func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
+func (ErrCollectionNotFound) IsCollectionNftByIDOrError()       {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
 
 type ErrDoesNotOwnRequiredNft struct {
@@ -241,8 +247,9 @@ type ErrNftNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrNftNotFound) IsNftByIDOrError() {}
-func (ErrNftNotFound) IsError()          {}
+func (ErrNftNotFound) IsNftByIDOrError()           {}
+func (ErrNftNotFound) IsError()                    {}
+func (ErrNftNotFound) IsCollectionNftByIDOrError() {}
 
 type ErrNoCookie struct {
 	Message string `json:"message"`

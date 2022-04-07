@@ -180,7 +180,7 @@ func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collecti
 		return nil, err
 	}
 
-	galleryNft := &model.CollectionNft{
+	collectionNft := &model.CollectionNft{
 		HelperCollectionNftData: model.HelperCollectionNftData{
 			NftId:        nftID,
 			CollectionId: collectionID,
@@ -189,7 +189,7 @@ func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collecti
 		Collection: collection,
 	}
 
-	return galleryNft, nil
+	return collectionNft, nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
