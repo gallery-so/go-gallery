@@ -10,26 +10,26 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-func (r *Gallery) ID() GqlID {
-	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
+func (r *Collection) ID() GqlID {
+	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
 
-func (r *GalleryCollection) ID() GqlID {
-	return GqlID(fmt.Sprintf("GalleryCollection:%s", r.Dbid))
-}
-
-func (r *GalleryNft) ID() GqlID {
+func (r *CollectionNft) ID() GqlID {
 	//-----------------------------------------------------------------------------------------------
 	//-----------------------------------------------------------------------------------------------
 	// Some fields specified by @goGqlId require manual binding because one of the following is true:
-	// (a) the field does not exist on the GalleryNft type, or
+	// (a) the field does not exist on the CollectionNft type, or
 	// (b) the field exists but is not a string type
 	//-----------------------------------------------------------------------------------------------
-	// Please create binding methods on the GalleryNft type with the following signatures:
-	// func (r *GalleryNft) GetGqlIDField_NftID() string
-	// func (r *GalleryNft) GetGqlIDField_CollectionID() string
+	// Please create binding methods on the CollectionNft type with the following signatures:
+	// func (r *CollectionNft) GetGqlIDField_NftID() string
+	// func (r *CollectionNft) GetGqlIDField_CollectionID() string
 	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("GalleryNft:%s:%s", r.GetGqlIDField_NftID(), r.GetGqlIDField_CollectionID()))
+	return GqlID(fmt.Sprintf("CollectionNft:%s:%s", r.GetGqlIDField_NftID(), r.GetGqlIDField_CollectionID()))
+}
+
+func (r *Gallery) ID() GqlID {
+	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
 }
 
 func (r *GalleryUser) ID() GqlID {
@@ -49,13 +49,13 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnGallery           func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
-	OnGalleryCollection func(ctx context.Context, dbid persist.DBID) (*GalleryCollection, error)
-	OnGalleryNft        func(ctx context.Context, nftId string, collectionId string) (*GalleryNft, error)
-	OnGalleryUser       func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipTier    func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
-	OnNft               func(ctx context.Context, dbid persist.DBID) (*Nft, error)
-	OnWallet            func(ctx context.Context, address persist.Address) (*Wallet, error)
+	OnCollection     func(ctx context.Context, dbid persist.DBID) (*Collection, error)
+	OnCollectionNft  func(ctx context.Context, nftId string, collectionId string) (*CollectionNft, error)
+	OnGallery        func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
+	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnNft            func(ctx context.Context, dbid persist.DBID) (*Nft, error)
+	OnWallet         func(ctx context.Context, address persist.Address) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -68,21 +68,21 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 	ids := parts[1:]
 
 	switch typeName {
+	case "Collection":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnCollection(ctx, persist.DBID(ids[0]))
+	case "CollectionNft":
+		if len(ids) != 2 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectionNft' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnCollectionNft(ctx, string(ids[0]), string(ids[1]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnGallery(ctx, persist.DBID(ids[0]))
-	case "GalleryCollection":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryCollection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnGalleryCollection(ctx, persist.DBID(ids[0]))
-	case "GalleryNft":
-		if len(ids) != 2 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryNft' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnGalleryNft(ctx, string(ids[0]), string(ids[1]))
 	case "GalleryUser":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'GalleryUser' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -110,12 +110,12 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 
 func (n *NodeFetcher) ValidateHandlers() {
 	switch {
+	case n.OnCollection == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
+	case n.OnCollectionNft == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionNft")
 	case n.OnGallery == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGallery")
-	case n.OnGalleryCollection == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryCollection")
-	case n.OnGalleryNft == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryNft")
 	case n.OnGalleryUser == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
 	case n.OnMembershipTier == nil:

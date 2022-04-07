@@ -16,6 +16,38 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
+	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return galleryToModel(ctx, *gallery), nil
+}
+
+func (r *collectionResolver) Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error) {
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]*model.CollectionNft, len(nfts))
+	for i, nft := range nfts {
+		output[i] = &model.CollectionNft{
+			HelperCollectionNftData: model.HelperCollectionNftData{
+				NftId:        nft.ID,
+				CollectionId: obj.Dbid,
+			},
+			Nft:        nftToModel(ctx, nft),
+			Collection: obj,
+		}
+	}
+
+	return output, nil
+}
+
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
@@ -26,40 +58,8 @@ func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model
 	return resolveGalleryUserByUserID(ctx, gallery.OwnerUserID)
 }
 
-func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
-	return resolveGalleryCollectionsByGalleryID(ctx, obj.Dbid)
-}
-
-func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
-	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return galleryToModel(ctx, *gallery), nil
-}
-
-func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
-
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]*model.GalleryNft, len(nfts))
-	for i, nft := range nfts {
-		output[i] = &model.GalleryNft{
-			HelperGalleryNftData: model.HelperGalleryNftData{
-				NftId:        nft.ID,
-				CollectionId: obj.Dbid,
-			},
-			Nft:        nftToModel(ctx, nft),
-			Collection: obj,
-		}
-	}
-
-	return output, nil
+func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error) {
+	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
@@ -339,7 +339,7 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 }
 
 func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
-	return resolveGalleryCollectionByCollectionID(ctx, id)
+	return resolveCollectionByCollectionID(ctx, id)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
@@ -383,13 +383,11 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.
 	return output, nil
 }
 
+// Collection returns generated.CollectionResolver implementation.
+func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
+
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
-
-// GalleryCollection returns generated.GalleryCollectionResolver implementation.
-func (r *Resolver) GalleryCollection() generated.GalleryCollectionResolver {
-	return &galleryCollectionResolver{r}
-}
 
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
@@ -417,8 +415,8 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 // Wallet returns generated.WalletResolver implementation.
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
+type collectionResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
-type galleryCollectionResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type membershipOwnerResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }

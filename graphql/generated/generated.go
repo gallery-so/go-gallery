@@ -38,8 +38,8 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Collection() CollectionResolver
 	Gallery() GalleryResolver
-	GalleryCollection() GalleryCollectionResolver
 	GalleryUser() GalleryUserResolver
 	MembershipOwner() MembershipOwnerResolver
 	Mutation() MutationResolver
@@ -69,6 +69,29 @@ type ComplexityRoot struct {
 	AuthNonce struct {
 		Nonce      func(childComplexity int) int
 		UserExists func(childComplexity int) int
+	}
+
+	Collection struct {
+		CollectorsNote func(childComplexity int) int
+		Dbid           func(childComplexity int) int
+		Gallery        func(childComplexity int) int
+		Hidden         func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Layout         func(childComplexity int) int
+		Name           func(childComplexity int) int
+		Nfts           func(childComplexity int) int
+		Version        func(childComplexity int) int
+	}
+
+	CollectionLayout struct {
+		Columns    func(childComplexity int) int
+		Whitespace func(childComplexity int) int
+	}
+
+	CollectionNft struct {
+		Collection func(childComplexity int) int
+		ID         func(childComplexity int) int
+		Nft        func(childComplexity int) int
 	}
 
 	CreateCollectionPayload struct {
@@ -128,29 +151,6 @@ type ComplexityRoot struct {
 		Dbid        func(childComplexity int) int
 		ID          func(childComplexity int) int
 		Owner       func(childComplexity int) int
-	}
-
-	GalleryCollection struct {
-		CollectorsNote func(childComplexity int) int
-		Dbid           func(childComplexity int) int
-		Gallery        func(childComplexity int) int
-		Hidden         func(childComplexity int) int
-		ID             func(childComplexity int) int
-		Layout         func(childComplexity int) int
-		Name           func(childComplexity int) int
-		Nfts           func(childComplexity int) int
-		Version        func(childComplexity int) int
-	}
-
-	GalleryCollectionLayout struct {
-		Columns    func(childComplexity int) int
-		Whitespace func(childComplexity int) int
-	}
-
-	GalleryNft struct {
-		Collection func(childComplexity int) int
-		ID         func(childComplexity int) int
-		Nft        func(childComplexity int) int
 	}
 
 	GalleryUser struct {
@@ -343,14 +343,14 @@ type ComplexityRoot struct {
 	}
 }
 
+type CollectionResolver interface {
+	Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error)
+
+	Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error)
+}
 type GalleryResolver interface {
 	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
-	Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error)
-}
-type GalleryCollectionResolver interface {
-	Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error)
-
-	Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error)
+	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
 }
 type GalleryUserResolver interface {
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
@@ -456,6 +456,104 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
+
+	case "Collection.collectorsNote":
+		if e.complexity.Collection.CollectorsNote == nil {
+			break
+		}
+
+		return e.complexity.Collection.CollectorsNote(childComplexity), true
+
+	case "Collection.dbid":
+		if e.complexity.Collection.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Collection.Dbid(childComplexity), true
+
+	case "Collection.gallery":
+		if e.complexity.Collection.Gallery == nil {
+			break
+		}
+
+		return e.complexity.Collection.Gallery(childComplexity), true
+
+	case "Collection.hidden":
+		if e.complexity.Collection.Hidden == nil {
+			break
+		}
+
+		return e.complexity.Collection.Hidden(childComplexity), true
+
+	case "Collection.id":
+		if e.complexity.Collection.ID == nil {
+			break
+		}
+
+		return e.complexity.Collection.ID(childComplexity), true
+
+	case "Collection.layout":
+		if e.complexity.Collection.Layout == nil {
+			break
+		}
+
+		return e.complexity.Collection.Layout(childComplexity), true
+
+	case "Collection.name":
+		if e.complexity.Collection.Name == nil {
+			break
+		}
+
+		return e.complexity.Collection.Name(childComplexity), true
+
+	case "Collection.nfts":
+		if e.complexity.Collection.Nfts == nil {
+			break
+		}
+
+		return e.complexity.Collection.Nfts(childComplexity), true
+
+	case "Collection.version":
+		if e.complexity.Collection.Version == nil {
+			break
+		}
+
+		return e.complexity.Collection.Version(childComplexity), true
+
+	case "CollectionLayout.columns":
+		if e.complexity.CollectionLayout.Columns == nil {
+			break
+		}
+
+		return e.complexity.CollectionLayout.Columns(childComplexity), true
+
+	case "CollectionLayout.whitespace":
+		if e.complexity.CollectionLayout.Whitespace == nil {
+			break
+		}
+
+		return e.complexity.CollectionLayout.Whitespace(childComplexity), true
+
+	case "CollectionNft.collection":
+		if e.complexity.CollectionNft.Collection == nil {
+			break
+		}
+
+		return e.complexity.CollectionNft.Collection(childComplexity), true
+
+	case "CollectionNft.id":
+		if e.complexity.CollectionNft.ID == nil {
+			break
+		}
+
+		return e.complexity.CollectionNft.ID(childComplexity), true
+
+	case "CollectionNft.nft":
+		if e.complexity.CollectionNft.Nft == nil {
+			break
+		}
+
+		return e.complexity.CollectionNft.Nft(childComplexity), true
 
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
@@ -596,104 +694,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Gallery.Owner(childComplexity), true
-
-	case "GalleryCollection.collectorsNote":
-		if e.complexity.GalleryCollection.CollectorsNote == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.CollectorsNote(childComplexity), true
-
-	case "GalleryCollection.dbid":
-		if e.complexity.GalleryCollection.Dbid == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Dbid(childComplexity), true
-
-	case "GalleryCollection.gallery":
-		if e.complexity.GalleryCollection.Gallery == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Gallery(childComplexity), true
-
-	case "GalleryCollection.hidden":
-		if e.complexity.GalleryCollection.Hidden == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Hidden(childComplexity), true
-
-	case "GalleryCollection.id":
-		if e.complexity.GalleryCollection.ID == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.ID(childComplexity), true
-
-	case "GalleryCollection.layout":
-		if e.complexity.GalleryCollection.Layout == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Layout(childComplexity), true
-
-	case "GalleryCollection.name":
-		if e.complexity.GalleryCollection.Name == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Name(childComplexity), true
-
-	case "GalleryCollection.nfts":
-		if e.complexity.GalleryCollection.Nfts == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Nfts(childComplexity), true
-
-	case "GalleryCollection.version":
-		if e.complexity.GalleryCollection.Version == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollection.Version(childComplexity), true
-
-	case "GalleryCollectionLayout.columns":
-		if e.complexity.GalleryCollectionLayout.Columns == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollectionLayout.Columns(childComplexity), true
-
-	case "GalleryCollectionLayout.whitespace":
-		if e.complexity.GalleryCollectionLayout.Whitespace == nil {
-			break
-		}
-
-		return e.complexity.GalleryCollectionLayout.Whitespace(childComplexity), true
-
-	case "GalleryNft.collection":
-		if e.complexity.GalleryNft.Collection == nil {
-			break
-		}
-
-		return e.complexity.GalleryNft.Collection(childComplexity), true
-
-	case "GalleryNft.id":
-		if e.complexity.GalleryNft.ID == nil {
-			break
-		}
-
-		return e.complexity.GalleryNft.ID(childComplexity), true
-
-	case "GalleryNft.nft":
-		if e.complexity.GalleryNft.Nft == nil {
-			break
-		}
-
-		return e.complexity.GalleryNft.Nft(childComplexity), true
 
 	case "GalleryUser.bio":
 		if e.complexity.GalleryUser.Bio == nil {
@@ -1810,34 +1810,34 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type GalleryNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
+type CollectionNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
   id: ID!
   nft: Nft
-  collection: GalleryCollection
+  collection: Collection
 }
 
-type GalleryCollectionLayout {
+type CollectionLayout {
   columns: Int
   whitespace: [Int]
 }
 
-type GalleryCollection implements Node {
+type Collection implements Node {
   id: ID!
   dbid: DBID!
   version: Int
   name: String
   collectorsNote: String
   gallery: Gallery @goField(forceResolver: true)
-  layout: GalleryCollectionLayout
+  layout: CollectionLayout
   hidden: Boolean
-  nfts: [GalleryNft] @goField(forceResolver: true)
+  nfts: [CollectionNft] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
   id: ID!
   dbid: DBID!
   owner: GalleryUser @goField(forceResolver: true)
-  collections: [GalleryCollection] @goField(forceResolver: true)
+  collections: [Collection] @goField(forceResolver: true)
 }
 
 type MembershipOwner {
@@ -1874,7 +1874,7 @@ type ErrCollectionNotFound implements Error {
   message: String!
 }
 
-union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
+union CollectionByIdOrError = ErrCollectionNotFound | Collection
 
 type Query {
   node(id: ID!): Node
@@ -1884,7 +1884,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
 }
 
-input GalleryCollectionLayoutInput {
+input CollectionLayoutInput {
   columns: Int!
   whitespace: [Int!]!
 }
@@ -1894,7 +1894,7 @@ input CreateCollectionInput {
   name: String!
   collectorsNote: String!
   nfts: [DBID!]!
-  layout: GalleryCollectionLayoutInput!
+  layout: CollectionLayoutInput!
 }
 
 union CreateCollectionPayloadOrError =
@@ -1903,7 +1903,7 @@ union CreateCollectionPayloadOrError =
   | ErrInvalidInput
 
 type CreateCollectionPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 union DeleteCollectionPayloadOrError =
@@ -1928,13 +1928,13 @@ union UpdateCollectionInfoPayloadOrError =
   | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 input UpdateCollectionNftsInput {
   collectionId: DBID!
   nfts: [DBID!]!
-  layout: GalleryCollectionLayoutInput!
+  layout: CollectionLayoutInput!
 }
 
 union UpdateCollectionNftsPayloadOrError =
@@ -1943,7 +1943,7 @@ union UpdateCollectionNftsPayloadOrError =
   | ErrInvalidInput
 
 type UpdateCollectionNftsPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 input UpdateGalleryCollectionsInput {
@@ -2658,6 +2658,463 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Collection_id(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_version(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Version, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_name(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_collectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CollectorsNote, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_gallery(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Collection().Gallery(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_layout(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Layout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CollectionLayout)
+	fc.Result = res
+	return ec.marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayout(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_hidden(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Hidden, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Collection_nfts(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Collection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Collection().Nfts(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionNft)
+	fc.Result = res
+	return ec.marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionLayout",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Columns, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionLayout_whitespace(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionLayout",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Whitespace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚕᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionNft_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionNft_nft(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nft, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Nft)
+	fc.Result = res
+	return ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionNft_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionNft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Collection, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _CreateCollectionPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.CreateCollectionPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2685,9 +3142,9 @@ func (ec *executionContext) _CreateCollectionPayload_collection(ctx context.Cont
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.GalleryCollection)
+	res := resTmp.(*model.Collection)
 	fc.Result = res
-	return ec.marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, field.Selections, res)
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
@@ -3335,466 +3792,9 @@ func (ec *executionContext) _Gallery_collections(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.GalleryCollection)
+	res := resTmp.([]*model.Collection)
 	fc.Result = res
-	return ec.marshalOGalleryCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_id(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_dbid(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_version(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Version, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_name(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_collectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CollectorsNote, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_gallery(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryCollection().Gallery(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Gallery)
-	fc.Result = res
-	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_layout(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Layout, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryCollectionLayout)
-	fc.Result = res
-	return ec.marshalOGalleryCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayout(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_hidden(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Hidden, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollection_nfts(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryCollection().Nfts(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*model.GalleryNft)
-	fc.Result = res
-	return ec.marshalOGalleryNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryNft(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionLayout) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionLayout",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Columns, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollectionLayout_whitespace(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionLayout) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionLayout",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Whitespace, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚕᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryNft_id(ctx context.Context, field graphql.CollectedField, obj *model.GalleryNft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryNft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryNft_nft(ctx context.Context, field graphql.CollectedField, obj *model.GalleryNft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryNft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Nft, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Nft)
-	fc.Result = res
-	return ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryNft_collection(ctx context.Context, field graphql.CollectedField, obj *model.GalleryNft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryNft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Collection, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryCollection)
-	fc.Result = res
-	return ec.marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, field.Selections, res)
+	return ec.marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_id(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -7108,9 +7108,9 @@ func (ec *executionContext) _UpdateCollectionInfoPayload_collection(ctx context.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.GalleryCollection)
+	res := resTmp.(*model.Collection)
 	fc.Result = res
-	return ec.marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, field.Selections, res)
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateCollectionNftsPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionNftsPayload) (ret graphql.Marshaler) {
@@ -7140,9 +7140,9 @@ func (ec *executionContext) _UpdateCollectionNftsPayload_collection(ctx context.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.GalleryCollection)
+	res := resTmp.(*model.Collection)
 	fc.Result = res
-	return ec.marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, field.Selections, res)
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryCollectionsPayload) (ret graphql.Marshaler) {
@@ -8877,6 +8877,37 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Context, obj interface{}) (model.CollectionLayoutInput, error) {
+	var it model.CollectionLayoutInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "columns":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("columns"))
+			it.Columns, err = ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "whitespace":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("whitespace"))
+			it.Whitespace, err = ec.unmarshalNInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Context, obj interface{}) (model.CreateCollectionInput, error) {
 	var it model.CreateCollectionInput
 	asMap := map[string]interface{}{}
@@ -8922,7 +8953,7 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("layout"))
-			it.Layout, err = ec.unmarshalNGalleryCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayoutInput(ctx, v)
+			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -8962,37 +8993,6 @@ func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, o
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
 			it.Signature, err = ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputGalleryCollectionLayoutInput(ctx context.Context, obj interface{}) (model.GalleryCollectionLayoutInput, error) {
-	var it model.GalleryCollectionLayoutInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	for k, v := range asMap {
-		switch k {
-		case "columns":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("columns"))
-			it.Columns, err = ec.unmarshalNInt2int(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "whitespace":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("whitespace"))
-			it.Whitespace, err = ec.unmarshalNInt2ᚕintᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -9101,7 +9101,7 @@ func (ec *executionContext) unmarshalInputUpdateCollectionNftsInput(ctx context.
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("layout"))
-			it.Layout, err = ec.unmarshalNGalleryCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayoutInput(ctx, v)
+			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -9255,13 +9255,13 @@ func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
-	case model.GalleryCollection:
-		return ec._GalleryCollection(ctx, sel, &obj)
-	case *model.GalleryCollection:
+	case model.Collection:
+		return ec._Collection(ctx, sel, &obj)
+	case *model.Collection:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._GalleryCollection(ctx, sel, obj)
+		return ec._Collection(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -9681,20 +9681,20 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Nft(ctx, sel, obj)
-	case model.GalleryNft:
-		return ec._GalleryNft(ctx, sel, &obj)
-	case *model.GalleryNft:
+	case model.CollectionNft:
+		return ec._CollectionNft(ctx, sel, &obj)
+	case *model.CollectionNft:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._GalleryNft(ctx, sel, obj)
-	case model.GalleryCollection:
-		return ec._GalleryCollection(ctx, sel, &obj)
-	case *model.GalleryCollection:
+		return ec._CollectionNft(ctx, sel, obj)
+	case model.Collection:
+		return ec._Collection(ctx, sel, &obj)
+	case *model.Collection:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._GalleryCollection(ctx, sel, obj)
+		return ec._Collection(ctx, sel, obj)
 	case model.Gallery:
 		return ec._Gallery(ctx, sel, &obj)
 	case *model.Gallery:
@@ -10041,6 +10041,196 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 		case "userExists":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._AuthNonce_userExists(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionImplementors = []string{"Collection", "Node", "CollectionByIdOrError"}
+
+func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSet, obj *model.Collection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Collection")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "version":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_version(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "collectorsNote":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_collectorsNote(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "gallery":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Collection_gallery(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "layout":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_layout(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "hidden":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Collection_hidden(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "nfts":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Collection_nfts(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionLayoutImplementors = []string{"CollectionLayout"}
+
+func (ec *executionContext) _CollectionLayout(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionLayout) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionLayoutImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionLayout")
+		case "columns":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionLayout_columns(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "whitespace":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionLayout_whitespace(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionNftImplementors = []string{"CollectionNft", "Node"}
+
+func (ec *executionContext) _CollectionNft(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionNft) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionNftImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionNft")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionNft_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "nft":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionNft_nft(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "collection":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionNft_collection(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -10520,196 +10710,6 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 				return innerFunc(ctx)
 
 			})
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var galleryCollectionImplementors = []string{"GalleryCollection", "Node", "CollectionByIdOrError"}
-
-func (ec *executionContext) _GalleryCollection(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryCollection) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, galleryCollectionImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("GalleryCollection")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "version":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_version(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "name":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_name(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "collectorsNote":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_collectorsNote(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "gallery":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryCollection_gallery(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "layout":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_layout(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "hidden":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollection_hidden(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "nfts":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryCollection_nfts(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var galleryCollectionLayoutImplementors = []string{"GalleryCollectionLayout"}
-
-func (ec *executionContext) _GalleryCollectionLayout(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryCollectionLayout) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, galleryCollectionLayoutImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("GalleryCollectionLayout")
-		case "columns":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollectionLayout_columns(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "whitespace":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollectionLayout_whitespace(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var galleryNftImplementors = []string{"GalleryNft", "Node"}
-
-func (ec *executionContext) _GalleryNft(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryNft) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, galleryNftImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("GalleryNft")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryNft_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "nft":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryNft_nft(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "collection":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryNft_collection(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12736,6 +12736,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
+	res, err := ec.unmarshalInputCollectionLayoutInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInput(ctx context.Context, v interface{}) (model.CreateCollectionInput, error) {
 	res, err := ec.unmarshalInputCreateCollectionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -12787,11 +12792,6 @@ func (ec *executionContext) marshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	}
 
 	return ret
-}
-
-func (ec *executionContext) unmarshalNGalleryCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayoutInput(ctx context.Context, v interface{}) (*model.GalleryCollectionLayoutInput, error) {
-	res, err := ec.unmarshalInputGalleryCollectionLayoutInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, v interface{}) (model.GqlID, error) {
@@ -13243,11 +13243,114 @@ func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgall
 	return v
 }
 
+func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v *model.Collection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Collection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.CollectionByIDOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._CollectionByIdOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.CollectionLayout) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionLayout(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionNft) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollectionNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollectionNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx context.Context, sel ast.SelectionSet, v *model.CollectionNft) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionNft(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCreateCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateCollectionPayloadOrError) graphql.Marshaler {
@@ -13342,109 +13445,6 @@ func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 		return graphql.Null
 	}
 	return ec._Gallery(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryCollection) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOGalleryCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollection(ctx context.Context, sel ast.SelectionSet, v *model.GalleryCollection) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryCollection(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.GalleryCollectionLayout) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryCollectionLayout(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryNft(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryNft) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOGalleryNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryNft(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOGalleryNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryNft(ctx context.Context, sel ast.SelectionSet, v *model.GalleryNft) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryNft(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {

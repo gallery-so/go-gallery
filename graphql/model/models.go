@@ -7,15 +7,15 @@ import (
 
 type GqlID string
 
-func (r *GalleryNft) GetGqlIDField_NftID() string {
+func (r *CollectionNft) GetGqlIDField_NftID() string {
 	return r.NftId.String()
 }
 
-func (r *GalleryNft) GetGqlIDField_CollectionID() string {
+func (r *CollectionNft) GetGqlIDField_CollectionID() string {
 	return r.CollectionId.String()
 }
 
-type HelperGalleryNftData struct {
+type HelperCollectionNftData struct {
 	NftId        persist.DBID
 	CollectionId persist.DBID
 }

@@ -123,16 +123,48 @@ type AuthNonce struct {
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
+type Collection struct {
+	Dbid           persist.DBID      `json:"dbid"`
+	Version        *int              `json:"version"`
+	Name           *string           `json:"name"`
+	CollectorsNote *string           `json:"collectorsNote"`
+	Gallery        *Gallery          `json:"gallery"`
+	Layout         *CollectionLayout `json:"layout"`
+	Hidden         *bool             `json:"hidden"`
+	Nfts           []*CollectionNft  `json:"nfts"`
+}
+
+func (Collection) IsNode()                  {}
+func (Collection) IsCollectionByIDOrError() {}
+
+type CollectionLayout struct {
+	Columns    *int   `json:"columns"`
+	Whitespace []*int `json:"whitespace"`
+}
+
+type CollectionLayoutInput struct {
+	Columns    int   `json:"columns"`
+	Whitespace []int `json:"whitespace"`
+}
+
+type CollectionNft struct {
+	HelperCollectionNftData
+	Nft        *Nft        `json:"nft"`
+	Collection *Collection `json:"collection"`
+}
+
+func (CollectionNft) IsNode() {}
+
 type CreateCollectionInput struct {
-	GalleryID      persist.DBID                  `json:"galleryId"`
-	Name           string                        `json:"name"`
-	CollectorsNote string                        `json:"collectorsNote"`
-	Nfts           []persist.DBID                `json:"nfts"`
-	Layout         *GalleryCollectionLayoutInput `json:"layout"`
+	GalleryID      persist.DBID           `json:"galleryId"`
+	Name           string                 `json:"name"`
+	CollectorsNote string                 `json:"collectorsNote"`
+	Nfts           []persist.DBID         `json:"nfts"`
+	Layout         *CollectionLayoutInput `json:"layout"`
 }
 
 type CreateCollectionPayload struct {
-	Collection *GalleryCollection `json:"collection"`
+	Collection *Collection `json:"collection"`
 }
 
 func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
@@ -247,44 +279,12 @@ type EthereumEoaAuth struct {
 }
 
 type Gallery struct {
-	Dbid        persist.DBID         `json:"dbid"`
-	Owner       *GalleryUser         `json:"owner"`
-	Collections []*GalleryCollection `json:"collections"`
+	Dbid        persist.DBID  `json:"dbid"`
+	Owner       *GalleryUser  `json:"owner"`
+	Collections []*Collection `json:"collections"`
 }
 
 func (Gallery) IsNode() {}
-
-type GalleryCollection struct {
-	Dbid           persist.DBID             `json:"dbid"`
-	Version        *int                     `json:"version"`
-	Name           *string                  `json:"name"`
-	CollectorsNote *string                  `json:"collectorsNote"`
-	Gallery        *Gallery                 `json:"gallery"`
-	Layout         *GalleryCollectionLayout `json:"layout"`
-	Hidden         *bool                    `json:"hidden"`
-	Nfts           []*GalleryNft            `json:"nfts"`
-}
-
-func (GalleryCollection) IsNode()                  {}
-func (GalleryCollection) IsCollectionByIDOrError() {}
-
-type GalleryCollectionLayout struct {
-	Columns    *int   `json:"columns"`
-	Whitespace []*int `json:"whitespace"`
-}
-
-type GalleryCollectionLayoutInput struct {
-	Columns    int   `json:"columns"`
-	Whitespace []int `json:"whitespace"`
-}
-
-type GalleryNft struct {
-	HelperGalleryNftData
-	Nft        *Nft               `json:"nft"`
-	Collection *GalleryCollection `json:"collection"`
-}
-
-func (GalleryNft) IsNode() {}
 
 type GalleryUser struct {
 	Dbid                persist.DBID `json:"dbid"`
@@ -448,19 +448,19 @@ type UpdateCollectionInfoInput struct {
 }
 
 type UpdateCollectionInfoPayload struct {
-	Collection *GalleryCollection `json:"collection"`
+	Collection *Collection `json:"collection"`
 }
 
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
 type UpdateCollectionNftsInput struct {
-	CollectionID persist.DBID                  `json:"collectionId"`
-	Nfts         []persist.DBID                `json:"nfts"`
-	Layout       *GalleryCollectionLayoutInput `json:"layout"`
+	CollectionID persist.DBID           `json:"collectionId"`
+	Nfts         []persist.DBID         `json:"nfts"`
+	Layout       *CollectionLayoutInput `json:"layout"`
 }
 
 type UpdateCollectionNftsPayload struct {
-	Collection *GalleryCollection `json:"collection"`
+	Collection *Collection `json:"collection"`
 }
 
 func (UpdateCollectionNftsPayload) IsUpdateCollectionNftsPayloadOrError() {}
