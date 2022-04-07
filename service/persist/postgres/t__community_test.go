@@ -96,5 +96,5 @@ func TestGetCommunity_Success(t *testing.T) {
 	a.NoError(err)
 
 	a.Equal(nfts[0].Contract.ContractName, comm.Name)
-	a.Greater(len(comm.Owners), 1)
+	a.Greater(len(comm.Owners), 0)
 }
