@@ -114,10 +114,16 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 }
 
 func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-	// Change the TextFormatter so newlines will be preserved in log fields.
-	// Otherwise, they get converted to the literal string \n
 	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+
+	// To make queries show up in a readable format in a local console, we want a text formatter that
+	// doesn't escape newlines. To make queries readable in GCP logs, we actually want a JSON formatter;
+	// otherwise, each individual line of the query will be treated as a separate log entry.
+	if viper.GetString("ENV") == "local" {
+		logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+	} else {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
 
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 		gc := util.GinContextFromContext(ctx)
