@@ -59,6 +59,10 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
+type NftByIDOrError interface {
+	IsNftByIDOrError()
+}
+
 type Node interface {
 	IsNode()
 }
@@ -233,6 +237,13 @@ type ErrInvalidToken struct {
 func (ErrInvalidToken) IsAuthorizationError() {}
 func (ErrInvalidToken) IsError()              {}
 
+type ErrNftNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrNftNotFound) IsNftByIDOrError() {}
+func (ErrNftNotFound) IsError()          {}
+
 type ErrNoCookie struct {
 	Message string `json:"message"`
 }
@@ -405,7 +416,8 @@ type Nft struct {
 	BlockNumber      *string             `json:"blockNumber"`
 }
 
-func (Nft) IsNode() {}
+func (Nft) IsNode()           {}
+func (Nft) IsNftByIDOrError() {}
 
 type OwnerAtBlock struct {
 	Owner       GalleryUserOrWallet `json:"owner"`

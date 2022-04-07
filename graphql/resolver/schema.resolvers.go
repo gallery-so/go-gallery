@@ -342,6 +342,10 @@ func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (mo
 	return resolveCollectionByCollectionID(ctx, id)
 }
 
+func (r *queryResolver) NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error) {
+	return resolveNftByNftID(ctx, id)
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)

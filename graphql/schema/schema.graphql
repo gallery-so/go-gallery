@@ -286,7 +286,13 @@ type ErrCollectionNotFound implements Error {
   message: String!
 }
 
-union CollectionByIdOrError = ErrCollectionNotFound | Collection
+union NftByIdOrError = Nft | ErrNftNotFound
+
+type ErrNftNotFound implements Error {
+  message: String!
+}
+
+union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
 type Query {
   node(id: ID!): Node
@@ -294,6 +300,7 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
+  nftById(id: DBID!): NftByIdOrError
 }
 
 input CollectionLayoutInput {

@@ -63,6 +63,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"NftByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(NftByIDOrError)
+		return obj, ok
+	},
+
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
 		return obj, ok

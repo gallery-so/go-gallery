@@ -56,6 +56,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
+	case persist.ErrNFTNotFoundByID:
+		mappedErr = model.ErrNftNotFound{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}

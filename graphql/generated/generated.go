@@ -129,6 +129,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrNftNotFound struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrNoCookie struct {
 		Message func(childComplexity int) int
 	}
@@ -277,6 +281,7 @@ type ComplexityRoot struct {
 	Query struct {
 		CollectionByID  func(childComplexity int, id persist.DBID) int
 		MembershipTiers func(childComplexity int, forceRefresh *bool) int
+		NftByID         func(childComplexity int, id persist.DBID) int
 		Node            func(childComplexity int, id model.GqlID) int
 		UserByUsername  func(childComplexity int, username string) int
 		Viewer          func(childComplexity int) int
@@ -391,6 +396,7 @@ type QueryResolver interface {
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
+	NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
@@ -638,6 +644,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrInvalidToken.Message(childComplexity), true
+
+	case "ErrNftNotFound.message":
+		if e.complexity.ErrNftNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrNftNotFound.Message(childComplexity), true
 
 	case "ErrNoCookie.message":
 		if e.complexity.ErrNoCookie.Message == nil {
@@ -1339,6 +1352,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.MembershipTiers(childComplexity, args["forceRefresh"].(*bool)), true
 
+	case "Query.nftById":
+		if e.complexity.Query.NftByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_nftById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.NftByID(childComplexity, args["id"].(persist.DBID)), true
+
 	case "Query.node":
 		if e.complexity.Query.Node == nil {
 			break
@@ -1918,7 +1943,13 @@ type ErrCollectionNotFound implements Error {
   message: String!
 }
 
-union CollectionByIdOrError = ErrCollectionNotFound | Collection
+union NftByIdOrError = Nft | ErrNftNotFound
+
+type ErrNftNotFound implements Error {
+  message: String!
+}
+
+union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
 type Query {
   node(id: ID!): Node
@@ -1926,6 +1957,7 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
+  nftById(id: DBID!): NftByIdOrError
 }
 
 input CollectionLayoutInput {
@@ -2407,6 +2439,21 @@ func (ec *executionContext) field_Query_membershipTiers_args(ctx context.Context
 		}
 	}
 	args["forceRefresh"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_nftById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -3506,6 +3553,41 @@ func (ec *executionContext) _ErrInvalidToken_message(ctx context.Context, field 
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrInvalidToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrNftNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNftNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrNftNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6862,6 +6944,45 @@ func (ec *executionContext) _Query_collectionById(ctx context.Context, field gra
 	return ec.marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_nftById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_nftById_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().NftByID(rctx, args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.NftByIDOrError)
+	fc.Result = res
+	return ec.marshalONftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNftByIDOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -9420,13 +9541,6 @@ func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.ErrCollectionNotFound:
-		return ec._ErrCollectionNotFound(ctx, sel, &obj)
-	case *model.ErrCollectionNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	case model.Collection:
 		return ec._Collection(ctx, sel, &obj)
 	case *model.Collection:
@@ -9434,6 +9548,13 @@ func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.
 			return graphql.Null
 		}
 		return ec._Collection(ctx, sel, obj)
+	case model.ErrCollectionNotFound:
+		return ec._ErrCollectionNotFound(ctx, sel, &obj)
+	case *model.ErrCollectionNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCollectionNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -9554,6 +9675,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
+	case model.ErrNftNotFound:
+		return ec._ErrNftNotFound(ctx, sel, &obj)
+	case *model.ErrNftNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNftNotFound(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -9837,6 +9965,29 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._InvalidMedia(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _NftByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.NftByIDOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.Nft:
+		return ec._Nft(ctx, sel, &obj)
+	case *model.Nft:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Nft(ctx, sel, obj)
+	case model.ErrNftNotFound:
+		return ec._ErrNftNotFound(ctx, sel, &obj)
+	case *model.ErrNftNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNftNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -10680,6 +10831,37 @@ func (ec *executionContext) _ErrInvalidToken(ctx context.Context, sel ast.Select
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrInvalidToken_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errNftNotFoundImplementors = []string{"ErrNftNotFound", "NftByIdOrError", "Error"}
+
+func (ec *executionContext) _ErrNftNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNftNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errNftNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrNftNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrNftNotFound_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -11560,7 +11742,7 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
-var nftImplementors = []string{"Nft", "Node"}
+var nftImplementors = []string{"Nft", "Node", "NftByIdOrError"}
 
 func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj *model.Nft) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, nftImplementors)
@@ -11933,6 +12115,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_collectionById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "nftById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_nftById(ctx, field)
 				return res
 			}
 
@@ -13922,6 +14124,13 @@ func (ec *executionContext) marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgaller
 		return graphql.Null
 	}
 	return ec._Nft(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalONftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNftByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.NftByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._NftByIdOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalONode2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {
