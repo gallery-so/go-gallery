@@ -4,10 +4,11 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/lib/pq"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/lib/pq"
 
 	"github.com/segmentio/ksuid"
 )
@@ -69,6 +70,7 @@ type Repositories struct {
 	UserEventRepository       UserEventRepository
 	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
+	CommunityRepository       CommunityRepository
 }
 
 // GenerateID generates a application-wide unique ID
