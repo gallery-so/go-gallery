@@ -4,186 +4,26 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/asottile/dockerfile"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang-migrate/migrate/v4"
-	pgdriver "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/ory/dockertest"
-	"github.com/ory/dockertest/docker"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/suite"
-	"gopkg.in/yaml.v2"
 )
 
 type TestAddressFile struct {
 	Wallet1     string `json:"automated_test_wallet"`
 	PrivateKey1 string `json:"pk_automated_test_wallet"`
-}
-
-// N.B. This isn't the entire Docker Compose spec...
-type ComposeFile struct {
-	Version  string             `yaml:"version"`
-	Services map[string]Service `yaml:"services"`
-}
-
-type Service struct {
-	Image       string                 `yaml:"image"`
-	Ports       []string               `yaml:"ports"`
-	Build       map[string]interface{} `yaml:"build"`
-	Environment []string               `yaml:"environment"`
-	Command     string                 `yaml:"command"`
-}
-
-func configureContainerCleanup(config *docker.HostConfig) {
-	config.AutoRemove = true
-	config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-}
-
-func waitOnDB() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("db is not available")
-		}
-	}()
-	postgres.NewClient().Close()
-	return
-}
-
-func waitOnCache() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("cache is not available")
-		}
-	}()
-	redis.NewCache(0).Close(false)
-	return
-}
-
-func loadComposeFile(path string) (f ComposeFile) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = yaml.Unmarshal(data, &f)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return
-}
-
-func getImageAndVersion(s string) ([]string, error) {
-	imgAndVer := strings.Split(s, ":")
-	if len(imgAndVer) != 2 {
-		return nil, errors.New("no version specified for image")
-	}
-	return imgAndVer, nil
-}
-
-func getBuildImage(s Service) ([]string, error) {
-	res, err := dockerfile.ParseFile(".." + string(filepath.Separator) + s.Build["dockerfile"].(string))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, cmd := range res {
-		if cmd.Cmd == "FROM" {
-			return getImageAndVersion(cmd.Value[0])
-		}
-	}
-
-	return nil, errors.New("no `FROM` directive found in dockerfile")
-}
-
-func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB, *pgxpool.Pool) {
-	apps := loadComposeFile("../docker-compose.yml")
-	imgAndVer, err := getBuildImage(apps.Services["postgres"])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pg, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: imgAndVer[0],
-			Tag:        imgAndVer[1],
-			Env:        apps.Services["postgres"].Environment,
-		}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start postgres: %s", err)
-	}
-
-	// Patch environment to use container
-	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
-	viper.SetDefault("POSTGRES_HOST", hostAndPort[0])
-	viper.SetDefault("POSTGRES_PORT", hostAndPort[1])
-
-	if err = pool.Retry(waitOnDB); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
-	}
-
-	// Seed db
-	db = postgres.NewClient()
-	pgx = postgres.NewPgxClient()
-	d, err := pgdriver.WithInstance(db, &pgdriver.Config{})
-	if err != nil {
-		log.Fatalf("could not create pg driver: %s", err)
-	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://../db/migrations", "postgres", d)
-	if err != nil {
-		log.Fatalf("failed to create migration: %s", err)
-	}
-	m.Up()
-
-	return pg, db, pgx
-}
-
-func initRedis(pool *dockertest.Pool) *dockertest.Resource {
-	apps := loadComposeFile("../docker-compose.yml")
-	imgAndVer, err := getImageAndVersion(apps.Services["redis"].Image)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	rd, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: imgAndVer[0],
-			Tag:        imgAndVer[1],
-		}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start redis: %s", err)
-	}
-
-	// Patch environment to use container
-	viper.SetDefault("REDIS_URL", rd.GetHostPort("6379/tcp"))
-	if err = pool.Retry(waitOnCache); err != nil {
-		log.Fatalf("could not connect to redis: %s", err)
-	}
-
-	return rd
 }
 
 func loadWallet(f string) *TestWallet {

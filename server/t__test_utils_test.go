@@ -7,15 +7,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v4/pgxpool"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
+	migrate "github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -91,22 +94,6 @@ func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt str
 	return &TestUser{&wallet, id, jwt, username, c}
 }
 
-// Should be called at the beginning of every integration test
-// Initializes the runtime and starts a test server
-func initializeTestEnv(a *assert.Assertions, v int) *TestConfig {
-	setDefaults()
-
-	if db == nil {
-		db = postgres.NewClient()
-	}
-
-	if pgx == nil {
-		pgx = postgres.NewPgxClient()
-	}
-
-	return initializeTestServer(db, pgx, a, v)
-}
-
 func initializeTestServer(db *sql.DB, pgx *pgxpool.Pool, a *assert.Assertions, v int) *TestConfig {
 	router := CoreInit(db, pgx)
 	router.POST("/fake-cookie", fakeCookie)
@@ -129,6 +116,22 @@ func initializeTestServer(db *sql.DB, pgx *pgxpool.Pool, a *assert.Assertions, v
 	}
 }
 
+func teardown() {
+	log.Info("tearing down test suite...")
+	tc.server.Close()
+	clearDB()
+	tc.galleriesCache.Close(true)
+	tc.galleriesCacheToken.Close(true)
+}
+
+func clearDB() {
+	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
+	_, err := db.Exec(dropSQL)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func assertValidResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.Equal(http.StatusOK, resp.StatusCode, "Status should be 200")
 }
@@ -144,32 +147,30 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 	assert.NotEqual(http.StatusOK, resp.StatusCode, "Status should not be 200")
 }
 
-func setupTest(t *testing.T, v int) *assert.Assertions {
+func setupDoubles(t *testing.T) {
 	setDefaults()
 
-	a := assert.New(t)
+	pg := docker.InitPostgres("../docker-compose.yml")
+	rd := docker.InitRedis("../docker-compose.yml")
 
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-
-	pg, pgClient := initPostgres(pool)
-	rd := initRedis(pool)
-
-	tc = initializeTestServer(pgClient, a, v)
+	db = postgres.NewClient()
+	migrate.RunMigration("../db/migrations", db)
 
 	t.Cleanup(func() {
 		for _, r := range []*dockertest.Resource{pg, rd} {
-			if err := pool.Purge(r); err != nil {
+			if err := r.Close(); err != nil {
 				log.Fatalf("could not purge resource: %s", err)
 			}
 		}
-
-		tc.server.Close()
 	})
+}
 
-	return assert.New(t)
+func setupTest(t *testing.T, v int) *assert.Assertions {
+	// cpy := *t
+	a := assert.New(t)
+	tc = initializeTestServer(postgres.NewClient(), a, v)
+	t.Cleanup(teardown)
+	return a
 }
 
 type fakeCookieInput struct {

@@ -8,59 +8,59 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateQueue(t *testing.T) {
-	assert := assert.New(t)
-	viper.Set("REDIS_URL", "localhost:6379")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func TestTasks(t *testing.T) {
 
-	redisCache := redis.NewCache(5)
+	t.Run("can update queue", func(t *testing.T) {
+		assert := setupTest(t)
 
-	nft := persist.NFT{
-		CollectorsNote: "bob",
-		Description:    "test",
-	}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-	asJSON, err := json.Marshal(nft)
-	assert.Nil(err)
+		redisCache := redis.NewCache(5)
 
-	redisCache.Set(ctx, "test", asJSON, time.Hour)
+		nft := persist.NFT{
+			CollectorsNote: "bob",
+			Description:    "test",
+		}
 
-	bs, err := redisCache.Get(ctx, "test")
-	assert.Nil(err)
+		asJSON, err := json.Marshal(nft)
+		assert.Nil(err)
 
-	result := persist.NFT{}
-	err = json.Unmarshal([]byte(bs), &result)
-	assert.Nil(err)
-	assert.Equal(nft.CollectorsNote.String(), result.CollectorsNote.String())
+		redisCache.Set(ctx, "test", asJSON, time.Hour)
 
-	uq := NewUpdateQueue(redisCache)
+		bs, err := redisCache.Get(ctx, "test")
+		assert.Nil(err)
 
-	result.Description = "updated"
+		result := persist.NFT{}
+		err = json.Unmarshal([]byte(bs), &result)
+		assert.Nil(err)
+		assert.Equal(nft.CollectorsNote.String(), result.CollectorsNote.String())
 
-	asJSON, err = json.Marshal(result)
-	assert.Nil(err)
-	uq.QueueUpdate("test", asJSON, -1)
+		uq := NewUpdateQueue(redisCache)
 
-	result.Description = "updated2"
-	next, err := json.Marshal(result)
-	assert.Nil(err)
-	uq.QueueUpdate("test", next, -1)
+		result.Description = "updated"
 
-	time.Sleep(time.Second * 3)
+		asJSON, err = json.Marshal(result)
+		assert.Nil(err)
+		uq.QueueUpdate("test", asJSON, -1)
 
-	uq.Stop()
+		result.Description = "updated2"
+		next, err := json.Marshal(result)
+		assert.Nil(err)
+		uq.QueueUpdate("test", next, -1)
 
-	bs, err = redisCache.Get(ctx, "test")
-	assert.Nil(err)
+		time.Sleep(time.Second * 3)
 
-	result = persist.NFT{}
-	err = json.Unmarshal([]byte(bs), &result)
-	assert.Nil(err)
-	assert.Equal(result.Description.String(), "updated2")
+		uq.Stop()
 
+		bs, err = redisCache.Get(ctx, "test")
+		assert.Nil(err)
+
+		result = persist.NFT{}
+		err = json.Unmarshal([]byte(bs), &result)
+		assert.Nil(err)
+		assert.Equal(result.Description.String(), "updated2")
+	})
 }

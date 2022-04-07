@@ -13,172 +13,176 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetTokenByID_Success(t *testing.T) {
-	assert := setupTest(t, 2)
+func TestTokenRoutes(t *testing.T) {
 
-	// seed DB with nft
-	name := "very cool nft"
-	nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
-		Name:           persist.NullString(name),
-		CollectorsNote: "this is a bad note",
-		OwnerAddress:   tc.user1.address,
+	setupDoubles(t)
+
+	t.Run("get token by ID", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		// seed DB with nft
+		name := "very cool nft"
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+			Name:           persist.NullString(name),
+			CollectorsNote: "this is a bad note",
+			OwnerAddress:   tc.user1.address,
+		})
+		assert.Nil(err)
+
+		resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
+
+		type NftGetByIDResponse struct {
+			Nft   persist.Token `json:"nft"`
+			Error string        `json:"error"`
+		}
+		body := &NftGetByIDResponse{}
+		util.UnmarshallBody(body, resp.Body)
+		assert.Empty(body.Error)
+		assert.Equal(name, body.Nft.Name.String())
 	})
-	assert.Nil(err)
 
-	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
+	t.Run("get token with no ID errors", func(t *testing.T) {
+		assert := setupTest(t, 2)
 
-	type NftGetByIDResponse struct {
-		Nft   persist.Token `json:"nft"`
-		Error string        `json:"error"`
-	}
-	body := &NftGetByIDResponse{}
-	util.UnmarshallBody(body, resp.Body)
-	assert.Empty(body.Error)
-	assert.Equal(name, body.Nft.Name.String())
-}
+		resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
+		assert.Nil(err)
+		assertErrorResponse(assert, resp)
 
-func TestGetTokenByID_NoParamError(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	resp, err := http.Get(fmt.Sprintf("%s/nfts/get", tc.serverURL))
-	assert.Nil(err)
-	assertErrorResponse(assert, resp)
-
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotEmpty(body.Error)
-}
-
-func TestGetTokenByID_NotFoundError(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	nonexistentNftID := "12345"
-
-	resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nonexistentNftID))
-	assert.Nil(err)
-	assertErrorResponse(assert, resp)
-
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotEmpty(fmt.Sprintf("token not found by ID:: %s", nonexistentNftID), body.Error)
-}
-
-func TestRefreshMetadata_Success(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	// seed DB with nft
-	name := "very cool nft"
-	token := persist.Token{
-		Name:            persist.NullString(name),
-		CollectorsNote:  "this is a bad note",
-		OwnerAddress:    tc.user1.address,
-		ContractAddress: "0xb74bf94049d2c01f8805b8b15db0909168cabf46",
-		TokenID:         "2ad",
-		TokenURI:        "https://bad-uri.com",
-	}
-	_, err := tc.repos.TokenRepository.Create(context.Background(), token)
-	assert.Nil(err)
-
-	resp, err := http.Get(fmt.Sprintf("%s/nfts/metadata/refresh?token_id=%s&contract_address=%s", tc.serverURL, token.TokenID, token.ContractAddress))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
-
-	type RefreshResponse struct {
-		Nft   persist.Token `json:"token"`
-		Error string        `json:"error"`
-	}
-	body := &RefreshResponse{}
-	util.UnmarshallBody(body, resp.Body)
-	assert.Empty(body.Error)
-	assert.Equal(name, body.Nft.Name.String())
-	assert.NotEqual(token.TokenURI, body.Nft.TokenURI)
-}
-
-func TestUpdateTokenByID_Success(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	// seed DB with nft
-	nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
-		Name:           "very cool nft",
-		CollectorsNote: "silly note",
-		OwnerAddress:   tc.user1.address,
+		body := util.ErrorResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotEmpty(body.Error)
 	})
-	assert.Nil(err)
 
-	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
-	assertValidResponse(assert, resp)
+	t.Run("get non-existent token errors", func(t *testing.T) {
+		assert := setupTest(t, 2)
 
-	errResp := util.ErrorResponse{}
-	assert.NoError(util.UnmarshallBody(&errResp, resp.Body))
-	assert.Empty(errResp.Error)
+		nonexistentNftID := "12345"
 
-	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
+		resp, err := http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nonexistentNftID))
+		assert.Nil(err)
+		assertErrorResponse(assert, resp)
 
-	// ensure nft was updated
-	body := &getTokenOutput{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Equal("new nft note", body.Nft.CollectorsNote.String())
-}
-
-func TestUpdateTokenByID_UnauthedError(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	// seed DB with nft
-	nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
-		Name:           "very cool nft",
-		CollectorsNote: "this is a bad note",
-		OwnerAddress:   tc.user1.address,
+		body := util.ErrorResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotEmpty(fmt.Sprintf("token not found by ID:: %s", nonexistentNftID), body.Error)
 	})
-	assert.Nil(err)
 
-	update := updateTokenByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
-	resp := updateTokenUnauthedRequest(assert, update)
-	assertErrorResponse(assert, resp)
+	t.Run("referesh metadata", func(t *testing.T) {
+		assert := setupTest(t, 2)
 
-	assert.Equal(resp.StatusCode, http.StatusUnauthorized)
-}
+		// seed DB with nft
+		name := "very cool nft"
+		token := persist.Token{
+			Name:            persist.NullString(name),
+			CollectorsNote:  "this is a bad note",
+			OwnerAddress:    tc.user1.address,
+			ContractAddress: "0xb74bf94049d2c01f8805b8b15db0909168cabf46",
+			TokenID:         "2ad",
+			TokenURI:        "https://bad-uri.com",
+		}
+		_, err := tc.repos.TokenRepository.Create(context.Background(), token)
+		assert.Nil(err)
 
-func TestUpdateTokenByID_NoIDFieldError(t *testing.T) {
-	assert := setupTest(t, 2)
+		resp, err := http.Get(fmt.Sprintf("%s/nfts/metadata/refresh?token_id=%s&contract_address=%s", tc.serverURL, token.TokenID, token.ContractAddress))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
 
-	resp := updateTokenRequest(assert, "", "new nft note", tc.user1)
-	assertErrorResponse(assert, resp)
-
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotEmpty(body.Error)
-}
-
-func TestUpdateTokenByID_NotFoundError(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	nftID := persist.DBID("no exist :(")
-
-	resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
-	assertErrorResponse(assert, resp)
-
-	body := util.ErrorResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotEmpty(body.Error)
-}
-
-func TestUpdateTokenByID_UpdatingAsUserWithoutToken_CantDo(t *testing.T) {
-	assert := setupTest(t, 2)
-
-	// seed DB with nft
-	nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
-		Name: "very cool nft",
+		type RefreshResponse struct {
+			Nft   persist.Token `json:"token"`
+			Error string        `json:"error"`
+		}
+		body := &RefreshResponse{}
+		util.UnmarshallBody(body, resp.Body)
+		assert.Empty(body.Error)
+		assert.Equal(name, body.Nft.Name.String())
+		assert.NotEqual(token.TokenURI, body.Nft.TokenURI)
 	})
-	assert.Nil(err)
 
-	resp := updateTokenRequest(assert, nftID, "new nft name", tc.user2)
-	assertErrorResponse(assert, resp)
+	t.Run("update token by ID", func(t *testing.T) {
+		assert := setupTest(t, 2)
 
+		// seed DB with nft
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+			Name:           "very cool nft",
+			CollectorsNote: "silly note",
+			OwnerAddress:   tc.user1.address,
+		})
+		assert.Nil(err)
+
+		resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
+		assertValidResponse(assert, resp)
+
+		errResp := util.ErrorResponse{}
+		assert.NoError(util.UnmarshallBody(&errResp, resp.Body))
+		assert.Empty(errResp.Error)
+
+		// retrieve updated nft
+		resp, err = http.Get(fmt.Sprintf("%s/nfts/get?id=%s", tc.serverURL, nftID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
+
+		// ensure nft was updated
+		body := &getTokenOutput{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Equal("new nft note", body.Nft.CollectorsNote.String())
+	})
+
+	t.Run("update token by ID fails when unauthenticated", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		// seed DB with nft
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+			Name:           "very cool nft",
+			CollectorsNote: "this is a bad note",
+			OwnerAddress:   tc.user1.address,
+		})
+		assert.Nil(err)
+
+		update := updateTokenByIDInput{CollectorsNote: "new nft note thats much better", ID: nftID}
+		resp := updateTokenUnauthedRequest(assert, update)
+		assertErrorResponse(assert, resp)
+
+		assert.Equal(resp.StatusCode, http.StatusUnauthorized)
+	})
+
+	t.Run("update token by ID fails when no ID provided", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		resp := updateTokenRequest(assert, "", "new nft note", tc.user1)
+		assertErrorResponse(assert, resp)
+
+		body := util.ErrorResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotEmpty(body.Error)
+	})
+
+	t.Run("update token fails when not found", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		nftID := persist.DBID("no exist :(")
+
+		resp := updateTokenRequest(assert, nftID, "new nft note", tc.user1)
+		assertErrorResponse(assert, resp)
+
+		body := util.ErrorResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotEmpty(body.Error)
+	})
+
+	t.Run("update token fails when user does not own NFT", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		// seed DB with nft
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+			Name: "very cool nft",
+		})
+		assert.Nil(err)
+
+		resp := updateTokenRequest(assert, nftID, "new nft name", tc.user2)
+		assertErrorResponse(assert, resp)
+	})
 }
 
 func updateTokenUnauthedRequest(assert *assert.Assertions, update updateTokenByIDInput) *http.Response {
