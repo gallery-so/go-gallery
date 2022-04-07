@@ -166,9 +166,8 @@ func setupDoubles(t *testing.T) {
 }
 
 func setupTest(t *testing.T, v int) *assert.Assertions {
-	// cpy := *t
 	a := assert.New(t)
-	tc = initializeTestServer(postgres.NewClient(), a, v)
+	tc = initializeTestServer(postgres.NewClient(), pgx, a, v)
 	t.Cleanup(teardown)
 	return a
 }

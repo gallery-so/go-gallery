@@ -27,21 +27,6 @@ func NewCache(db int) *Cache {
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic(err)
 	}
-	// var err error
-	// for i := 1; i < 5; i++ {
-	// 	err := client.Ping(ctx).Err()
-
-	// 	if err == nil {
-	// 		break
-	// 	}
-
-	// 	time.Sleep(5 * time.Second)
-	// }
-
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	return &Cache{client: client}
 }
 
