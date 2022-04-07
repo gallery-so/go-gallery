@@ -114,10 +114,11 @@ func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *Integrat
 	rd := docker.InitRedis("../docker-compose.yml")
 
 	pgClient := postgres.NewClient()
+	pgxClient := postgres.NewPgxClient()
 	migrate.RunMigration("../db/migrations", pgClient)
 
 	return &IntegrationTestConfig{
-		TestConfig:    initializeTestServer(pgClient, a, version),
+		TestConfig:    initializeTestServer(pgClient, pgxClient, a, version),
 		pgResource:    pg,
 		redisResource: rd,
 		db:            pgClient,
