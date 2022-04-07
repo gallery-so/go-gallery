@@ -28,6 +28,9 @@ const defaultWaitTime = 2 * time.Millisecond
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
+
+	// Every entry here must have a corresponding entry in the Clear___Caches methods below
+
 	UserByUserId             UserLoaderByID
 	UserByUsername           UserLoaderByString
 	UserByAddress            UserLoaderByAddress
@@ -118,6 +121,74 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 	}
 
 	return loaders
+}
+
+// These are pretty verbose and repetitive; hopefully generics make this cleaner in the future
+
+func (l *Loaders) ClearAllCaches() {
+	l.ClearUserCaches()
+	l.ClearGalleryCaches()
+	l.ClearCollectionCaches()
+	l.ClearNftCaches()
+	l.ClearMembershipCaches()
+}
+
+func (l *Loaders) ClearUserCaches() {
+	l.UserByUserId.mu.Lock()
+	l.UserByUserId.cache = nil
+	l.UserByUserId.mu.Unlock()
+
+	l.UserByAddress.mu.Lock()
+	l.UserByAddress.cache = nil
+	l.UserByAddress.mu.Unlock()
+
+	l.UserByUsername.mu.Lock()
+	l.UserByUsername.cache = nil
+	l.UserByUsername.mu.Unlock()
+}
+
+func (l *Loaders) ClearGalleryCaches() {
+	l.GalleryByGalleryId.mu.Lock()
+	l.GalleryByGalleryId.cache = nil
+	l.GalleryByGalleryId.mu.Unlock()
+
+	l.GalleryByCollectionId.mu.Lock()
+	l.GalleryByCollectionId.cache = nil
+	l.GalleryByCollectionId.mu.Unlock()
+
+	l.GalleriesByUserId.mu.Lock()
+	l.GalleriesByUserId.cache = nil
+	l.GalleriesByUserId.mu.Unlock()
+}
+
+func (l *Loaders) ClearCollectionCaches() {
+	l.CollectionByCollectionId.mu.Lock()
+	l.CollectionByCollectionId.cache = nil
+	l.CollectionByCollectionId.mu.Unlock()
+
+	l.CollectionsByGalleryId.mu.Lock()
+	l.CollectionsByGalleryId.cache = nil
+	l.CollectionsByGalleryId.mu.Unlock()
+}
+
+func (l *Loaders) ClearNftCaches() {
+	l.NftByNftId.mu.Lock()
+	l.NftByNftId.cache = nil
+	l.NftByNftId.mu.Unlock()
+
+	l.NftsByOwnerAddress.mu.Lock()
+	l.NftsByOwnerAddress.cache = nil
+	l.NftsByOwnerAddress.mu.Unlock()
+
+	l.NftsByCollectionId.mu.Lock()
+	l.NftsByCollectionId.cache = nil
+	l.NftsByCollectionId.mu.Unlock()
+}
+
+func (l *Loaders) ClearMembershipCaches() {
+	l.MembershipByMembershipId.mu.Lock()
+	l.MembershipByMembershipId.cache = nil
+	l.MembershipByMembershipId.mu.Unlock()
 }
 
 func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {

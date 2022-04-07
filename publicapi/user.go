@@ -92,7 +92,13 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, 
 		return err
 	}
 
-	return user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
+	err = user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+	return nil
 }
 
 func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) error {
@@ -108,7 +114,13 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.
 		return err
 	}
 
-	return user.RemoveAddressesFromUser(ctx, userID, addresses, api.repos.UserRepository)
+	err = user.RemoveAddressesFromUser(ctx, userID, addresses, api.repos.UserRepository)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+	return nil
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
@@ -128,11 +140,18 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		return err
 	}
 
+	err = user.UpdateUser(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
 	// Send event
 	userData := persist.UserEvent{Username: username, Bio: persist.NullString(bio)}
 	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
 
-	return user.UpdateUser(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	return nil
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
