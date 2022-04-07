@@ -10,7 +10,7 @@ type Community struct {
 	CreatorAddress  Address
 	Name            NullString `json:"name"`
 	Description     NullString `json:"description"`
-	ProfileImageURL NullString `json:"profile_image_url"`
+	PreviewImage    NullString `json:"preview_image"`
 
 	Owners []CommunityOwner `json:"owners"`
 }

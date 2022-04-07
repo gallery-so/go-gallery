@@ -74,7 +74,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 	seen := map[persist.Address]bool{}
 	for rows.Next() {
 		var address persist.Address
-		err = rows.Scan(&address, &contract, &community.Name, &community.CreatorAddress, &community.ProfileImageURL)
+		err = rows.Scan(&address, &contract, &community.Name, &community.CreatorAddress, &community.PreviewImage)
 		if err != nil {
 			return persist.Community{}, fmt.Errorf("error scanning community info: %w", err)
 		}
@@ -92,7 +92,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 	community.Description = contract.ContractDescription
 
 	if contract.ContractImage.String() != "" {
-		community.ProfileImageURL = contract.ContractImage
+		community.PreviewImage = contract.ContractImage
 	}
 	if community.Name.String() == "" {
 		community.Name = contract.ContractName

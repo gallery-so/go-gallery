@@ -90,8 +90,8 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 			hasDescription = false
 		}
 
-		if media.ThumbnailURL != "" && community.ProfileImageURL == "" {
-			community.ProfileImageURL = media.ThumbnailURL
+		if media.ThumbnailURL != "" && community.PreviewImage == "" {
+			community.PreviewImage = media.ThumbnailURL
 		}
 
 		if !seen[address] {
