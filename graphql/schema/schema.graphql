@@ -69,6 +69,7 @@ union MediaSubtype =
   | TextMedia
   | HtmlMedia
   | JsonMedia
+  | GltfMedia
   | UnknownMedia
   | InvalidMedia
 
@@ -149,6 +150,14 @@ type HtmlMedia implements Media {
 }
 
 type JsonMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
+}
+
+type GltfMedia implements Media {
   previewURLs: PreviewURLSet
   mediaURL: String
   mediaType: String

@@ -299,6 +299,16 @@ func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
+type GltfMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (GltfMedia) IsMediaSubtype() {}
+func (GltfMedia) IsMedia()        {}
+
 type GnosisSafeAuth struct {
 	Address persist.Address `json:"address"`
 	Nonce   string          `json:"nonce"`

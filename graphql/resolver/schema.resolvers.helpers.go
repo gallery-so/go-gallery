@@ -430,7 +430,8 @@ func getMediaForNft(nft sqlc.Nft) model.MediaSubtype {
 	case "html":
 		return getHtmlMedia(nft)
 	case "glb":
-		return getUnknownMedia(nft)
+	case "gltf":
+		return getGltfMedia(nft)
 	}
 	// Note: default in v1 frontend mapping was "animation"
 	return getUnknownMedia(nft)
@@ -517,6 +518,15 @@ func getHtmlMedia(nft sqlc.Nft) model.HTMLMedia {
 
 func getJsonMedia(nft sqlc.Nft) model.JSONMedia {
 	return model.JSONMedia{
+		PreviewURLs:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
+		MediaType:        nil,
+		ContentRenderURL: &nft.AnimationUrl.String,
+	}
+}
+
+func getGltfMedia(nft sqlc.Nft) model.GltfMedia {
+	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
