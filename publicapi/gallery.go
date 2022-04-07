@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -15,10 +15,58 @@ const maxCollectionsPerGallery = 1000
 
 type GalleryAPI struct {
 	repos     *persist.Repositories
+	queries   *sqlc.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
-	pubsub    pubsub.PubSub
+}
+
+func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*sqlc.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryId.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gallery, nil
+}
+
+func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID persist.DBID) (*sqlc.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	gallery, err := api.loaders.GalleryByCollectionId.Load(collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gallery, nil
+}
+
+func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	galleries, err := api.loaders.GalleriesByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return galleries, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {

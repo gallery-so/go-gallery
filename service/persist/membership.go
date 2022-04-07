@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"github.com/lib/pq"
 )
 
 // MembershipTier represents the membership tier of a user
@@ -25,6 +26,17 @@ type MembershipOwner struct {
 	Address     Address      `json:"address"`
 	Username    NullString   `json:"username"`
 	PreviewNFTs []NullString `json:"preview_nfts"`
+}
+
+// MembershipOwnerList is a slice of MembershipOwners, used to implement scanner/valuer interfaces
+type MembershipOwnerList []MembershipOwner
+
+func (l MembershipOwnerList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+func (l *MembershipOwnerList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
 }
 
 // MembershipRepository represents the interface for interacting with the persisted state of users
@@ -53,6 +65,11 @@ type ErrMembershipNotFoundByTokenID struct {
 	TokenID TokenID
 }
 
+// ErrMembershipNotFoundByID represents an error when a membership is not found by its id
+type ErrMembershipNotFoundByID struct {
+	ID DBID
+}
+
 // ErrMembershipNotFoundByName represents an error when a membership is not found by name
 type ErrMembershipNotFoundByName struct {
 	Name string
@@ -64,4 +81,8 @@ func (e ErrMembershipNotFoundByName) Error() string {
 
 func (e ErrMembershipNotFoundByTokenID) Error() string {
 	return "membership not found by token id: " + e.TokenID.String()
+}
+
+func (e ErrMembershipNotFoundByID) Error() string {
+	return "membership not found by id: " + e.ID.String()
 }

@@ -28,6 +28,8 @@ require (
 	github.com/hamba/avro v1.6.6 // indirect
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/go-ipfs-files v0.1.1 // indirect
+	github.com/jackc/pgconn v1.11.0
+	github.com/jackc/pgtype v1.10.0
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/lib/pq v1.10.4
 	github.com/libp2p/go-libp2p-core v0.14.0 // indirect

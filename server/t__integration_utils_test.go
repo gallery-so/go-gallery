@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -115,7 +116,7 @@ func getBuildImage(s Service) ([]string, error) {
 	return nil, errors.New("no `FROM` directive found in dockerfile")
 }
 
-func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
+func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB, *pgxpool.Pool) {
 	apps := loadComposeFile("../docker-compose.yml")
 	imgAndVer, err := getBuildImage(apps.Services["postgres"])
 	if err != nil {
@@ -144,6 +145,7 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 
 	// Seed db
 	db = postgres.NewClient()
+	pgx = postgres.NewPgxClient()
 	d, err := pgdriver.WithInstance(db, &pgdriver.Config{})
 	if err != nil {
 		log.Fatalf("could not create pg driver: %s", err)
@@ -155,7 +157,7 @@ func initPostgres(pool *dockertest.Pool) (*dockertest.Resource, *sql.DB) {
 	}
 	m.Up()
 
-	return pg, db
+	return pg, db, pgx
 }
 
 func initRedis(pool *dockertest.Pool) *dockertest.Resource {

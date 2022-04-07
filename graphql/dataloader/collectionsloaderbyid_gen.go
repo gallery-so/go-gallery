@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // CollectionsLoaderByIDConfig captures the config to create a new CollectionsLoaderByID
 type CollectionsLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([][]persist.Collection, []error)
+	Fetch func(keys []persist.DBID) ([][]sqlc.Collection, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +34,7 @@ func NewCollectionsLoaderByID(config CollectionsLoaderByIDConfig) *CollectionsLo
 // CollectionsLoaderByID batches and caches requests
 type CollectionsLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([][]persist.Collection, []error)
+	fetch func(keys []persist.DBID) ([][]sqlc.Collection, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +45,7 @@ type CollectionsLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID][]persist.Collection
+	cache map[persist.DBID][]sqlc.Collection
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,25 +57,25 @@ type CollectionsLoaderByID struct {
 
 type collectionsLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    [][]persist.Collection
+	data    [][]sqlc.Collection
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Collection by key, batching and caching will be applied automatically
-func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]persist.Collection, error) {
+func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]sqlc.Collection, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Collection.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Collection, error) {
+func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.Collection, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]persist.Collection, error) {
+		return func() ([]sqlc.Collection, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +86,10 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Co
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]persist.Collection, error) {
+	return func() ([]sqlc.Collection, error) {
 		<-batch.done
 
-		var data []persist.Collection
+		var data []sqlc.Collection
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +114,14 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]persist.Co
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.Collection, []error) {
-	results := make([]func() ([]persist.Collection, error), len(keys))
+func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.Collection, []error) {
+	results := make([]func() ([]sqlc.Collection, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	collections := make([][]persist.Collection, len(keys))
+	collections := make([][]sqlc.Collection, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		collections[i], errors[i] = thunk()
@@ -131,13 +132,13 @@ func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]persist.Collec
 // LoadAllThunk returns a function that when called will block waiting for a Collections.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]persist.Collection, []error) {
-	results := make([]func() ([]persist.Collection, error), len(keys))
+func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Collection, []error) {
+	results := make([]func() ([]sqlc.Collection, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]persist.Collection, []error) {
-		collections := make([][]persist.Collection, len(keys))
+	return func() ([][]sqlc.Collection, []error) {
+		collections := make([][]sqlc.Collection, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			collections[i], errors[i] = thunk()
@@ -149,13 +150,13 @@ func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]pe
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []persist.Collection) bool {
+func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []sqlc.Collection) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]persist.Collection, len(value))
+		cpy := make([]sqlc.Collection, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -170,9 +171,9 @@ func (l *CollectionsLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []persist.Collection) {
+func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []sqlc.Collection) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID][]persist.Collection{}
+		l.cache = map[persist.DBID][]sqlc.Collection{}
 	}
 	l.cache[key] = value
 }

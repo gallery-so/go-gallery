@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/lib/pq"
 	"strings"
 	"time"
 	"unicode"
@@ -20,6 +21,18 @@ var cleanString = func(r rune) rune {
 
 // DBID represents a database ID
 type DBID string
+
+// DBIDList is a slice of DBIDs, used to implement scanner/valuer interfaces
+type DBIDList []DBID
+
+func (l DBIDList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+// Scan implements the Scanner interface for the DBIDList type
+func (l *DBIDList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
+}
 
 // CreationTime represents the time a record was created
 type CreationTime time.Time

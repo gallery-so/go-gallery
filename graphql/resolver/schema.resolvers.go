@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -18,30 +17,31 @@ import (
 )
 
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(obj.Dbid)
+	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserByUserID(ctx, r.Resolver, gallery.OwnerUserID)
+	return resolveGalleryUserByUserID(ctx, gallery.OwnerUserID)
 }
 
 func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) ([]*model.GalleryCollection, error) {
-	return resolveGalleryCollectionsByGalleryID(ctx, r.Resolver, obj.Dbid)
+	return resolveGalleryCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
 func (r *galleryCollectionResolver) Gallery(ctx context.Context, obj *model.GalleryCollection) (*model.Gallery, error) {
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(obj.Dbid)
+	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return galleryToModel(gallery), nil
+	return galleryToModel(ctx, *gallery), nil
 }
 
 func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.GalleryCollection) ([]*model.GalleryNft, error) {
-	nfts, err := dataloader.For(ctx).NftsByCollectionId.Load(obj.Dbid)
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -49,26 +49,13 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 
 	output := make([]*model.GalleryNft, len(nfts))
 	for i, nft := range nfts {
-
-		// TODO: For resolvers, I don't think we want to use existing SQL queries that recursively fill out an entire
-		// Gallery -> Collection -> NFT hierarchy for us. Rather, I think we want to do DB calls as necessary based on
-		// what the client asks for. But for now, I'm using the existing SQL stuff to create these GalleryNft objects.
-		// Also worth noting: we should get rid of persist.CollectionNFT, which is a struct with a subset of NFT fields
-		// that reads from the same NFT database but just grabs less data. With GraphQL, clients will select the data
-		// they want.
-
-		if err == nil {
-			nftModel := nftToModel(ctx, r.Resolver, nft)
-			galleryNft := &model.GalleryNft{
-				HelperGalleryNftData: model.HelperGalleryNftData{
-					NftId:        nft.ID,
-					CollectionId: obj.Dbid,
-				},
-				Nft:        &nftModel,
-				Collection: obj,
-			}
-
-			output[i] = galleryNft
+		output[i] = &model.GalleryNft{
+			HelperGalleryNftData: model.HelperGalleryNftData{
+				NftId:        nft.ID,
+				CollectionId: obj.Dbid,
+			},
+			Nft:        nftToModel(ctx, nft),
+			Collection: obj,
 		}
 	}
 
@@ -76,11 +63,11 @@ func (r *galleryCollectionResolver) Nfts(ctx context.Context, obj *model.Gallery
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
-	return resolveGalleriesByUserID(ctx, r.Resolver, obj.Dbid)
+	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
 func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, r.Resolver, obj.Dbid)
+	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
@@ -110,13 +97,13 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 	api := publicapi.For(ctx)
 
 	// Make sure the collection exists before trying to delete it
-	_, err := dataloader.For(ctx).CollectionByCollectionId.Load(collectionID)
+	_, err := api.Collection.GetCollectionById(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the collection's parent gallery before deleting the collection
-	gallery, err := dataloader.For(ctx).GalleryByCollectionId.Load(collectionID)
+	gallery, err := api.Gallery.GetGalleryByCollectionId(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +116,7 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 	// Deleting a collection marks the collection as "deleted" but doesn't alter the gallery,
 	// so we don't need to refetch the gallery before returning it here
 	output := &model.DeleteCollectionPayload{
-		Gallery: galleryToModel(gallery),
+		Gallery: galleryToModel(ctx, *gallery),
 	}
 
 	return output, nil
@@ -144,14 +131,14 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 		return nil, err
 	}
 
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: field collection
 	output := &model.UpdateCollectionInfoPayload{
-		Collection: collectionToModel(ctx, collection),
+		Collection: collectionToModel(ctx, *collection),
 	}
 
 	return output, nil
@@ -170,14 +157,14 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 		return nil, err
 	}
 
-	collection, err := dataloader.For(ctx).CollectionByCollectionId.Load(input.CollectionID)
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateCollectionNftsPayload{
-		Collection: collectionToModel(ctx, collection),
+		Collection: collectionToModel(ctx, *collection),
 	}
 
 	return output, nil
@@ -191,14 +178,14 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 		return nil, err
 	}
 
-	gallery, err := dataloader.For(ctx).GalleryByGalleryId.Load(input.GalleryID)
+	gallery, err := api.Gallery.GetGalleryById(ctx, input.GalleryID)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Field collection
 	output := &model.UpdateGalleryCollectionsPayload{
-		Gallery: galleryToModel(gallery),
+		Gallery: galleryToModel(ctx, *gallery),
 	}
 
 	return output, nil
@@ -311,11 +298,15 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftId(ctx, r.Resolver, obj.Dbid)
+	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error) {
 	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *queryResolver) Node(ctx context.Context, id model.GqlID) (model.Node, error) {
+	return nodeFetcher.GetNodeByGqlID(ctx, id)
 }
 
 func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error) {
@@ -323,13 +314,7 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 }
 
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error) {
-	user, err := resolveGalleryUserByUsername(ctx, r.Resolver, username)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return resolveGalleryUserByUsername(ctx, username)
 }
 
 func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error) {
@@ -347,36 +332,27 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 
 	output := make([]*model.MembershipTier, len(tiers))
 	for i, tier := range tiers {
-		tierModel := membershipTierToModel(ctx, tier)
-		output[i] = &tierModel
+		output[i] = persistMembershipTierToModel(ctx, tier)
 	}
 
 	return output, nil
 }
 
 func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
-	api := publicapi.For(ctx)
-
-	collection, err := api.Collection.GetCollection(ctx, id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return collectionToModel(ctx, *collection), nil
+	return resolveGalleryCollectionByCollectionID(ctx, id)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)
-	return resolveGalleryUserByUserID(ctx, r.Resolver, userID)
+	return resolveGalleryUserByUserID(ctx, userID)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)
 
-	galleries, err := resolveGalleriesByUserID(ctx, r.Resolver, userID)
+	galleries, err := resolveGalleriesByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -393,7 +369,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
-	nfts, err := dataloader.For(ctx).NftsByAddress.Load(*obj.Address)
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByOwnerAddress(ctx, *obj.Address)
 
 	if err != nil {
 		return nil, err
@@ -401,8 +377,7 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.
 
 	output := make([]*model.Nft, len(nfts))
 	for i, nft := range nfts {
-		nftModel := nftToModel(ctx, r.Resolver, nft)
-		output[i] = &nftModel
+		output[i] = nftToModel(ctx, nft)
 	}
 
 	return output, nil

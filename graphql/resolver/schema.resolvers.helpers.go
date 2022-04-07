@@ -7,7 +7,7 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -19,6 +19,23 @@ import (
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
+
+var nodeFetcher = model.NodeFetcher{
+	OnGallery:           resolveGalleryByGalleryID,
+	OnGalleryCollection: resolveGalleryCollectionByCollectionID,
+	OnGalleryUser:       resolveGalleryUserByUserID,
+	OnMembershipTier:    resolveMembershipTierByMembershipId,
+	OnNft:               resolveNftByNftID,
+	OnWallet:            resolveWalletByAddress,
+
+	OnGalleryNft: func(ctx context.Context, nftId string, collectionId string) (*model.GalleryNft, error) {
+		return resolveGalleryNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	},
+}
+
+func init() {
+	nodeFetcher.ValidateHandlers()
+}
 
 // errorToGraphqlType converts a golang error to its matching type from our GraphQL schema.
 // If no matching type is found, ok will return false
@@ -82,38 +99,38 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 	return nil, errNoAuthMechanismFound
 }
 
-func resolveGalleryUserByUserID(ctx context.Context, r *Resolver, userID persist.DBID) (*model.GalleryUser, error) {
-	user, err := dataloader.For(ctx).UserByUserId.Load(userID)
+func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByUsername(ctx context.Context, r *Resolver, username string) (*model.GalleryUser, error) {
-	user, err := dataloader.For(ctx).UserByUsername.Load(username)
+func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, r *Resolver, address persist.Address) (*model.GalleryUser, error) {
-	user, err := dataloader.For(ctx).UserByAddress.Load(address)
+func resolveGalleryUserByAddress(ctx context.Context, address persist.Address) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, r, user)
+	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.DBID) ([]*model.Gallery, error) {
-	galleries, err := dataloader.For(ctx).GalleriesByUserId.Load(userID)
+func resolveGalleriesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Gallery, error) {
+	galleries, err := publicapi.For(ctx).Gallery.GetGalleriesByUserId(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -121,142 +138,282 @@ func resolveGalleriesByUserID(ctx context.Context, r *Resolver, userID persist.D
 
 	var output = make([]*model.Gallery, len(galleries))
 	for i, gallery := range galleries {
-		output[i] = galleryToModel(gallery)
+		output[i] = galleryToModel(ctx, gallery)
 	}
 
 	return output, nil
 }
 
-func resolveGalleryCollectionsByGalleryID(ctx context.Context, r *Resolver, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
-	collections, err := dataloader.For(ctx).CollectionsByGalleryId.Load(galleryID)
+func resolveGalleryCollectionByCollectionID(ctx context.Context, collectionID persist.DBID) (*model.GalleryCollection, error) {
+	collection, err := publicapi.For(ctx).Collection.GetCollectionById(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectionToModel(ctx, *collection), nil
+}
+
+func resolveGalleryCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
+	collections, err := publicapi.For(ctx).Collection.GetCollectionsByGalleryId(ctx, galleryID)
 	if err != nil {
 		return nil, err
 	}
 
 	var output = make([]*model.GalleryCollection, len(collections))
 	for i, collection := range collections {
-		version := collection.Version.Int()
-		hidden := collection.Hidden.Bool()
-
-		output[i] = &model.GalleryCollection{
-			Dbid:           collection.ID,
-			Version:        &version,
-			Name:           util.StringToPointer(collection.Name.String()),
-			CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
-			Gallery:        galleryIDToGalleryModel(galleryID),
-			Layout:         layoutToModel(ctx, collection.Layout),
-			Hidden:         &hidden,
-			Nfts:           nil, // handled by dedicated resolver
-		}
+		output[i] = collectionToModel(ctx, collection)
 	}
 
 	return output, nil
 }
 
-func galleryToModel(gallery persist.Gallery) *model.Gallery {
-	return galleryIDToGalleryModel(gallery.ID)
+func resolveGalleryNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.GalleryNft, error) {
+	nft, err := resolveNftByNftID(ctx, nftID)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := resolveGalleryCollectionByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	galleryNft := &model.GalleryNft{
+		HelperGalleryNftData: model.HelperGalleryNftData{
+			NftId:        nftID,
+			CollectionId: collectionID,
+		},
+		Nft:        nft,
+		Collection: collection,
+	}
+
+	return galleryNft, nil
 }
 
-func galleryIDToGalleryModel(galleryID persist.DBID) *model.Gallery {
-	return &model.Gallery{
+func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
+	gallery := &model.Gallery{
 		Dbid:        galleryID,
 		Owner:       nil, // handled by dedicated resolver
 		Collections: nil, // handled by dedicated resolver
 	}
+
+	return gallery, nil
 }
 
-func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.GalleryCollectionLayout {
-	columns := layout.Columns.Int()
-
-	whitespace := make([]*int, len(layout.Whitespace))
-	for i, w := range layout.Whitespace {
-		ws := w
-		whitespace[i] = &ws
-	}
-
-	output := model.GalleryCollectionLayout{
-		Columns:    &columns,
-		Whitespace: whitespace,
-	}
-
-	return &output
-}
-
-// userToModel converts a persist.User to a model.User
-func userToModel(ctx context.Context, r *Resolver, user persist.User) (*model.GalleryUser, error) {
-	gc := util.GinContextFromContext(ctx)
-	isAuthenticated := auth.GetUserAuthedFromCtx(gc)
-
-	galleryUser := &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            util.StringToPointer(user.Username.String()),
-		Bio:                 util.StringToPointer(user.Bio.String()),
-		Wallets:             addressesToModels(ctx, r, user.Addresses),
-		Galleries:           nil, // handled by dedicated resolver
-		IsAuthenticatedUser: &isAuthenticated,
-	}
-
-	return galleryUser, nil
-}
-
-// addressesToModels converts a slice of persist.Address to a slice of model.Wallet
-func addressesToModels(ctx context.Context, r *Resolver, addresses []persist.Address) []*model.Wallet {
-	wallets := make([]*model.Wallet, len(addresses))
-	for i, address := range addresses {
-		wallets[i] = &model.Wallet{
-			Address: &address,
-			Nfts:    nil, // handled by dedicated resolver
-		}
-	}
-
-	return wallets
-}
-
-func resolveNftOwnerByNftId(ctx context.Context, r *Resolver, nftId persist.DBID) (model.GalleryUserOrWallet, error) {
-	nft, err := dataloader.For(ctx).NftByNftId.Load(nftId)
+func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, error) {
+	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserOrWalletByAddress(ctx, r, nft.OwnerAddress)
+	return nftToModel(ctx, *nft), nil
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, r *Resolver, address persist.Address) (model.GalleryUserOrWallet, error) {
-	owner, err := dataloader.For(ctx).UserByAddress.Load(address)
+func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (model.GalleryUserOrWallet, error) {
+	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveGalleryUserOrWalletByAddress(ctx, nft.OwnerAddress)
+}
+
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.Address) (model.GalleryUserOrWallet, error) {
+	owner, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err == nil {
-		return userToModel(ctx, r, owner)
+		return userToModel(ctx, *owner), nil
 	}
 
 	if _, ok := err.(persist.ErrUserNotFound); ok {
-		wallet := model.Wallet{
-			Address: &address,
-			Nfts:    nil, // handled by dedicated resolver
-		}
-
-		return wallet, nil
+		return resolveWalletByAddress(ctx, address)
 	}
 
 	return nil, err
+}
+
+func resolveWalletByAddress(ctx context.Context, address persist.Address) (*model.Wallet, error) {
+	wallet := model.Wallet{
+		Address: &address,
+		Nfts:    nil, // handled by dedicated resolver
+	}
+
+	return &wallet, nil
+}
+
+func resolveViewer(ctx context.Context) *model.Viewer {
+	viewer := &model.Viewer{
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}
+
+	return viewer
+}
+
+func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
+	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return membershipToModel(ctx, *tier), nil
+}
+
+func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
+	return &model.Gallery{
+		Dbid:        gallery.ID,
+		Owner:       nil, // handled by dedicated resolver
+		Collections: nil, // handled by dedicated resolver
+	}
+}
+
+func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.GalleryCollectionLayout {
+	whitespace := make([]*int, len(layout.Whitespace))
+	for i, w := range layout.Whitespace {
+		w := w
+		whitespace[i] = &w
+	}
+
+	return &model.GalleryCollectionLayout{
+		Columns:    &layout.Columns,
+		Whitespace: whitespace,
+	}
+}
+
+// userToModel converts a sqlc.User to a model.User
+func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
+	gc := util.GinContextFromContext(ctx)
+	isAuthenticatedUser := auth.GetUserAuthedFromCtx(gc) && auth.GetUserIDFromCtx(gc) == user.ID
+
+	wallets := make([]*model.Wallet, len(user.Addresses))
+	for i, address := range user.Addresses {
+		wallets[i] = addressToModel(ctx, address)
+	}
+
+	return &model.GalleryUser{
+		Dbid:                user.ID,
+		Username:            &user.Username.String,
+		Bio:                 &user.Bio.String,
+		Wallets:             wallets,
+		Galleries:           nil, // handled by dedicated resolver
+		IsAuthenticatedUser: &isAuthenticatedUser,
+	}
+}
+
+func addressToModel(ctx context.Context, address persist.Address) *model.Wallet {
+	return &model.Wallet{
+		Address: &address,
+		Nfts:    nil, // handled by dedicated resolver
+	}
+}
+
+func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.GalleryCollection {
+	version := int(collection.Version.Int32)
+
+	return &model.GalleryCollection{
+		Dbid:           collection.ID,
+		Version:        &version,
+		Name:           &collection.Name.String,
+		CollectorsNote: &collection.CollectorsNote.String,
+		Gallery:        nil, // handled by dedicated resolver
+		Layout:         layoutToModel(ctx, collection.Layout),
+		Hidden:         &collection.Hidden,
+		Nfts:           nil, // handled by dedicated resolver
+	}
+}
+
+func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
+	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	for _, owner := range membershipTier.Owners {
+		if owner.UserID != "" {
+			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+		}
+	}
+
+	return &model.MembershipTier{
+		Dbid:     membershipTier.ID,
+		Name:     &membershipTier.Name.String,
+		AssetURL: &membershipTier.AssetUrl.String,
+		TokenID:  &membershipTier.TokenID.String,
+		Owners:   owners,
+	}
+}
+
+func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
+	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	for _, owner := range membershipTier.Owners {
+		if owner.UserID != "" {
+			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+		}
+	}
+
+	return &model.MembershipTier{
+		Dbid:     membershipTier.ID,
+		Name:     util.StringToPointer(membershipTier.Name.String()),
+		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
+		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
+		Owners:   owners,
+	}
+}
+
+func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
+	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
+	for i, nft := range membershipOwner.PreviewNFTs {
+		previewNfts[i] = util.StringToPointer(nft.String())
+	}
+
+	return &model.MembershipOwner{
+		Dbid:        membershipOwner.UserID,
+		Address:     &membershipOwner.Address,
+		User:        nil, // handled by dedicated resolver
+		PreviewNfts: previewNfts,
+	}
+}
+
+func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
+	chainEthereum := model.ChainEthereum
+
+	return &model.Nft{
+		Dbid:             nft.ID,
+		CreationTime:     &nft.CreatedAt,
+		LastUpdated:      &nft.LastUpdated,
+		CollectorsNote:   &nft.CollectorsNote.String,
+		Media:            getMediaForNft(nft),
+		TokenType:        nil,            // TODO: later
+		Chain:            &chainEthereum, // Everything's Ethereum right now
+		Name:             &nft.Name.String,
+		Description:      &nft.Description.String,
+		TokenURI:         nil, // TODO: later
+		TokenID:          &nft.OpenseaTokenID.String,
+		Quantity:         nil, // TODO: later
+		Owner:            nil, // handled by dedicated resolver
+		OwnershipHistory: nil, // TODO: later
+		TokenMetadata:    nil, // TODO: later
+		ContractAddress:  &nft.Contract.ContractAddress,
+		ExternalURL:      &nft.ExternalUrl.String,
+		BlockNumber:      nil, // TODO: later
+	}
 }
 
 func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func getMediaForNft(nft persist.NFT) model.MediaSubtype {
+func getMediaForNft(nft sqlc.Nft) model.MediaSubtype {
 	// Extension/URL checking based on the existing frontend methodology
-	ext := getUrlExtension(nft.ImageURL.String())
+	ext := getUrlExtension(nft.ImageUrl.String)
 	if ext == "mp4" {
 		return getVideoMedia(nft)
 	}
 
-	if nft.AnimationURL.String() == "" {
+	if nft.AnimationUrl.String == "" {
 		return getImageMedia(nft)
 	}
 
-	ext = getUrlExtension(nft.AnimationURL.String())
+	ext = getUrlExtension(nft.AnimationUrl.String)
 
 	switch ext {
 	case "svg":
@@ -290,178 +447,92 @@ func getFirstNonEmptyString(strings ...string) *string {
 	return &empty
 }
 
-func getPreviewUrls(nft persist.NFT) *model.PreviewURLSet {
+func getPreviewUrls(nft sqlc.Nft) *model.PreviewURLSet {
 	return &model.PreviewURLSet{
-		Raw:    getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.AnimationURL.String()),
-		Small:  getFirstNonEmptyString(nft.ImageThumbnailURL.String(), nft.AnimationURL.String()),
-		Medium: getFirstNonEmptyString(nft.ImagePreviewURL.String(), nft.AnimationURL.String()),
-		Large:  getFirstNonEmptyString(nft.ImageURL.String(), nft.AnimationURL.String()),
+		Raw:    getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String),
+		Small:  getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String),
+		Medium: getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String),
+		Large:  getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String),
 	}
 }
 
-func getImageMedia(nft persist.NFT) model.ImageMedia {
+func getImageMedia(nft sqlc.Nft) model.ImageMedia {
 	imageUrls := model.ImageURLSet{
-		Raw:    getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.AnimationURL.String()),
-		Small:  getFirstNonEmptyString(nft.ImageThumbnailURL.String(), nft.AnimationURL.String()),
-		Medium: getFirstNonEmptyString(nft.ImagePreviewURL.String(), nft.AnimationURL.String()),
-		Large:  getFirstNonEmptyString(nft.ImageURL.String(), nft.AnimationURL.String()),
+		Raw:    getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String),
+		Small:  getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String),
+		Medium: getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String),
+		Large:  getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String),
 	}
 
 	return model.ImageMedia{
 		PreviewURLs:       getPreviewUrls(nft),
-		MediaURL:          getFirstNonEmptyString(nft.ImageOriginalURL.String(), nft.ImageURL.String()),
+		MediaURL:          getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.ImageUrl.String),
 		MediaType:         nil,
 		ContentRenderURLs: &imageUrls,
 	}
 }
 
-func getVideoMedia(nft persist.NFT) model.VideoMedia {
+func getVideoMedia(nft sqlc.Nft) model.VideoMedia {
 	videoUrls := model.VideoURLSet{
-		Raw:    util.StringToPointer(nft.AnimationOriginalURL.String()),
-		Small:  util.StringToPointer(nft.AnimationURL.String()),
-		Medium: util.StringToPointer(nft.AnimationURL.String()),
-		Large:  util.StringToPointer(nft.AnimationURL.String()),
+		Raw:    &nft.AnimationOriginalUrl.String,
+		Small:  &nft.AnimationUrl.String,
+		Medium: &nft.AnimationUrl.String,
+		Large:  &nft.AnimationUrl.String,
 	}
 
 	return model.VideoMedia{
 		PreviewURLs:       getPreviewUrls(nft),
-		MediaURL:          getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:          getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:         nil,
 		ContentRenderURLs: &videoUrls,
 	}
 }
 
-func getAudioMedia(nft persist.NFT) model.AudioMedia {
+func getAudioMedia(nft sqlc.Nft) model.AudioMedia {
 	return model.AudioMedia{
 		PreviewURLs:      getPreviewUrls(nft),
-		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
-func getTextMedia(nft persist.NFT) model.TextMedia {
+func getTextMedia(nft sqlc.Nft) model.TextMedia {
 	return model.TextMedia{
 		PreviewURLs:      getPreviewUrls(nft),
-		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
-func getHtmlMedia(nft persist.NFT) model.HTMLMedia {
+func getHtmlMedia(nft sqlc.Nft) model.HTMLMedia {
 	return model.HTMLMedia{
 		PreviewURLs:      getPreviewUrls(nft),
-		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
-func getJsonMedia(nft persist.NFT) model.JSONMedia {
+func getJsonMedia(nft sqlc.Nft) model.JSONMedia {
 	return model.JSONMedia{
 		PreviewURLs:      getPreviewUrls(nft),
-		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
-func getUnknownMedia(nft persist.NFT) model.UnknownMedia {
+func getUnknownMedia(nft sqlc.Nft) model.UnknownMedia {
 	return model.UnknownMedia{
 		PreviewURLs:      getPreviewUrls(nft),
-		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalURL.String(), nft.AnimationURL.String()),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,
-		ContentRenderURL: util.StringToPointer(nft.AnimationURL.String()),
+		ContentRenderURL: &nft.AnimationUrl.String,
 	}
 }
 
-func getInvalidMedia(nft persist.NFT) model.InvalidMedia {
+func getInvalidMedia(nft sqlc.Nft) model.InvalidMedia {
 	return model.InvalidMedia{}
-}
-
-func nftToModel(ctx context.Context, r *Resolver, nft persist.NFT) model.Nft {
-	creationTime := nft.CreationTime.Time()
-	lastUpdated := nft.LastUpdatedTime.Time()
-	chainEthereum := model.ChainEthereum
-
-	return model.Nft{
-		Dbid:             nft.ID,
-		CreationTime:     &creationTime,
-		LastUpdated:      &lastUpdated,
-		CollectorsNote:   util.StringToPointer(nft.CollectorsNote.String()),
-		Media:            getMediaForNft(nft),
-		TokenType:        nil,            // TODO: later
-		Chain:            &chainEthereum, // Everything's Ethereum right now
-		Name:             util.StringToPointer(nft.Name.String()),
-		Description:      util.StringToPointer(nft.Description.String()),
-		TokenURI:         nil, // TODO: later
-		TokenID:          util.StringToPointer(nft.OpenseaTokenID.String()),
-		Quantity:         nil, // TODO: later
-		Owner:            nil, // handled by dedicated resolver
-		OwnershipHistory: nil, // TODO: later
-		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  &nft.Contract.ContractAddress,
-		ExternalURL:      util.StringToPointer(nft.ExternalURL.String()),
-		BlockNumber:      nil, // TODO: later
-	}
-}
-
-func collectionToModel(ctx context.Context, collection persist.Collection) *model.GalleryCollection {
-	version := collection.Version.Int()
-	hidden := collection.Hidden.Bool()
-
-	// TODO: Should we be filling this collection's gallery out, or leaving it to a resolver?
-	// The Gallery->Collections path currently fills out the Gallery field on each Collection it returns,
-	// and switching to a resolver here means switching to a resolver there. Not a big deal, just remember
-	// to prime the "GalleryByCollectionId" cache with results from the "collections by gallery" lookup.
-	return &model.GalleryCollection{
-		Dbid:           collection.ID,
-		Version:        &version,
-		Name:           util.StringToPointer(collection.Name.String()),
-		CollectorsNote: util.StringToPointer(collection.CollectorsNote.String()),
-		Gallery:        nil, // handled by dedicated resolver
-		Layout:         layoutToModel(ctx, collection.Layout),
-		Hidden:         &hidden,
-		Nfts:           nil, // handled by dedicated resolver
-	}
-}
-
-func membershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) model.MembershipTier {
-	owners := make([]*model.MembershipOwner, len(membershipTier.Owners))
-	for i, owner := range membershipTier.Owners {
-		ownerModel := membershipOwnerToModel(ctx, owner)
-		owners[i] = &ownerModel
-	}
-
-	return model.MembershipTier{
-		Dbid:     membershipTier.ID,
-		Name:     util.StringToPointer(membershipTier.Name.String()),
-		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
-		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
-		Owners:   owners,
-	}
-}
-
-func membershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) model.MembershipOwner {
-	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
-	for i, nft := range membershipOwner.PreviewNFTs {
-		previewNfts[i] = util.StringToPointer(nft.String())
-	}
-
-	return model.MembershipOwner{
-		Dbid:        membershipOwner.UserID,
-		Address:     &membershipOwner.Address,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
-	}
-}
-
-func resolveViewer(ctx context.Context) *model.Viewer {
-	viewer := &model.Viewer{
-		User:            nil, // handled by dedicated resolver
-		ViewerGalleries: nil, // handled by dedicated resolver
-	}
-
-	return viewer
 }

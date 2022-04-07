@@ -243,8 +243,7 @@ type Gallery implements Node {
   collections: [GalleryCollection] @goField(forceResolver: true)
 }
 
-type MembershipOwner implements Node {
-  id: ID!
+type MembershipOwner {
   dbid: DBID!
   address: Address
   user: GalleryUser @goField(forceResolver: true)
@@ -281,6 +280,7 @@ type ErrCollectionNotFound implements Error {
 union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
 
 type Query {
+  node(id: ID!): Node
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]

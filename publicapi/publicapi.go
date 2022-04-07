@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -13,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/pubsub"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -22,6 +22,7 @@ const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
 	repos      *persist.Repositories
+	queries    *sqlc.Queries
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
 	Collection *CollectionAPI
@@ -30,18 +31,19 @@ type PublicAPI struct {
 	Nft        *NftAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, pubsub pubsub.PubSub) {
-	loaders := dataloader.NewLoaders(ctx, repos)
+func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+	loaders := dataloader.NewLoaders(ctx, queries)
 	validator := newValidator()
 
 	api := &PublicAPI{
 		repos:      repos,
+		queries:    queries,
 		loaders:    loaders,
 		validator:  validator,
-		Collection: &CollectionAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
-		Gallery:    &GalleryAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
-		User:       &UserAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Nft:        &NftAPI{repos: repos, loaders: loaders, validator: validator, ethClient: ethClient, pubsub: pubsub},
+		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
+		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 	}
 
 	ctx.Set(apiContextKey, api)

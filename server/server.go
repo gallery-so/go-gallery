@@ -1,31 +1,29 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"database/sql"
-	"net/http"
-	"strings"
-	"time"
-
-	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/pubsub"
-	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/validate"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
+	"net/http"
+	"strings"
 )
 
 // Init initializes the server
@@ -34,14 +32,14 @@ func Init() {
 
 	initSentry()
 
-	router := CoreInit(postgres.NewClient())
+	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(pqClient *sql.DB) *gin.Engine {
+func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	log.Info("initializing server...")
 
 	log.SetReportCaller(true)
@@ -62,8 +60,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 	if err := redis.ClearCache(); err != nil {
 		panic(err)
 	}
-
-	return handlersInit(router, newRepos(pqClient), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), newGCPPubSub())
+	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient())
 }
 
 func newStorageClient() *storage.Client {
@@ -154,18 +151,6 @@ func newEthClient() *ethclient.Client {
 	if err != nil {
 		panic(err)
 	}
-	return client
-}
-
-func newGCPPubSub() pubsub.PubSub {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Second)
-	defer cancel()
-	client, err := gcp.NewPubSub(ctx)
-	if err != nil {
-		panic(err)
-	}
-	client.CreateTopic(ctx, viper.GetString("SIGNUPS_TOPIC"))
-	client.CreateTopic(ctx, viper.GetString("ADD_ADDRESS_TOPIC"))
 	return client
 }
 

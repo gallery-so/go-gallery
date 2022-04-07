@@ -60,3 +60,12 @@ type ErrGalleryNotFoundByID struct {
 func (e ErrGalleryNotFoundByID) Error() string {
 	return fmt.Sprintf("gallery not found with ID: %v", e.ID)
 }
+
+// ErrGalleryNotFoundByCollectionID is returned when a gallery is not found by a child collection ID
+type ErrGalleryNotFoundByCollectionID struct {
+	ID DBID
+}
+
+func (e ErrGalleryNotFoundByCollectionID) Error() string {
+	return fmt.Sprintf("gallery not found for child collection ID: %v", e.ID)
+}

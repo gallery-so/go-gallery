@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/lib/pq"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -111,6 +112,18 @@ const ZeroAddress Address = "0x0000000000000000000000000000000000000000"
 
 // Address represents an Ethereum address
 type Address string
+
+// AddressList is a slice of Addresses, used to implement scanner/valuer interfaces
+type AddressList []Address
+
+func (l AddressList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+// Scan implements the Scanner interface for the AddressList type
+func (l *AddressList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
+}
 
 // BlockNumber represents an Ethereum block number
 type BlockNumber uint64

@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	// register postgres driver
 	// _ "github.com/lib/pq"
@@ -11,25 +13,47 @@ import (
 	"github.com/spf13/viper"
 )
 
-// NewClient creates a new postgres client
-func NewClient() *sql.DB {
+func getSqlConnectionString() string {
 	dbUser := viper.GetString("POSTGRES_USER")
 	dbPwd := viper.GetString("POSTGRES_PASSWORD")
 	dbName := viper.GetString("POSTGRES_DB")
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+}
 
-	db, err := sql.Open("pgx", psqlInfo)
+// NewClient creates a new postgres client
+func NewClient() *sql.DB {
+	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
 		logrus.WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
-	db.SetMaxOpenConns(100)
+	db.SetMaxOpenConns(50)
 
 	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// NewPgxClient creates a new postgres client via pgx
+func NewPgxClient() *pgxpool.Pool {
+	ctx := context.Background()
+	db, err := pgxpool.Connect(ctx, getSqlConnectionString())
+	if err != nil {
+		logrus.WithError(err).Fatal("could not open database connection")
+		panic(err)
+	}
+
+	// Split 50/50 with existing database/sql implementation so we don't go over the GCP limit
+	// for incoming connections. Once we remove database/sql, this can go back up to 100.
+	db.Config().MaxConns = 50
+
+	err = db.Ping(ctx)
 	if err != nil {
 		panic(err)
 	}

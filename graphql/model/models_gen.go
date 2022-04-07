@@ -364,8 +364,6 @@ type MembershipOwner struct {
 	PreviewNfts []*string        `json:"previewNfts"`
 }
 
-func (MembershipOwner) IsNode() {}
-
 type MembershipTier struct {
 	Dbid     persist.DBID       `json:"dbid"`
 	Name     *string            `json:"name"`
