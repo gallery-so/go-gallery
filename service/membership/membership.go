@@ -299,8 +299,13 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 				logrus.Debug("Event is to real address")
 				// does to have the NFT?
 				membershipOwner := fillMembershipOwner(ctx, addr, id, ethClient, userRepository, galleryRepository)
-				logrus.Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
-				ownersChan <- membershipOwner
+				if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
+					logrus.Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
+					ownersChan <- membershipOwner
+				} else {
+					logrus.Debugf("Skipping membership owner %s for ID %s", membershipOwner.Address, id)
+					ownersChan <- persist.MembershipOwner{}
+				}
 				return
 			}
 			logrus.Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
@@ -341,25 +346,22 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.MembershipOwner {
 	membershipOwner := persist.MembershipOwner{Address: pAddress}
 
-	hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, pAddress, ethClient)
-	if hasNFT {
-		glryUser, err := userRepository.GetByAddress(ctx, pAddress)
-		if err != nil || glryUser.Username == "" {
-			logrus.WithError(err).Errorf("Failed to get user for address %s", pAddress)
-			return membershipOwner
-		}
-		membershipOwner.Username = glryUser.Username
-		membershipOwner.UserID = glryUser.ID
-
-		galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-		if err == nil && len(galleries) > 0 {
-			gallery := galleries[0]
-			if gallery.Collections != nil || len(gallery.Collections) > 0 {
-				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
-			}
-		}
-
+	glryUser, err := userRepository.GetByAddress(ctx, pAddress)
+	if err != nil || glryUser.Username == "" {
+		logrus.WithError(err).Errorf("Failed to get user for address %s", pAddress)
+		return membershipOwner
 	}
+	membershipOwner.Username = glryUser.Username
+	membershipOwner.UserID = glryUser.ID
+
+	galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+	if err == nil && len(galleries) > 0 {
+		gallery := galleries[0]
+		if gallery.Collections != nil && len(gallery.Collections) > 0 {
+			membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
+		}
+	}
+
 	return membershipOwner
 }
 
@@ -414,12 +416,19 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 		token := t
 		wp.Submit(func() {
 			membershipOwner := fillMembershipOwnerToken(ctx, token.OwnerAddress, id, ethClient, userRepository, galleryRepository)
-			ownersChan <- membershipOwner
+			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
+				ownersChan <- membershipOwner
+			} else {
+				ownersChan <- persist.MembershipOwner{}
+			}
 		})
 
 	}
 	for i := 0; i < len(tokens); i++ {
-		tier.Owners = append(tier.Owners, <-ownersChan)
+		owner := <-ownersChan
+		if owner.Address != "" {
+			tier.Owners = append(tier.Owners, <-ownersChan)
+		}
 	}
 	wp.StopWait()
 
