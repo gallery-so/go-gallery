@@ -214,6 +214,11 @@ type Nft implements Node {
     contractAddress: Address
     externalUrl: String
     blockNumber: String # source is uint64
+
+    # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
+    # struct and may ultimately end up elsewhere
+    creatorAddress: Address
+    openseaCollectionName: String
 }
 
 type OwnerAtBlock {

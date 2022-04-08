@@ -409,24 +409,26 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	Dbid             persist.DBID        `json:"dbid"`
-	CreationTime     *time.Time          `json:"creationTime"`
-	LastUpdated      *time.Time          `json:"lastUpdated"`
-	CollectorsNote   *string             `json:"collectorsNote"`
-	Media            MediaSubtype        `json:"media"`
-	TokenType        *TokenType          `json:"tokenType"`
-	Chain            *Chain              `json:"chain"`
-	Name             *string             `json:"name"`
-	Description      *string             `json:"description"`
-	TokenURI         *string             `json:"tokenUri"`
-	TokenID          *string             `json:"tokenId"`
-	Quantity         *string             `json:"quantity"`
-	Owner            GalleryUserOrWallet `json:"owner"`
-	OwnershipHistory []*OwnerAtBlock     `json:"ownershipHistory"`
-	TokenMetadata    *string             `json:"tokenMetadata"`
-	ContractAddress  *persist.Address    `json:"contractAddress"`
-	ExternalURL      *string             `json:"externalUrl"`
-	BlockNumber      *string             `json:"blockNumber"`
+	Dbid                  persist.DBID        `json:"dbid"`
+	CreationTime          *time.Time          `json:"creationTime"`
+	LastUpdated           *time.Time          `json:"lastUpdated"`
+	CollectorsNote        *string             `json:"collectorsNote"`
+	Media                 MediaSubtype        `json:"media"`
+	TokenType             *TokenType          `json:"tokenType"`
+	Chain                 *Chain              `json:"chain"`
+	Name                  *string             `json:"name"`
+	Description           *string             `json:"description"`
+	TokenURI              *string             `json:"tokenUri"`
+	TokenID               *string             `json:"tokenId"`
+	Quantity              *string             `json:"quantity"`
+	Owner                 GalleryUserOrWallet `json:"owner"`
+	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
+	TokenMetadata         *string             `json:"tokenMetadata"`
+	ContractAddress       *persist.Address    `json:"contractAddress"`
+	ExternalURL           *string             `json:"externalUrl"`
+	BlockNumber           *string             `json:"blockNumber"`
+	CreatorAddress        *persist.Address    `json:"creatorAddress"`
+	OpenseaCollectionName *string             `json:"openseaCollectionName"`
 }
 
 func (Nft) IsNode()           {}

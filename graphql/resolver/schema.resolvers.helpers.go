@@ -397,6 +397,10 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		ContractAddress:  &nft.Contract.ContractAddress,
 		ExternalURL:      &nft.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
+
+		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
+		CreatorAddress:        &nft.CreatorAddress,
+		OpenseaCollectionName: &nft.TokenCollectionName.String,
 	}
 }
 

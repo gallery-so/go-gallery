@@ -246,25 +246,27 @@ type ComplexityRoot struct {
 	}
 
 	Nft struct {
-		BlockNumber      func(childComplexity int) int
-		Chain            func(childComplexity int) int
-		CollectorsNote   func(childComplexity int) int
-		ContractAddress  func(childComplexity int) int
-		CreationTime     func(childComplexity int) int
-		Dbid             func(childComplexity int) int
-		Description      func(childComplexity int) int
-		ExternalURL      func(childComplexity int) int
-		ID               func(childComplexity int) int
-		LastUpdated      func(childComplexity int) int
-		Media            func(childComplexity int) int
-		Name             func(childComplexity int) int
-		Owner            func(childComplexity int) int
-		OwnershipHistory func(childComplexity int) int
-		Quantity         func(childComplexity int) int
-		TokenID          func(childComplexity int) int
-		TokenMetadata    func(childComplexity int) int
-		TokenType        func(childComplexity int) int
-		TokenURI         func(childComplexity int) int
+		BlockNumber           func(childComplexity int) int
+		Chain                 func(childComplexity int) int
+		CollectorsNote        func(childComplexity int) int
+		ContractAddress       func(childComplexity int) int
+		CreationTime          func(childComplexity int) int
+		CreatorAddress        func(childComplexity int) int
+		Dbid                  func(childComplexity int) int
+		Description           func(childComplexity int) int
+		ExternalURL           func(childComplexity int) int
+		ID                    func(childComplexity int) int
+		LastUpdated           func(childComplexity int) int
+		Media                 func(childComplexity int) int
+		Name                  func(childComplexity int) int
+		OpenseaCollectionName func(childComplexity int) int
+		Owner                 func(childComplexity int) int
+		OwnershipHistory      func(childComplexity int) int
+		Quantity              func(childComplexity int) int
+		TokenID               func(childComplexity int) int
+		TokenMetadata         func(childComplexity int) int
+		TokenType             func(childComplexity int) int
+		TokenURI              func(childComplexity int) int
 	}
 
 	OwnerAtBlock struct {
@@ -1208,6 +1210,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Nft.CreationTime(childComplexity), true
 
+	case "Nft.creatorAddress":
+		if e.complexity.Nft.CreatorAddress == nil {
+			break
+		}
+
+		return e.complexity.Nft.CreatorAddress(childComplexity), true
+
 	case "Nft.dbid":
 		if e.complexity.Nft.Dbid == nil {
 			break
@@ -1256,6 +1265,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Nft.Name(childComplexity), true
+
+	case "Nft.openseaCollectionName":
+		if e.complexity.Nft.OpenseaCollectionName == nil {
+			break
+		}
+
+		return e.complexity.Nft.OpenseaCollectionName(childComplexity), true
 
 	case "Nft.owner":
 		if e.complexity.Nft.Owner == nil {
@@ -1910,6 +1926,11 @@ type Nft implements Node {
     contractAddress: Address
     externalUrl: String
     blockNumber: String # source is uint64
+
+    # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
+    # struct and may ultimately end up elsewhere
+    creatorAddress: Address
+    openseaCollectionName: String
 }
 
 type OwnerAtBlock {
@@ -6672,6 +6693,70 @@ func (ec *executionContext) _Nft_blockNumber(ctx context.Context, field graphql.
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.BlockNumber, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Nft_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Nft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatorAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Nft_openseaCollectionName(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Nft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OpenseaCollectionName, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12207,6 +12292,20 @@ func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj 
 		case "blockNumber":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Nft_blockNumber(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "creatorAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Nft_creatorAddress(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "openseaCollectionName":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Nft_openseaCollectionName(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
