@@ -8,9 +8,10 @@ import (
 )
 
 func setupTest(t *testing.T) *assert.Assertions {
-	rd := docker.InitRedis("../../docker-compose.yml")
+	rd, rdUnpatch := docker.InitRedis("../../docker-compose.yml")
 
 	t.Cleanup(func() {
+		defer rdUnpatch()
 		if err := rd.Close(); err != nil {
 			t.Fatalf("could not purge resource: %s", err)
 		}

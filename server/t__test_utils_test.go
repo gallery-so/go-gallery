@@ -150,13 +150,15 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 func setupDoubles(t *testing.T) {
 	setDefaults()
 
-	pg := docker.InitPostgres("../docker-compose.yml")
-	rd := docker.InitRedis("../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres("../docker-compose.yml")
+	rd, rdUnpatch := docker.InitRedis("../docker-compose.yml")
 
 	db = postgres.NewClient()
 	migrate.RunMigration("../db/migrations", db)
 
 	t.Cleanup(func() {
+		defer pgUnpatch()
+		defer rdUnpatch()
 		for _, r := range []*dockertest.Resource{pg, rd} {
 			if err := r.Close(); err != nil {
 				log.Fatalf("could not purge resource: %s", err)

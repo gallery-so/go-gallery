@@ -115,16 +115,15 @@ func getBuildImage(path string, s Service) ([]string, error) {
 	return nil, errors.New("no `FROM` directive found in dockerfile")
 }
 
-func InitPostgres(composePath string) *dockertest.Resource {
+func InitPostgres(composePath string) (resource *dockertest.Resource, callback func()) {
 	pool, err := dockertest.NewPool("")
 	pool.MaxWait = 3 * time.Minute
 	if err != nil {
 		log.Fatalf("could not connect to docker: %s", err)
 	}
 
-	absPath, _ := filepath.Abs(composePath)
-	apps := loadComposeFile(absPath)
-	imgAndVer, err := getBuildImage(absPath, apps.Services["postgres"])
+	apps := loadComposeFile(composePath)
+	imgAndVer, err := getBuildImage(composePath, apps.Services["postgres"])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -141,22 +140,39 @@ func InitPostgres(composePath string) *dockertest.Resource {
 	}
 
 	// Patch environment to use container
+	pgHost := viper.GetString("POSTGRES_HOST")
+	pgPort := viper.GetString("POSTGRES_PORT")
+	pgUser := viper.GetString("POSTGRES_USER")
+	pgPass := viper.GetString("POSTGRES_PASSWORD")
+	pgDb := viper.GetString("POSTGRES_DB")
+	env := viper.GetString("ENV")
+
 	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
-	viper.SetDefault("POSTGRES_HOST", hostAndPort[0])
-	viper.SetDefault("POSTGRES_PORT", hostAndPort[1])
+	viper.Set("POSTGRES_HOST", hostAndPort[0])
+	viper.Set("POSTGRES_PORT", hostAndPort[1])
 	viper.Set("POSTGRES_USER", "postgres")
 	viper.Set("POSTGRES_PASSWORD", "")
 	viper.Set("POSTGRES_DB", "postgres")
 	viper.Set("ENV", "local")
 
+	// Called to restore original environment
+	callback = func() {
+		viper.Set("POSTGRES_HOST", pgHost)
+		viper.Set("POSTGRES_PORT", pgPort)
+		viper.Set("POSTGRES_USER", pgUser)
+		viper.Set("POSTGRES_PASSWORD", pgPass)
+		viper.Set("POSTGRES_DB", pgDb)
+		viper.Set("ENV", env)
+	}
+
 	if err = pool.Retry(waitOnDB); err != nil {
 		log.Fatalf("could not connect to postgres: %s", err)
 	}
 
-	return pg
+	return pg, callback
 }
 
-func InitRedis(composePath string) *dockertest.Resource {
+func InitRedis(composePath string) (resource *dockertest.Resource, callback func()) {
 	pool, err := dockertest.NewPool("")
 	pool.MaxWait = 3 * time.Minute
 	if err != nil {
@@ -180,10 +196,17 @@ func InitRedis(composePath string) *dockertest.Resource {
 	}
 
 	// Patch environment to use container
-	viper.SetDefault("REDIS_URL", rd.GetHostPort("6379/tcp"))
+	url := viper.Get("REDIS_URL")
+	viper.Set("REDIS_URL", rd.GetHostPort("6379/tcp"))
+
+	// Called to restore original environment
+	callback = func() {
+		viper.Set("REDIS_URL", url)
+	}
+
 	if err = pool.Retry(waitOnCache); err != nil {
 		log.Fatalf("could not connect to redis: %s", err)
 	}
 
-	return rd
+	return rd, callback
 }

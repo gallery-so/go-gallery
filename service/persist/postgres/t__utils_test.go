@@ -15,8 +15,8 @@ import (
 )
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
-	pg := docker.InitPostgres("../../../docker-compose.yml")
-	rd := docker.InitRedis("../../../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres("../../../docker-compose.yml")
+	rd, rdUnpatch := docker.InitRedis("../../../docker-compose.yml")
 
 	db := NewClient()
 	err := migrate.RunMigration("../../../db/migrations", db)
@@ -26,6 +26,8 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 
 	t.Cleanup(func() {
 		defer db.Close()
+		defer pgUnpatch()
+		defer rdUnpatch()
 		for _, r := range []*dockertest.Resource{pg, rd} {
 			if err := r.Close(); err != nil {
 				t.Fatalf("could not purge resource: %s", err)

@@ -50,7 +50,9 @@ var (
 type IntegrationTestConfig struct {
 	*TestConfig
 	pgResource    *dockertest.Resource
+	pgUnpatch     func()
 	redisResource *dockertest.Resource
+	redisUnpatch  func()
 	db            *sql.DB
 }
 
@@ -110,8 +112,8 @@ func setBlockchainContext(t TestTarget) {
 }
 
 func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *IntegrationTestConfig {
-	pg := docker.InitPostgres("../docker-compose.yml")
-	rd := docker.InitRedis("../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres("../docker-compose.yml")
+	rd, rdUnpatch := docker.InitRedis("../docker-compose.yml")
 
 	pgClient := postgres.NewClient()
 	pgxClient := postgres.NewPgxClient()
@@ -120,7 +122,9 @@ func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *Integrat
 	return &IntegrationTestConfig{
 		TestConfig:    initializeTestServer(pgClient, pgxClient, a, version),
 		pgResource:    pg,
+		pgUnpatch:     pgUnpatch,
 		redisResource: rd,
+		redisUnpatch:  rdUnpatch,
 		db:            pgClient,
 	}
 }
@@ -135,6 +139,8 @@ func (i *IntegrationTest) TearDownTest(tc *IntegrationTestConfig) {
 
 	tc.db.Close()
 	tc.server.Close()
+	tc.pgUnpatch()
+	tc.redisUnpatch()
 }
 
 func (s *UserAuthSuite) SetupTest() {
