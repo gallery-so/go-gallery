@@ -89,6 +89,10 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		return persist.Community{}, fmt.Errorf("error getting community info: %w", err)
 	}
 
+	if len(seen) == 0 {
+		return persist.Community{}, persist.ErrCommunityNotFound{CommunityAddress: pAddress}
+	}
+
 	community.Description = contract.ContractDescription
 
 	if contract.ContractImage.String() != "" {

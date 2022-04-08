@@ -26,6 +26,10 @@ func getCommunity(communityRepo persist.CommunityRepository) gin.HandlerFunc {
 
 		community, err := communityRepo.GetByAddress(c, input.ContractAddress)
 		if err != nil {
+			if _, ok := err.(persist.ErrCommunityNotFound); ok {
+				util.ErrResponse(c, http.StatusNotFound, err)
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

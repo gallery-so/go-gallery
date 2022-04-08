@@ -105,6 +105,10 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 		return persist.Community{}, fmt.Errorf("error getting community info: %w", err)
 	}
 
+	if len(seen) == 0 {
+		return persist.Community{}, persist.ErrCommunityNotFound{CommunityAddress: pAddress}
+	}
+
 	if !hasDescription {
 		community.Description = ""
 	}
