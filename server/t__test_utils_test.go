@@ -150,11 +150,11 @@ func assertErrorResponse(assert *assert.Assertions, resp *http.Response) {
 func setupDoubles(t *testing.T) {
 	setDefaults()
 
-	pg, pgUnpatch := docker.InitPostgres("../docker-compose.yml")
-	rd, rdUnpatch := docker.InitRedis("../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres()
+	rd, rdUnpatch := docker.InitRedis()
 
 	db = postgres.NewClient()
-	migrate.RunMigration("../db/migrations", db)
+	migrate.RunMigration(db)
 
 	t.Cleanup(func() {
 		defer pgUnpatch()

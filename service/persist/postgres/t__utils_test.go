@@ -15,11 +15,11 @@ import (
 )
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
-	pg, pgUnpatch := docker.InitPostgres("../../../docker-compose.yml")
-	rd, rdUnpatch := docker.InitRedis("../../../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres()
+	rd, rdUnpatch := docker.InitRedis()
 
 	db := NewClient()
-	err := migrate.RunMigration("../../../db/migrations", db)
+	err := migrate.RunMigration(db)
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}

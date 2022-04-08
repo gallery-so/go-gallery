@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -103,6 +106,7 @@ func CopyMax(writer io.Writer, it io.Reader, max int64) error {
 	}
 	return nil
 }
+
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {
@@ -129,4 +133,22 @@ func GinContextFromContext(ctx context.Context) *gin.Context {
 	}
 
 	return gc
+}
+
+// FindFile finds a file relative to the working directory
+// by searching outer directories up to the search depth.
+// Mostly for testing purposes.
+func FindFile(f string, searchDepth int) (string, error) {
+	if _, err := os.Stat(f); err == nil {
+		return f, nil
+	}
+
+	for i := 0; i < searchDepth; i++ {
+		f = filepath.Join("..", f)
+		if _, err := os.Stat(f); err == nil {
+			return f, nil
+		}
+	}
+
+	return "", errors.New("could not find file in path")
 }

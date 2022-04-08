@@ -112,12 +112,12 @@ func setBlockchainContext(t TestTarget) {
 }
 
 func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *IntegrationTestConfig {
-	pg, pgUnpatch := docker.InitPostgres("../docker-compose.yml")
-	rd, rdUnpatch := docker.InitRedis("../docker-compose.yml")
+	pg, pgUnpatch := docker.InitPostgres()
+	rd, rdUnpatch := docker.InitRedis()
 
 	pgClient := postgres.NewClient()
 	pgxClient := postgres.NewPgxClient()
-	migrate.RunMigration("../db/migrations", pgClient)
+	migrate.RunMigration(pgClient)
 
 	return &IntegrationTestConfig{
 		TestConfig:    initializeTestServer(pgClient, pgxClient, a, version),

@@ -8,7 +8,7 @@ import (
 )
 
 func setupTest(t *testing.T) *assert.Assertions {
-	rd, rdUnpatch := docker.InitRedis("../../docker-compose.yml")
+	rd, rdUnpatch := docker.InitRedis()
 
 	t.Cleanup(func() {
 		defer rdUnpatch()

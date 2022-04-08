@@ -12,6 +12,7 @@ import (
 
 	"github.com/asottile/dockerfile"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
 	"github.com/spf13/viper"
@@ -76,7 +77,12 @@ func waitOnCache() (err error) {
 	return
 }
 
-func loadComposeFile(path string) (f ComposeFile) {
+func loadComposeFile() (f ComposeFile) {
+	path, err := util.FindFile("./docker-compose.yml", 3)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -98,7 +104,12 @@ func getImageAndVersion(s string) ([]string, error) {
 	return imgAndVer, nil
 }
 
-func getBuildImage(path string, s Service) ([]string, error) {
+func getBuildImage(s Service) ([]string, error) {
+	path, err := util.FindFile("./docker-compose.yml", 3)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	dockerPath := filepath.Join(filepath.Dir(path), s.Build["dockerfile"].(string))
 	absPath, _ := filepath.Abs(dockerPath)
 	res, err := dockerfile.ParseFile(absPath)
@@ -115,15 +126,15 @@ func getBuildImage(path string, s Service) ([]string, error) {
 	return nil, errors.New("no `FROM` directive found in dockerfile")
 }
 
-func InitPostgres(composePath string) (resource *dockertest.Resource, callback func()) {
+func InitPostgres() (resource *dockertest.Resource, callback func()) {
 	pool, err := dockertest.NewPool("")
-	pool.MaxWait = 3 * time.Minute
 	if err != nil {
 		log.Fatalf("could not connect to docker: %s", err)
 	}
+	pool.MaxWait = 3 * time.Minute
 
-	apps := loadComposeFile(composePath)
-	imgAndVer, err := getBuildImage(composePath, apps.Services["postgres"])
+	apps := loadComposeFile()
+	imgAndVer, err := getBuildImage(apps.Services["postgres"])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -172,14 +183,14 @@ func InitPostgres(composePath string) (resource *dockertest.Resource, callback f
 	return pg, callback
 }
 
-func InitRedis(composePath string) (resource *dockertest.Resource, callback func()) {
+func InitRedis() (resource *dockertest.Resource, callback func()) {
 	pool, err := dockertest.NewPool("")
-	pool.MaxWait = 3 * time.Minute
 	if err != nil {
 		log.Fatalf("could not connect to docker: %s", err)
 	}
+	pool.MaxWait = 3 * time.Minute
 
-	apps := loadComposeFile(composePath)
+	apps := loadComposeFile()
 	imgAndVer, err := getImageAndVersion(apps.Services["redis"].Image)
 	if err != nil {
 		log.Fatal(err)
