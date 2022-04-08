@@ -3,11 +3,14 @@ package publicapi
 import (
 	"context"
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/service/event"
+	nftservice "github.com/mikeydub/go-gallery/service/nft"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -80,7 +83,7 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 		return err
 	}
 
-	err = nft.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
+	err = nftservice.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
 	if err != nil {
 		return err
 	}
@@ -88,4 +91,52 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 	api.loaders.ClearAllCaches()
 
 	return nil
+}
+
+func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectorsNote string) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"nftID":          {nftID, "required"},
+		"collectorsNote": {collectorsNote, "nft_note"},
+	}); err != nil {
+		return err
+	}
+
+	// Sanitize
+	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	update := persist.NFTUpdateInfoInput{
+		CollectorsNote: persist.NullString(collectorsNote),
+	}
+
+	err = api.repos.NftRepository.UpdateByID(ctx, nftID, userID, update)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
+	// Send event
+	nftData := persist.NftEvent{CollectorsNote: persist.NullString(collectorsNote)}
+	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, nftID, nftData)
+
+	return nil
+}
+
+func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
+	gc := util.GinContextFromContext(ctx)
+	nftHandlers := event.For(gc).Nft
+	evt := persist.NftEventRecord{
+		UserID: userID,
+		NftID:  nftID,
+		Code:   eventCode,
+		Data:   nftData,
+	}
+
+	nftHandlers.Dispatch(evt)
 }

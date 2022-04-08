@@ -91,6 +91,10 @@ type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
 }
 
+type UpdateNftInfoPayloadOrError interface {
+	IsUpdateNftInfoPayloadOrError()
+}
+
 type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
@@ -231,6 +235,7 @@ func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateCollectionNftsPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
+func (ErrInvalidInput) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
 func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
@@ -269,6 +274,7 @@ func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateCollectionNftsPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
+func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
 func (ErrNotAuthorized) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
@@ -504,6 +510,17 @@ type UpdateGalleryCollectionsPayload struct {
 }
 
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
+
+type UpdateNftInfoInput struct {
+	NftID          persist.DBID `json:"nftId"`
+	CollectorsNote string       `json:"collectorsNote"`
+}
+
+type UpdateNftInfoPayload struct {
+	Nft *Nft `json:"nft"`
+}
+
+func (UpdateNftInfoPayload) IsUpdateNftInfoPayloadOrError() {}
 
 type UpdateUserInfoInput struct {
 	Username string `json:"username"`

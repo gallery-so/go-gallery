@@ -135,12 +135,12 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 	return nil
 }
 
-func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
+func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID":   {collectionID, "required"},
-		"name":           {name, "required,collection_name"},
-		"collectorsNote": {collectorsNote, "required,collection_note"},
+		"name":           {name, "collection_name"},
+		"collectorsNote": {collectorsNote, "collection_note"},
 	}); err != nil {
 		return err
 	}

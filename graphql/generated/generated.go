@@ -241,6 +241,7 @@ type ComplexityRoot struct {
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
 		UpdateGalleryCollections func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
+		UpdateNftInfo            func(childComplexity int, input model.UpdateNftInfoInput) int
 		UpdateUserInfo           func(childComplexity int, input model.UpdateUserInfoInput) int
 	}
 
@@ -322,6 +323,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	UpdateNftInfoPayload struct {
+		Nft func(childComplexity int) int
+	}
+
 	UpdateUserInfoPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -372,14 +377,15 @@ type MembershipOwnerResolver interface {
 	User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error)
 }
 type MutationResolver interface {
+	AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
+	RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error)
+	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
+	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
 	DeleteCollection(ctx context.Context, collectionID persist.DBID) (model.DeleteCollectionPayloadOrError, error)
 	UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error)
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
-	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
-	AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
-	RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error)
-	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
+	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
 	RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
@@ -1143,6 +1149,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateGalleryCollections(childComplexity, args["input"].(model.UpdateGalleryCollectionsInput)), true
 
+	case "Mutation.updateNftInfo":
+		if e.complexity.Mutation.UpdateNftInfo == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateNftInfo_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateNftInfo(childComplexity, args["input"].(model.UpdateNftInfoInput)), true
+
 	case "Mutation.updateUserInfo":
 		if e.complexity.Mutation.UpdateUserInfo == nil {
 			break
@@ -1500,6 +1518,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateGalleryCollectionsPayload.Gallery(childComplexity), true
 
+	case "UpdateNftInfoPayload.nft":
+		if e.complexity.UpdateNftInfoPayload.Nft == nil {
+			break
+		}
+
+		return e.complexity.UpdateNftInfoPayload.Nft(childComplexity), true
+
 	case "UpdateUserInfoPayload.viewer":
 		if e.complexity.UpdateUserInfoPayload.Viewer == nil {
 			break
@@ -1672,8 +1697,8 @@ var sources = []*ast.Source{
 	{Name: "graphql/schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
-  forceResolver: Boolean
-  name: String
+    forceResolver: Boolean
+    name: String
 ) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 # Add @authRequired to any field that requires a user to be logged in. NOTE: Any field tagged with
@@ -1707,260 +1732,260 @@ scalar Address
 scalar DBID
 
 interface Node {
-  id: ID!
+    id: ID!
 }
 
 interface Error {
-  message: String!
+    message: String!
 }
 
 type GalleryUser implements Node {
-  id: ID!
-  dbid: DBID!
-  username: String
-  bio: String
-  wallets: [Wallet]
-  galleries: [Gallery] @goField(forceResolver: true)
-  isAuthenticatedUser: Boolean
+    id: ID!
+    dbid: DBID!
+    username: String
+    bio: String
+    wallets: [Wallet]
+    galleries: [Gallery] @goField(forceResolver: true)
+    isAuthenticatedUser: Boolean
 }
 
 type Wallet implements Node @goGqlId(fields: ["address"]) {
-  id: ID!
-  address: Address
-  # TODO: Do we paginate these currently?
-  nfts: [Nft] @goField(forceResolver: true)
+    id: ID!
+    address: Address
+    # TODO: Do we paginate these currently?
+    nfts: [Nft] @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
 union MediaSubtype =
     ImageMedia
-  | VideoMedia
-  | AudioMedia
-  | TextMedia
-  | HtmlMedia
-  | JsonMedia
-  | GltfMedia
-  | UnknownMedia
-  | InvalidMedia
+    | VideoMedia
+    | AudioMedia
+    | TextMedia
+    | HtmlMedia
+    | JsonMedia
+    | GltfMedia
+    | UnknownMedia
+    | InvalidMedia
 
 type PreviewURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 type ImageURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 type VideoURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 interface Media {
-  # Various sizes of preview images for the media
-  previewURLs: PreviewURLSet
+    # Various sizes of preview images for the media
+    previewURLs: PreviewURLSet
 
-  # The original source URL for the media (may be IPFS, etc)
-  mediaURL: String
+    # The original source URL for the media (may be IPFS, etc)
+    mediaURL: String
 
-  # The type of media, as determined by the backend. May be redundant given the approach we're using here
-  # (media subtypes implementing the Media interface)
-  mediaType: String
+    # The type of media, as determined by the backend. May be redundant given the approach we're using here
+    # (media subtypes implementing the Media interface)
+    mediaType: String
 
-  # All Media types will also have something like contentRenderURL or contentRenderURLs,
-  # which are the URL(s) that should actually be used for rendering the media's content
+    # All Media types will also have something like contentRenderURL or contentRenderURLs,
+    # which are the URL(s) that should actually be used for rendering the media's content
 }
 
 type ImageMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURLs: ImageURLSet
+    contentRenderURLs: ImageURLSet
 }
 
 type VideoMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURLs: VideoURLSet
+    contentRenderURLs: VideoURLSet
 }
 
 type AudioMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type TextMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type JsonMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type GltfMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type UnknownMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 enum TokenType {
-  ERC721
-  ERC1155
-  ERC20
+    ERC721
+    ERC1155
+    ERC20
 }
 
 enum Chain {
-  Ethereum
-  Arbitrum
-  Polygon
-  Optimism
+    Ethereum
+    Arbitrum
+    Polygon
+    Optimism
 }
 
 type Nft implements Node {
-  id: ID!
-  dbid: DBID!
-  creationTime: Time
-  lastUpdated: Time
-  collectorsNote: String
-  media: MediaSubtype
-  tokenType: TokenType
-  chain: Chain
-  name: String
-  description: String
-  tokenUri: String
-  tokenId: String
-  quantity: String # source is a hex string
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
-  ownershipHistory: [OwnerAtBlock]
-  tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: Address
-  externalUrl: String
-  blockNumber: String # source is uint64
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    collectorsNote: String
+    media: MediaSubtype
+    tokenType: TokenType
+    chain: Chain
+    name: String
+    description: String
+    tokenUri: String
+    tokenId: String
+    quantity: String # source is a hex string
+    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    ownershipHistory: [OwnerAtBlock]
+    tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
+    contractAddress: Address
+    externalUrl: String
+    blockNumber: String # source is uint64
 }
 
 type OwnerAtBlock {
-  # TODO: will need to store addresses to make this resolver work
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
-  blockNumber: String # source is uint64
+    # TODO: will need to store addresses to make this resolver work
+    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    blockNumber: String # source is uint64
 }
 
 type CollectionNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
-  id: ID!
-  nft: Nft
-  collection: Collection
+    id: ID!
+    nft: Nft
+    collection: Collection
 }
 
 type CollectionLayout {
-  columns: Int
-  whitespace: [Int]
+    columns: Int
+    whitespace: [Int]
 }
 
 type Collection implements Node {
-  id: ID!
-  dbid: DBID!
-  version: Int
-  name: String
-  collectorsNote: String
-  gallery: Gallery @goField(forceResolver: true)
-  layout: CollectionLayout
-  hidden: Boolean
-  nfts: [CollectionNft] @goField(forceResolver: true)
+    id: ID!
+    dbid: DBID!
+    version: Int
+    name: String
+    collectorsNote: String
+    gallery: Gallery @goField(forceResolver: true)
+    layout: CollectionLayout
+    hidden: Boolean
+    nfts: [CollectionNft] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
-  id: ID!
-  dbid: DBID!
-  owner: GalleryUser @goField(forceResolver: true)
-  collections: [Collection] @goField(forceResolver: true)
+    id: ID!
+    dbid: DBID!
+    owner: GalleryUser @goField(forceResolver: true)
+    collections: [Collection] @goField(forceResolver: true)
 }
 
 type MembershipOwner {
-  dbid: DBID!
-  address: Address
-  user: GalleryUser @goField(forceResolver: true)
-  previewNfts: [String]
+    dbid: DBID!
+    address: Address
+    user: GalleryUser @goField(forceResolver: true)
+    previewNfts: [String]
 }
 
 type MembershipTier implements Node {
-  id: ID!
-  dbid: DBID!
-  name: String
-  assetUrl: String
-  tokenId: String
-  owners: [MembershipOwner]
+    id: ID!
+    dbid: DBID!
+    name: String
+    assetUrl: String
+    tokenId: String
+    owners: [MembershipOwner]
 }
 
 # We have this extra type in case we need to stick authed data
 # in here one day.
 type ViewerGallery {
-  gallery: Gallery
+    gallery: Gallery
 }
 
 type Viewer {
-  user: GalleryUser @goField(forceResolver: true)
-  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+    user: GalleryUser @goField(forceResolver: true)
+    viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
-  message: String!
+    message: String!
 }
 
 union NftByIdOrError = Nft | ErrNftNotFound
 
 type ErrNftNotFound implements Error {
-  message: String!
+    message: String!
 }
 
 union CollectionByIdOrError = Collection | ErrCollectionNotFound
@@ -1968,254 +1993,255 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound
 union CollectionNftByIdOrError = CollectionNft | ErrCollectionNotFound | ErrNftNotFound
 
 type Query {
-  node(id: ID!): Node
-  viewer: ViewerOrError @authRequired
-  userByUsername(username: String!): UserByUsernameOrError
-  membershipTiers(forceRefresh: Boolean): [MembershipTier]
-  collectionById(id: DBID!): CollectionByIdOrError
-  nftById(id: DBID!): NftByIdOrError
-  collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
+    node(id: ID!): Node
+    viewer: ViewerOrError @authRequired
+    userByUsername(username: String!): UserByUsernameOrError
+    membershipTiers(forceRefresh: Boolean): [MembershipTier]
+    collectionById(id: DBID!): CollectionByIdOrError
+    nftById(id: DBID!): NftByIdOrError
+    collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
 }
 
 input CollectionLayoutInput {
-  columns: Int!
-  whitespace: [Int!]!
+    columns: Int!
+    whitespace: [Int!]!
 }
 
 input CreateCollectionInput {
-  galleryId: DBID!
-  name: String!
-  collectorsNote: String!
-  nfts: [DBID!]!
-  layout: CollectionLayoutInput!
+    galleryId: DBID!
+    name: String!
+    collectorsNote: String!
+    nfts: [DBID!]!
+    layout: CollectionLayoutInput!
 }
 
 union CreateCollectionPayloadOrError =
     CreateCollectionPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type CreateCollectionPayload {
-  collection: Collection
+    collection: Collection
 }
 
 union DeleteCollectionPayloadOrError =
     DeleteCollectionPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
-  | ErrCollectionNotFound
+    | ErrNotAuthorized
+    | ErrInvalidInput
+    | ErrCollectionNotFound
 
 type DeleteCollectionPayload {
-  gallery: Gallery
+    gallery: Gallery
 }
 
 input UpdateCollectionInfoInput {
-  collectionId: DBID!
-  name: String!
-  collectorsNote: String!
+    collectionId: DBID!
+    name: String!
+    collectorsNote: String!
 }
 
 union UpdateCollectionInfoPayloadOrError =
     UpdateCollectionInfoPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
-  collection: Collection
+    collection: Collection
 }
 
 input UpdateCollectionNftsInput {
-  collectionId: DBID!
-  nfts: [DBID!]!
-  layout: CollectionLayoutInput!
+    collectionId: DBID!
+    nfts: [DBID!]!
+    layout: CollectionLayoutInput!
 }
 
 union UpdateCollectionNftsPayloadOrError =
     UpdateCollectionNftsPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateCollectionNftsPayload {
-  collection: Collection
+    collection: Collection
 }
 
 input UpdateGalleryCollectionsInput {
-  galleryId: DBID!
-  collections: [DBID!]!
+    galleryId: DBID!
+    collections: [DBID!]!
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
     UpdateGalleryCollectionsPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateGalleryCollectionsPayload {
-  gallery: Gallery
+    gallery: Gallery
+}
+
+input UpdateNftInfoInput {
+    nftId: DBID!
+    collectorsNote: String!
+}
+
+union UpdateNftInfoPayloadOrError =
+    UpdateNftInfoPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
+
+type UpdateNftInfoPayload {
+    nft: Nft
 }
 
 union AddUserAddressPayloadOrError =
     AddUserAddressPayload
-  | ErrAuthenticationFailed
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrAuthenticationFailed
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type AddUserAddressPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 union RemoveUserAddressesPayloadOrError =
     RemoveUserAddressesPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type RemoveUserAddressesPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 input UpdateUserInfoInput {
-  username: String!
-  bio: String!
+    username: String!
+    bio: String!
 }
 
 union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateUserInfoPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 union RefreshOpenSeaNftsPayloadOrError =
     RefreshOpenSeaNftsPayload
-  | ErrNotAuthorized
+    | ErrNotAuthorized
 
 type RefreshOpenSeaNftsPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 type AuthNonce {
-  nonce: String
-  userExists: Boolean
+    nonce: String
+    userExists: Boolean
 }
 
 union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredNFT
 
 type ErrAuthenticationFailed implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrUserAlreadyExists implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrUserNotFound implements Error {
-  message: String!
+    message: String!
 }
 
 union AuthorizationError =
     ErrNoCookie
-  | ErrInvalidToken
-  | ErrDoesNotOwnRequiredNFT
+    | ErrInvalidToken
+    | ErrDoesNotOwnRequiredNFT
 
 type ErrNotAuthorized implements Error {
-  message: String!
-  cause: AuthorizationError!
+    message: String!
+    cause: AuthorizationError!
 }
 
 type ErrInvalidInput implements Error {
-  message: String!
-  parameters: [String!]!
-  reasons: [String!]!
+    message: String!
+    parameters: [String!]!
+    reasons: [String!]!
 }
 
 type ErrNoCookie implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrInvalidToken implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrDoesNotOwnRequiredNFT implements Error {
-  message: String!
+    message: String!
 }
 
 input AuthMechanism {
-  ethereumEoa: EthereumEoaAuth
-  gnosisSafe: GnosisSafeAuth
+    ethereumEoa: EthereumEoaAuth
+    gnosisSafe: GnosisSafeAuth
 }
 
 input EthereumEoaAuth {
-  address: Address!
-  nonce: String!
-  signature: String! @scrub
+    address: Address!
+    nonce: String!
+    signature: String! @scrub
 }
 
 input GnosisSafeAuth {
-  address: Address!
-  nonce: String!
+    address: Address!
+    nonce: String!
 }
 
 union LoginPayloadOrError =
     LoginPayload
-  | ErrUserNotFound
-  | ErrAuthenticationFailed
-  | ErrDoesNotOwnRequiredNFT
+    | ErrUserNotFound
+    | ErrAuthenticationFailed
+    | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
-  userId: DBID
+    userId: DBID
 }
 
 union CreateUserPayloadOrError =
     CreateUserPayload
-  | ErrUserAlreadyExists
-  | ErrAuthenticationFailed
-  | ErrDoesNotOwnRequiredNFT
+    | ErrUserAlreadyExists
+    | ErrAuthenticationFailed
+    | ErrDoesNotOwnRequiredNFT
 
 type CreateUserPayload {
-  userId: DBID
-  galleryId: DBID
+    userId: DBID
+    galleryId: DBID
 }
 
 type Mutation {
-  # Collection Mutations
-  createCollection(
-    input: CreateCollectionInput!
-  ): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
-    @authRequired
-  updateCollectionInfo(
-    input: UpdateCollectionInfoInput!
-  ): UpdateCollectionInfoPayloadOrError @authRequired
-  updateCollectionNfts(
-    input: UpdateCollectionNftsInput!
-  ): UpdateCollectionNftsPayloadOrError @authRequired
+    # User Mutations
+    addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
+    removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayloadOrError @authRequired
+    updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
-  # Gallery Mutations
-  updateGalleryCollections(
-    input: UpdateGalleryCollectionsInput!
-  ): UpdateGalleryCollectionsPayloadOrError @authRequired
+    # Gallery Mutations
+    updateGalleryCollections(input: UpdateGalleryCollectionsInput!): UpdateGalleryCollectionsPayloadOrError @authRequired
 
-  # User Mutations
-  addUserAddress(
-    address: Address!
-    authMechanism: AuthMechanism!
-  ): AddUserAddressPayloadOrError @authRequired
-  removeUserAddresses(
-    addresses: [Address!]!
-  ): RemoveUserAddressesPayloadOrError @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
-    @authRequired
+    # Collection Mutations
+    createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
+    deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
+    updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
+    updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
 
-  # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
-    @authRequired
+    # Nft Mutations
+    updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
 
-  getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
+    # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
+    refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError @authRequired
 
-  createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
-  login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
+
+    createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+    login(authMechanism: AuthMechanism!): LoginPayloadOrError
 }
 `, BuiltIn: false},
 }
@@ -2391,6 +2417,21 @@ func (ec *executionContext) field_Mutation_updateGalleryCollections_args(ctx con
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNUpdateGalleryCollectionsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateNftInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateNftInfoInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateNftInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -5323,6 +5364,242 @@ func (ec *executionContext) _MembershipTier_owners(ctx context.Context, field gr
 	return ec.marshalOMembershipOwner2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipOwner(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_addUserAddress_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.Address), args["authMechanism"].(model.AuthMechanism))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AddUserAddressPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserAddressPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AddUserAddressPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_removeUserAddresses_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.Address))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.RemoveUserAddressesPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserAddressesPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RemoveUserAddressesPayloadOrError)
+	fc.Result = res
+	return ec.marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateUserInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateUserInfo_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateUserInfo(rctx, args["input"].(model.UpdateUserInfoInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateUserInfoPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateUserInfoPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateUserInfoPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateGalleryCollections_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateGalleryCollections(rctx, args["input"].(model.UpdateGalleryCollectionsInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateGalleryCollectionsPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateGalleryCollectionsPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateGalleryCollectionsPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateGalleryCollectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_createCollection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5559,7 +5836,7 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 	return ec.marshalOUpdateCollectionNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5576,7 +5853,7 @@ func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Conte
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_updateGalleryCollections_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateNftInfo_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -5585,7 +5862,7 @@ func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Conte
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateGalleryCollections(rctx, args["input"].(model.UpdateGalleryCollectionsInput))
+			return ec.resolvers.Mutation().UpdateNftInfo(rctx, args["input"].(model.UpdateNftInfoInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -5601,10 +5878,10 @@ func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Conte
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.UpdateGalleryCollectionsPayloadOrError); ok {
+		if data, ok := tmp.(model.UpdateNftInfoPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateGalleryCollectionsPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateNftInfoPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5613,186 +5890,9 @@ func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Conte
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.UpdateGalleryCollectionsPayloadOrError)
+	res := resTmp.(model.UpdateNftInfoPayloadOrError)
 	fc.Result = res
-	return ec.marshalOUpdateGalleryCollectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsPayloadOrError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_addUserAddress_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.Address), args["authMechanism"].(model.AuthMechanism))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.AddUserAddressPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserAddressPayloadOrError`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.AddUserAddressPayloadOrError)
-	fc.Result = res
-	return ec.marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_removeUserAddresses_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.Address))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.RemoveUserAddressesPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserAddressesPayloadOrError`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.RemoveUserAddressesPayloadOrError)
-	fc.Result = res
-	return ec.marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_updateUserInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_updateUserInfo_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateUserInfo(rctx, args["input"].(model.UpdateUserInfoInput))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.UpdateUserInfoPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateUserInfoPayloadOrError`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.UpdateUserInfoPayloadOrError)
-	fc.Result = res
-	return ec.marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOUpdateNftInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -7548,6 +7648,38 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateNftInfoPayload_nft(ctx context.Context, field graphql.CollectedField, obj *model.UpdateNftInfoPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateNftInfoPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nft, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Nft)
+	fc.Result = res
+	return ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateUserInfoPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateUserInfoPayload) (ret graphql.Marshaler) {
@@ -9515,6 +9647,37 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateNftInfoInput(ctx context.Context, obj interface{}) (model.UpdateNftInfoInput, error) {
+	var it model.UpdateNftInfoInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "nftId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nftId"))
+			it.NftID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "collectorsNote":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectorsNote"))
+			it.CollectorsNote, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Context, obj interface{}) (model.UpdateUserInfoInput, error) {
 	var it model.UpdateUserInfoInput
 	asMap := map[string]interface{}{}
@@ -10304,6 +10467,36 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayloadOrError(ctx context.
 	}
 }
 
+func (ec *executionContext) _UpdateNftInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateNftInfoPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateNftInfoPayload:
+		return ec._UpdateNftInfoPayload(ctx, sel, &obj)
+	case *model.UpdateNftInfoPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateNftInfoPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateUserInfoPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -10877,7 +11070,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel a
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -11021,7 +11214,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -11757,6 +11950,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "addUserAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addUserAddress(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "removeUserAddresses":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removeUserAddresses(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateUserInfo":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateUserInfo(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateGalleryCollections":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateGalleryCollections(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "createCollection":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createCollection(ctx, field)
@@ -11785,30 +12006,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "updateGalleryCollections":
+		case "updateNftInfo":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateGalleryCollections(ctx, field)
-			}
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		case "addUserAddress":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_addUserAddress(ctx, field)
-			}
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		case "removeUserAddresses":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_removeUserAddresses(ctx, field)
-			}
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		case "updateUserInfo":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateUserInfo(ctx, field)
+				return ec._Mutation_updateNftInfo(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -12523,6 +12723,34 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload(ctx context.Context
 		case "gallery":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UpdateGalleryCollectionsPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateNftInfoPayloadImplementors = []string{"UpdateNftInfoPayload", "UpdateNftInfoPayloadOrError"}
+
+func (ec *executionContext) _UpdateNftInfoPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateNftInfoPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateNftInfoPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateNftInfoPayload")
+		case "nft":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateNftInfoPayload_nft(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -13486,6 +13714,11 @@ func (ec *executionContext) unmarshalNUpdateGalleryCollectionsInput2githubᚗcom
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNUpdateNftInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoInput(ctx context.Context, v interface{}) (model.UpdateNftInfoInput, error) {
+	res, err := ec.unmarshalInputUpdateNftInfoInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateUserInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoInput(ctx context.Context, v interface{}) (model.UpdateUserInfoInput, error) {
 	res, err := ec.unmarshalInputUpdateUserInfoInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -14445,6 +14678,13 @@ func (ec *executionContext) marshalOUpdateGalleryCollectionsPayloadOrError2githu
 		return graphql.Null
 	}
 	return ec._UpdateGalleryCollectionsPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateNftInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateNftInfoPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateNftInfoPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateUserInfoPayloadOrError) graphql.Marshaler {

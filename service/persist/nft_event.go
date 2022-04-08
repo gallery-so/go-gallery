@@ -10,7 +10,7 @@ import (
 type NftEventRecord struct {
 	ID           DBID            `json:"id"`
 	UserID       DBID            `json:"user_id"`
-	NftID        TokenID         `json:"nft_id"`
+	NftID        DBID            `json:"nft_id"`
 	Version      NullInt32       `json:"version"`
 	Code         EventCode       `json:"event_code"`
 	CreationTime CreationTime    `json:"created_at"`
