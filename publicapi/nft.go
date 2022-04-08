@@ -80,5 +80,12 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 		return err
 	}
 
-	return nft.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
+	err = nft.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
 }

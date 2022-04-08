@@ -98,6 +98,8 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
+	api.loaders.ClearAllCaches()
+
 	createdCollection, err := api.loaders.CollectionByCollectionId.Load(collectionID)
 	if err != nil {
 		return nil, err
@@ -123,7 +125,14 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	return api.repos.CollectionRepository.Delete(ctx, collectionID, userID)
+	err = api.repos.CollectionRepository.Delete(ctx, collectionID, userID)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
 }
 
 func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
@@ -150,11 +159,18 @@ func (api CollectionAPI) UpdateCollection(ctx context.Context, collectionID pers
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
+	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
 	// Send event
 	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
 	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
 
-	return api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
+	return nil
 }
 
 func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error {
@@ -183,6 +199,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 		return err
 	}
 
+	api.loaders.ClearAllCaches()
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event

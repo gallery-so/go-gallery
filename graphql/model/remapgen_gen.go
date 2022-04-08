@@ -18,6 +18,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"CollectionNftByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CollectionNftByIDOrError)
+		return obj, ok
+	},
+
 	"CreateCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CreateCollectionPayloadOrError)
 		return obj, ok
@@ -60,6 +65,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"MediaSubtype": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(MediaSubtype)
+		return obj, ok
+	},
+
+	"NftByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(NftByIDOrError)
 		return obj, ok
 	},
 

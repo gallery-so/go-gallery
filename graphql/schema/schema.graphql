@@ -69,6 +69,7 @@ union MediaSubtype =
   | TextMedia
   | HtmlMedia
   | JsonMedia
+  | GltfMedia
   | UnknownMedia
   | InvalidMedia
 
@@ -156,6 +157,14 @@ type JsonMedia implements Media {
   contentRenderURL: String
 }
 
+type GltfMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
+}
+
 type UnknownMedia implements Media {
   previewURLs: PreviewURLSet
   mediaURL: String
@@ -213,34 +222,34 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type GalleryNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
+type CollectionNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
   id: ID!
   nft: Nft
-  collection: GalleryCollection
+  collection: Collection
 }
 
-type GalleryCollectionLayout {
+type CollectionLayout {
   columns: Int
   whitespace: [Int]
 }
 
-type GalleryCollection implements Node {
+type Collection implements Node {
   id: ID!
   dbid: DBID!
   version: Int
   name: String
   collectorsNote: String
   gallery: Gallery @goField(forceResolver: true)
-  layout: GalleryCollectionLayout
+  layout: CollectionLayout
   hidden: Boolean
-  nfts: [GalleryNft] @goField(forceResolver: true)
+  nfts: [CollectionNft] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
   id: ID!
   dbid: DBID!
   owner: GalleryUser @goField(forceResolver: true)
-  collections: [GalleryCollection] @goField(forceResolver: true)
+  collections: [Collection] @goField(forceResolver: true)
 }
 
 type MembershipOwner {
@@ -277,7 +286,15 @@ type ErrCollectionNotFound implements Error {
   message: String!
 }
 
-union CollectionByIdOrError = ErrCollectionNotFound | GalleryCollection
+union NftByIdOrError = Nft | ErrNftNotFound
+
+type ErrNftNotFound implements Error {
+  message: String!
+}
+
+union CollectionByIdOrError = Collection | ErrCollectionNotFound
+
+union CollectionNftByIdOrError = CollectionNft | ErrCollectionNotFound | ErrNftNotFound
 
 type Query {
   node(id: ID!): Node
@@ -285,9 +302,11 @@ type Query {
   userByUsername(username: String!): UserByUsernameOrError
   membershipTiers(forceRefresh: Boolean): [MembershipTier]
   collectionById(id: DBID!): CollectionByIdOrError
+  nftById(id: DBID!): NftByIdOrError
+  collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
 }
 
-input GalleryCollectionLayoutInput {
+input CollectionLayoutInput {
   columns: Int!
   whitespace: [Int!]!
 }
@@ -297,7 +316,7 @@ input CreateCollectionInput {
   name: String!
   collectorsNote: String!
   nfts: [DBID!]!
-  layout: GalleryCollectionLayoutInput!
+  layout: CollectionLayoutInput!
 }
 
 union CreateCollectionPayloadOrError =
@@ -306,7 +325,7 @@ union CreateCollectionPayloadOrError =
   | ErrInvalidInput
 
 type CreateCollectionPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 union DeleteCollectionPayloadOrError =
@@ -331,13 +350,13 @@ union UpdateCollectionInfoPayloadOrError =
   | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 input UpdateCollectionNftsInput {
   collectionId: DBID!
   nfts: [DBID!]!
-  layout: GalleryCollectionLayoutInput!
+  layout: CollectionLayoutInput!
 }
 
 union UpdateCollectionNftsPayloadOrError =
@@ -346,7 +365,7 @@ union UpdateCollectionNftsPayloadOrError =
   | ErrInvalidInput
 
 type UpdateCollectionNftsPayload {
-  collection: GalleryCollection
+  collection: Collection
 }
 
 input UpdateGalleryCollectionsInput {

@@ -21,15 +21,15 @@ import (
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 var nodeFetcher = model.NodeFetcher{
-	OnGallery:           resolveGalleryByGalleryID,
-	OnGalleryCollection: resolveGalleryCollectionByCollectionID,
-	OnGalleryUser:       resolveGalleryUserByUserID,
-	OnMembershipTier:    resolveMembershipTierByMembershipId,
-	OnNft:               resolveNftByNftID,
-	OnWallet:            resolveWalletByAddress,
+	OnGallery:        resolveGalleryByGalleryID,
+	OnCollection:     resolveCollectionByCollectionID,
+	OnGalleryUser:    resolveGalleryUserByUserID,
+	OnMembershipTier: resolveMembershipTierByMembershipId,
+	OnNft:            resolveNftByNftID,
+	OnWallet:         resolveWalletByAddress,
 
-	OnGalleryNft: func(ctx context.Context, nftId string, collectionId string) (*model.GalleryNft, error) {
-		return resolveGalleryNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
+		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
 	},
 }
 
@@ -56,6 +56,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
+	case persist.ErrNFTNotFoundByID:
+		mappedErr = model.ErrNftNotFound{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -144,7 +146,7 @@ func resolveGalleriesByUserID(ctx context.Context, userID persist.DBID) ([]*mode
 	return output, nil
 }
 
-func resolveGalleryCollectionByCollectionID(ctx context.Context, collectionID persist.DBID) (*model.GalleryCollection, error) {
+func resolveCollectionByCollectionID(ctx context.Context, collectionID persist.DBID) (*model.Collection, error) {
 	collection, err := publicapi.For(ctx).Collection.GetCollectionById(ctx, collectionID)
 	if err != nil {
 		return nil, err
@@ -153,13 +155,13 @@ func resolveGalleryCollectionByCollectionID(ctx context.Context, collectionID pe
 	return collectionToModel(ctx, *collection), nil
 }
 
-func resolveGalleryCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.GalleryCollection, error) {
+func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.Collection, error) {
 	collections, err := publicapi.For(ctx).Collection.GetCollectionsByGalleryId(ctx, galleryID)
 	if err != nil {
 		return nil, err
 	}
 
-	var output = make([]*model.GalleryCollection, len(collections))
+	var output = make([]*model.Collection, len(collections))
 	for i, collection := range collections {
 		output[i] = collectionToModel(ctx, collection)
 	}
@@ -167,19 +169,19 @@ func resolveGalleryCollectionsByGalleryID(ctx context.Context, galleryID persist
 	return output, nil
 }
 
-func resolveGalleryNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.GalleryNft, error) {
+func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.CollectionNft, error) {
 	nft, err := resolveNftByNftID(ctx, nftID)
 	if err != nil {
 		return nil, err
 	}
 
-	collection, err := resolveGalleryCollectionByCollectionID(ctx, collectionID)
+	collection, err := resolveCollectionByCollectionID(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
 
-	galleryNft := &model.GalleryNft{
-		HelperGalleryNftData: model.HelperGalleryNftData{
+	collectionNft := &model.CollectionNft{
+		HelperCollectionNftData: model.HelperCollectionNftData{
 			NftId:        nftID,
 			CollectionId: collectionID,
 		},
@@ -187,7 +189,7 @@ func resolveGalleryNftByIDs(ctx context.Context, nftID persist.DBID, collectionI
 		Collection: collection,
 	}
 
-	return galleryNft, nil
+	return collectionNft, nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
@@ -270,14 +272,14 @@ func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 	}
 }
 
-func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.GalleryCollectionLayout {
+func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.CollectionLayout {
 	whitespace := make([]*int, len(layout.Whitespace))
 	for i, w := range layout.Whitespace {
 		w := w
 		whitespace[i] = &w
 	}
 
-	return &model.GalleryCollectionLayout{
+	return &model.CollectionLayout{
 		Columns:    &layout.Columns,
 		Whitespace: whitespace,
 	}
@@ -310,10 +312,10 @@ func addressToModel(ctx context.Context, address persist.Address) *model.Wallet 
 	}
 }
 
-func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.GalleryCollection {
+func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 
-	return &model.GalleryCollection{
+	return &model.Collection{
 		Dbid:           collection.ID,
 		Version:        &version,
 		Name:           &collection.Name.String,
@@ -430,7 +432,8 @@ func getMediaForNft(nft sqlc.Nft) model.MediaSubtype {
 	case "html":
 		return getHtmlMedia(nft)
 	case "glb":
-		return getUnknownMedia(nft)
+	case "gltf":
+		return getGltfMedia(nft)
 	}
 	// Note: default in v1 frontend mapping was "animation"
 	return getUnknownMedia(nft)
@@ -517,6 +520,15 @@ func getHtmlMedia(nft sqlc.Nft) model.HTMLMedia {
 
 func getJsonMedia(nft sqlc.Nft) model.JSONMedia {
 	return model.JSONMedia{
+		PreviewURLs:      getPreviewUrls(nft),
+		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
+		MediaType:        nil,
+		ContentRenderURL: &nft.AnimationUrl.String,
+	}
+}
+
+func getGltfMedia(nft sqlc.Nft) model.GltfMedia {
+	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(nft),
 		MediaURL:         getFirstNonEmptyString(nft.AnimationOriginalUrl.String, nft.AnimationUrl.String),
 		MediaType:        nil,

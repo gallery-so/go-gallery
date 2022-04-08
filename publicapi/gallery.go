@@ -90,6 +90,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
+	api.loaders.ClearAllCaches()
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	return nil
