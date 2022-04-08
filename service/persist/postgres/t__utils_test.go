@@ -5,29 +5,33 @@ import (
 	"database/sql"
 	"testing"
 
+	migrate "github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
+	"github.com/ory/dockertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
-	viper.Set("POSTGRES_HOST", "0.0.0.0")
-	viper.Set("POSTGRES_PORT", 5432)
-	viper.Set("POSTGRES_USER", "postgres")
-	viper.Set("POSTGRES_PASSWORD", "")
-	viper.Set("POSTGRES_DB", "postgres")
-	viper.Set("ENV", "local")
+	pg, pgUnpatch := docker.InitPostgres()
+	rd, rdUnpatch := docker.InitRedis()
 
 	db := NewClient()
+	err := migrate.RunMigration(db)
+	if err != nil {
+		t.Fatalf("failed to seed db: %s", err)
+	}
 
 	t.Cleanup(func() {
 		defer db.Close()
-		dropSQL := `TRUNCATE users, nfts, collections, galleries;`
-		_, err := db.Exec(dropSQL)
-		if err != nil {
-			t.Logf("error dropping tables: %v", err)
+		defer pgUnpatch()
+		defer rdUnpatch()
+		for _, r := range []*dockertest.Resource{pg, rd} {
+			if err := r.Close(); err != nil {
+				t.Fatalf("could not purge resource: %s", err)
+			}
 		}
 	})
 

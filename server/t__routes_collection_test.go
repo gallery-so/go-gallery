@@ -18,347 +18,352 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateCollectionNameByID_Success(t *testing.T) {
-	assert := setupTest(t, 1)
+func TestCollectionRoutes(t *testing.T) {
 
-	nft := persist.NFT{
-		Description:    "asd",
-		OwnerAddress:   tc.user1.address,
-		CollectorsNote: "asd",
-	}
-	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
-	assert.Nil(err)
-	// seed DB with collection
-	collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        []persist.DBID{nftID},
+	setupDoubles(t)
+
+	t.Run("update collection name by ID", func(t *testing.T) {
+		assert := setupTest(t, 1)
+
+		nft := persist.NFT{
+			Description:    "asd",
+			OwnerAddress:   tc.user1.address,
+			CollectorsNote: "asd",
+		}
+		nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
+		assert.Nil(err)
+		// seed DB with collection
+		collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        []persist.DBID{nftID},
+		})
+		assert.Nil(err)
+
+		// build update request body
+		update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
+		resp := updateCollectionInfoRequest(assert, update, tc.user1)
+
+		errResp := &util.ErrorResponse{}
+		err = util.UnmarshallBody(errResp, resp.Body)
+		assert.Nil(err)
+		assert.Empty(errResp.Error)
+
+		assertValidResponse(assert, resp)
+
+		// retrieve updated nft
+		resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
+
+		type CollectionGetResponse struct {
+			Collection persist.Collection `json:"collection"`
+			Error      string             `json:"error"`
+		}
+		// ensure nft was updated
+		body := CollectionGetResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Empty(body.Error)
+		assert.Equal(update.Name, body.Collection.Name.String())
+		assert.NotEmpty(body.Collection.ID)
 	})
-	assert.Nil(err)
 
-	// build update request body
-	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID}
-	resp := updateCollectionInfoRequest(assert, update, tc.user1)
+	t.Run("update collection, collector's note is too long", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	errResp := &util.ErrorResponse{}
-	err = util.UnmarshallBody(errResp, resp.Body)
-	assert.Nil(err)
-	assert.Empty(errResp.Error)
+		nft := persist.NFT{
+			Description:    "asd",
+			OwnerAddress:   tc.user1.address,
+			CollectorsNote: "asd",
+		}
+		nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
+		assert.Nil(err)
+		// seed DB with collection
+		collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        []persist.DBID{nftID},
+		})
+		assert.Nil(err)
 
-	assertValidResponse(assert, resp)
+		// build update request body
+		update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID, CollectorsNote: util.RandStringBytes(601)}
+		resp := updateCollectionInfoRequest(assert, update, tc.user1)
 
-	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
+		errResp := &util.ErrorResponse{}
+		err = util.UnmarshallBody(errResp, resp.Body)
+		assert.Nil(err)
+		assert.NotEmpty(errResp.Error)
 
-	type CollectionGetResponse struct {
-		Collection persist.Collection `json:"collection"`
-		Error      string             `json:"error"`
-	}
-	// ensure nft was updated
-	body := CollectionGetResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Empty(body.Error)
-	assert.Equal(update.Name, body.Collection.Name.String())
-	assert.NotEmpty(body.Collection.ID)
-}
-
-func TestUpdateCollectionCollectorsNoteByID_Failure_TooLong(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	nft := persist.NFT{
-		Description:    "asd",
-		OwnerAddress:   tc.user1.address,
-		CollectorsNote: "asd",
-	}
-	nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
-	assert.Nil(err)
-	// seed DB with collection
-	collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        []persist.DBID{nftID},
+		assertErrorResponse(assert, resp)
 	})
-	assert.Nil(err)
 
-	// build update request body
-	update := collectionUpdateInfoByIDInput{Name: "new coll name", ID: collID, CollectorsNote: util.RandStringBytes(601)}
-	resp := updateCollectionInfoRequest(assert, update, tc.user1)
+	t.Run("create collection", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	errResp := &util.ErrorResponse{}
-	err = util.UnmarshallBody(errResp, resp.Body)
-	assert.Nil(err)
-	assert.NotEmpty(errResp.Error)
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		assert.Nil(err)
+		gid, err := tc.repos.GalleryRepository.Create(context.Background(), persist.GalleryDB{OwnerUserID: tc.user1.id})
+		assert.Nil(err)
 
-	assertErrorResponse(assert, resp)
-}
+		input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs}
+		resp := createCollectionRequest(assert, input, tc.user1)
+		assertValidResponse(assert, resp)
 
-func TestCreateCollection_Success(t *testing.T) {
-	assert := setupTest(t, 1)
+		type CreateResp struct {
+			ID    persist.DBID `json:"collection_id"`
+			Error string       `json:"error"`
+		}
 
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	assert.Nil(err)
-	gid, err := tc.repos.GalleryRepository.Create(context.Background(), persist.GalleryDB{OwnerUserID: tc.user1.id})
-	assert.Nil(err)
+		createResp := &CreateResp{}
+		err = util.UnmarshallBody(createResp, resp.Body)
+		assert.Nil(err)
+		assert.Empty(createResp.Error)
 
-	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs}
-	resp := createCollectionRequest(assert, input, tc.user1)
-	assertValidResponse(assert, resp)
+		// retrieve updated nft
+		resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, createResp.ID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
 
-	type CreateResp struct {
-		ID    persist.DBID `json:"collection_id"`
-		Error string       `json:"error"`
-	}
+		type CollectionGetResponse struct {
+			Collection persist.Collection `json:"collection"`
+			Error      string             `json:"error"`
+		}
+		// ensure nft was updated
+		body := CollectionGetResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Len(body.Collection.NFTs, 3)
+		assert.Empty(body.Error)
 
-	createResp := &CreateResp{}
-	err = util.UnmarshallBody(createResp, resp.Body)
-	assert.Nil(err)
-	assert.Empty(createResp.Error)
-
-	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, createResp.ID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
-
-	type CollectionGetResponse struct {
-		Collection persist.Collection `json:"collection"`
-		Error      string             `json:"error"`
-	}
-	// ensure nft was updated
-	body := CollectionGetResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collection.NFTs, 3)
-	assert.Empty(body.Error)
-
-	gallery, err := tc.repos.GalleryRepository.GetByID(context.Background(), gid)
-	assert.Nil(err)
-	assert.Len(gallery.Collections, 1)
-}
-
-func TestGetUnassignedCollection_Success(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	// seed DB with collection
-	_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[:2],
+		gallery, err := tc.repos.GalleryRepository.GetByID(context.Background(), gid)
+		assert.Nil(err)
+		assert.Len(gallery.Collections, 1)
 	})
-	assert.Nil(err)
 
-	resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1)
-	assertValidResponse(assert, resp)
+	t.Run("get unassigned collection", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	type NftsResponse struct {
-		Nfts  []*persist.NFT `json:"nfts"`
-		Error string         `json:"error"`
-	}
-	// ensure nft was updated
-	body := NftsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Nfts, 1)
-	assert.Empty(body.Error)
-}
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		// seed DB with collection
+		_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        nftIDs[:2],
+		})
+		assert.Nil(err)
 
-func TestDeleteCollection_Success(t *testing.T) {
-	assert := setupTest(t, 1)
+		resp := getUnassignedNFTsRequest(assert, tc.user1.id, tc.user1)
+		assertValidResponse(assert, resp)
 
-	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
-	verifyCollectionExistsInDbForID(assert, collID)
-
-	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user1)
-
-	assertValidResponse(assert, resp)
-
-	// Assert that the collection was deleted
-	_, err := tc.repos.CollectionRepository.GetByID(context.Background(), collID, false)
-	assert.NotNil(err)
-}
-
-func TestDeleteCollection_Failure_Unauthenticated(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
-	verifyCollectionExistsInDbForID(assert, collID)
-
-	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, nil)
-
-	assert.Equal(401, resp.StatusCode)
-}
-
-func TestDeleteCollection_Failure_DifferentUsersCollection(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
-	verifyCollectionExistsInDbForID(assert, collID)
-
-	resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
-	assert.Equal(500, resp.StatusCode)
-}
-
-func TestGetHiddenCollections_Success(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	assert.Nil(err)
-
-	_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs,
-		Hidden:      true,
+		type NftsResponse struct {
+			Nfts  []*persist.NFT `json:"nfts"`
+			Error string         `json:"error"`
+		}
+		// ensure nft was updated
+		body := NftsResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Len(body.Nfts, 1)
+		assert.Empty(body.Error)
 	})
-	assert.Nil(err)
 
-	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user1)
+	t.Run("delete collection", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	type CollectionsResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
-	}
+		collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
+		verifyCollectionExistsInDbForID(assert, collID)
 
-	body := CollectionsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Empty(body.Error)
-}
+		resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user1)
 
-func TestGetNoHiddenCollections_Success(t *testing.T) {
-	assert := setupTest(t, 1)
+		assertValidResponse(assert, resp)
 
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	assert.Nil(err)
-
-	_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[0:1],
-		Hidden:      false,
+		// Assert that the collection was deleted
+		_, err := tc.repos.CollectionRepository.GetByID(context.Background(), collID, false)
+		assert.NotNil(err)
 	})
-	_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs[1:],
-		Hidden:      true,
+
+	t.Run("cannot delete collection if unauthenticated", func(t *testing.T) {
+		assert := setupTest(t, 1)
+
+		collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
+		verifyCollectionExistsInDbForID(assert, collID)
+
+		resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, nil)
+
+		assert.Equal(401, resp.StatusCode)
 	})
-	assert.Nil(err)
 
-	resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
+	t.Run("delete collection fails if not user's collection", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	type CollectionsResponse struct {
-		Collections []*persist.Collection `json:"collections"`
-		Error       string                `json:"error"`
-	}
+		collID := createCollectionInDbForUserID(assert, "COLLECTION NAME", tc.user1.id)
+		verifyCollectionExistsInDbForID(assert, collID)
 
-	body := CollectionsResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.Len(body.Collections, 1)
-	assert.Empty(body.Error)
-}
-
-func TestCreateCollectionWithUsedNFT_Success(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	assert.Nil(err)
-
-	preCollID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{Name: "test", NFTs: nftIDs, OwnerUserID: tc.user1.id})
-	gid, err := tc.repos.GalleryRepository.Create(context.Background(), persist.GalleryDB{Collections: []persist.DBID{preCollID}, OwnerUserID: tc.user1.id})
-
-	input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs[0:2]}
-	resp := createCollectionRequest(assert, input, tc.user1)
-	assertValidResponse(assert, resp)
-
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, preCollID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
-
-	type CollectionGetResponse struct {
-		Collection *persist.Collection `json:"collection"`
-		Error      string              `json:"error"`
-	}
-	// ensure collection was updated
-	body := CollectionGetResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotNil(body.Collection)
-	assert.Len(body.Collection.NFTs, 3)
-	assert.Empty(body.Error)
-
-}
-
-func TestUpdateCollectionNftsOrder_Success(t *testing.T) {
-	assert := setupTest(t, 1)
-
-	nfts := []persist.NFT{
-		{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
-		{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
-		{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
-	}
-	nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
-	assert.Nil(err)
-
-	collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
-		Name:        "very cool collection",
-		OwnerUserID: tc.user1.id,
-		NFTs:        nftIDs,
+		resp := sendDeleteRequest(assert, collectionDeleteInput{ID: collID}, tc.user2)
+		assert.Equal(500, resp.StatusCode)
 	})
-	assert.Nil(err)
 
-	temp := nftIDs[1]
-	nftIDs[1] = nftIDs[2]
-	nftIDs[2] = temp
+	t.Run("get hidden collections", func(t *testing.T) {
+		assert := setupTest(t, 1)
 
-	update := collectionUpdateNftsByIDInput{ID: collID, Nfts: nftIDs}
-	resp := updateCollectionNftsRequest(assert, update, tc.user1)
-	assertValidResponse(assert, resp)
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		assert.Nil(err)
 
-	errResp := util.ErrorResponse{}
-	util.UnmarshallBody(&errResp, resp.Body)
-	assert.Empty(errResp.Error)
+		_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        nftIDs,
+			Hidden:      true,
+		})
+		assert.Nil(err)
 
-	// retrieve updated nft
-	resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
-	assert.Nil(err)
-	assertValidJSONResponse(assert, resp)
+		resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user1)
 
-	type CollectionGetResponse struct {
-		Collection *persist.Collection `json:"collection"`
-		Error      string              `json:"error"`
-	}
-	// ensure nft was updated
-	body := CollectionGetResponse{}
-	util.UnmarshallBody(&body, resp.Body)
-	assert.NotNil(body.Collection)
-	assert.Empty(body.Error)
-	logrus.Infof("nfts body: %v", body.Collection.NFTs)
-	assert.Equal(update.Nfts[1], body.Collection.NFTs[1].ID)
+		type CollectionsResponse struct {
+			Collections []*persist.Collection `json:"collections"`
+			Error       string                `json:"error"`
+		}
+
+		body := CollectionsResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Len(body.Collections, 1)
+		assert.Empty(body.Error)
+	})
+
+	t.Run("get no hidden collections", func(t *testing.T) {
+		assert := setupTest(t, 1)
+
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		assert.Nil(err)
+
+		_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        nftIDs[0:1],
+			Hidden:      false,
+		})
+		_, err = tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        nftIDs[1:],
+			Hidden:      true,
+		})
+		assert.Nil(err)
+
+		resp := sendCollUserGetRequest(assert, string(tc.user1.id), tc.user2)
+
+		type CollectionsResponse struct {
+			Collections []*persist.Collection `json:"collections"`
+			Error       string                `json:"error"`
+		}
+
+		body := CollectionsResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.Len(body.Collections, 1)
+		assert.Empty(body.Error)
+	})
+
+	t.Run("create collections with used NFTs", func(t *testing.T) {
+		assert := setupTest(t, 1)
+
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		assert.Nil(err)
+
+		preCollID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{Name: "test", NFTs: nftIDs, OwnerUserID: tc.user1.id})
+		gid, err := tc.repos.GalleryRepository.Create(context.Background(), persist.GalleryDB{Collections: []persist.DBID{preCollID}, OwnerUserID: tc.user1.id})
+
+		input := collectionCreateInput{GalleryID: gid, Nfts: nftIDs[0:2]}
+		resp := createCollectionRequest(assert, input, tc.user1)
+		assertValidResponse(assert, resp)
+
+		resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, preCollID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
+
+		type CollectionGetResponse struct {
+			Collection *persist.Collection `json:"collection"`
+			Error      string              `json:"error"`
+		}
+		// ensure collection was updated
+		body := CollectionGetResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotNil(body.Collection)
+		assert.Len(body.Collection.NFTs, 3)
+		assert.Empty(body.Error)
+
+	})
+
+	t.Run("update NFT order in collection", func(t *testing.T) {
+		assert := setupTest(t, 1)
+
+		nfts := []persist.NFT{
+			{Description: "asd", CollectorsNote: "asd", OwnerAddress: tc.user1.address, OpenseaID: 0},
+			{Description: "bbb", CollectorsNote: "bbb", OwnerAddress: tc.user1.address, OpenseaID: 1},
+			{Description: "wowowowow", CollectorsNote: "wowowowow", OwnerAddress: tc.user1.address, OpenseaID: 2},
+		}
+		nftIDs, err := tc.repos.NftRepository.CreateBulk(context.Background(), nfts)
+		assert.Nil(err)
+
+		collID, err := tc.repos.CollectionRepository.Create(context.Background(), persist.CollectionDB{
+			Name:        "very cool collection",
+			OwnerUserID: tc.user1.id,
+			NFTs:        nftIDs,
+		})
+		assert.Nil(err)
+
+		temp := nftIDs[1]
+		nftIDs[1] = nftIDs[2]
+		nftIDs[2] = temp
+
+		update := collectionUpdateNftsByIDInput{ID: collID, Nfts: nftIDs}
+		resp := updateCollectionNftsRequest(assert, update, tc.user1)
+		assertValidResponse(assert, resp)
+
+		errResp := util.ErrorResponse{}
+		util.UnmarshallBody(&errResp, resp.Body)
+		assert.Empty(errResp.Error)
+
+		// retrieve updated nft
+		resp, err = http.Get(fmt.Sprintf("%s/collections/get?id=%s", tc.serverURL, collID))
+		assert.Nil(err)
+		assertValidJSONResponse(assert, resp)
+
+		type CollectionGetResponse struct {
+			Collection *persist.Collection `json:"collection"`
+			Error      string              `json:"error"`
+		}
+		// ensure nft was updated
+		body := CollectionGetResponse{}
+		util.UnmarshallBody(&body, resp.Body)
+		assert.NotNil(body.Collection)
+		assert.Empty(body.Error)
+		logrus.Infof("nfts body: %v", body.Collection.NFTs)
+		assert.Equal(update.Nfts[1], body.Collection.NFTs[1].ID)
+	})
 }
 
 func verifyCollectionExistsInDbForID(assert *assert.Assertions, collID persist.DBID) {

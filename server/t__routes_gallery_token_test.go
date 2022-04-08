@@ -14,42 +14,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateGalleryById_ReorderCollections_Success_Token(t *testing.T) {
-	assert := setupTest(t, 2)
+func TestTokenGalleryRoutes(t *testing.T) {
 
-	initialCollectionOrder := []persist.DBID{}
+	setupDoubles(t)
 
-	// SET UP
-	// Seed DB with collection
-	for i := 0; i < 4; i++ {
-		collID := createCollectionInDbForUserIDToken(assert, fmt.Sprintf("Collection #%d", i), tc.user1.id)
-		initialCollectionOrder = append(initialCollectionOrder, collID)
-	}
-	// Seed DB with gallery
-	id, err := tc.repos.GalleryTokenRepository.Create(context.Background(), persist.GalleryTokenDB{
-		OwnerUserID: tc.user1.id,
-		Collections: initialCollectionOrder,
+	t.Run("update gallery by ID reorder collections", func(t *testing.T) {
+		assert := setupTest(t, 2)
+
+		initialCollectionOrder := []persist.DBID{}
+
+		// SET UP
+		// Seed DB with collection
+		for i := 0; i < 4; i++ {
+			collID := createCollectionInDbForUserIDToken(assert, fmt.Sprintf("Collection #%d", i), tc.user1.id)
+			initialCollectionOrder = append(initialCollectionOrder, collID)
+		}
+		// Seed DB with gallery
+		id, err := tc.repos.GalleryTokenRepository.Create(context.Background(), persist.GalleryTokenDB{
+			OwnerUserID: tc.user1.id,
+			Collections: initialCollectionOrder,
+		})
+		assert.Nil(err)
+
+		// Validate the initial order of the gallery's collections
+		validateCollectionsOrderInGallery(assert, initialCollectionOrder)
+
+		// UPDATE COLLECTION ORDER
+		// build update request body
+		updatedCollectionOrder := []persist.DBID{
+			initialCollectionOrder[3],
+			initialCollectionOrder[2],
+			initialCollectionOrder[1],
+			initialCollectionOrder[0],
+		}
+		update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
+		updateTestGalleryToken(assert, update)
+
+		time.Sleep(time.Second * 3)
+
+		// Validate the updated order of the gallery's collections
+		validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
 	})
-	assert.Nil(err)
-
-	// Validate the initial order of the gallery's collections
-	validateCollectionsOrderInGallery(assert, initialCollectionOrder)
-
-	// UPDATE COLLECTION ORDER
-	// build update request body
-	updatedCollectionOrder := []persist.DBID{
-		initialCollectionOrder[3],
-		initialCollectionOrder[2],
-		initialCollectionOrder[1],
-		initialCollectionOrder[0],
-	}
-	update := galleryTokenUpdateInput{Collections: updatedCollectionOrder, ID: id}
-	updateTestGalleryToken(assert, update)
-
-	time.Sleep(time.Second * 3)
-
-	// Validate the updated order of the gallery's collections
-	validateCollectionsOrderInGallery(assert, updatedCollectionOrder)
 }
 
 // Retrieve the user's gallery and verify that the collections are in the expected order

@@ -1,9 +1,12 @@
 package server
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"database/sql"
+	"net/http"
+	"strings"
+
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
@@ -22,8 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
-	"net/http"
-	"strings"
 )
 
 // Init initializes the server

@@ -7,8 +7,11 @@ import (
 	"flag"
 	"testing"
 
+	migrate "github.com/mikeydub/go-gallery/db"
+	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/ory/dockertest"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -46,9 +49,10 @@ var (
 
 type IntegrationTestConfig struct {
 	*TestConfig
-	pool          *dockertest.Pool
 	pgResource    *dockertest.Resource
+	pgUnpatch     func()
 	redisResource *dockertest.Resource
+	redisUnpatch  func()
 	db            *sql.DB
 }
 
@@ -108,18 +112,19 @@ func setBlockchainContext(t TestTarget) {
 }
 
 func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *IntegrationTestConfig {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-	pg, pgClient, pgxClient := initPostgres(pool)
-	rd := initRedis(pool)
+	pg, pgUnpatch := docker.InitPostgres()
+	rd, rdUnpatch := docker.InitRedis()
+
+	pgClient := postgres.NewClient()
+	pgxClient := postgres.NewPgxClient()
+	migrate.RunMigration(pgClient)
 
 	return &IntegrationTestConfig{
 		TestConfig:    initializeTestServer(pgClient, pgxClient, a, version),
-		pool:          pool,
 		pgResource:    pg,
+		pgUnpatch:     pgUnpatch,
 		redisResource: rd,
+		redisUnpatch:  rdUnpatch,
 		db:            pgClient,
 	}
 }
@@ -127,13 +132,15 @@ func (i *IntegrationTest) setupTest(a *assert.Assertions, version int) *Integrat
 func (i *IntegrationTest) TearDownTest(tc *IntegrationTestConfig) {
 	// Kill containers
 	for _, r := range []*dockertest.Resource{tc.pgResource, tc.redisResource} {
-		if err := tc.pool.Purge(r); err != nil {
+		if err := r.Close(); err != nil {
 			log.Fatalf("could not purge resource: %s", err)
 		}
 	}
 
 	tc.db.Close()
 	tc.server.Close()
+	tc.pgUnpatch()
+	tc.redisUnpatch()
 }
 
 func (s *UserAuthSuite) SetupTest() {
