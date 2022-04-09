@@ -7,6 +7,9 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -14,8 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
-	"path/filepath"
-	"strings"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -423,19 +424,25 @@ func getMediaForNft(nft sqlc.Nft) model.MediaSubtype {
 
 	switch ext {
 	case "svg":
+		fallthrough
 	case "gif":
+		fallthrough
 	case "jpg":
+		fallthrough
 	case "jpeg":
+		fallthrough
 	case "png":
 		return getImageMedia(nft)
 	case "mp4":
 		return getVideoMedia(nft)
 	case "mp3":
+		fallthrough
 	case "wav":
 		return getAudioMedia(nft)
 	case "html":
 		return getHtmlMedia(nft)
 	case "glb":
+		fallthrough
 	case "gltf":
 		return getGltfMedia(nft)
 	}
