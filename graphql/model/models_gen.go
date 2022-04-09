@@ -91,6 +91,10 @@ type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
 }
 
+type UpdateNftInfoPayloadOrError interface {
+	IsUpdateNftInfoPayloadOrError()
+}
+
 type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
@@ -231,6 +235,7 @@ func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateCollectionNftsPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
+func (ErrInvalidInput) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
 func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
@@ -269,6 +274,7 @@ func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateCollectionNftsPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
+func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
 func (ErrNotAuthorized) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
@@ -403,24 +409,26 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	Dbid             persist.DBID        `json:"dbid"`
-	CreationTime     *time.Time          `json:"creationTime"`
-	LastUpdated      *time.Time          `json:"lastUpdated"`
-	CollectorsNote   *string             `json:"collectorsNote"`
-	Media            MediaSubtype        `json:"media"`
-	TokenType        *TokenType          `json:"tokenType"`
-	Chain            *Chain              `json:"chain"`
-	Name             *string             `json:"name"`
-	Description      *string             `json:"description"`
-	TokenURI         *string             `json:"tokenUri"`
-	TokenID          *string             `json:"tokenId"`
-	Quantity         *string             `json:"quantity"`
-	Owner            GalleryUserOrWallet `json:"owner"`
-	OwnershipHistory []*OwnerAtBlock     `json:"ownershipHistory"`
-	TokenMetadata    *string             `json:"tokenMetadata"`
-	ContractAddress  *persist.Address    `json:"contractAddress"`
-	ExternalURL      *string             `json:"externalUrl"`
-	BlockNumber      *string             `json:"blockNumber"`
+	Dbid                  persist.DBID        `json:"dbid"`
+	CreationTime          *time.Time          `json:"creationTime"`
+	LastUpdated           *time.Time          `json:"lastUpdated"`
+	CollectorsNote        *string             `json:"collectorsNote"`
+	Media                 MediaSubtype        `json:"media"`
+	TokenType             *TokenType          `json:"tokenType"`
+	Chain                 *Chain              `json:"chain"`
+	Name                  *string             `json:"name"`
+	Description           *string             `json:"description"`
+	TokenURI              *string             `json:"tokenUri"`
+	TokenID               *string             `json:"tokenId"`
+	Quantity              *string             `json:"quantity"`
+	Owner                 GalleryUserOrWallet `json:"owner"`
+	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
+	TokenMetadata         *string             `json:"tokenMetadata"`
+	ContractAddress       *persist.Address    `json:"contractAddress"`
+	ExternalURL           *string             `json:"externalUrl"`
+	BlockNumber           *string             `json:"blockNumber"`
+	CreatorAddress        *persist.Address    `json:"creatorAddress"`
+	OpenseaCollectionName *string             `json:"openseaCollectionName"`
 }
 
 func (Nft) IsNode()           {}
@@ -504,6 +512,17 @@ type UpdateGalleryCollectionsPayload struct {
 }
 
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
+
+type UpdateNftInfoInput struct {
+	NftID          persist.DBID `json:"nftId"`
+	CollectorsNote string       `json:"collectorsNote"`
+}
+
+type UpdateNftInfoPayload struct {
+	Nft *Nft `json:"nft"`
+}
+
+func (UpdateNftInfoPayload) IsUpdateNftInfoPayloadOrError() {}
 
 type UpdateUserInfoInput struct {
 	Username string `json:"username"`

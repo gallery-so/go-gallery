@@ -70,6 +70,77 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	if err != nil {
+		return nil, err
+	}
+
+	err = api.User.AddUserAddress(ctx, address, authenticator)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.AddUserAddressPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.User.RemoveUserAddresses(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RemoveUserAddressesPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.User.UpdateUserInfo(ctx, input.Username, input.Bio)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateUserInfoPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Gallery.UpdateGalleryCollections(ctx, input.GalleryID, input.Collections)
+	if err != nil {
+		return nil, err
+	}
+
+	gallery, err := api.Gallery.GetGalleryById(ctx, input.GalleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Field collection
+	output := &model.UpdateGalleryCollectionsPayload{
+		Gallery: galleryToModel(ctx, *gallery),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
@@ -125,7 +196,7 @@ func (r *mutationResolver) DeleteCollection(ctx context.Context, collectionID pe
 func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Collection.UpdateCollection(ctx, input.CollectionID, input.Name, input.CollectorsNote)
+	err := api.Collection.UpdateCollectionInfo(ctx, input.CollectionID, input.Name, input.CollectorsNote)
 
 	if err != nil {
 		return nil, err
@@ -170,72 +241,21 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error) {
+func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Gallery.UpdateGalleryCollections(ctx, input.GalleryID, input.Collections)
+	err := api.Nft.UpdateNftInfo(ctx, input.NftID, input.CollectorsNote)
 	if err != nil {
 		return nil, err
 	}
 
-	gallery, err := api.Gallery.GetGalleryById(ctx, input.GalleryID)
+	nft, err := api.Nft.GetNftById(ctx, input.NftID)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Field collection
-	output := &model.UpdateGalleryCollectionsPayload{
-		Gallery: galleryToModel(ctx, *gallery),
-	}
-
-	return output, nil
-}
-
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
-	api := publicapi.For(ctx)
-
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
-	if err != nil {
-		return nil, err
-	}
-
-	err = api.User.AddUserAddress(ctx, address, authenticator)
-	if err != nil {
-		return nil, err
-	}
-
-	output := &model.AddUserAddressPayload{
-		Viewer: resolveViewer(ctx),
-	}
-
-	return output, nil
-}
-
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error) {
-	api := publicapi.For(ctx)
-
-	err := api.User.RemoveUserAddresses(ctx, addresses)
-	if err != nil {
-		return nil, err
-	}
-
-	output := &model.RemoveUserAddressesPayload{
-		Viewer: resolveViewer(ctx),
-	}
-
-	return output, nil
-}
-
-func (r *mutationResolver) UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error) {
-	api := publicapi.For(ctx)
-
-	err := api.User.UpdateUserInfo(ctx, input.Username, input.Bio)
-	if err != nil {
-		return nil, err
-	}
-
-	output := &model.UpdateUserInfoPayload{
-		Viewer: resolveViewer(ctx),
+	output := &model.UpdateNftInfoPayload{
+		Nft: nftToModel(ctx, *nft),
 	}
 
 	return output, nil

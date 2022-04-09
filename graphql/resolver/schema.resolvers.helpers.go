@@ -397,6 +397,10 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		ContractAddress:  &nft.Contract.ContractAddress,
 		ExternalURL:      &nft.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
+
+		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
+		CreatorAddress:        &nft.CreatorAddress,
+		OpenseaCollectionName: &nft.TokenCollectionName.String,
 	}
 }
 
@@ -452,19 +456,19 @@ func getFirstNonEmptyString(strings ...string) *string {
 
 func getPreviewUrls(nft sqlc.Nft) *model.PreviewURLSet {
 	return &model.PreviewURLSet{
-		Raw:    getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String),
-		Small:  getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String),
-		Medium: getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String),
-		Large:  getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String),
+		Raw:    remapLargeImageUrls(getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String)),
+		Small:  remapLargeImageUrls(getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String)),
+		Medium: remapLargeImageUrls(getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String)),
+		Large:  remapLargeImageUrls(getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String)),
 	}
 }
 
 func getImageMedia(nft sqlc.Nft) model.ImageMedia {
 	imageUrls := model.ImageURLSet{
-		Raw:    getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String),
-		Small:  getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String),
-		Medium: getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String),
-		Large:  getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String),
+		Raw:    remapLargeImageUrls(getFirstNonEmptyString(nft.ImageOriginalUrl.String, nft.AnimationUrl.String)),
+		Small:  remapLargeImageUrls(getFirstNonEmptyString(nft.ImageThumbnailUrl.String, nft.AnimationUrl.String)),
+		Medium: remapLargeImageUrls(getFirstNonEmptyString(nft.ImagePreviewUrl.String, nft.AnimationUrl.String)),
+		Large:  remapLargeImageUrls(getFirstNonEmptyString(nft.ImageUrl.String, nft.AnimationUrl.String)),
 	}
 
 	return model.ImageMedia{
@@ -473,6 +477,17 @@ func getImageMedia(nft sqlc.Nft) model.ImageMedia {
 		MediaType:         nil,
 		ContentRenderURLs: &imageUrls,
 	}
+}
+
+// Temporary method for handling the large "dead ringers" NFT image. This remapping
+// step should actually happen as part of generating resized images with imgix.
+func remapLargeImageUrls(url *string) *string {
+	if url == nil || (*url != "https://storage.opensea.io/files/33ab86c2a565430af5e7fb8399876960.png" && *url != "https://openseauserdata.com/files/33ab86c2a565430af5e7fb8399876960.png") {
+		return url
+	}
+
+	remapped := "https://lh3.googleusercontent.com/pw/AM-JKLVsudnwN97ULF-DgJC1J_AZ8i-1pMjLCVUqswF1_WShId30uP_p_jSRkmVx-XNgKNIGFSglgRojZQrsLOoCM2pVNJwgx5_E4yeYRsMvDQALFKbJk0_6wj64tjLhSIINwGpdNw0MhtWNehKCipDKNeE"
+	return &remapped
 }
 
 func getVideoMedia(nft sqlc.Nft) model.VideoMedia {
