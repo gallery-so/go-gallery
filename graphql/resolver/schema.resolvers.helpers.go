@@ -28,6 +28,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
+	OnCommunity:      resolveCommunityByContractAddress,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
@@ -59,6 +60,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrNFTNotFoundByID:
 		mappedErr = model.ErrNftNotFound{Message: message}
+	case persist.ErrCommunityNotFound:
+		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -265,6 +268,16 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
+}
+
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 	return &model.Gallery{
 		Dbid:        gallery.ID,
@@ -402,6 +415,28 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
 		CreatorAddress:        &nft.CreatorAddress,
 		OpenseaCollectionName: &nft.TokenCollectionName.String,
+	}
+}
+
+func communityToModel(ctx context.Context, community persist.Community) *model.Community {
+	lastUpdated := community.LastUpdated.Time()
+
+	owners := make([]*model.CommunityOwner, len(community.Owners))
+	for i, owner := range community.Owners {
+		owners[i] = &model.CommunityOwner{
+			Address:  &owner.Address,
+			Username: util.StringToPointer(owner.Username.String()),
+		}
+	}
+
+	return &model.Community{
+		LastUpdated:     &lastUpdated,
+		ContractAddress: &community.ContractAddress,
+		CreatorAddress:  &community.CreatorAddress,
+		Name:            util.StringToPointer(community.Name.String()),
+		Description:     util.StringToPointer(community.Description.String()),
+		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
+		Owners:          owners,
 	}
 }
 

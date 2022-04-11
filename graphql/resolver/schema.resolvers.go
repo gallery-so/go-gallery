@@ -370,6 +370,10 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
+func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddress(ctx, contractAddress)
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)

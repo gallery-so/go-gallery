@@ -27,6 +27,10 @@ type CollectionNftByIDOrError interface {
 	IsCollectionNftByIDOrError()
 }
 
+type CommunityByAddressOrError interface {
+	IsCommunityByAddressOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -168,6 +172,24 @@ type CollectionNft struct {
 func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
+type Community struct {
+	LastUpdated     *time.Time        `json:"lastUpdated"`
+	ContractAddress *persist.Address  `json:"contractAddress"`
+	CreatorAddress  *persist.Address  `json:"creatorAddress"`
+	Name            *string           `json:"name"`
+	Description     *string           `json:"description"`
+	PreviewImage    *string           `json:"previewImage"`
+	Owners          []*CommunityOwner `json:"owners"`
+}
+
+func (Community) IsNode()                      {}
+func (Community) IsCommunityByAddressOrError() {}
+
+type CommunityOwner struct {
+	Address  *persist.Address `json:"address"`
+	Username *string          `json:"username"`
+}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
 	Name           string                 `json:"name"`
@@ -212,6 +234,13 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionNftByIDOrError()       {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+
+type ErrCommunityNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
+func (ErrCommunityNotFound) IsError()                     {}
 
 type ErrDoesNotOwnRequiredNft struct {
 	Message string `json:"message"`
