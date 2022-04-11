@@ -83,6 +83,10 @@ type RemoveUserAddressesPayloadOrError interface {
 	IsRemoveUserAddressesPayloadOrError()
 }
 
+type UpdateCollectionHiddenPayloadOrError interface {
+	IsUpdateCollectionHiddenPayloadOrError()
+}
+
 type UpdateCollectionInfoPayloadOrError interface {
 	IsUpdateCollectionInfoPayloadOrError()
 }
@@ -263,6 +267,7 @@ func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrInvalidInput) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
@@ -302,6 +307,7 @@ func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
@@ -506,6 +512,17 @@ type UnknownMedia struct {
 
 func (UnknownMedia) IsMediaSubtype() {}
 func (UnknownMedia) IsMedia()        {}
+
+type UpdateCollectionHiddenInput struct {
+	CollectionID persist.DBID `json:"collectionId"`
+	Hidden       bool         `json:"hidden"`
+}
+
+type UpdateCollectionHiddenPayload struct {
+	Collection *Collection `json:"collection"`
+}
+
+func (UpdateCollectionHiddenPayload) IsUpdateCollectionHiddenPayloadOrError() {}
 
 type UpdateCollectionInfoInput struct {
 	CollectionID   persist.DBID `json:"collectionId"`

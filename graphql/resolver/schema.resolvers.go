@@ -241,6 +241,26 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 	return output, nil
 }
 
+func (r *mutationResolver) UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Collection.UpdateCollectionHidden(ctx, input.CollectionID, input.Hidden)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateCollectionHiddenPayload{
+		Collection: collectionToModel(ctx, *collection),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 

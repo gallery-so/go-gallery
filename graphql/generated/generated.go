@@ -258,6 +258,7 @@ type ComplexityRoot struct {
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
+		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
 		UpdateGalleryCollections func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
@@ -334,6 +335,10 @@ type ComplexityRoot struct {
 		PreviewURLs      func(childComplexity int) int
 	}
 
+	UpdateCollectionHiddenPayload struct {
+		Collection func(childComplexity int) int
+	}
+
 	UpdateCollectionInfoPayload struct {
 		Collection func(childComplexity int) int
 	}
@@ -408,6 +413,7 @@ type MutationResolver interface {
 	DeleteCollection(ctx context.Context, collectionID persist.DBID) (model.DeleteCollectionPayloadOrError, error)
 	UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error)
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
+	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
 	RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error)
@@ -1214,6 +1220,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.Address)), true
 
+	case "Mutation.updateCollectionHidden":
+		if e.complexity.Mutation.UpdateCollectionHidden == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateCollectionHidden_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateCollectionHidden(childComplexity, args["input"].(model.UpdateCollectionHiddenInput)), true
+
 	case "Mutation.updateCollectionInfo":
 		if e.complexity.Mutation.UpdateCollectionInfo == nil {
 			break
@@ -1623,6 +1641,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UnknownMedia.PreviewURLs(childComplexity), true
+
+	case "UpdateCollectionHiddenPayload.collection":
+		if e.complexity.UpdateCollectionHiddenPayload.Collection == nil {
+			break
+		}
+
+		return e.complexity.UpdateCollectionHiddenPayload.Collection(childComplexity), true
 
 	case "UpdateCollectionInfoPayload.collection":
 		if e.complexity.UpdateCollectionInfoPayload.Collection == nil {
@@ -2218,6 +2243,20 @@ type UpdateCollectionNftsPayload {
     collection: Collection
 }
 
+input UpdateCollectionHiddenInput {
+    collectionId: DBID!
+    hidden: Boolean!
+}
+
+union UpdateCollectionHiddenPayloadOrError =
+    UpdateCollectionHiddenPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
+
+type UpdateCollectionHiddenPayload {
+    collection: Collection
+}
+
 input UpdateGalleryCollectionsInput {
     galleryId: DBID!
     collections: [DBID!]!
@@ -2389,6 +2428,7 @@ type Mutation {
     deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
     updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
     updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+    updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
 
     # Nft Mutations
     updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
@@ -2535,6 +2575,21 @@ func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.
 		}
 	}
 	args["addresses"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateCollectionHidden_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateCollectionHiddenInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateCollectionHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -6367,6 +6422,65 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 	return ec.marshalOUpdateCollectionNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_updateCollectionHidden(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateCollectionHidden_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateCollectionHidden(rctx, args["input"].(model.UpdateCollectionHiddenInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateCollectionHiddenPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateCollectionHiddenPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateCollectionHiddenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateCollectionHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -8186,6 +8300,38 @@ func (ec *executionContext) _UnknownMedia_contentRenderURL(ctx context.Context, 
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateCollectionHiddenPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionHiddenPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateCollectionHiddenPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Collection, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateCollectionInfoPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionInfoPayload) (ret graphql.Marshaler) {
@@ -10172,6 +10318,37 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateCollectionHiddenInput(ctx context.Context, obj interface{}) (model.UpdateCollectionHiddenInput, error) {
+	var it model.UpdateCollectionHiddenInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "collectionId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
+			it.CollectionID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "hidden":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hidden"))
+			it.Hidden, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateCollectionInfoInput(ctx context.Context, obj interface{}) (model.UpdateCollectionInfoInput, error) {
 	var it model.UpdateCollectionInfoInput
 	asMap := map[string]interface{}{}
@@ -11048,6 +11225,36 @@ func (ec *executionContext) _RemoveUserAddressesPayloadOrError(ctx context.Conte
 	}
 }
 
+func (ec *executionContext) _UpdateCollectionHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateCollectionHiddenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateCollectionHiddenPayload:
+		return ec._UpdateCollectionHiddenPayload(ctx, sel, &obj)
+	case *model.UpdateCollectionHiddenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateCollectionHiddenPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateCollectionInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateCollectionInfoPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -11887,7 +12094,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel a
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -12031,7 +12238,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -12823,6 +13030,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "updateCollectionHidden":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateCollectionHidden(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "updateNftInfo":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateNftInfo(ctx, field)
@@ -13490,6 +13704,34 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UnknownMedia_contentRenderURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateCollectionHiddenPayloadImplementors = []string{"UpdateCollectionHiddenPayload", "UpdateCollectionHiddenPayloadOrError"}
+
+func (ec *executionContext) _UpdateCollectionHiddenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateCollectionHiddenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateCollectionHiddenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateCollectionHiddenPayload")
+		case "collection":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateCollectionHiddenPayload_collection(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14550,6 +14792,11 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
+func (ec *executionContext) unmarshalNUpdateCollectionHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenInput(ctx context.Context, v interface{}) (model.UpdateCollectionHiddenInput, error) {
+	res, err := ec.unmarshalInputUpdateCollectionHiddenInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateCollectionInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInfoInput(ctx context.Context, v interface{}) (model.UpdateCollectionInfoInput, error) {
 	res, err := ec.unmarshalInputUpdateCollectionInfoInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -15563,6 +15810,13 @@ func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOUpdateCollectionHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionHiddenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateCollectionHiddenPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateCollectionInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionInfoPayloadOrError) graphql.Marshaler {

@@ -395,6 +395,20 @@ type UpdateCollectionNftsPayload {
     collection: Collection
 }
 
+input UpdateCollectionHiddenInput {
+    collectionId: DBID!
+    hidden: Boolean!
+}
+
+union UpdateCollectionHiddenPayloadOrError =
+    UpdateCollectionHiddenPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
+
+type UpdateCollectionHiddenPayload {
+    collection: Collection
+}
+
 input UpdateGalleryCollectionsInput {
     galleryId: DBID!
     collections: [DBID!]!
@@ -566,6 +580,7 @@ type Mutation {
     deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
     updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
     updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+    updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
 
     # Nft Mutations
     updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired

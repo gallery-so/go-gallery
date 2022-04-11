@@ -209,6 +209,32 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	return nil
 }
 
+func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"collectionID":          {collectionID, "required"},
+		"hidden": {hidden, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	update := persist.CollectionUpdateHiddenInput{Hidden: persist.NullBool(hidden)}
+
+	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
+	if err != nil {
+		return err
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
+}
+
 func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
 	gc := util.GinContextFromContext(ctx)
 	collectionHandlers := event.For(gc).Collection
