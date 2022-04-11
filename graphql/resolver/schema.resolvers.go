@@ -241,6 +241,26 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 	return output, nil
 }
 
+func (r *mutationResolver) UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Collection.UpdateCollectionHidden(ctx, input.CollectionID, input.Hidden)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateCollectionHiddenPayload{
+		Collection: collectionToModel(ctx, *collection),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
@@ -368,6 +388,10 @@ func (r *queryResolver) NftByID(ctx context.Context, id persist.DBID) (model.Nft
 
 func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error) {
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
+}
+
+func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddress(ctx, contractAddress)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {

@@ -273,6 +273,25 @@ type MembershipTier implements Node {
     owners: [MembershipOwner]
 }
 
+type CommunityOwner {
+    address: Address
+    username: String
+}
+
+type Community implements Node @goGqlId(fields: ["contractAddress"]) {
+    id: ID!
+
+    lastUpdated: Time
+
+    contractAddress: Address
+    creatorAddress: Address
+    name: String
+    description: String
+    previewImage: String
+
+    owners: [CommunityOwner]
+}
+
 # We have this extra type in case we need to stick authed data
 # in here one day.
 type ViewerGallery {
@@ -301,6 +320,8 @@ union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
 union CollectionNftByIdOrError = CollectionNft | ErrCollectionNotFound | ErrNftNotFound
 
+union CommunityByAddressOrError = Community | ErrCommunityNotFound
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -309,6 +330,7 @@ type Query {
     collectionById(id: DBID!): CollectionByIdOrError
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
+    communityByAddress(contractAddress: Address!): CommunityByAddressOrError
 }
 
 input CollectionLayoutInput {
@@ -370,6 +392,20 @@ union UpdateCollectionNftsPayloadOrError =
     | ErrInvalidInput
 
 type UpdateCollectionNftsPayload {
+    collection: Collection
+}
+
+input UpdateCollectionHiddenInput {
+    collectionId: DBID!
+    hidden: Boolean!
+}
+
+union UpdateCollectionHiddenPayloadOrError =
+    UpdateCollectionHiddenPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
+
+type UpdateCollectionHiddenPayload {
     collection: Collection
 }
 
@@ -461,6 +497,10 @@ type ErrUserNotFound implements Error {
     message: String!
 }
 
+type ErrCommunityNotFound implements Error {
+    message: String!
+}
+
 union AuthorizationError =
     ErrNoCookie
     | ErrInvalidToken
@@ -540,6 +580,7 @@ type Mutation {
     deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
     updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
     updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+    updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
 
     # Nft Mutations
     updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired

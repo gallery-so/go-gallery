@@ -28,5 +28,11 @@
     "debugAdapter": "legacy",
     "substitutePath": []
   },
+  "files.associations": {
+    "*.graphql": "graphql"
+  },
+  "[graphql]": {
+    "editor.formatOnSave": false
+  },
   "python.formatting.provider": "black"
 }

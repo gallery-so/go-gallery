@@ -127,7 +127,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
-		"bio":      {bio, "required,bio"},
+		"bio":      {bio, "bio"},
 	}); err != nil {
 		return err
 	}
@@ -172,6 +172,22 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	}
 
 	return &membership, nil
+}
+
+func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*persist.Community, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractAddress": {contractAddress, "required,eth_addr"},
+	}); err != nil {
+		return nil, err
+	}
+
+	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &community, nil
 }
 
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
