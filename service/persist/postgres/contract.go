@@ -21,10 +21,10 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6;`)
+	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6;`)
 	checkNoErr(err)
 
 	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt}
@@ -33,7 +33,7 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 // GetByAddress returns the contract with the given address
 func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Contract, error) {
 	contract := persist.Contract{}
-	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock)
+	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
 	if err != nil {
 		return persist.Contract{}, err
 	}
@@ -43,7 +43,7 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 
 // UpsertByAddress upserts the contract with the given address
 func (c *ContractRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pContract persist.Contract) error {
-	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.LatestBlock)
+	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.LatestBlock, pContract.CreatorAddress)
 	if err != nil {
 		return err
 	}
@@ -57,15 +57,15 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 		return nil
 	}
 	pContracts = removeDuplicates(pContracts)
-	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK) VALUES `
-	vals := make([]interface{}, 0, len(pContracts)*6)
+	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES `
+	vals := make([]interface{}, 0, len(pContracts)*7)
 	for i, contract := range pContracts {
-		sqlStr += generateValuesPlaceholders(6, i*6)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock)
+		sqlStr += generateValuesPlaceholders(7, i*7)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.LatestBlock, contract.CreatorAddress)
 		sqlStr += ","
 	}
 	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK;`
+	sqlStr += ` ON CONFLICT (ADDRESS) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,LATEST_BLOCK = EXCLUDED.LATEST_BLOCK,CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS;`
 	_, err := c.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)

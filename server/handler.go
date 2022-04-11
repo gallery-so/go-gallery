@@ -204,6 +204,10 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, eth
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshUnassignedTokensForUser(repos.CollectionTokenRepository))
 	nftsGroup.GET("/metadata/refresh", refreshMetadataForToken(repos.TokenRepository, ethClient, ipfsClient, arweaveClient, stg))
 
+	communitiesGroup := parent.Group("/communities")
+
+	communitiesGroup.GET("/get", middleware.AuthOptional(), getCommunity(repos.CommunityRepository))
+
 	proxy := parent.Group("/proxy")
 	proxy.GET("/snapshot", proxySnapshot(stg))
 
@@ -249,6 +253,10 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethCl
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.UserRepository, ethClient), updateNftByID(repos.NftRepository))
 	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.UserRepository, ethClient), getUnassignedNftsForUser(repos.CollectionRepository))
 	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshUnassignedNftsForUser(repos.CollectionRepository))
+
+	communitiesGroup := parent.Group("/communities")
+
+	communitiesGroup.GET("/get", middleware.AuthOptional(), getCommunity(repos.CommunityRepository))
 
 	proxy := parent.Group("/proxy")
 	proxy.GET("/snapshot", proxySnapshot(stg))

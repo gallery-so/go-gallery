@@ -13,9 +13,10 @@ type Contract struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address Address    `json:"address"`
-	Symbol  NullString `json:"symbol"`
-	Name    NullString `json:"name"`
+	Address        Address    `json:"address"`
+	Symbol         NullString `json:"symbol"`
+	Name           NullString `json:"name"`
+	CreatorAddress Address    `json:"creator_address"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
 }

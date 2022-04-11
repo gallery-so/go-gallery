@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS nfts (
     ACQUISITION_DATE varchar,
     TOKEN_METADATA_URL varchar
 );
+
 CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS);
 
 CREATE TABLE IF NOT EXISTS collections (
@@ -132,6 +133,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     NAME varchar,
     SYMBOL varchar,
     ADDRESS varchar(255),
+    CREATOR_ADDRESS varchar(255),
     LATEST_BLOCK bigint
 );
 
