@@ -212,8 +212,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"collectionID":          {collectionID, "required"},
-		"hidden": {hidden, "required"},
+		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return err
 	}
