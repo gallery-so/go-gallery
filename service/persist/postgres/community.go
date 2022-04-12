@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -107,9 +108,14 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		var username persist.NullString
 		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&username)
 		if err != nil {
-			return persist.Community{}, fmt.Errorf("error getting user by address: %w", err)
+			logrus.Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
+			continue
 		}
-		community.Owners = append(community.Owners, persist.CommunityOwner{Address: address, Username: username})
+
+		// Don't include users who haven't picked a username yet
+		if username.String() != "" {
+			community.Owners = append(community.Owners, persist.CommunityOwner{Address: address, Username: username})
+		}
 	}
 
 	community.LastUpdated = persist.LastUpdatedTime(time.Now())
