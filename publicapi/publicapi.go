@@ -29,6 +29,7 @@ type PublicAPI struct {
 	Gallery    *GalleryAPI
 	User       *UserAPI
 	Nft        *NftAPI
+	Misc       *MiscAPI
 }
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
@@ -44,6 +45,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
 		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Misc:       &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 	}
 
 	ctx.Set(apiContextKey, api)

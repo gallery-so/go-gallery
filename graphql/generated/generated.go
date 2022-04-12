@@ -306,6 +306,7 @@ type ComplexityRoot struct {
 		CollectionByID     func(childComplexity int, id persist.DBID) int
 		CollectionNftByID  func(childComplexity int, nftID persist.DBID, collectionID persist.DBID) int
 		CommunityByAddress func(childComplexity int, contractAddress persist.Address) int
+		GeneralAllowlist   func(childComplexity int) int
 		MembershipTiers    func(childComplexity int, forceRefresh *bool) int
 		NftByID            func(childComplexity int, id persist.DBID) int
 		Node               func(childComplexity int, id model.GqlID) int
@@ -435,6 +436,7 @@ type QueryResolver interface {
 	NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error)
 	CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error)
 	CommunityByAddress(ctx context.Context, contractAddress persist.Address) (model.CommunityByAddressOrError, error)
+	GeneralAllowlist(ctx context.Context) ([]persist.Address, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
@@ -1517,6 +1519,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["contractAddress"].(persist.Address)), true
 
+	case "Query.generalAllowlist":
+		if e.complexity.Query.GeneralAllowlist == nil {
+			break
+		}
+
+		return e.complexity.Query.GeneralAllowlist(childComplexity), true
+
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
 			break
@@ -2179,6 +2188,7 @@ type Query {
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
     communityByAddress(contractAddress: Address!): CommunityByAddressOrError
+    generalAllowlist: [Address!]
 }
 
 input CollectionLayoutInput {
@@ -7911,6 +7921,38 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	return ec.marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_generalAllowlist(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().GeneralAllowlist(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -13540,6 +13582,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "generalAllowlist":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_generalAllowlist(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "__type":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -15080,6 +15142,44 @@ func (ec *executionContext) marshalOAddUserAddressPayloadOrError2githubᚗcomᚋ
 		return graphql.Null
 	}
 	return ec._AddUserAddressPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, v interface{}) ([]persist.Address, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.Address, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Address) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (*persist.Address, error) {
