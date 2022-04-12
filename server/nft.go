@@ -1,14 +1,11 @@
 package server
 
 import (
-	"net/http"
-	"strings"
-
 	"github.com/mikeydub/go-gallery/service/nft"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -162,28 +159,12 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 			return
 		}
 
-		addresses := []persist.Address{}
-		if input.WalletAddresses != "" {
-			addresses = []persist.Address{persist.Address(input.WalletAddresses)}
-			if strings.Contains(input.WalletAddresses, ",") {
-				addressesStrings := strings.Split(input.WalletAddresses, ",")
-				for _, address := range addressesStrings {
-					addresses = append(addresses, persist.Address(address))
-				}
-			}
-			ownsWallet, err := nft.DoesUserOwnWallets(c, userID, addresses, userRepo)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			if !ownsWallet {
-				util.ErrResponse(c, http.StatusBadRequest, nft.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses})
-				return
-			}
-		}
-
-		err := opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
+		err := nft.GetOpenseaNFTs(c, userID, input.WalletAddresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
 		if err != nil {
+			if _, ok := err.(nft.ErrDoesNotOwnWallets); ok {
+				util.ErrResponse(c, http.StatusBadRequest, err)
+				return
+			}
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -192,7 +173,7 @@ func getNftsFromOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepo
 	}
 }
 
-func refreshOpenseaNFTsREST(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {
+func refreshOpenseaNFTs(nftRepo persist.NFTRepository, userRepo persist.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &refreshOpenseaNftsInput{}
 		if err := c.ShouldBindQuery(input); err != nil {

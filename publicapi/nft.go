@@ -71,19 +71,14 @@ func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 }
 
 func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) error {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"addresses": {addresses, "required"},
-	}); err != nil {
-		return err
-	}
+	// No validation to do here -- addresses is an optional comma-separated list of addresses
 
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = nftservice.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
+	err = nftservice.GetOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository, api.repos.CollectionRepository, api.repos.GalleryRepository, api.repos.BackupRepository)
 	if err != nil {
 		return err
 	}
