@@ -424,7 +424,7 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 	owners := make([]*model.CommunityOwner, len(community.Owners))
 	for i, owner := range community.Owners {
 		owners[i] = &model.CommunityOwner{
-			Address:  &owner.Address,
+			Address:  &community.Owners[i].Address,
 			Username: util.StringToPointer(owner.Username.String()),
 		}
 	}
