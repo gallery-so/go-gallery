@@ -256,7 +256,7 @@ type ComplexityRoot struct {
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, address persist.Address) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
-		RefreshOpenSeaNfts       func(childComplexity int, addresses string) int
+		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
@@ -415,7 +415,7 @@ type MutationResolver interface {
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
-	RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error)
+	RefreshOpenSeaNfts(ctx context.Context, addresses *string) (model.RefreshOpenSeaNftsPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
@@ -1206,7 +1206,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RefreshOpenSeaNfts(childComplexity, args["addresses"].(string)), true
+		return e.complexity.Mutation.RefreshOpenSeaNfts(childComplexity, args["addresses"].(*string)), true
 
 	case "Mutation.removeUserAddresses":
 		if e.complexity.Mutation.RemoveUserAddresses == nil {
@@ -2434,7 +2434,7 @@ type Mutation {
     updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
 
     # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-    refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError @authRequired
+    refreshOpenSeaNfts(addresses: String): RefreshOpenSeaNftsPayloadOrError @authRequired
 
     getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 
@@ -2551,10 +2551,10 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 func (ec *executionContext) field_Mutation_refreshOpenSeaNfts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 *string
 	if tmp, ok := rawArgs["addresses"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -6566,7 +6566,7 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RefreshOpenSeaNfts(rctx, args["addresses"].(string))
+			return ec.resolvers.Mutation().RefreshOpenSeaNfts(rctx, args["addresses"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/opensea"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -146,6 +147,36 @@ func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresse
 		if !ownsWallet {
 			return ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
 		}
+	}
+
+	return nil
+}
+
+func GetOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository,
+	collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
+
+	var addresses []persist.Address
+	if walletAddresses != "" {
+		addresses = []persist.Address{persist.Address(walletAddresses)}
+		if strings.Contains(walletAddresses, ",") {
+			addressesStrings := strings.Split(walletAddresses, ",")
+			for _, address := range addressesStrings {
+				addresses = append(addresses, persist.Address(address))
+			}
+		}
+		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
+		if err != nil {
+			return err
+		}
+
+		if !ownsWallet {
+			return ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
+		}
+	}
+
+	err := opensea.UpdateAssetsForAcc(ctx, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
+	if err != nil {
+		return err
 	}
 
 	return nil

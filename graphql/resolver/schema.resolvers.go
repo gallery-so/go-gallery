@@ -281,10 +281,15 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error) {
+func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses *string) (model.RefreshOpenSeaNftsPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Nft.RefreshOpenSeaNfts(ctx, addresses)
+	addressList := ""
+	if addresses != nil {
+		addressList = *addresses
+	}
+
+	err := api.Nft.RefreshOpenSeaNfts(ctx, addressList)
 	if err != nil {
 		return nil, err
 	}

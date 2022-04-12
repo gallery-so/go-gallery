@@ -586,7 +586,7 @@ type Mutation {
     updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
 
     # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-    refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError @authRequired
+    refreshOpenSeaNfts(addresses: String): RefreshOpenSeaNftsPayloadOrError @authRequired
 
     getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
 
