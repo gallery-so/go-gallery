@@ -399,6 +399,10 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress 
 	return resolveCommunityByContractAddress(ctx, contractAddress)
 }
 
+func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address, error) {
+	return publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	gc := util.GinContextFromContext(ctx)
 	userID := auth.GetUserIDFromCtx(gc)

@@ -331,6 +331,7 @@ type Query {
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
     communityByAddress(contractAddress: Address!): CommunityByAddressOrError
+    generalAllowlist: [Address!]
 }
 
 input CollectionLayoutInput {
