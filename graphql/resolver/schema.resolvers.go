@@ -302,13 +302,14 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses *st
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error) {
-	gc := util.GinContextFromContext(ctx)
-
-	authed := auth.GetUserAuthedFromCtx(gc)
-	output, err := auth.GetAuthNonce(gc, address, authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
-
+	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, address)
 	if err != nil {
 		return nil, err
+	}
+
+	output := &model.AuthNonce{
+		Nonce:      &nonce,
+		UserExists: &userExists,
 	}
 
 	return output, nil

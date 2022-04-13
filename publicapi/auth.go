@@ -8,6 +8,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type AuthAPI struct {
@@ -29,6 +30,13 @@ func (api AuthAPI) NewEthereumNonceAuthenticator(address persist.Address, nonce 
 		EthClient:  api.ethClient,
 	}
 	return authenticator
+}
+
+func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.Address) (nonce string, userExists bool, err error) {
+	gc := util.GinContextFromContext(ctx)
+	authed := auth.GetUserAuthedFromCtx(gc)
+
+	return auth.GetAuthNonce(ctx, address, authed, api.repos.UserRepository, api.repos.NonceRepository, api.ethClient)
 }
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
