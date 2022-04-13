@@ -129,6 +129,12 @@ func AddAuthToContext() gin.HandlerFunc {
 
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 
+		// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
+		// string is how we "delete" them.
+		if err == nil && jwt == "" {
+			err = http.ErrNoCookie
+		}
+
 		if err != nil {
 			if err == http.ErrNoCookie {
 				err = auth.ErrNoCookie
