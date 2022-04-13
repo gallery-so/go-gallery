@@ -117,6 +117,7 @@ type ComplexityRoot struct {
 	CreateUserPayload struct {
 		GalleryID func(childComplexity int) int
 		UserID    func(childComplexity int) int
+		Viewer    func(childComplexity int) int
 	}
 
 	DeleteCollectionPayload struct {
@@ -231,10 +232,11 @@ type ComplexityRoot struct {
 
 	LoginPayload struct {
 		UserID func(childComplexity int) int
+		Viewer func(childComplexity int) int
 	}
 
 	LogoutPayload struct {
-		Success func(childComplexity int) int
+		Viewer func(childComplexity int) int
 	}
 
 	MembershipOwner struct {
@@ -705,6 +707,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateUserPayload.UserID(childComplexity), true
 
+	case "CreateUserPayload.viewer":
+		if e.complexity.CreateUserPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.CreateUserPayload.Viewer(childComplexity), true
+
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
 			break
@@ -1062,12 +1071,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.LoginPayload.UserID(childComplexity), true
 
-	case "LogoutPayload.success":
-		if e.complexity.LogoutPayload.Success == nil {
+	case "LoginPayload.viewer":
+		if e.complexity.LoginPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.LogoutPayload.Success(childComplexity), true
+		return e.complexity.LoginPayload.Viewer(childComplexity), true
+
+	case "LogoutPayload.viewer":
+		if e.complexity.LogoutPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.LogoutPayload.Viewer(childComplexity), true
 
 	case "MembershipOwner.address":
 		if e.complexity.MembershipOwner.Address == nil {
@@ -2430,11 +2446,13 @@ union LoginPayloadOrError =
     | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
+    # TODO: Remove userId in favor of viewer
     userId: DBID
+    viewer: Viewer
 }
 
 type LogoutPayload {
-    success: Boolean
+    viewer: Viewer
 }
 
 union CreateUserPayloadOrError =
@@ -2446,6 +2464,8 @@ union CreateUserPayloadOrError =
 type CreateUserPayload {
     userId: DBID
     galleryId: DBID
+    # TODO: Remove userId and galleryId in favor of viewer
+    viewer: Viewer
 }
 
 type Mutation {
@@ -3968,6 +3988,38 @@ func (ec *executionContext) _CreateUserPayload_galleryId(ctx context.Context, fi
 	res := resTmp.(*persist.DBID)
 	fc.Result = res
 	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CreateUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CreateUserPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCollectionPayload) (ret graphql.Marshaler) {
@@ -5656,7 +5708,39 @@ func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field grap
 	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _LogoutPayload_success(ctx context.Context, field graphql.CollectedField, obj *model.LogoutPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _LoginPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.LoginPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "LoginPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _LogoutPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.LogoutPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5674,7 +5758,7 @@ func (ec *executionContext) _LogoutPayload_success(ctx context.Context, field gr
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Success, nil
+		return obj.Viewer, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5683,9 +5767,9 @@ func (ec *executionContext) _LogoutPayload_success(ctx context.Context, field gr
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*model.Viewer)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipOwner_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
@@ -12062,6 +12146,13 @@ func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.Sele
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CreateUserPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12944,6 +13035,13 @@ func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._LoginPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12965,9 +13063,9 @@ func (ec *executionContext) _LogoutPayload(ctx context.Context, sel ast.Selectio
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("LogoutPayload")
-		case "success":
+		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._LogoutPayload_success(ctx, field, obj)
+				return ec._LogoutPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

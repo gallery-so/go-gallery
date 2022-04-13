@@ -328,6 +328,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 	output := &model.CreateUserPayload{
 		UserID:    &userID,
 		GalleryID: &galleryID,
+		Viewer:    resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -344,17 +345,20 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 		return nil, err
 	}
 
-	output := &model.LoginPayload{UserID: &userId}
+	output := &model.LoginPayload{
+		UserID: &userId,
+		Viewer: resolveViewer(ctx),
+	}
 	return output, nil
 }
 
 func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
 	publicapi.For(ctx).Auth.Logout(ctx)
 
-	// Logging out never fails! We always clear the cookie.
-	success := true
+	output := &model.LogoutPayload{
+		Viewer: nil,
+	}
 
-	output := &model.LogoutPayload{Success: &success}
 	return output, nil
 }
 
