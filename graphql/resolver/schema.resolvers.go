@@ -12,7 +12,6 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -321,9 +320,14 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		return nil, err
 	}
 
-	output, err := user.CreateUser(ctx, authenticator, r.Repos.UserRepository, r.Repos.GalleryRepository)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator)
 	if err != nil {
 		return nil, err
+	}
+
+	output := &model.CreateUserPayload{
+		UserID:    &userID,
+		GalleryID: &galleryID,
 	}
 
 	return output, nil

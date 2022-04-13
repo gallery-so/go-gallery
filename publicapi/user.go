@@ -122,6 +122,11 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.
 	return nil
 }
 
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
+	// Nothing to validate
+	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
+}
+
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -154,6 +159,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
+	// Nothing to validate
 	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
 }
 

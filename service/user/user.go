@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/graphql/model"
-
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
@@ -180,16 +178,16 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (*model.CreateUserPayload, error) {
+	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, auth.ErrAuthenticationFailed{WrappedErr: err}
+		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID != "" {
-		return nil, ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+		return "", "", ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -203,31 +201,26 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		Addresses: []persist.Address{address},
 	}
 
-	userID, err := userRepo.Create(pCtx, user)
+	userID, err = userRepo.Create(pCtx, user)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
-	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
+	galleryID, err = galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.CreateUserPayload{
-		UserID:    &userID,
-		GalleryID: &galleryID,
-	}
-
-	return &output, nil
+	return userID, galleryID, nil
 }
 
 // CreateUserREST creates a new user
@@ -243,15 +236,15 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 		EthClient:  ethClient,
 	}
 
-	gqlOutput, err := CreateUser(pCtx, authenticator, userRepo, galleryRepo)
+	userID, galleryID, err := CreateUser(pCtx, authenticator, userRepo, galleryRepo)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
 
 	output := CreateUserOutput{
 		SignatureValid: true,
-		UserID:         *gqlOutput.UserID,
-		GalleryID:      *gqlOutput.GalleryID,
+		UserID:         userID,
+		GalleryID:      galleryID,
 	}
 
 	return output, nil
