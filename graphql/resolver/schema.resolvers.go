@@ -73,7 +73,7 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Add
 }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error) {
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +329,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
