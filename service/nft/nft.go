@@ -130,14 +130,11 @@ outer:
 
 func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
 
-	addresses := []persist.Address{}
+	var addresses []persist.Address
 	if walletAddresses != "" {
-		addresses = []persist.Address{persist.Address(walletAddresses)}
-		if strings.Contains(walletAddresses, ",") {
-			addressesStrings := strings.Split(walletAddresses, ",")
-			for _, address := range addressesStrings {
-				addresses = append(addresses, persist.Address(address))
-			}
+		addressStrings := strings.Split(walletAddresses, ",")
+		for _, address := range addressStrings {
+			addresses = append(addresses, persist.Address(address))
 		}
 		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
 		if err != nil {
@@ -157,12 +154,9 @@ func GetOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses st
 
 	var addresses []persist.Address
 	if walletAddresses != "" {
-		addresses = []persist.Address{persist.Address(walletAddresses)}
-		if strings.Contains(walletAddresses, ",") {
-			addressesStrings := strings.Split(walletAddresses, ",")
-			for _, address := range addressesStrings {
-				addresses = append(addresses, persist.Address(address))
-			}
+		addressStrings := strings.Split(walletAddresses, ",")
+		for _, address := range addressStrings {
+			addresses = append(addresses, persist.Address(address))
 		}
 		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
 		if err != nil {
