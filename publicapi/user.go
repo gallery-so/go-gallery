@@ -189,16 +189,6 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	return &community, nil
 }
 
-func (api UserAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
-	// Nothing to validate
-	return auth.Login(ctx, authenticator)
-}
-
-func (api UserAPI) Logout(ctx context.Context) {
-	// Nothing to validate
-	auth.Logout(ctx)
-}
-
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User

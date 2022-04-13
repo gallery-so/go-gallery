@@ -334,7 +334,7 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 		return nil, err
 	}
 
-	userId, err := publicapi.For(ctx).User.Login(ctx, authenticator)
+	userId, err := publicapi.For(ctx).Auth.Login(ctx, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 }
 
 func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
-	publicapi.For(ctx).User.Logout(ctx)
+	publicapi.For(ctx).Auth.Logout(ctx)
 
 	// Logging out never fails! We always clear the cookie.
 	success := true
