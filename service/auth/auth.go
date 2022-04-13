@@ -275,6 +275,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 		return "", err
 	}
 
+	SetAuthStateForCtx(gc, authResult.UserID, nil)
 	SetJWTCookie(gc, jwtTokenStr)
 
 	return authResult.UserID, nil
@@ -282,6 +283,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 
 func Logout(pCtx context.Context) {
 	gc := util.GinContextFromContext(pCtx)
+	SetAuthStateForCtx(gc, "", ErrNoCookie)
 	SetJWTCookie(gc, "")
 }
 

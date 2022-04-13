@@ -218,6 +218,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		return "", "", err
 	}
 
+	auth.SetAuthStateForCtx(gc, userID, nil)
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
 	return userID, galleryID, nil
