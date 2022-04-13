@@ -10,9 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
@@ -424,15 +422,12 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
-	gc := util.GinContextFromContext(ctx)
-	userID := auth.GetUserIDFromCtx(gc)
+	userID := publicapi.For(ctx).Auth.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
-	gc := util.GinContextFromContext(ctx)
-	userID := auth.GetUserIDFromCtx(gc)
-
+	userID := publicapi.For(ctx).Auth.GetLoggedInUserId(ctx)
 	galleries, err := resolveGalleriesByUserID(ctx, userID)
 
 	if err != nil {

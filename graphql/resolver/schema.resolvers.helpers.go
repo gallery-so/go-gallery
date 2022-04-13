@@ -293,8 +293,8 @@ func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.Collecti
 
 // userToModel converts a sqlc.User to a model.User
 func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
-	gc := util.GinContextFromContext(ctx)
-	isAuthenticatedUser := auth.GetUserAuthedFromCtx(gc) && auth.GetUserIDFromCtx(gc) == user.ID
+	authApi := publicapi.For(ctx).Auth
+	isAuthenticatedUser := authApi.IsUserLoggedIn(ctx) && authApi.GetLoggedInUserId(ctx) == user.ID
 
 	wallets := make([]*model.Wallet, len(user.Addresses))
 	for i, address := range user.Addresses {
