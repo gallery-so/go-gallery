@@ -556,6 +556,10 @@ type LoginPayload {
     userId: DBID
 }
 
+type LogoutPayload {
+    success: Boolean
+}
+
 union CreateUserPayloadOrError =
     CreateUserPayload
     | ErrUserAlreadyExists
@@ -593,4 +597,5 @@ type Mutation {
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    logout: LogoutPayload
 }

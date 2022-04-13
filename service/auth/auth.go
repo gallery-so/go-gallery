@@ -285,6 +285,11 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPaylo
 	return &output, nil
 }
 
+func Logout(pCtx context.Context) {
+	gc := util.GinContextFromContext(pCtx)
+	SetJWTCookie(gc, "")
+}
+
 // VerifySignatureAllMethods will verify a signature using all available methods (eth_sign and personal_sign)
 func VerifySignatureAllMethods(pSignatureStr string,
 	pNonce string,

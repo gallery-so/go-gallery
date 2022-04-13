@@ -342,6 +342,16 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 	return output, nil
 }
 
+func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
+	publicapi.For(ctx).User.Logout(ctx)
+
+	// Logging out never fails! We always clear the cookie.
+	success := true
+
+	output := &model.LogoutPayload{Success: &success}
+	return output, nil
+}
+
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }

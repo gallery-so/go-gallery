@@ -233,6 +233,10 @@ type ComplexityRoot struct {
 		UserID func(childComplexity int) int
 	}
 
+	LogoutPayload struct {
+		Success func(childComplexity int) int
+	}
+
 	MembershipOwner struct {
 		Address     func(childComplexity int) int
 		Dbid        func(childComplexity int) int
@@ -256,6 +260,7 @@ type ComplexityRoot struct {
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, address persist.Address) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
+		Logout                   func(childComplexity int) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
@@ -420,6 +425,7 @@ type MutationResolver interface {
 	GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
+	Logout(ctx context.Context) (*model.LogoutPayload, error)
 }
 type NftResolver interface {
 	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
@@ -1056,6 +1062,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.LoginPayload.UserID(childComplexity), true
 
+	case "LogoutPayload.success":
+		if e.complexity.LogoutPayload.Success == nil {
+			break
+		}
+
+		return e.complexity.LogoutPayload.Success(childComplexity), true
+
 	case "MembershipOwner.address":
 		if e.complexity.MembershipOwner.Address == nil {
 			break
@@ -1197,6 +1210,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Login(childComplexity, args["authMechanism"].(model.AuthMechanism)), true
+
+	case "Mutation.logout":
+		if e.complexity.Mutation.Logout == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity), true
 
 	case "Mutation.refreshOpenSeaNfts":
 		if e.complexity.Mutation.RefreshOpenSeaNfts == nil {
@@ -2413,6 +2433,10 @@ type LoginPayload {
     userId: DBID
 }
 
+type LogoutPayload {
+    success: Boolean
+}
+
 union CreateUserPayloadOrError =
     CreateUserPayload
     | ErrUserAlreadyExists
@@ -2450,6 +2474,7 @@ type Mutation {
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    logout: LogoutPayload
 }
 `, BuiltIn: false},
 }
@@ -5631,6 +5656,38 @@ func (ec *executionContext) _LoginPayload_userId(ctx context.Context, field grap
 	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _LogoutPayload_success(ctx context.Context, field graphql.CollectedField, obj *model.LogoutPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "LogoutPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _MembershipOwner_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6724,6 +6781,38 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 	res := resTmp.(model.LoginPayloadOrError)
 	fc.Result = res
 	return ec.marshalOLoginPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLoginPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().Logout(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.LogoutPayload)
+	fc.Result = res
+	return ec.marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLogoutPayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_id(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
@@ -12866,6 +12955,34 @@ func (ec *executionContext) _LoginPayload(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var logoutPayloadImplementors = []string{"LogoutPayload"}
+
+func (ec *executionContext) _LogoutPayload(ctx context.Context, sel ast.SelectionSet, obj *model.LogoutPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, logoutPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LogoutPayload")
+		case "success":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._LogoutPayload_success(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var membershipOwnerImplementors = []string{"MembershipOwner"}
 
 func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.SelectionSet, obj *model.MembershipOwner) graphql.Marshaler {
@@ -13110,6 +13227,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "login":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_login(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "logout":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logout(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -15596,6 +15720,13 @@ func (ec *executionContext) marshalOLoginPayloadOrError2githubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._LoginPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLogoutPayload(ctx context.Context, sel ast.SelectionSet, v *model.LogoutPayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._LogoutPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx context.Context, sel ast.SelectionSet, v model.MediaSubtype) graphql.Marshaler {

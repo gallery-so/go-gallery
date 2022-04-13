@@ -426,6 +426,10 @@ type LoginPayload struct {
 
 func (LoginPayload) IsLoginPayloadOrError() {}
 
+type LogoutPayload struct {
+	Success *bool `json:"success"`
+}
+
 type MembershipOwner struct {
 	Dbid        persist.DBID     `json:"dbid"`
 	Address     *persist.Address `json:"address"`

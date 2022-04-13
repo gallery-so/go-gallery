@@ -190,6 +190,11 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	return &community, nil
 }
 
+func (api UserAPI) Logout(ctx context.Context) {
+	// Nothing to validate
+	auth.Logout(ctx)
+}
+
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User
