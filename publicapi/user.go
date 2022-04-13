@@ -1,14 +1,13 @@
 package publicapi
 
 import (
-	"context"
-	"github.com/mikeydub/go-gallery/db/sqlc"
-
 	"cloud.google.com/go/storage"
+	"context"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/event"
@@ -188,6 +187,11 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	}
 
 	return &community, nil
+}
+
+func (api UserAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
+	// Nothing to validate
+	return auth.Login(ctx, authenticator)
 }
 
 func (api UserAPI) Logout(ctx context.Context) {

@@ -334,11 +334,12 @@ func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMe
 		return nil, err
 	}
 
-	output, err := auth.Login(ctx, authenticator)
+	userId, err := publicapi.For(ctx).User.Login(ctx, authenticator)
 	if err != nil {
 		return nil, err
 	}
 
+	output := &model.LoginPayload{UserID: &userId}
 	return output, nil
 }
 

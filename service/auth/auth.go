@@ -245,44 +245,40 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 		EthClient:  ec,
 	}
 
-	gqlOutput, err := Login(pCtx, authenticator)
+	userID, err := Login(pCtx, authenticator)
 	if err != nil {
 		return LoginOutput{}, err
 	}
 
 	output := LoginOutput{
 		SignatureValid: true,
-		UserID:         *gqlOutput.UserID,
+		UserID:         userID,
 	}
 
 	return output, nil
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPayload, error) {
+func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, ErrAuthenticationFailed{WrappedErr: err}
+		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID == "" {
-		return nil, persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
+		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.LoginPayload{
-		UserID: &authResult.UserID,
-	}
-
-	return &output, nil
+	return authResult.UserID, nil
 }
 
 func Logout(pCtx context.Context) {
