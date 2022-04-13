@@ -356,7 +356,7 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	publicapi.For(ctx).Auth.Logout(ctx)
 
 	output := &model.LogoutPayload{
-		Viewer: nil,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil

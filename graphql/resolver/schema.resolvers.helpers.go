@@ -238,6 +238,10 @@ func resolveWalletByAddress(ctx context.Context, address persist.Address) (*mode
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
+	if !publicapi.For(ctx).Auth.IsUserLoggedIn(ctx) {
+		return nil
+	}
+
 	viewer := &model.Viewer{
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver

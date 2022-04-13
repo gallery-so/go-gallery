@@ -32,6 +32,16 @@ func (api AuthAPI) NewEthereumNonceAuthenticator(address persist.Address, nonce 
 	return authenticator
 }
 
+func (api AuthAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserIDFromCtx(gc)
+}
+
+func (api AuthAPI) IsUserLoggedIn(ctx context.Context) bool {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserAuthedFromCtx(gc)
+}
+
 func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.Address) (nonce string, userExists bool, err error) {
 	gc := util.GinContextFromContext(ctx)
 	authed := auth.GetUserAuthedFromCtx(gc)
