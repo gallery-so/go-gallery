@@ -18,6 +18,19 @@ type AuthAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api AuthAPI) NewEthereumNonceAuthenticator(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
+	authenticator := auth.EthereumNonceAuthenticator{
+		Address:    address,
+		Nonce:      nonce,
+		Signature:  signature,
+		WalletType: walletType,
+		UserRepo:   api.repos.UserRepository,
+		NonceRepo:  api.repos.NonceRepository,
+		EthClient:  api.ethClient,
+	}
+	return authenticator
+}
+
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {
 	// Nothing to validate
 	return auth.Login(ctx, authenticator)

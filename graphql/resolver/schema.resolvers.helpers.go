@@ -15,7 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/user"
+	userservice "github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -54,7 +54,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case user.ErrUserAlreadyExists:
+	case userservice.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
@@ -78,28 +78,16 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 }
 
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
-func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
-
-	ethNonceAuth := func(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
-		authenticator := auth.EthereumNonceAuthenticator{
-			Address:    address,
-			Nonce:      nonce,
-			Signature:  signature,
-			WalletType: walletType,
-			UserRepo:   r.Repos.UserRepository,
-			NonceRepo:  r.Repos.NonceRepository,
-			EthClient:  r.EthClient,
-		}
-		return authenticator
-	}
+func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
+	authApi := publicapi.For(ctx).Auth
 
 	if m.EthereumEoa != nil {
-		return ethNonceAuth(m.EthereumEoa.Address, m.EthereumEoa.Nonce, m.EthereumEoa.Signature, auth.WalletTypeEOA), nil
+		return authApi.NewEthereumNonceAuthenticator(m.EthereumEoa.Address, m.EthereumEoa.Nonce, m.EthereumEoa.Signature, auth.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, "0x", auth.WalletTypeGnosis), nil
+		return authApi.NewEthereumNonceAuthenticator(m.GnosisSafe.Address, m.GnosisSafe.Nonce, "0x", auth.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
