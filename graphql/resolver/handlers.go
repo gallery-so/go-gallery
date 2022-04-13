@@ -62,6 +62,11 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		if authError := auth.GetAuthErrorFromCtx(gc); authError != nil {
+			if authError != auth.ErrNoCookie {
+				// Clear the user's cookie on any auth error (except for ErrNoCookie, since there is no cookie set)
+				auth.Logout(ctx)
+			}
+
 			var gqlModel model.AuthorizationError
 			errorMsg := authError.Error()
 
