@@ -238,7 +238,7 @@ func resolveWalletByAddress(ctx context.Context, address persist.Address) (*mode
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
-	if !publicapi.For(ctx).Auth.IsUserLoggedIn(ctx) {
+	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
 		return nil
 	}
 
@@ -293,8 +293,8 @@ func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.Collecti
 
 // userToModel converts a sqlc.User to a model.User
 func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
-	authApi := publicapi.For(ctx).Auth
-	isAuthenticatedUser := authApi.IsUserLoggedIn(ctx) && authApi.GetLoggedInUserId(ctx) == user.ID
+	userApi := publicapi.For(ctx).User
+	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
 
 	wallets := make([]*model.Wallet, len(user.Addresses))
 	for i, address := range user.Addresses {

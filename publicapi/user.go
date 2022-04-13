@@ -29,6 +29,16 @@ type UserAPI struct {
 	storageClient *storage.Client
 }
 
+func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserIDFromCtx(gc)
+}
+
+func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserAuthedFromCtx(gc)
+}
+
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
