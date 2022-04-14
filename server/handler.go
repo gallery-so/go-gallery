@@ -50,8 +50,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 }
 
 func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
-	// TODO: Resolver probably doesn't need repos or ethClient once the publicAPI is done
-	config := generated.Config{Resolvers: &graphql.Resolver{Repos: repos, EthClient: ethClient}}
+	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
 
 	schema := generated.NewExecutableSchema(config)

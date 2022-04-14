@@ -211,6 +211,7 @@ func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
 type CreateUserPayload struct {
 	UserID    *persist.DBID `json:"userId"`
 	GalleryID *persist.DBID `json:"galleryId"`
+	Viewer    *Viewer       `json:"viewer"`
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
@@ -422,9 +423,14 @@ func (JSONMedia) IsMedia()        {}
 
 type LoginPayload struct {
 	UserID *persist.DBID `json:"userId"`
+	Viewer *Viewer       `json:"viewer"`
 }
 
 func (LoginPayload) IsLoginPayloadOrError() {}
+
+type LogoutPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
 
 type MembershipOwner struct {
 	Dbid        persist.DBID     `json:"dbid"`

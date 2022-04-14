@@ -1,14 +1,13 @@
 package publicapi
 
 import (
-	"context"
-	"github.com/mikeydub/go-gallery/db/sqlc"
-
 	"cloud.google.com/go/storage"
+	"context"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/event"
@@ -28,6 +27,16 @@ type UserAPI struct {
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
 	storageClient *storage.Client
+}
+
+func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserIDFromCtx(gc)
+}
+
+func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
+	gc := util.GinContextFromContext(ctx)
+	return auth.GetUserAuthedFromCtx(gc)
 }
 
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.User, error) {
@@ -123,6 +132,11 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.
 	return nil
 }
 
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
+	// Nothing to validate
+	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
+}
+
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -155,6 +169,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
+	// Nothing to validate
 	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
 }
 

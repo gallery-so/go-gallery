@@ -10,10 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/user"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
@@ -73,7 +70,7 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
@@ -302,41 +299,62 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses *st
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error) {
-	gc := util.GinContextFromContext(ctx)
-
-	authed := auth.GetUserAuthedFromCtx(gc)
-	output, err := auth.GetAuthNonce(gc, address, authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
-
+	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, address)
 	if err != nil {
 		return nil, err
+	}
+
+	output := &model.AuthNonce{
+		Nonce:      &nonce,
+		UserExists: &userExists,
 	}
 
 	return output, nil
 }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error) {
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
 
-	output, err := user.CreateUser(ctx, authenticator, r.Repos.UserRepository, r.Repos.GalleryRepository)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator)
 	if err != nil {
 		return nil, err
+	}
+
+	output := &model.CreateUserPayload{
+		UserID:    &userID,
+		GalleryID: &galleryID,
+		Viewer:    resolveViewer(ctx),
 	}
 
 	return output, nil
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {
-	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
+	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
 
-	output, err := auth.Login(ctx, authenticator)
+	userId, err := publicapi.For(ctx).Auth.Login(ctx, authenticator)
 	if err != nil {
 		return nil, err
+	}
+
+	output := &model.LoginPayload{
+		UserID: &userId,
+		Viewer: resolveViewer(ctx),
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
+	publicapi.For(ctx).Auth.Logout(ctx)
+
+	output := &model.LogoutPayload{
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
@@ -404,15 +422,12 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
-	gc := util.GinContextFromContext(ctx)
-	userID := auth.GetUserIDFromCtx(gc)
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
-	gc := util.GinContextFromContext(ctx)
-	userID := auth.GetUserIDFromCtx(gc)
-
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	galleries, err := resolveGalleriesByUserID(ctx, userID)
 
 	if err != nil {

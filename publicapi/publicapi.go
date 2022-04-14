@@ -25,6 +25,7 @@ type PublicAPI struct {
 	queries    *sqlc.Queries
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
+	Auth       *AuthAPI
 	Collection *CollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
@@ -41,6 +42,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		queries:    queries,
 		loaders:    loaders,
 		validator:  validator,
+		Auth:       &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},

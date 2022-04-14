@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -245,44 +244,47 @@ func LoginREST(pCtx context.Context, pInput LoginInput,
 		EthClient:  ec,
 	}
 
-	gqlOutput, err := Login(pCtx, authenticator)
+	userID, err := Login(pCtx, authenticator)
 	if err != nil {
 		return LoginOutput{}, err
 	}
 
 	output := LoginOutput{
 		SignatureValid: true,
-		UserID:         *gqlOutput.UserID,
+		UserID:         userID,
 	}
 
 	return output, nil
 }
 
 // Login logs in a user with a given authentication scheme
-func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPayload, error) {
+func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, ErrAuthenticationFailed{WrappedErr: err}
+		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID == "" {
-		return nil, persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
+		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
 	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
+	SetAuthStateForCtx(gc, authResult.UserID, nil)
 	SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.LoginPayload{
-		UserID: &authResult.UserID,
-	}
+	return authResult.UserID, nil
+}
 
-	return &output, nil
+func Logout(pCtx context.Context) {
+	gc := util.GinContextFromContext(pCtx)
+	SetAuthStateForCtx(gc, "", ErrNoCookie)
+	SetJWTCookie(gc, "")
 }
 
 // VerifySignatureAllMethods will verify a signature using all available methods (eth_sign and personal_sign)
@@ -405,20 +407,16 @@ func VerifySignature(pSignatureStr string,
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
 func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.AuthNonce, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
 		logrus.WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
-	userExistsBool := user.ID != ""
+	userExists = user.ID != ""
 
-	output := model.AuthNonce{
-		UserExists: &userExistsBool,
-	}
-
-	if !userExistsBool {
+	if !userExists {
 
 		if !pPreAuthed {
 
@@ -428,7 +426,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 
 				hasNFT, err := eth.HasNFTs(pCtx, k, v, pAddress, ethClient)
 				if err != nil {
-					return nil, err
+					return "", false, err
 				}
 				if hasNFT {
 					has = true
@@ -436,49 +434,49 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 				}
 			}
 			if !has {
-				return nil, ErrDoesNotOwnRequiredNFT{pAddress}
+				return "", false, ErrDoesNotOwnRequiredNFT{pAddress}
 			}
 
 		}
 
-		nonce, err := nonceRepo.Get(pCtx, pAddress)
-		if err != nil || nonce.ID == "" {
-			nonce = persist.UserNonce{
+		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
+		if err != nil || dbNonce.ID == "" {
+			dbNonce = persist.UserNonce{
 				Address: pAddress,
 				Value:   persist.NullString(GenerateNonce()),
 			}
 
-			err = nonceRepo.Create(pCtx, nonce)
+			err = nonceRepo.Create(pCtx, dbNonce)
 			if err != nil {
-				return nil, err
+				return "", false, err
 			}
 		}
 
-		output.Nonce = util.StringToPointer(NewNoncePrepend + nonce.Value.String())
+		nonce = NewNoncePrepend + dbNonce.Value.String()
 
 	} else {
-		nonce, err := nonceRepo.Get(pCtx, pAddress)
+		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
 		if err != nil {
-			return nil, err
+			return "", false, err
 		}
-		output.Nonce = util.StringToPointer(NewNoncePrepend + nonce.Value.String())
+		nonce = NewNoncePrepend + dbNonce.Value.String()
 	}
 
-	return &output, nil
+	return nonce, userExists, nil
 }
 
 // GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
 func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
 
-	gqlOutput, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
+	nonce, userExists, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
 	if err != nil {
 		return nil, err
 	}
 
 	output := GetPreflightOutput{
-		Nonce:      *gqlOutput.Nonce,
-		UserExists: *gqlOutput.UserExists,
+		Nonce:      nonce,
+		UserExists: userExists,
 	}
 
 	return &output, nil

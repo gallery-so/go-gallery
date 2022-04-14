@@ -553,7 +553,13 @@ union LoginPayloadOrError =
     | ErrDoesNotOwnRequiredNFT
 
 type LoginPayload {
+    # TODO: Remove userId in favor of viewer
     userId: DBID
+    viewer: Viewer
+}
+
+type LogoutPayload {
+    viewer: Viewer
 }
 
 union CreateUserPayloadOrError =
@@ -565,6 +571,8 @@ union CreateUserPayloadOrError =
 type CreateUserPayload {
     userId: DBID
     galleryId: DBID
+    # TODO: Remove userId and galleryId in favor of viewer
+    viewer: Viewer
 }
 
 type Mutation {
@@ -593,4 +601,5 @@ type Mutation {
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    logout: LogoutPayload
 }
