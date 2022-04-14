@@ -130,7 +130,6 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.UpdateGalleryCollectionsPayload{
 		Gallery: galleryToModel(ctx, *gallery),
 	}
@@ -152,8 +151,6 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		return nil, err
 	}
 
-	// TODO: Use field collection here, and only query for the collection if it was requested.
-	// That also means returning just the ID from the public API and using it here.
 	output := model.CreateCollectionPayload{
 		Collection: collectionToModel(ctx, *collection),
 	}
@@ -204,7 +201,6 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 		return nil, err
 	}
 
-	// TODO: field collection
 	output := &model.UpdateCollectionInfoPayload{
 		Collection: collectionToModel(ctx, *collection),
 	}
@@ -230,7 +226,6 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 		return nil, err
 	}
 
-	// TODO: Field collection
 	output := &model.UpdateCollectionNftsPayload{
 		Collection: collectionToModel(ctx, *collection),
 	}
