@@ -133,7 +133,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		NonceRepository:           postgres.NewNonceRepository(db),
 		LoginRepository:           postgres.NewLoginRepository(db),
 		NftRepository:             postgres.NewNFTRepository(db, galleryRepo),
-		TokenRepository:           postgres.NewTokenRepository(db, galleryTokenRepo),
+		TokenRepository:           postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
 		CollectionRepository:      postgres.NewCollectionRepository(db, galleryRepo),
 		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
 		GalleryRepository:         galleryRepo,
@@ -145,6 +145,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
 		NftEventRepository:        postgres.NewNftEventRepository(db),
 		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
+		WalletRepository:          postgres.NewWalletRepository(db),
 	}
 }
 

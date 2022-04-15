@@ -219,7 +219,7 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 		return fmt.Errorf("could not get backup %s: %w", pBackupID, err)
 	}
 
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err = b.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return fmt.Errorf("could not get user addresses for user %s: %w", pUserID, err)

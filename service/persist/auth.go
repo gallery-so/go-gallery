@@ -20,7 +20,7 @@ type UserNonce struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 	Value        NullString      `json:"value"`
-	Address      Address         `json:"address"`
+	Address      Wallet          `json:"address"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
@@ -30,7 +30,7 @@ type UserLoginAttempt struct {
 	ID             DBID         `json:"id"`
 	CreationTime   CreationTime `json:"created_at"`
 	Deleted        NullBool     `json:"-"`
-	Address        Address      `json:"address"`
+	Address        Wallet       `json:"address"`
 	Signature      NullString   `json:"signature"`
 	NonceValue     NullString   `json:"nonce_value"`
 	UserExists     NullBool     `json:"user_exists"`
@@ -41,7 +41,7 @@ type UserLoginAttempt struct {
 
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, Address) (UserNonce, error)
+	Get(context.Context, Wallet) (UserNonce, error)
 	Create(context.Context, UserNonce) error
 }
 
@@ -66,7 +66,7 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	Address Address
+	Address Wallet
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {

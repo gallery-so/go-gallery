@@ -18,19 +18,19 @@ var errMustProvideUserIdentifier = fmt.Errorf("must provide either ID or usernam
 var errNoGalleries = errors.New("no galleries found for first user")
 
 type getUserInput struct {
-	ID       persist.DBID    `form:"id"`
-	Username string          `form:"username"`
-	Address  persist.Address `form:"address"`
+	ID       persist.DBID            `form:"id"`
+	Username string                  `form:"username"`
+	Address  persist.EthereumAddress `form:"address"`
 }
 type deleteUserInput struct {
 	ID persist.DBID `json:"id" binding:"required"`
 }
 
 type updateUserInput struct {
-	ID        persist.DBID      `json:"id" binding:"required"`
-	Username  string            `json:"username" binding:"required"`
-	Bio       string            `json:"bio"`
-	Addresses []persist.Address `json:"addresses" binding:"required"`
+	ID        persist.DBID              `json:"id" binding:"required"`
+	Username  string                    `json:"username" binding:"required"`
+	Bio       string                    `json:"bio"`
+	Addresses []persist.EthereumAddress `json:"addresses" binding:"required"`
 }
 
 type mergeUserInput struct {
@@ -39,9 +39,9 @@ type mergeUserInput struct {
 }
 
 type createUserInput struct {
-	Addresses []persist.Address `json:"addresses" binding:"required"`
-	Username  string            `json:"username" binding:"required"`
-	Bio       string            `json:"bio"`
+	Addresses []persist.EthereumAddress `json:"addresses" binding:"required"`
+	Username  string                    `json:"username" binding:"required"`
+	Bio       string                    `json:"bio"`
 }
 
 type createUserOutput struct {

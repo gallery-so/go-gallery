@@ -87,8 +87,10 @@ type CollectionRepository interface {
 	GetByIDRaw(context.Context, DBID, bool) (Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
 	UpdateNFTs(context.Context, DBID, DBID, CollectionUpdateNftsInput) error
-	ClaimNFTs(context.Context, DBID, []Address, CollectionUpdateNftsInput) error
-	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
+	// TODO move this to package multichain
+	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionUpdateNftsInput) error
+	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error
+	// TODO move this to package multichain
 	RemoveNFTsOfOldAddresses(context.Context, DBID) error
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (Collection, error)

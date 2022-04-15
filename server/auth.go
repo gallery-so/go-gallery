@@ -78,7 +78,7 @@ func logout() gin.HandlerFunc {
 	}
 }
 
-func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client, contractAddress persist.Address, tokenIDs []persist.TokenID) gin.HandlerFunc {
+func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client, contractAddress persist.EthereumAddress, tokenIDs []persist.TokenID) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &authHasNFTInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -92,7 +92,10 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client,
 		}
 		has := false
 		for _, addr := range user.Addresses {
-			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, addr, ethClient); res {
+			if addr.Chain != persist.ChainETH {
+				continue
+			}
+			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, persist.EthereumAddress(addr.Address), ethClient); res {
 				has = true
 				break
 			}

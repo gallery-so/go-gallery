@@ -17,8 +17,11 @@ func TestUserCreate_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Addresses: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 
@@ -36,8 +39,11 @@ func TestUserGetByID_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Addresses: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 
@@ -61,8 +67,11 @@ func TestUserGetByAddress_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Addresses: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 

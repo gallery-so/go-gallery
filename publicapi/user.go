@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 
 	"cloud.google.com/go/storage"
@@ -62,7 +63,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
-func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.Address) (*sqlc.User, error) {
+func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.EthereumAddress) (*sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address": {address, "required,eth_addr"},
@@ -78,7 +79,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.Address
 	return &user, nil
 }
 
-func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, authenticator auth.Authenticator) error {
+func (api UserAPI) AddUserAddress(ctx context.Context, address persist.EthereumAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address":       {address, "required,eth_addr"},
@@ -101,7 +102,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, 
 	return nil
 }
 
-func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) error {
+func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.EthereumAddress) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"addresses": {addresses, "required,unique,dive,required,eth_addr"},

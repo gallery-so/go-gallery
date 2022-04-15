@@ -24,7 +24,7 @@ func main() {
 		panic(err)
 	}
 
-	var allAddresses []persist.Address
+	var allAddresses []persist.EthereumAddress
 
 	if err = json.NewDecoder(refreshFile).Decode(&allAddresses); err != nil {
 		panic(err)
@@ -32,7 +32,7 @@ func main() {
 
 	wp := workerpool.New(3)
 
-	groupings := [][]persist.Address{}
+	groupings := [][]persist.EthereumAddress{}
 
 	for i := 0; i < len(allAddresses); i += 100 {
 		if i+100 < len(allAddresses) {

@@ -338,7 +338,7 @@ func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID p
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.Address, pUpdate persist.CollectionTokenUpdateNftsInput) error {
+func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionTokenUpdateNftsInput) error {
 	nftsToRemove, err := c.nftsToRemoveStmt.QueryContext(pCtx, pq.Array(pOwnerAddresses), pq.Array(pUpdate.NFTs))
 	if err != nil {
 		return err
@@ -376,7 +376,7 @@ func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID pers
 }
 
 // RemoveNFTsOfAddresses removes nfts of addresses from a collection in the database
-func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
+func (c *CollectionTokenRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.EthereumAddress) error {
 	nfts, err := c.getNFTsForAddressStmt.QueryContext(pCtx, pq.Array(pAddresses))
 	if err != nil {
 		return err
@@ -456,7 +456,7 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 
 // GetUnassigned returns all unassigned nfts
 func (c *CollectionTokenRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.CollectionToken, error) {
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 
 	rows, err := c.getUnassignedNFTsStmt.QueryContext(pCtx, pUserID, pq.Array(addresses))
@@ -490,7 +490,7 @@ func (c *CollectionTokenRepository) RefreshUnassigned(context.Context, persist.D
 }
 
 func ensureTokensOwnedByUser(pCtx context.Context, c *CollectionTokenRepository, pUserID persist.DBID, nfts []persist.DBID) error {
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return err
@@ -505,4 +505,13 @@ func ensureTokensOwnedByUser(pCtx context.Context, c *CollectionTokenRepository,
 		return errNotOwnedByUser
 	}
 	return nil
+}
+
+func containsAddress(pStrings []persist.Address, pString persist.Address) bool {
+	for _, s := range pStrings {
+		if s == pString {
+			return true
+		}
+	}
+	return false
 }

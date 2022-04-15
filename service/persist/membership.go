@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+
 	"github.com/lib/pq"
 )
 
@@ -22,10 +23,10 @@ type MembershipTier struct {
 
 // MembershipOwner represents a user who owns a membership card
 type MembershipOwner struct {
-	UserID      DBID         `json:"user_id"`
-	Address     Address      `json:"address"`
-	Username    NullString   `json:"username"`
-	PreviewNFTs []NullString `json:"preview_nfts"`
+	UserID      DBID            `json:"user_id"`
+	Address     EthereumAddress `json:"address"`
+	Username    NullString      `json:"username"`
+	PreviewNFTs []NullString    `json:"preview_nfts"`
 }
 
 // MembershipOwnerList is a slice of MembershipOwners, used to implement scanner/valuer interfaces

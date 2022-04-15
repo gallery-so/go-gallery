@@ -131,8 +131,8 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories,
 
 	usersGroup.POST("/login", login(repos.UserRepository, repos.NonceRepository, repos.LoginRepository, ethClient))
 	usersGroup.POST("/update/info", middleware.AuthRequired(repos.UserRepository, ethClient), updateUserInfo(repos.UserRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddressToken(repos.UserRepository, repos.NonceRepository, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
-	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddressesToken(repos.UserRepository))
+	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddressToken(repos.UserRepository, repos.WalletRepository, repos.NonceRepository, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddressesToken(repos.UserRepository, repos.WalletRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.UserRepository))
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.UserRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.MembershipRepository, repos.UserRepository, repos.TokenRepository, repos.GalleryTokenRepository, ethClient))
@@ -157,8 +157,8 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 
 	usersGroup.POST("/login", login(repos.UserRepository, repos.NonceRepository, repos.LoginRepository, ethClient))
 	usersGroup.POST("/update/info", middleware.AuthRequired(repos.UserRepository, ethClient), updateUserInfo(repos.UserRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddress(repos.UserRepository, repos.NonceRepository, ethClient))
-	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddresses(repos.UserRepository))
+	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddress(repos.UserRepository, repos.WalletRepository, repos.NonceRepository, ethClient))
+	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddresses(repos.UserRepository, repos.WalletRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.UserRepository))
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.UserRepository))
 	usersGroup.GET("/membership", getMembershipTiersREST(repos.MembershipRepository, repos.UserRepository, repos.GalleryRepository, ethClient, ipfsClient, arweaveClient, storageClient))
@@ -248,12 +248,7 @@ func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethCl
 
 	nftsGroup.GET("/get", middleware.AuthOptional(), getNftByID(repos.NftRepository))
 	nftsGroup.GET("/user_get", middleware.AuthOptional(), getNftsForUser(repos.NftRepository))
-	nftsGroup.GET("/opensea/get", middleware.AuthRequired(repos.UserRepository, ethClient), getNftsFromOpensea(repos.NftRepository, repos.UserRepository, repos.CollectionRepository, repos.GalleryRepository, repos.BackupRepository))
-	nftsGroup.POST("/opensea/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshOpenseaNFTsREST(repos.NftRepository, repos.UserRepository))
 	nftsGroup.POST("/update", middleware.AuthRequired(repos.UserRepository, ethClient), updateNftByID(repos.NftRepository))
-	nftsGroup.GET("/unassigned/get", middleware.AuthRequired(repos.UserRepository, ethClient), getUnassignedNftsForUser(repos.CollectionRepository))
-	nftsGroup.POST("/unassigned/refresh", middleware.AuthRequired(repos.UserRepository, ethClient), refreshUnassignedNftsForUser(repos.CollectionRepository))
-
 	communitiesGroup := parent.Group("/communities")
 
 	communitiesGroup.GET("/get", middleware.AuthOptional(), getCommunity(repos.CommunityRepository))

@@ -50,7 +50,7 @@ var ts *httptest.Server
 
 type TestWallet struct {
 	pk      *ecdsa.PrivateKey
-	address persist.Address
+	address persist.Wallet
 }
 
 type TestUser struct {
@@ -70,12 +70,15 @@ func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt str
 	a.NoError(err)
 
 	pub := crypto.PubkeyToAddress(pk.PublicKey).String()
-	wallet := TestWallet{pk, persist.Address(strings.ToLower(pub))}
+	wallet := TestWallet{pk, persist.Wallet{
+		Address: persist.NullString(strings.ToLower(pub)),
+		Chain:   persist.ChainETH,
+	}}
 
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
-		Addresses:          []persist.Address{wallet.address},
+		Addresses:          []persist.Wallet{wallet.address},
 	}
 	id, err := repos.UserRepository.Create(ctx, user)
 	a.NoError(err)

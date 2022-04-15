@@ -134,7 +134,7 @@ func (n *NFTRepository) Create(pCtx context.Context, pNFT persist.NFT) (persist.
 
 // GetByUserID gets all NFTs for a user
 func (n *NFTRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.NFT, error) {
-	pAddresses := []persist.Address{}
+	pAddresses := []persist.EthereumAddress{}
 	err := n.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&pAddresses))
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (n *NFTRepository) GetByCollectionID(pCtx context.Context, pCollectionID pe
 }
 
 // GetByAddresses gets all NFTs owned by a set of addresses
-func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address) ([]persist.NFT, error) {
+func (n *NFTRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.EthereumAddress) ([]persist.NFT, error) {
 	rows, err := n.getByAddressesStmt.QueryContext(pCtx, pq.Array(pAddresses))
 	if err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (n *NFTRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist
 }
 
 // GetByContractData gets a NFT by its contract data (contract address and token ID)
-func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContract persist.Address) ([]persist.NFT, error) {
+func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist.TokenID, pContract persist.EthereumAddress) ([]persist.NFT, error) {
 	rows, err := n.getByContractDataStmt.QueryContext(pCtx, pContract, pTokenID)
 	if err != nil {
 		return nil, err
@@ -234,7 +234,7 @@ func (n *NFTRepository) GetByContractData(pCtx context.Context, pTokenID persist
 }
 
 // GetByOpenseaID gets a NFT by its Opensea ID and owner address
-func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.Address) (persist.NFT, error) {
+func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.NullInt64, pWalletAddress persist.EthereumAddress) (persist.NFT, error) {
 	var nft persist.NFT
 	err := n.getByOpenseaIDStmt.QueryRowContext(pCtx, pOpenseaID, pWalletAddress).Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
 	if err != nil {
@@ -251,7 +251,7 @@ func (n *NFTRepository) GetByOpenseaID(pCtx context.Context, pOpenseaID persist.
 // UpdateByID updates a NFT by its ID
 func (n *NFTRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 
-	var userAddresses []persist.Address
+	var userAddresses []persist.EthereumAddress
 	err := n.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&userAddresses))
 	if err != nil {
 		return err

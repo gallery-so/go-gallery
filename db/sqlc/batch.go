@@ -480,7 +480,7 @@ type GetNftsByOwnerAddressBatchBatchResults struct {
 	ind int
 }
 
-func (q *Queries) GetNftsByOwnerAddressBatch(ctx context.Context, ownerAddress []persist.Address) *GetNftsByOwnerAddressBatchBatchResults {
+func (q *Queries) GetNftsByOwnerAddressBatch(ctx context.Context, ownerAddress []persist.EthereumAddress) *GetNftsByOwnerAddressBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range ownerAddress {
 		vals := []interface{}{

@@ -47,7 +47,7 @@ func NewNonceRepository(db *sql.DB) *NonceRepository {
 }
 
 // Get returns a nonce from the DB by its address
-func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Address) (persist.UserNonce, error) {
+func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Wallet) (persist.UserNonce, error) {
 	var nonce persist.UserNonce
 	err := n.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
 	if err != nil {

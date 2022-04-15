@@ -51,7 +51,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 }
 
 // GetByAddress returns a community by its address
-func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress persist.Address) (persist.Community, error) {
+func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress persist.EthereumAddress) (persist.Community, error) {
 	var community persist.Community
 
 	bs, err := c.cache.Get(ctx, pAddress.String())
@@ -66,7 +66,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 	community = persist.Community{ContractAddress: pAddress}
 	hasDescription := true
 
-	addresses := make([]persist.Address, 0, 20)
+	addresses := make([]persist.EthereumAddress, 0, 20)
 
 	rows, err := c.getInfoStmt.QueryContext(ctx, pAddress)
 	if err != nil {
@@ -74,12 +74,12 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 	}
 	defer rows.Close()
 
-	seen := map[persist.Address]bool{}
+	seen := map[persist.EthereumAddress]bool{}
 
 	for rows.Next() {
 		tempDesc := community.Description
 
-		var address persist.Address
+		var address persist.EthereumAddress
 		var media persist.Media
 		err = rows.Scan(&address, &community.Description, &media)
 		if err != nil {

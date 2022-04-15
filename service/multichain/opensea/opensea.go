@@ -18,6 +18,13 @@ import (
 
 var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
 
+type OpenseaDataRetriever struct {
+	httpClient *http.Client
+
+	nftRepository  persist.NFTRepository
+	userRepository persist.UserRepository
+}
+
 // TokenID represents a token ID from Opensea. It is separate from persist.TokenID becuase opensea returns token IDs in base 10 format instead of what we want, base 16
 type TokenID string
 
@@ -75,8 +82,8 @@ type Event struct {
 
 // Account is a user account from OpenSea
 type Account struct {
-	User    User            `json:"user"`
-	Address persist.Address `json:"address"`
+	User    User                    `json:"user"`
+	Address persist.EthereumAddress `json:"address"`
 }
 
 // User is a user from OpenSea
@@ -101,11 +108,11 @@ type errNoSingleNFTForOpenseaID struct {
 
 // ErrNoAssetsForWallets is returned when opensea returns an empty array of assets for a wallet address
 type ErrNoAssetsForWallets struct {
-	Wallets []persist.Address
+	Wallets []persist.EthereumAddress
 }
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
-func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.Address,
+func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.EthereumAddress,
 	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
 
 	err := galleryRepo.RefreshCache(pCtx, pUserID)
@@ -130,7 +137,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 		return fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
 	}
 	if len(pOwnerWalletAddresses) == 0 {
-		pOwnerWalletAddresses = user.Addresses
+		pOwnerWalletAddresses = persist.WalletsToEthereumAddresses(user.Addresses)
 	}
 
 	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)
@@ -154,7 +161,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 }
 
 // UpdateAssetsForWallet is a pipeline for getting assets for a wallet
-func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.DBID, error) {
+func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist.EthereumAddress, nftRepo persist.NFTRepository) ([]persist.DBID, error) {
 	var returnErr error
 	asDBNfts, err := fetchAssetsForWallets(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
@@ -174,12 +181,12 @@ func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist
 	return ids, returnErr
 }
 
-func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Address, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
+func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.EthereumAddress, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
 	result := []persist.NFT{}
 	nftsChan := make(chan []persist.NFT)
 	errChan := make(chan error)
 	for _, walletAddress := range pWalletAddresses {
-		go func(wa persist.Address) {
+		go func(wa persist.EthereumAddress) {
 			assets, err := FetchAssetsForWallet(pCtx, wa, "", 0, nil)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to fetch assets for wallet %s: %s", wa, err)
@@ -193,7 +200,7 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 					return
 				}
 				if len(assets) == 0 {
-					errChan <- ErrNoAssetsForWallets{Wallets: []persist.Address{wa}}
+					errChan <- ErrNoAssetsForWallets{Wallets: []persist.EthereumAddress{wa}}
 					return
 				}
 			}
@@ -230,7 +237,7 @@ func fetchAssetsForWallets(pCtx context.Context, pWalletAddresses []persist.Addr
 }
 
 // FetchAssetsForWallet recursively fetches all assets for a wallet
-func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumAddress, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -305,7 +312,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 }
 
 // FetchAssets fetches assets by its token identifiers
-func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.Address, pTokenID TokenID, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -398,7 +405,7 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 	return result, nil
 }
 
-func assetsToNFTs(pCtx context.Context, pWalletAddress persist.Address, openseaNfts []Asset, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
+func assetsToNFTs(pCtx context.Context, pWalletAddress persist.EthereumAddress, openseaNfts []Asset, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
 
 	nfts := make([]persist.NFT, len(openseaNfts))
 	nftChan := make(chan persist.NFT)
@@ -413,7 +420,7 @@ func assetsToNFTs(pCtx context.Context, pWalletAddress persist.Address, openseaN
 	return nfts, nil
 }
 
-func openseaToDBNft(pCtx context.Context, pWalletAddress persist.Address, nft Asset, nftRepo persist.NFTRepository) persist.NFT {
+func openseaToDBNft(pCtx context.Context, pWalletAddress persist.EthereumAddress, nft Asset, nftRepo persist.NFTRepository) persist.NFT {
 
 	result := persist.NFT{
 		OwnerAddress:         pWalletAddress,

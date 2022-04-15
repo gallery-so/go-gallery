@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	migrate "github.com/mikeydub/go-gallery/db"
@@ -50,7 +51,10 @@ func createMockGallery(t *testing.T, a *assert.Assertions, db *sql.DB) (persist.
 	user := persist.User{
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses:          []persist.Address{persist.Address(address)},
+		Addresses: []persist.Wallet{persist.Wallet{
+			Address: persist.NullString(strings.ToLower(address)),
+			Chain:   persist.ChainETH,
+		}},
 	}
 
 	userID, err := userRepo.Create(context.Background(), user)
@@ -58,12 +62,12 @@ func createMockGallery(t *testing.T, a *assert.Assertions, db *sql.DB) (persist.
 
 	nfts := []persist.NFT{
 		{
-			OwnerAddress: persist.Address(address),
+			OwnerAddress: persist.EthereumAddress(address),
 			Name:         "name",
 			OpenseaID:    1,
 		},
 		{
-			OwnerAddress: persist.Address(address),
+			OwnerAddress: persist.EthereumAddress(address),
 			Name:         "blah blah",
 			OpenseaID:    10,
 		},

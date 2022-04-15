@@ -25,7 +25,7 @@ var ErrRateLimited = errors.New("rate limited")
 var mixpanelDistinctIDs = map[string]string{}
 
 type errUserDoesNotHaveRequiredNFT struct {
-	addresses []persist.Address
+	addresses []persist.Wallet
 }
 
 // AuthRequired is a middleware that checks if the user is authenticated
@@ -66,9 +66,12 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 			}
 			has := false
 			for _, addr := range user.Addresses {
+				if addr.Chain != persist.ChainETH {
+					continue
+				}
 				allowlist := auth.GetAllowlistContracts()
 				for k, v := range allowlist {
-					if res, _ := eth.HasNFTs(c, k, v, addr, ethClient); res {
+					if res, _ := eth.HasNFTs(c, k, v, persist.EthereumAddress(addr.Address), ethClient); res {
 						has = true
 						break
 					}

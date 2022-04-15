@@ -410,7 +410,7 @@ func (c *CollectionRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.Address, pUpdate persist.CollectionUpdateNftsInput) error {
+func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionUpdateNftsInput) error {
 	nftsToRemove, err := c.nftsToRemoveStmt.QueryContext(pCtx, pq.Array(pOwnerAddresses), pq.Array(pUpdate.NFTs))
 	if err != nil {
 		return err
@@ -505,7 +505,7 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 }
 
 // RemoveNFTsOfAddresses removes nfts of addresses from a collection in the database
-func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.Address) error {
+func (c *CollectionRepository) RemoveNFTsOfAddresses(pCtx context.Context, pID persist.DBID, pAddresses []persist.EthereumAddress) error {
 	nfts, err := c.getNFTsForAddressStmt.QueryContext(pCtx, pq.Array(pAddresses))
 	if err != nil {
 		return err
@@ -548,14 +548,14 @@ func (c *CollectionRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pU
 		return err
 	}
 
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses)); err != nil {
 		return err
 	}
 
 	for _, coll := range colls {
 		for _, nft := range coll.NFTs {
-			if !containsAddress(addresses, nft.OwnerAddress) {
+			if !containsWallet(addresses, nft.OwnerAddress) {
 				logrus.Infof("removing nft %s from collections for %s because NFT is of old address", nft.ID, pUserID)
 				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
 				if err != nil {
@@ -587,7 +587,7 @@ func (c *CollectionRepository) Delete(pCtx context.Context, pID persist.DBID, pU
 // GetUnassigned returns all unassigned nfts
 func (c *CollectionRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.Collection, error) {
 
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 
 	rows, err := c.getUnassignedNFTsStmt.QueryContext(pCtx, pUserID, pq.Array(addresses))
@@ -622,7 +622,7 @@ func (c *CollectionRepository) RefreshUnassigned(context.Context, persist.DBID) 
 }
 
 func ensureNFTsOwnedByUser(pCtx context.Context, c *CollectionRepository, pUserID persist.DBID, nfts []persist.DBID) error {
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return err
@@ -639,7 +639,7 @@ func ensureNFTsOwnedByUser(pCtx context.Context, c *CollectionRepository, pUserI
 	return nil
 }
 
-func containsAddress(addresses []persist.Address, address persist.Address) bool {
+func containsWallet(addresses []persist.EthereumAddress, address persist.EthereumAddress) bool {
 	for _, a := range addresses {
 		if a == address {
 			return true

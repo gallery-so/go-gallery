@@ -111,7 +111,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -131,7 +131,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 
 	}
 }
-func addUserAddress(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func addUserAddress(userRepository persist.UserRepository, walletRepo persist.WalletRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -157,7 +157,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 			EthClient:  ethClient,
 		}
 
-		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository)
+		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository, walletRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -171,7 +171,7 @@ func addUserAddress(userRepository persist.UserRepository, nonceRepository persi
 
 	}
 }
-func addUserAddressToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func addUserAddressToken(userRepository persist.UserRepository, walletRepo persist.WalletRepository, nonceRepository persist.NonceRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -197,7 +197,7 @@ func addUserAddressToken(userRepository persist.UserRepository, nonceRepository 
 			EthClient:  ethClient,
 		}
 
-		err := user.AddAddressToUserToken(c, userID, input.Address, authenticator, userRepository, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
+		err := user.AddAddressToUserToken(c, userID, input.Address, authenticator, userRepository, walletRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -212,7 +212,7 @@ func addUserAddressToken(userRepository persist.UserRepository, nonceRepository 
 	}
 }
 
-func removeAddressesToken(userRepository persist.UserRepository) gin.HandlerFunc {
+func removeAddressesToken(userRepository persist.UserRepository, walletRepo persist.WalletRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.RemoveUserAddressesInput{}
@@ -228,7 +228,7 @@ func removeAddressesToken(userRepository persist.UserRepository) gin.HandlerFunc
 			return
 		}
 
-		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository)
+		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository, walletRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

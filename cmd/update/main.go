@@ -42,7 +42,7 @@ func main() {
 		panic(err)
 	}
 
-	users := map[persist.DBID][]persist.Address{}
+	users := map[persist.DBID][]persist.EthereumAddress{}
 
 	res, err := stmt.Query()
 	if err != nil {
@@ -51,7 +51,7 @@ func main() {
 
 	for res.Next() {
 		var id persist.DBID
-		var addresses []persist.Address
+		var addresses []persist.EthereumAddress
 
 		err := res.Scan(&id, pq.Array(&addresses))
 		if err != nil {
@@ -79,21 +79,19 @@ func main() {
 				defer cancel()
 				logrus.Warnf("Processing user %s with addresses %v", userID, addresses)
 
-				input := indexer.ValidateUsersNFTsInput{
-					UserID: userID,
-				}
-
-				_, err := indexer.ValidateNFTs(ctx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-				if err != nil {
-					logrus.Errorf("Error processing user %s: %s", userID, err)
-				}
 				for _, addr := range addresses {
 
-					input := indexer.UpdateMediaInput{
+					updateInput := indexer.UpdateMediaInput{
 						OwnerAddress: addr,
 					}
-
-					err = indexer.UpdateMedia(ctx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+					err = indexer.UpdateMedia(ctx, updateInput, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+					if err != nil {
+						logrus.Errorf("Error processing user %s: %s", userID, err)
+					}
+					validateInput := indexer.ValidateUsersNFTsInput{
+						Wallet: addr,
+					}
+					_, err := indexer.ValidateNFTs(ctx, validateInput, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 					if err != nil {
 						logrus.Errorf("Error processing user %s: %s", userID, err)
 					}

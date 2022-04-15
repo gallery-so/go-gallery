@@ -77,7 +77,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
 
-	ethNonceAuth := func(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
+	ethNonceAuth := func(address persist.EthereumAddress, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
 		authenticator := auth.EthereumNonceAuthenticator{
 			Address:    address,
 			Nonce:      nonce,
@@ -122,7 +122,7 @@ func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.
 	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, address persist.Address) (*model.GalleryUser, error) {
+func resolveGalleryUserByAddress(ctx context.Context, address persist.EthereumAddress) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err != nil {
@@ -223,7 +223,7 @@ func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (model.Gall
 	return resolveGalleryUserOrWalletByAddress(ctx, nft.OwnerAddress)
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.Address) (model.GalleryUserOrWallet, error) {
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.EthereumAddress) (model.GalleryUserOrWallet, error) {
 	owner, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err == nil {
@@ -237,7 +237,7 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.Ad
 	return nil, err
 }
 
-func resolveWalletByAddress(ctx context.Context, address persist.Address) (*model.Wallet, error) {
+func resolveWalletByAddress(ctx context.Context, address persist.EthereumAddress) (*model.Wallet, error) {
 	wallet := model.Wallet{
 		Address: &address,
 		Nfts:    nil, // handled by dedicated resolver
@@ -306,7 +306,7 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 }
 
-func addressToModel(ctx context.Context, address persist.Address) *model.Wallet {
+func addressToModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
 	return &model.Wallet{
 		Address: &address,
 		Nfts:    nil, // handled by dedicated resolver

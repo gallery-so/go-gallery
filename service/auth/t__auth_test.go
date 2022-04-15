@@ -19,7 +19,7 @@ func TestAuthVerifySignature_Success(t *testing.T) {
 
 	testNonce := "TestNonce"
 	sig := "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b"
-	addr := persist.Address("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")
+	addr := persist.EthereumAddress("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")
 
 	success, err := VerifySignatureAllMethods(sig, testNonce, addr, WalletTypeEOA, client)
 	assert.Nil(err)
@@ -35,7 +35,7 @@ func TestAuthVerifySignature_WrongNonce_Failure(t *testing.T) {
 	}
 	testNonce := "Wrong Nonce despite address signing sig"
 	sig := "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b"
-	addr := persist.Address("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")
+	addr := persist.EthereumAddress("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")
 
 	success, err := VerifySignatureAllMethods(sig, testNonce, addr, WalletTypeEOA, client)
 	assert.NotNil(err)
@@ -52,7 +52,7 @@ func TestAuthVerifySignature_WrongAddress_Failure(t *testing.T) {
 
 	testNonce := "TestNonce"
 	sig := "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b"
-	addr := persist.Address("0x456d569592f15Af845D0dbe984C12BAB8F430e32")
+	addr := persist.EthereumAddress("0x456d569592f15Af845D0dbe984C12BAB8F430e32")
 
 	success, err := VerifySignatureAllMethods(sig, testNonce, addr, WalletTypeEOA, client)
 	assert.NotNil(err)

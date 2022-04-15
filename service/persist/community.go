@@ -9,29 +9,29 @@ import (
 type Community struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	ContractAddress Address    `json:"contract_address"`
-	CreatorAddress  Address    `json:"creator_address"`
-	Name            NullString `json:"name"`
-	Description     NullString `json:"description"`
-	PreviewImage    NullString `json:"preview_image"`
+	ContractAddress EthereumAddress `json:"contract_address"`
+	CreatorAddress  EthereumAddress `json:"creator_address"`
+	Name            NullString      `json:"name"`
+	Description     NullString      `json:"description"`
+	PreviewImage    NullString      `json:"preview_image"`
 
 	Owners []CommunityOwner `json:"owners"`
 }
 
 // CommunityOwner represents a user in a community
 type CommunityOwner struct {
-	Address  Address    `json:"address"`
-	Username NullString `json:"username"`
+	Address  EthereumAddress `json:"address"`
+	Username NullString      `json:"username"`
 }
 
 // ErrCommunityNotFound is returned when a community is not found
 type ErrCommunityNotFound struct {
-	CommunityAddress Address
+	CommunityAddress EthereumAddress
 }
 
 // CommunityRepository represents a repository for interacting with persisted communities
 type CommunityRepository interface {
-	GetByAddress(context.Context, Address) (Community, error)
+	GetByAddress(context.Context, EthereumAddress) (Community, error)
 }
 
 func (e ErrCommunityNotFound) Error() string {

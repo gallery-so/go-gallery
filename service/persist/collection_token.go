@@ -104,9 +104,11 @@ type CollectionTokenRepository interface {
 	UpdateNFTs(context.Context, DBID, DBID, CollectionTokenUpdateNftsInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
 	UpdateNFTsUnsafe(context.Context, DBID, CollectionTokenUpdateNftsInput) error
-	ClaimNFTs(context.Context, DBID, []Address, CollectionTokenUpdateNftsInput) error
+	// TODO move this to package multichain
+	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionTokenUpdateNftsInput) error
 	RemoveNFTsOfOldAddresses(context.Context, DBID) error
-	RemoveNFTsOfAddresses(context.Context, DBID, []Address) error
+	// TODO move this to package multichain
+	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error
 	Delete(context.Context, DBID, DBID) error
 	GetUnassigned(context.Context, DBID) (CollectionToken, error)
 	RefreshUnassigned(context.Context, DBID) error

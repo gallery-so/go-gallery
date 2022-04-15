@@ -48,7 +48,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 }
 
 // GetByAddress returns a community by its address
-func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist.Address) (persist.Community, error) {
+func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist.EthereumAddress) (persist.Community, error) {
 	var community persist.Community
 
 	bs, err := c.cache.Get(ctx, pAddress.String())
@@ -62,7 +62,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 
 	community = persist.Community{ContractAddress: pAddress}
 
-	addresses := make([]persist.Address, 0, 20)
+	addresses := make([]persist.EthereumAddress, 0, 20)
 	contract := persist.NFTContract{}
 
 	rows, err := c.getInfoStmt.QueryContext(ctx, pAddress)
@@ -71,9 +71,9 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 	}
 	defer rows.Close()
 
-	seen := map[persist.Address]bool{}
+	seen := map[persist.EthereumAddress]bool{}
 	for rows.Next() {
-		var address persist.Address
+		var address persist.EthereumAddress
 		err = rows.Scan(&address, &contract, &community.Name, &community.CreatorAddress, &community.PreviewImage)
 		if err != nil {
 			return persist.Community{}, fmt.Errorf("error scanning community info: %w", err)

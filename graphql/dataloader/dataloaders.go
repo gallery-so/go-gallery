@@ -14,10 +14,11 @@ package dataloader
 
 import (
 	"context"
+	"time"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"time"
 )
 
 const defaultMaxBatchOne = 100 // Default for queries that return a single result
@@ -247,8 +248,8 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.Address) ([]sqlc.User, []error) {
-	return func(addresses []persist.Address) ([]sqlc.User, []error) {
+func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.EthereumAddress) ([]sqlc.User, []error) {
+	return func(addresses []persist.EthereumAddress) ([]sqlc.User, []error) {
 		users := make([]sqlc.User, len(addresses))
 		errors := make([]error, len(addresses))
 
@@ -425,8 +426,8 @@ func loadNftByNftId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 	}
 }
 
-func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.Address) ([][]sqlc.Nft, []error) {
-	return func(addresses []persist.Address) ([][]sqlc.Nft, []error) {
+func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.EthereumAddress) ([][]sqlc.Nft, []error) {
+	return func(addresses []persist.EthereumAddress) ([][]sqlc.Nft, []error) {
 		nfts := make([][]sqlc.Nft, len(addresses))
 		errors := make([]error, len(addresses))
 

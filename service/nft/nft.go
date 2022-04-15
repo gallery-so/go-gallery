@@ -3,10 +3,10 @@ package nft
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/user"
 )
 
 var errInvalidPreviewsInput = errors.New("user_id or username required for previews")
@@ -127,58 +127,24 @@ outer:
 
 }
 
-func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
+func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
 
-	addresses := []persist.Address{}
-	if walletAddresses != "" {
-		addresses = []persist.Address{persist.Address(walletAddresses)}
-		if strings.Contains(walletAddresses, ",") {
-			addressesStrings := strings.Split(walletAddresses, ",")
-			for _, address := range addressesStrings {
-				addresses = append(addresses, persist.Address(address))
-			}
+	addresses := []persist.Wallet{}
+	if walletAddress != "" {
+		addresses = []persist.Wallet{}
+		addressesStrings := strings.Split(walletAddress, ",")
+		for _, address := range addressesStrings {
+			addresses = append(addresses, persist.Wallet{Address: persist.Address(address), Chain: persist.ChainETH})
 		}
-		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
+		ownsWallet, err := user.DoesUserOwnWallets(ctx, userID, addresses, userRepo)
 		if err != nil {
 			return err
 		}
 
 		if !ownsWallet {
-			return ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
+			return user.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
 		}
 	}
 
 	return nil
-}
-
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Address, userRepo persist.UserRepository) (bool, error) {
-	user, err := userRepo.GetByID(pCtx, userID)
-	if err != nil {
-		return false, err
-	}
-	for _, walletAddress := range walletAddresses {
-		if !ContainsWalletAddresses(user.Addresses, walletAddress) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func ContainsWalletAddresses(a []persist.Address, b persist.Address) bool {
-	for _, v := range a {
-		if v == b {
-			return true
-		}
-	}
-
-	return false
-}
-
-type ErrDoesNotOwnWallets struct {
-	ID        persist.DBID
-	Addresses []persist.Address
-}
-
-func (e ErrDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.ID, e.Addresses)
 }

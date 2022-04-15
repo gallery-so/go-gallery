@@ -59,7 +59,7 @@ type Repositories struct {
 	NonceRepository           NonceRepository
 	LoginRepository           LoginAttemptRepository
 	NftRepository             NFTRepository
-	TokenRepository           TokenRepository
+	TokenRepository           TokenGalleryRepository
 	CollectionRepository      CollectionRepository
 	CollectionTokenRepository CollectionTokenRepository
 	GalleryRepository         GalleryRepository
@@ -71,6 +71,7 @@ type Repositories struct {
 	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
 	CommunityRepository       CommunityRepository
+	WalletRepository          WalletRepository
 }
 
 // GenerateID generates a application-wide unique ID
@@ -312,9 +313,9 @@ func RemoveDuplicateDBIDs(a []DBID) []DBID {
 }
 
 // RemoveDuplicateAddresses ensures that an array of addresses has no repeat items
-func RemoveDuplicateAddresses(a []Address) []Address {
-	result := make([]Address, 0, len(a))
-	m := map[Address]bool{}
+func RemoveDuplicateAddresses(a []EthereumAddress) []EthereumAddress {
+	result := make([]EthereumAddress, 0, len(a))
+	m := map[EthereumAddress]bool{}
 
 	for _, val := range a {
 		if _, ok := m[val]; !ok {

@@ -9,7 +9,7 @@ import (
 )
 
 type getCommunityInput struct {
-	ContractAddress persist.Address `form:"contract_address" binding:"required"`
+	ContractAddress persist.EthereumAddress `form:"contract_address" binding:"required"`
 }
 
 type getCommunityOutput struct {

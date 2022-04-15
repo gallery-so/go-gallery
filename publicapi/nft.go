@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/event"
 	nftservice "github.com/mikeydub/go-gallery/service/nft"
@@ -54,7 +55,7 @@ func (api NftAPI) GetNftsByCollectionId(ctx context.Context, collectionID persis
 	return nfts, nil
 }
 
-func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.Address) ([]sqlc.Nft, error) {
+func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.EthereumAddress) ([]sqlc.Nft, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"ownerAddress": {ownerAddress, "required,eth_addr"},

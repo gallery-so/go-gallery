@@ -147,9 +147,9 @@ type Nft struct {
 	Description          sql.NullString
 	CollectorsNote       sql.NullString
 	ExternalUrl          sql.NullString
-	CreatorAddress       persist.Address
+	CreatorAddress       persist.EthereumAddress
 	CreatorName          sql.NullString
-	OwnerAddress         persist.Address
+	OwnerAddress         persist.EthereumAddress
 	MultipleOwners       sql.NullBool
 	Contract             persist.NFTContract
 	OpenseaID            sql.NullInt64
@@ -199,7 +199,7 @@ type Token struct {
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
 	Chain            sql.NullString
-	OwnerAddress     persist.Address
+	OwnerAddress     persist.EthereumAddress
 	TokenUri         sql.NullString
 	TokenType        sql.NullString
 	TokenID          sql.NullString
@@ -218,7 +218,7 @@ type User struct {
 	CreatedAt          time.Time
 	Username           sql.NullString
 	UsernameIdempotent sql.NullString
-	Addresses          persist.AddressList
+	Addresses          persist.EthereumAddressList
 	Bio                sql.NullString
 }
 

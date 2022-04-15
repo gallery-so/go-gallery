@@ -89,7 +89,7 @@ func TestAuthRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -113,13 +113,13 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		otherUser := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F0AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F0AC5"))},
 		}
 		_, err := tc.repos.UserRepository.Create(context.Background(), otherUser)
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -144,7 +144,7 @@ func TestAuthRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "Wrong Nonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -158,7 +158,7 @@ func TestAuthRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -172,7 +172,7 @@ func TestAuthRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3349a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3349a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -192,7 +192,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -224,7 +224,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -256,7 +256,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -286,7 +286,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x60facEcd4dBF14f1ae647Afc3d1D071B1C29ACE4"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -316,7 +316,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -336,7 +336,7 @@ func TestAuthRoutes(t *testing.T) {
 	t.Run("user login wrong signature fails", func(t *testing.T) {
 		assert := setupTest(t, 1)
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -357,7 +357,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -378,7 +378,7 @@ func TestAuthRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		user := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 
 		_, err := tc.repos.UserRepository.Create(context.Background(), user)
@@ -393,7 +393,7 @@ func TestAuthRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -461,7 +461,7 @@ func getPreflightRequest(assert *assert.Assertions, t *TestUser) *http.Response 
 	return resp
 }
 
-func createUserRequest(assert *assert.Assertions, sig string, address persist.Address) *http.Response {
+func createUserRequest(assert *assert.Assertions, sig string, address persist.EthereumAddress) *http.Response {
 	body := map[string]interface{}{"address": address, "signature": sig}
 	asJSON, err := json.Marshal(body)
 	assert.Nil(err)
@@ -475,7 +475,7 @@ func createUserRequest(assert *assert.Assertions, sig string, address persist.Ad
 	return resp
 }
 
-func loginRequest(assert *assert.Assertions, sig, nonce string, address persist.Address, wt auth.WalletType) *http.Response {
+func loginRequest(assert *assert.Assertions, sig, nonce string, address persist.EthereumAddress, wt auth.WalletType) *http.Response {
 	body := map[string]interface{}{"address": address, "wallet_type": wt}
 	if nonce != "" {
 		body["nonce"] = nonce

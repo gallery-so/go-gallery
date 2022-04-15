@@ -297,7 +297,7 @@ func (ErrUserNotFound) IsError()                 {}
 func (ErrUserNotFound) IsLoginPayloadOrError()   {}
 
 type EthereumEoaAuth struct {
-	Address   persist.Address `json:"address"`
+	Address   persist.EthereumAddress `json:"address"`
 	Nonce     string          `json:"nonce"`
 	Signature string          `json:"signature"`
 }
@@ -334,7 +334,7 @@ func (GltfMedia) IsMediaSubtype() {}
 func (GltfMedia) IsMedia()        {}
 
 type GnosisSafeAuth struct {
-	Address persist.Address `json:"address"`
+	Address persist.EthereumAddress `json:"address"`
 	Nonce   string          `json:"nonce"`
 }
 
@@ -393,7 +393,7 @@ func (LoginPayload) IsLoginPayloadOrError() {}
 
 type MembershipOwner struct {
 	Dbid        persist.DBID     `json:"dbid"`
-	Address     *persist.Address `json:"address"`
+	Address     *persist.EthereumAddress `json:"address"`
 	User        *GalleryUser     `json:"user"`
 	PreviewNfts []*string        `json:"previewNfts"`
 }
@@ -424,10 +424,10 @@ type Nft struct {
 	Owner                 GalleryUserOrWallet `json:"owner"`
 	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
 	TokenMetadata         *string             `json:"tokenMetadata"`
-	ContractAddress       *persist.Address    `json:"contractAddress"`
+	ContractAddress       *persist.EthereumAddress    `json:"contractAddress"`
 	ExternalURL           *string             `json:"externalUrl"`
 	BlockNumber           *string             `json:"blockNumber"`
-	CreatorAddress        *persist.Address    `json:"creatorAddress"`
+	CreatorAddress        *persist.EthereumAddress    `json:"creatorAddress"`
 	OpenseaCollectionName *string             `json:"openseaCollectionName"`
 }
 
@@ -564,7 +564,7 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	Address *persist.Address `json:"address"`
+	Address *persist.EthereumAddress `json:"address"`
 	Nfts    []*Nft           `json:"nfts"`
 }
 

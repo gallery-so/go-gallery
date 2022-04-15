@@ -55,7 +55,7 @@ type NodeFetcher struct {
 	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
 	OnNft            func(ctx context.Context, dbid persist.DBID) (*Nft, error)
-	OnWallet         func(ctx context.Context, address persist.Address) (*Wallet, error)
+	OnWallet         func(ctx context.Context, address persist.EthereumAddress) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -102,7 +102,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnWallet(ctx, persist.Address(ids[0]))
+		return n.OnWallet(ctx, persist.EthereumAddress(ids[0]))
 	}
 
 	return nil, ErrInvalidIDFormat{typeName}

@@ -17,7 +17,7 @@ import (
 )
 
 type alchemyGetOwnersForTokensResponse struct {
-	Owners []persist.Address `json:"owners"`
+	Owners []persist.EthereumAddress `json:"owners"`
 }
 
 type alchemyGetNFTMetadataResponse struct {
@@ -29,7 +29,7 @@ type alchemyNFTMetadata struct {
 	Image string `json:"image"`
 }
 
-func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.Address) ([]persist.Address, error) {
+func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
 	alchemyURL := viper.GetString("CONTRACT_INTERACTION_URL") + "/getOwnersForToken"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, fmt.Sprintf("0x0%s", tid)), nil)
@@ -51,7 +51,7 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 	return response.Owners, nil
 }
 
-func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
+func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
 	alchemyURL := viper.GetString("CONTRACT_INTERACTION_URL") + "/getNFTMetadata"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, tid), nil)
@@ -82,7 +82,7 @@ func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress 
 			logrus.WithError(err).Error("Failed to get metadata from URI")
 			return response.Metadata, nil
 		}
-		med, err := media.MakePreviewsForMetadata(ctx, md, contractAddress, tid, asURI, ipfsClient, arweaveClient, stg)
+		med, err := media.MakePreviewsForMetadata(ctx, md, persist.Address(contractAddress), tid, asURI, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to make previews")
 			return response.Metadata, nil

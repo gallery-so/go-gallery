@@ -258,7 +258,7 @@ const getNftsByOwnerAddress = `-- name: GetNftsByOwnerAddress :many
 SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE owner_address = $1 AND deleted = false
 `
 
-func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.Address) ([]Nft, error) {
+func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.EthereumAddress) ([]Nft, error) {
 	rows, err := q.db.Query(ctx, getNftsByOwnerAddress, ownerAddress)
 	if err != nil {
 		return nil, err

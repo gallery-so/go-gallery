@@ -13,7 +13,7 @@ import (
 // UserLoaderByAddressConfig captures the config to create a new UserLoaderByAddress
 type UserLoaderByAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.Address) ([]sqlc.User, []error)
+	Fetch func(keys []persist.EthereumAddress) ([]sqlc.User, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewUserLoaderByAddress(config UserLoaderByAddressConfig) *UserLoaderByAddre
 // UserLoaderByAddress batches and caches requests
 type UserLoaderByAddress struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.Address) ([]sqlc.User, []error)
+	fetch func(keys []persist.EthereumAddress) ([]sqlc.User, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type UserLoaderByAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.Address]sqlc.User
+	cache map[persist.EthereumAddress]sqlc.User
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,7 +56,7 @@ type UserLoaderByAddress struct {
 }
 
 type userLoaderByAddressBatch struct {
-	keys    []persist.Address
+	keys    []persist.EthereumAddress
 	data    []sqlc.User
 	error   []error
 	closing bool
@@ -64,14 +64,14 @@ type userLoaderByAddressBatch struct {
 }
 
 // Load a User by key, batching and caching will be applied automatically
-func (l *UserLoaderByAddress) Load(key persist.Address) (sqlc.User, error) {
+func (l *UserLoaderByAddress) Load(key persist.EthereumAddress) (sqlc.User, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserLoaderByAddress) LoadThunk(key persist.Address) func() (sqlc.User, error) {
+func (l *UserLoaderByAddress) LoadThunk(key persist.EthereumAddress) func() (sqlc.User, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -114,7 +114,7 @@ func (l *UserLoaderByAddress) LoadThunk(key persist.Address) func() (sqlc.User, 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserLoaderByAddress) LoadAll(keys []persist.Address) ([]sqlc.User, []error) {
+func (l *UserLoaderByAddress) LoadAll(keys []persist.EthereumAddress) ([]sqlc.User, []error) {
 	results := make([]func() (sqlc.User, error), len(keys))
 
 	for i, key := range keys {
@@ -132,7 +132,7 @@ func (l *UserLoaderByAddress) LoadAll(keys []persist.Address) ([]sqlc.User, []er
 // LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserLoaderByAddress) LoadAllThunk(keys []persist.Address) func() ([]sqlc.User, []error) {
+func (l *UserLoaderByAddress) LoadAllThunk(keys []persist.EthereumAddress) func() ([]sqlc.User, []error) {
 	results := make([]func() (sqlc.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -150,7 +150,7 @@ func (l *UserLoaderByAddress) LoadAllThunk(keys []persist.Address) func() ([]sql
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserLoaderByAddress) Prime(key persist.Address, value sqlc.User) bool {
+func (l *UserLoaderByAddress) Prime(key persist.EthereumAddress, value sqlc.User) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -161,22 +161,22 @@ func (l *UserLoaderByAddress) Prime(key persist.Address, value sqlc.User) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserLoaderByAddress) Clear(key persist.Address) {
+func (l *UserLoaderByAddress) Clear(key persist.EthereumAddress) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *UserLoaderByAddress) unsafeSet(key persist.Address, value sqlc.User) {
+func (l *UserLoaderByAddress) unsafeSet(key persist.EthereumAddress, value sqlc.User) {
 	if l.cache == nil {
-		l.cache = map[persist.Address]sqlc.User{}
+		l.cache = map[persist.EthereumAddress]sqlc.User{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userLoaderByAddressBatch) keyIndex(l *UserLoaderByAddress, key persist.Address) int {
+func (b *userLoaderByAddressBatch) keyIndex(l *UserLoaderByAddress, key persist.EthereumAddress) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

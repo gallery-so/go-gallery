@@ -6,6 +6,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 )
@@ -17,7 +18,8 @@ func handlersInit(router *gin.Engine, i *Indexer, tokenRepository persist.TokenR
 	mediaGroup.POST("/update", updateMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 
 	nftsGroup := router.Group("/nfts")
-	nftsGroup.POST("/validate", validateUsersNFTs(tokenRepository, contractRepository, userRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	nftsGroup.POST("/validate", validateWalletsNFTs(tokenRepository, contractRepository, userRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	nftsGroup.GET("/get", middleware.AuthOptional(), getTokens(tokenRepository, ipfsClient, ethClient))
 
 	return router
 }

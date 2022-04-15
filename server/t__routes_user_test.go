@@ -154,13 +154,13 @@ func TestUserRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
 
 		update := user.AddUserAddressesInput{
-			Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address:   persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 			Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 		}
 		resp := userAddAddressesRequest(assert, update, tc.user1)
@@ -181,13 +181,13 @@ func TestUserRoutes(t *testing.T) {
 
 		nonce := persist.UserNonce{
 			Value:   "Wrong Nonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err := tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
 
 		update := user.AddUserAddressesInput{
-			Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address:   persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 			Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 		}
 		resp := userAddAddressesRequest(assert, update, tc.user1)
@@ -198,19 +198,19 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		_, err := tc.repos.UserRepository.Create(context.Background(), u)
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		}
 		err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
 
 		update := user.AddUserAddressesInput{
-			Address:   persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			Address:   persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 			Signature: "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 		}
 		resp := userAddAddressesRequest(assert, update, tc.user1)
@@ -221,7 +221,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses:          []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 			Username:           "TestUser",
 			UsernameIdempotent: "testuser",
 		}
@@ -229,13 +229,13 @@ func TestUserRoutes(t *testing.T) {
 		assert.Nil(err)
 
 		nft := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 			Name:         "test",
 		}
 		nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 
 		nft2 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 			Name:         "blah",
 		}
 		nftID2, err := tc.repos.NftRepository.Create(context.Background(), nft2)
@@ -251,7 +251,7 @@ func TestUserRoutes(t *testing.T) {
 		assert.Nil(err)
 
 		update := user.RemoveUserAddressesInput{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		j, err := cookiejar.New(nil)
 		client := &http.Client{Jar: j}
@@ -286,7 +286,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses:          []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses:          []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 			Username:           "TestUser",
 			UsernameIdempotent: "testuser",
 		}
@@ -294,14 +294,14 @@ func TestUserRoutes(t *testing.T) {
 		assert.NoError(err)
 
 		nft := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 			Name:         "test",
 			OpenseaID:    2,
 		}
 		nftID, err := tc.repos.NftRepository.Create(context.Background(), nft)
 
 		nft2 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 			Name:         "blah",
 			OpenseaID:    1,
 		}
@@ -318,7 +318,7 @@ func TestUserRoutes(t *testing.T) {
 		assert.NoError(err)
 
 		update := user.RemoveUserAddressesInput{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		j, err := cookiejar.New(nil)
 		client := &http.Client{Jar: j}
@@ -349,13 +349,13 @@ func TestUserRoutes(t *testing.T) {
 		assert.Len(user.Addresses, 1)
 
 		err = tc.repos.NftRepository.UpdateByIDUnsafe(context.Background(), nftID2, persist.NFTUpdateOwnerAddressInput{
-			OwnerAddress: persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
 		})
 		assert.NoError(err)
 
 		newNFT2, err := tc.repos.NftRepository.GetByID(context.Background(), nftID2)
 		assert.NoError(err)
-		assert.Equal(newNFT2.OwnerAddress, persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")))
+		assert.Equal(newNFT2.OwnerAddress, persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")))
 
 		// This would happen in an opensea refresh
 		err = tc.repos.CollectionRepository.RemoveNFTsOfOldAddresses(context.Background(), userID)
@@ -370,7 +370,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -379,7 +379,7 @@ func TestUserRoutes(t *testing.T) {
 		assert.Nil(err)
 
 		update := user.RemoveUserAddressesInput{
-			Addresses: []persist.Address{tc.user1.address},
+			Addresses: []persist.EthereumAddress{tc.user1.address},
 		}
 
 		j, err := cookiejar.New(nil)
@@ -399,7 +399,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -492,13 +492,13 @@ func TestUserRoutes(t *testing.T) {
 
 		// Create user
 		u := persist.User{
-			Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Addresses: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
 
 		nft := persist.NFT{
-			OwnerAddress:   persist.Address(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
+			OwnerAddress:   persist.EthereumAddress(strings.ToLower("0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9")),
 			OpenseaTokenID: "1",
 		}
 		galleryID := fillGallery(assert, nft, userID)
@@ -509,7 +509,7 @@ func TestUserRoutes(t *testing.T) {
 		tu := createCookieAndSetOnUser(assert, userID, jwt)
 
 		u2 := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 		assert.Nil(err)
@@ -564,7 +564,7 @@ func TestUserRoutes(t *testing.T) {
 
 		// Create user
 		u := persist.User{
-			Addresses: []persist.Address{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Addresses: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -575,7 +575,7 @@ func TestUserRoutes(t *testing.T) {
 		tu := createCookieAndSetOnUser(assert, userID, jwt)
 
 		u2 := persist.User{
-			Addresses: []persist.Address{persist.Address(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 		assert.Nil(err)

@@ -18,7 +18,7 @@ func TestOpensea(t *testing.T) {
 		assert := setupTest(t, 1)
 		ctx := context.Background()
 
-		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
+		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
 
 		mikeUserID, err := tc.repos.UserRepository.Create(ctx, mike)
 		assert.Nil(err)
@@ -35,12 +35,12 @@ func TestOpensea(t *testing.T) {
 		}
 
 		nft3 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 			Name:         "wow",
 			OpenseaID:    46062322,
 		}
 		nft4 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 			Name:         "baby",
 			OpenseaID:    61355517,
 		}
@@ -75,7 +75,7 @@ func TestOpensea(t *testing.T) {
 		collID, err := tc.repos.CollectionRepository.Create(ctx, coll)
 		assert.NoError(err)
 
-		err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
+		err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
 		assert.NoError(err)
 
 		time.Sleep(time.Second * 3)
@@ -95,7 +95,7 @@ func TestOpensea(t *testing.T) {
 		assert := setupTest(t, 1)
 		ctx := context.Background()
 
-		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}}
+		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}}
 
 		mikeUserID, err := tc.repos.UserRepository.Create(ctx, mike)
 		assert.NoError(err)
@@ -112,12 +112,12 @@ func TestOpensea(t *testing.T) {
 		}
 
 		nft3 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 			Name:         "wow",
 			OpenseaID:    46062322,
 		}
 		nft4 := persist.NFT{
-			OwnerAddress: persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
+			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")),
 			Name:         "baby",
 			OpenseaID:    61355517,
 		}
@@ -152,7 +152,7 @@ func TestOpensea(t *testing.T) {
 		collID, err := tc.repos.CollectionRepository.Create(ctx, coll)
 		assert.NoError(err)
 
-		err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.Address{persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.Address(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
+		err = opensea.UpdateAssetsForAcc(ctx, mikeUserID, []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}, tc.repos.NftRepository, tc.repos.UserRepository, tc.repos.CollectionRepository, tc.repos.GalleryRepository, tc.repos.BackupRepository)
 		assert.NoError(err)
 
 		time.Sleep(time.Second * 3)

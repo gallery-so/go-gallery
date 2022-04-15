@@ -42,7 +42,7 @@ func getMembershipTiersREST(membershipRepository persist.MembershipRepository, u
 	}
 }
 
-func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input getMembershipTiersInput
 		if err := c.ShouldBindQuery(&input); err != nil {

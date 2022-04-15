@@ -45,12 +45,12 @@ var client = &http.Client{
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
 	BlockNumber     persist.BlockNumber
-	From            persist.Address
-	To              persist.Address
+	From            persist.EthereumAddress
+	To              persist.EthereumAddress
 	TokenID         persist.TokenID
 	TokenType       persist.TokenType
 	Amount          uint64
-	ContractAddress persist.Address
+	ContractAddress persist.EthereumAddress
 }
 
 // TokenContractMetadata represents a token contract's metadata
@@ -94,7 +94,7 @@ func NewArweaveClient() *goar.Client {
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
+func GetTokenContractMetadata(address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	contract := address.Address()
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
@@ -356,7 +356,7 @@ func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
 }
 
 // GetTokenURI returns metadata URI for a given token address.
-func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -403,7 +403,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 }
 
 // GetBalanceOfERC1155Token returns the balance of an ERC1155 token
-func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
@@ -424,7 +424,7 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, p
 }
 
 // GetContractCreator returns the address of the contract creator
-func GetContractCreator(ctx context.Context, contractAddress persist.Address, ethClient *ethclient.Client) (persist.Address, error) {
+func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
 	highestBlock, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting highest block: %s", err.Error())
@@ -466,7 +466,7 @@ func GetContractCreator(ctx context.Context, contractAddress persist.Address, et
 			if err != nil {
 				return "", fmt.Errorf("error getting message: %s", err.Error())
 			}
-			return persist.Address(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
+			return persist.EthereumAddress(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
 		}
 	}
 	return "", fmt.Errorf("could not find contract creator")

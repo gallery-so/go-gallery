@@ -13,24 +13,26 @@ type Contract struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address        Address    `json:"address"`
-	Symbol         NullString `json:"symbol"`
-	Name           NullString `json:"name"`
-	CreatorAddress Address    `json:"creator_address"`
+	Chain Chain `json:"chain"`
+
+	Address        EthereumAddress `json:"address"`
+	Symbol         NullString      `json:"symbol"`
+	Name           NullString      `json:"name"`
+	CreatorAddress EthereumAddress `json:"creator_address"`
 
 	LatestBlock BlockNumber `json:"latest_block"`
 }
 
 // ContractRepository represents a repository for interacting with persisted contracts
 type ContractRepository interface {
-	GetByAddress(context.Context, Address) (Contract, error)
-	UpsertByAddress(context.Context, Address, Contract) error
+	GetByAddress(context.Context, EthereumAddress) (Contract, error)
+	UpsertByAddress(context.Context, EthereumAddress, Contract) error
 	BulkUpsert(context.Context, []Contract) error
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
 type ErrContractNotFoundByAddress struct {
-	Address Address
+	Address EthereumAddress
 }
 
 func (e ErrContractNotFoundByAddress) Error() string {

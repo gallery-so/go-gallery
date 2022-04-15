@@ -43,7 +43,7 @@ func loadWallet(f string) *TestWallet {
 		log.Fatalf("private key is malformed: %s", err)
 	}
 
-	return &TestWallet{pk, persist.Address(wallets.Wallet1)}
+	return &TestWallet{pk, persist.EthereumAddress(wallets.Wallet1)}
 }
 
 func newClient() *http.Client {
@@ -100,7 +100,7 @@ func fetchCurrentUserIsValid(s suite.Suite, serverURL string, client *http.Clien
 	return output
 }
 
-func fetchNonce(s suite.Suite, serverURL string, address persist.Address) string {
+func fetchNonce(s suite.Suite, serverURL string, address persist.EthereumAddress) string {
 	resp, err := http.Get(
 		fmt.Sprintf("%s/auth/get_preflight?address=%s", serverURL, address),
 	)
@@ -248,26 +248,26 @@ func addNFTsToNFTsRepo(s suite.Suite, nftRepo persist.NFTRepository, wallet *Tes
 	return nftIDs
 }
 
-func addTokensToTokensRepo(s suite.Suite, tokenRepo persist.TokenRepository, wallet *TestWallet) []persist.DBID {
-	tokens := []persist.Token{
+func addTokensToTokensRepo(s suite.Suite, tokenRepo persist.TokenGalleryRepository, wallet *TestWallet) []persist.DBID {
+	tokens := []persist.TokenGallery{
 		{
 			OwnerAddress:    wallet.address,
 			Name:            "NFT1",
 			ID:              "id1",
 			TokenID:         persist.TokenID(util.RandHexString(10)),
-			ContractAddress: persist.Address(util.RandEthAddress()),
+			ContractAddress: persist.EthereumAddress(util.RandEthAddress()),
 		},
 		{
 			OwnerAddress:    wallet.address,
 			Name:            "NFT2",
 			ID:              "id2",
-			ContractAddress: persist.Address(util.RandEthAddress()),
+			ContractAddress: persist.EthereumAddress(util.RandEthAddress()),
 		},
 		{
 			OwnerAddress:    wallet.address,
 			Name:            "NFT3",
 			ID:              "id3",
-			ContractAddress: persist.Address(util.RandEthAddress()),
+			ContractAddress: persist.EthereumAddress(util.RandEthAddress()),
 		},
 	}
 	tokenIDs, err := tokenRepo.CreateBulk(context.Background(), tokens)

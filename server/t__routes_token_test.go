@@ -22,7 +22,7 @@ func TestTokenRoutes(t *testing.T) {
 
 		// seed DB with nft
 		name := "very cool nft"
-		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.TokenGallery{
 			Name:           persist.NullString(name),
 			CollectorsNote: "this is a bad note",
 			OwnerAddress:   tc.user1.address,
@@ -74,7 +74,7 @@ func TestTokenRoutes(t *testing.T) {
 
 		// seed DB with nft
 		name := "very cool nft"
-		token := persist.Token{
+		token := persist.TokenGallery{
 			Name:            persist.NullString(name),
 			CollectorsNote:  "this is a bad note",
 			OwnerAddress:    tc.user1.address,
@@ -104,7 +104,7 @@ func TestTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		// seed DB with nft
-		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.TokenGallery{
 			Name:           "very cool nft",
 			CollectorsNote: "silly note",
 			OwnerAddress:   tc.user1.address,
@@ -133,7 +133,7 @@ func TestTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		// seed DB with nft
-		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.TokenGallery{
 			Name:           "very cool nft",
 			CollectorsNote: "this is a bad note",
 			OwnerAddress:   tc.user1.address,
@@ -175,7 +175,7 @@ func TestTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		// seed DB with nft
-		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.Token{
+		nftID, err := tc.repos.TokenRepository.Create(context.Background(), persist.TokenGallery{
 			Name: "very cool nft",
 		})
 		assert.Nil(err)

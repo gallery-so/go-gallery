@@ -24,7 +24,7 @@ var errNoTokensToRefresh = errors.New("no tokens to refresh metadata for")
 
 type getTokensInput struct {
 	ID              persist.DBID    `form:"id"`
-	WalletAddress   persist.Address `form:"address"`
+	WalletAddress   persist.Wallet  `form:"address"`
 	ContractAddress persist.Address `form:"contract_address"`
 	TokenID         persist.TokenID `form:"token_id"`
 	Page            int64           `form:"page"`
@@ -38,11 +38,11 @@ type getTokensByUserIDInput struct {
 }
 
 type getTokensOutput struct {
-	Nfts []persist.Token `json:"nfts"`
+	Nfts []persist.TokenGallery `json:"nfts"`
 }
 
 type getTokenOutput struct {
-	Nft persist.Token `json:"nft"`
+	Nft persist.TokenGallery `json:"nft"`
 }
 
 type getUnassignedTokensOutput struct {
@@ -60,7 +60,7 @@ type refreshMetadataInput struct {
 }
 
 type refreshMetadataOutput struct {
-	Token persist.Token `json:"token"`
+	Token persist.TokenGallery `json:"token"`
 }
 type errCouldNotMakeMedia struct {
 	tokenID         persist.TokenID
@@ -71,11 +71,7 @@ type errCouldNotUpdateMedia struct {
 	id persist.DBID
 }
 
-type errInvalidInput struct {
-	reason string
-}
-
-func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getTokens(nftRepository persist.TokenGalleryRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
 
@@ -84,8 +80,8 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 
-		if input.ID == "" && input.WalletAddress == "" && input.ContractAddress == "" && input.TokenID == "" {
-			util.ErrResponse(c, http.StatusBadRequest, errInvalidInput{reason: "must specify at least one of id, address, contract_address, token_id"})
+		if input.ID == "" && input.WalletAddress.String() == "" && input.ContractAddress == "" && input.TokenID == "" {
+			util.ErrResponse(c, http.StatusBadRequest, util.ErrInvalidInput{Reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
 
@@ -124,7 +120,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 }
 
 // Must specify nft id in json input
-func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
+func updateTokenByID(nftRepository persist.TokenGalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &updateTokenByIDInput{}
 		if err := c.ShouldBindJSON(input); err != nil {
@@ -150,7 +146,7 @@ func updateTokenByID(nftRepository persist.TokenRepository) gin.HandlerFunc {
 	}
 }
 
-func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getTokensForUser(nftRepository persist.TokenGalleryRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensByUserIDInput{}
 		if err := c.ShouldBindQuery(input); err != nil {
@@ -159,14 +155,14 @@ func getTokensForUser(nftRepository persist.TokenRepository, ipfsClient *shell.S
 		}
 		nfts, err := nftRepository.GetByUserID(c, input.UserID, input.Limit, input.Page)
 		if nfts == nil || err != nil {
-			nfts = []persist.Token{}
+			nfts = []persist.TokenGallery{}
 		}
 
 		c.JSON(http.StatusOK, getTokensOutput{Nfts: nfts})
 	}
 }
 
-func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getUnassignedTokensForUser(collectionRepository persist.CollectionTokenRepository, tokenRepository persist.TokenGalleryRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		userID := auth.GetUserIDFromCtx(c)
@@ -200,7 +196,8 @@ func refreshUnassignedTokensForUser(collectionRepository persist.CollectionToken
 	}
 }
 
-func refreshMetadataForToken(tokenRepository persist.TokenRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
+// TODO use multichain handlers
+func refreshMetadataForToken(tokenRepository persist.TokenGalleryRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input refreshMetadataInput
 		if err := c.ShouldBindQuery(&input); err != nil {
@@ -242,22 +239,22 @@ func refreshMetadataForToken(tokenRepository persist.TokenRepository, ethcl *eth
 	}
 }
 
-func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {
+func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenGalleryRepository) (persist.TokenGallery, error) {
 	switch {
 	case input.ID != "":
 		return tokenRepo.GetByID(pCtx, input.ID)
 	}
-	return persist.Token{}, nil
+	return persist.TokenGallery{}, nil
 }
-func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) ([]persist.Token, error) {
+func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenGalleryRepository) ([]persist.TokenGallery, error) {
 	switch {
 	case input.ID != "":
 		token, err := tokenRepo.GetByID(pCtx, input.ID)
 		if err != nil {
 			return nil, err
 		}
-		return []persist.Token{token}, nil
-	case input.WalletAddress != "":
+		return []persist.TokenGallery{token}, nil
+	case input.WalletAddress.String() != "":
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":
 		if strings.HasPrefix(string(input.TokenID), "0x") {
@@ -274,9 +271,9 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 
 }
 
-func refreshMetadata(ctx context.Context, token persist.Token, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Token, error) {
+func refreshMetadata(ctx context.Context, token persist.TokenGallery, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.TokenGallery, error) {
 
-	uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethcl)
+	uri, err := rpc.GetTokenURI(ctx, token.TokenType, persist.EthereumAddress(token.ContractAddress), token.TokenID, ethcl)
 	if err != nil {
 		return token, fmt.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
 	}
@@ -308,8 +305,4 @@ func (e errCouldNotMakeMedia) Error() string {
 
 func (e errCouldNotUpdateMedia) Error() string {
 	return fmt.Sprintf("could not update media for token with ID: %s", e.id)
-}
-
-func (e errInvalidInput) Error() string {
-	return fmt.Sprintf("invalid input: %s", e.reason)
 }

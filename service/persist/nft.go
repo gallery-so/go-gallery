@@ -18,18 +18,18 @@ type NFT struct {
 	CollectorsNote NullString `json:"collectors_note"`
 
 	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
-	OwnerAddress Address `json:"owner_address"`
+	OwnerAddress EthereumAddress `json:"owner_address"`
 
 	MultipleOwners NullBool `json:"multiple_owners"`
 
-	Name                NullString  `json:"name"`
-	Description         NullString  `json:"description"`
-	ExternalURL         NullString  `json:"external_url"`
-	TokenMetadataURL    NullString  `json:"token_metadata_url"`
-	CreatorAddress      Address     `json:"creator_address"`
-	CreatorName         NullString  `json:"creator_name"`
-	Contract            NFTContract `json:"asset_contract"`
-	TokenCollectionName NullString  `json:"token_collection_name"`
+	Name                NullString      `json:"name"`
+	Description         NullString      `json:"description"`
+	ExternalURL         NullString      `json:"external_url"`
+	TokenMetadataURL    NullString      `json:"token_metadata_url"`
+	CreatorAddress      EthereumAddress `json:"creator_address"`
+	CreatorName         NullString      `json:"creator_name"`
+	Contract            NFTContract     `json:"asset_contract"`
+	TokenCollectionName NullString      `json:"token_collection_name"`
 
 	OpenseaID NullInt64 `json:"opensea_id"`
 	// OPEN_SEA_TOKEN_ID
@@ -53,7 +53,7 @@ type CollectionNFT struct {
 	ID           DBID         `json:"id" binding:"required"`
 	CreationTime CreationTime `json:"created_at"`
 
-	OwnerAddress Address `json:"owner_address"`
+	OwnerAddress EthereumAddress `json:"owner_address"`
 
 	MultipleOwners NullBool `json:"multiple_owners"`
 
@@ -61,7 +61,7 @@ type CollectionNFT struct {
 
 	Contract            ContractCollectionNFT `json:"asset_contract"`
 	TokenCollectionName NullString            `json:"token_collection_name"`
-	CreatorAddress      Address               `json:"creator_address"`
+	CreatorAddress      EthereumAddress       `json:"creator_address"`
 	CreatorName         NullString            `json:"creator_name"`
 
 	// IMAGES - OPENSEA
@@ -74,14 +74,14 @@ type CollectionNFT struct {
 
 // NFTContract represents a smart contract's information for a given NFT
 type NFTContract struct {
-	ContractAddress      Address    `json:"address"`
-	ContractName         NullString `json:"name"`
-	ContractImage        NullString `json:"image_url"`
-	ContractDescription  NullString `json:"description"`
-	ContractExternalLink NullString `json:"external_link"`
-	ContractSchemaName   NullString `json:"schema_name"`
-	ContractSymbol       NullString `json:"symbol"`
-	ContractTotalSupply  NullString `json:"total_supply"`
+	ContractAddress      EthereumAddress `json:"address"`
+	ContractName         NullString      `json:"name"`
+	ContractImage        NullString      `json:"image_url"`
+	ContractDescription  NullString      `json:"description"`
+	ContractExternalLink NullString      `json:"external_link"`
+	ContractSchemaName   NullString      `json:"schema_name"`
+	ContractSymbol       NullString      `json:"symbol"`
+	ContractTotalSupply  NullString      `json:"total_supply"`
 }
 
 // ContractCollectionNFT represents a contract within a collection nft
@@ -102,7 +102,7 @@ type NFTUpdateInfoInput struct {
 type NFTUpdateOwnerAddressInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	OwnerAddress Address `json:"owner_address"`
+	OwnerAddress EthereumAddress `json:"owner_address"`
 }
 
 // NFTRepository represents the interface for interacting with persisted NFTs
@@ -110,11 +110,11 @@ type NFTRepository interface {
 	CreateBulk(context.Context, []NFT) ([]DBID, error)
 	Create(context.Context, NFT) (DBID, error)
 	GetByUserID(context.Context, DBID) ([]NFT, error)
-	GetByAddresses(context.Context, []Address) ([]NFT, error)
+	GetByAddresses(context.Context, []EthereumAddress) ([]NFT, error)
 	GetByID(context.Context, DBID) (NFT, error)
 	GetByCollectionID(context.Context, DBID) ([]NFT, error)
-	GetByContractData(context.Context, TokenID, Address) ([]NFT, error)
-	GetByOpenseaID(context.Context, NullInt64, Address) (NFT, error)
+	GetByContractData(context.Context, TokenID, EthereumAddress) ([]NFT, error)
+	GetByOpenseaID(context.Context, NullInt64, EthereumAddress) (NFT, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	BulkUpsert(context.Context, []NFT) ([]DBID, error)
