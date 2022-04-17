@@ -1,10 +1,9 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
-
-	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -52,6 +51,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
+	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
 
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
