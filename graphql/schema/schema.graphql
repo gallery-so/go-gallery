@@ -536,8 +536,16 @@ type ErrDoesNotOwnRequiredNFT implements Error {
 }
 
 input AuthMechanism {
+    debugAuth: DebugAuth
     ethereumEoa: EthereumEoaAuth
     gnosisSafe: GnosisSafeAuth
+}
+
+# DebugAuth always succeeds and returns the supplied userId and addresses.
+# Only available for local development.
+input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    userId: DBID
+    addresses: [Address!]!
 }
 
 input EthereumEoaAuth {

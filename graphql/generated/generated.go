@@ -2430,8 +2430,16 @@ type ErrDoesNotOwnRequiredNFT implements Error {
 }
 
 input AuthMechanism {
+    debugAuth: DebugAuth
     ethereumEoa: EthereumEoaAuth
     gnosisSafe: GnosisSafeAuth
+}
+
+# DebugAuth always succeeds and returns the supplied userId and addresses.
+# Only available for local development.
+input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    userId: DBID
+    addresses: [Address!]!
 }
 
 input EthereumEoaAuth {
@@ -10376,6 +10384,36 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
+		case "debugAuth":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugAuth"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*model.DebugAuth); ok {
+				it.DebugAuth = data
+			} else if tmp == nil {
+				it.DebugAuth = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugAuth`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
 		case "ethereumEoa":
 			var err error
 
@@ -10477,6 +10515,81 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
 			if err != nil {
 				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj interface{}) (model.DebugAuth, error) {
+	var it model.DebugAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "userId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*persist.DBID); ok {
+				it.UserID = data
+			} else if tmp == nil {
+				it.UserID = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/service/persist.DBID`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+		case "addresses":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.([]persist.Address); ok {
+				it.Addresses = data
+			} else if tmp == nil {
+				it.Addresses = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be []github.com/mikeydub/go-gallery/service/persist.Address`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
 	}
@@ -15685,6 +15798,14 @@ func (ec *executionContext) marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	}
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx context.Context, v interface{}) (*model.DebugAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDebugAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteCollectionPayloadOrError) graphql.Marshaler {

@@ -7,6 +7,8 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 
@@ -80,6 +82,16 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 	authApi := publicapi.For(ctx).Auth
+
+	if debugtools.Enabled {
+		if viper.GetString("ENV") == "local" && m.DebugAuth != nil {
+			userID := persist.DBID("")
+			if m.DebugAuth.UserID != nil {
+				userID = *m.DebugAuth.UserID
+			}
+			return debugtools.NewDebugAuthenticator(userID, m.DebugAuth.Addresses), nil
+		}
+	}
 
 	if m.EthereumEoa != nil {
 		return authApi.NewEthereumNonceAuthenticator(m.EthereumEoa.Address, m.EthereumEoa.Nonce, m.EthereumEoa.Signature, auth.WalletTypeEOA), nil
