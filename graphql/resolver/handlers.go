@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"os"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -18,6 +19,36 @@ import (
 	"sort"
 	"strings"
 )
+
+var requestLogger *logrus.Logger
+
+// Gets (or creates) a logger for GraphQL requests and responses. Not thread-safe; only call during handler initialization.
+func getGraphQLRequestLogger() *logrus.Logger {
+	if requestLogger != nil {
+		return requestLogger
+	}
+
+	requestLogger = logrus.New()
+
+	// To make queries show up in a readable format in a local console, we want a text formatter that
+	// doesn't escape newlines. To make queries readable in GCP logs, we actually want a JSON formatter;
+	// otherwise, each individual line of the query will be treated as a separate log entry.
+	if viper.GetString("ENV") == "local" {
+		requestLogger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+	} else {
+		requestLogger.SetFormatter(&logrus.JSONFormatter{})
+	}
+
+	// Optionally, log to a file instead of stdout. This can be helpful in local development environments,
+	// where requests tend to fill up the console and make it harder to see other useful logging info.
+	logFilePath := viper.GetString("GQL_REQUEST_LOGFILE")
+	if logFilePath != "" {
+		logFile, _ := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		requestLogger.SetOutput(logFile)
+	}
+
+	return requestLogger
+}
 
 func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	response := next(ctx)
@@ -119,16 +150,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 }
 
 func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-	logger := logrus.New()
-
-	// To make queries show up in a readable format in a local console, we want a text formatter that
-	// doesn't escape newlines. To make queries readable in GCP logs, we actually want a JSON formatter;
-	// otherwise, each individual line of the query will be treated as a separate log entry.
-	if viper.GetString("ENV") == "local" {
-		logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
-	} else {
-		logger.SetFormatter(&logrus.JSONFormatter{})
-	}
+	logger := getGraphQLRequestLogger()
 
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 		gc := util.GinContextFromContext(ctx)
