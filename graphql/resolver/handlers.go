@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/publicapi"
 
@@ -115,6 +116,21 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		return next(ctx)
+	}
+}
+
+func RestrictEnvironmentDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
+	env := viper.GetString("ENV")
+	restrictionErr := errors.New("schema restriction: functionality not allowed in the current environment")
+
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
+		for _, allowedEnv := range allowed {
+			if strings.EqualFold(env, allowedEnv) {
+				return next(ctx)
+			}
+		}
+
+		return nil, restrictionErr
 	}
 }
 

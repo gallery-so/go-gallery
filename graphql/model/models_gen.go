@@ -132,6 +132,7 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
+	DebugAuth   *DebugAuth       `json:"debugAuth"`
 	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
 	GnosisSafe  *GnosisSafeAuth  `json:"gnosisSafe"`
 }
@@ -215,6 +216,11 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type DebugAuth struct {
+	UserID    *persist.DBID     `json:"userId"`
+	Addresses []persist.Address `json:"addresses"`
+}
 
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
