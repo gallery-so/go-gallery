@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"os"
@@ -149,6 +150,34 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 	}
 }
 
+func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+	logger := getGraphQLRequestLogger()
+
+	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		response := next(ctx)
+
+		var message string
+		messageBytes, err := json.Marshal(&response.Data)
+
+		if err != nil {
+			message = "failed to marshal json.RawMessage; unable to log GraphQL response"
+		} else {
+			message = string(messageBytes)
+		}
+
+		gc := util.GinContextFromContext(ctx)
+		userId := auth.GetUserIDFromCtx(gc)
+
+		logger.WithFields(logrus.Fields{
+			"authenticated": userId != "",
+			"userId":        userId,
+			"response":      message,
+		}).Info("Sending GraphQL response")
+
+		return response
+	}
+}
+
 func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 	logger := getGraphQLRequestLogger()
 
@@ -156,6 +185,7 @@ func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gq
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
 		oc := gqlgen.GetOperationContext(ctx)
+		fmt.Printf("variables: %v\n", oc.Variables)
 		scrubbedQuery := getScrubbedQuery(schema, oc.Doc, oc.RawQuery)
 		logger.WithFields(logrus.Fields{
 			"authenticated": userId != "",
