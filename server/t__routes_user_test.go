@@ -74,7 +74,7 @@ func TestUserRoutes(t *testing.T) {
 		body := persist.User{}
 		util.UnmarshallBody(&body, resp.Body)
 		assert.Equal(userID, body.ID)
-		assert.NotEmpty(body.Addresses)
+		assert.NotEmpty(body.Wallets)
 	})
 
 	t.Run("can update user if authenticated", func(t *testing.T) {
@@ -173,7 +173,7 @@ func TestUserRoutes(t *testing.T) {
 
 		updatedUser, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 		assert.Nil(err)
-		assert.Equal(update.Address, updatedUser.Addresses[1])
+		assert.Equal(update.Address, updatedUser.Wallets[1])
 	})
 
 	t.Run("can't add address if wrong nonce", func(t *testing.T) {
@@ -198,7 +198,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		_, err := tc.repos.UserRepository.Create(context.Background(), u)
 
@@ -221,7 +221,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses:          []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Wallets:            []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 			Username:           "TestUser",
 			UsernameIdempotent: "testuser",
 		}
@@ -279,14 +279,14 @@ func TestUserRoutes(t *testing.T) {
 
 		user, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 		assert.Nil(err)
-		assert.Len(user.Addresses, 1)
+		assert.Len(user.Wallets, 1)
 	})
 
 	t.Run("removing address moves NFTS", func(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses:          []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Wallets:            []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9", persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 			Username:           "TestUser",
 			UsernameIdempotent: "testuser",
 		}
@@ -346,7 +346,7 @@ func TestUserRoutes(t *testing.T) {
 
 		user, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 		assert.NoError(err)
-		assert.Len(user.Addresses, 1)
+		assert.Len(user.Wallets, 1)
 
 		err = tc.repos.NftRepository.UpdateByIDUnsafe(context.Background(), nftID2, persist.NFTUpdateOwnerAddressInput{
 			OwnerAddress: persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")),
@@ -370,7 +370,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -399,7 +399,7 @@ func TestUserRoutes(t *testing.T) {
 		assert := setupTest(t, 1)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5")), "0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -408,7 +408,7 @@ func TestUserRoutes(t *testing.T) {
 		assert.Nil(err)
 
 		update := user.RemoveUserAddressesInput{
-			Addresses: u.Addresses,
+			Addresses: u.Wallets,
 		}
 
 		j, err := cookiejar.New(nil)
@@ -492,7 +492,7 @@ func TestUserRoutes(t *testing.T) {
 
 		// Create user
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Wallets: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -509,20 +509,20 @@ func TestUserRoutes(t *testing.T) {
 		tu := createCookieAndSetOnUser(assert, userID, jwt)
 
 		u2 := persist.User{
-			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 		assert.Nil(err)
 
 		nft2 := persist.NFT{
-			OwnerAddress:   u2.Addresses[0],
+			OwnerAddress:   u2.Wallets[0],
 			OpenseaTokenID: "2",
 		}
 		deletedGallery := fillGallery(assert, nft2, userID2)
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: u2.Addresses[0],
+			Address: u2.Wallets[0],
 		}
 		err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -531,7 +531,7 @@ func TestUserRoutes(t *testing.T) {
 			SecondUserID: userID2,
 			Signature:    "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 			Nonce:        "TestNonce",
-			Address:      u2.Addresses[0],
+			Address:      u2.Wallets[0],
 			WalletType:   auth.WalletTypeEOA,
 		}
 
@@ -546,7 +546,7 @@ func TestUserRoutes(t *testing.T) {
 
 		newInitialUser, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 		assert.Nil(err)
-		assert.Len(newInitialUser.Addresses, 2)
+		assert.Len(newInitialUser.Wallets, 2)
 
 		newGallery, err := tc.repos.GalleryRepository.GetByID(context.Background(), galleryID)
 		assert.Nil(err)
@@ -564,7 +564,7 @@ func TestUserRoutes(t *testing.T) {
 
 		// Create user
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
+			Wallets: []persist.EthereumAddress{"0xcb1b78568d0Ef81585f074b0Dfd6B743959070D9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -575,14 +575,14 @@ func TestUserRoutes(t *testing.T) {
 		tu := createCookieAndSetOnUser(assert, userID, jwt)
 
 		u2 := persist.User{
-			Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
+			Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x9a3f9764B21adAF3C6fDf6f947e6D3340a3F8AC5"))},
 		}
 		userID2, err := tc.repos.UserRepository.Create(context.Background(), u2)
 		assert.Nil(err)
 
 		nonce := persist.UserNonce{
 			Value:   "TestNonce",
-			Address: u2.Addresses[0],
+			Address: u2.Wallets[0],
 		}
 		err = tc.repos.NonceRepository.Create(context.Background(), nonce)
 		assert.Nil(err)
@@ -591,7 +591,7 @@ func TestUserRoutes(t *testing.T) {
 			SecondUserID: userID2,
 			Signature:    "0x7d3b810c5ae6efa6e5457f5ed85fe048f623b0f1127a7825f119a86714b72fec444d3fa301c05887ba1b94b77e5d68c8567171404cff43b7790e8f4d928b752a1b",
 			Nonce:        "TestNonce",
-			Address:      u2.Addresses[0],
+			Address:      u2.Wallets[0],
 			WalletType:   auth.WalletTypeEOA,
 		}
 
@@ -601,7 +601,7 @@ func TestUserRoutes(t *testing.T) {
 
 		newInitialUser, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 		assert.Nil(err)
-		assert.Len(newInitialUser.Addresses, 2)
+		assert.Len(newInitialUser.Wallets, 2)
 
 		_, err = tc.repos.UserRepository.GetByID(context.Background(), userID2)
 		assert.NotNil(err)

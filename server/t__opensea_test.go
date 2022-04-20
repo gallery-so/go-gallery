@@ -18,7 +18,7 @@ func TestOpensea(t *testing.T) {
 		assert := setupTest(t, 1)
 		ctx := context.Background()
 
-		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
+		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA"))}}
 
 		mikeUserID, err := tc.repos.UserRepository.Create(ctx, mike)
 		assert.Nil(err)
@@ -58,16 +58,16 @@ func TestOpensea(t *testing.T) {
 		assert.NoError(err)
 
 		mikeCollNFTs := []persist.DBID{}
-		if nft1DB.OwnerAddress == mike.Addresses[0] {
+		if nft1DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[0])
 		}
-		if nft2DB.OwnerAddress == mike.Addresses[0] {
+		if nft2DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[1])
 		}
-		if nft3DB.OwnerAddress == mike.Addresses[0] {
+		if nft3DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[2])
 		}
-		if nft4DB.OwnerAddress == mike.Addresses[0] {
+		if nft4DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[3])
 		}
 
@@ -95,7 +95,7 @@ func TestOpensea(t *testing.T) {
 		assert := setupTest(t, 1)
 		ctx := context.Background()
 
-		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Addresses: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}}
+		mike := persist.User{UsernameIdempotent: "mikey", Username: "mikey", Wallets: []persist.EthereumAddress{persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFA")), persist.EthereumAddress(strings.ToLower("0x27B0f73721DA882fAAe00B6e43512BD9eC74ECFD"))}}
 
 		mikeUserID, err := tc.repos.UserRepository.Create(ctx, mike)
 		assert.NoError(err)
@@ -135,16 +135,16 @@ func TestOpensea(t *testing.T) {
 		assert.NoError(err)
 
 		mikeCollNFTs := []persist.DBID{}
-		if nft1DB.OwnerAddress == mike.Addresses[0] {
+		if nft1DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[0])
 		}
-		if nft2DB.OwnerAddress == mike.Addresses[0] {
+		if nft2DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[1])
 		}
-		if nft3DB.OwnerAddress == mike.Addresses[0] {
+		if nft3DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[2])
 		}
-		if nft4DB.OwnerAddress == mike.Addresses[0] {
+		if nft4DB.OwnerAddress == mike.Wallets[0] {
 			mikeCollNFTs = append(mikeCollNFTs, ids[3])
 		}
 

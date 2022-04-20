@@ -82,7 +82,7 @@ func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress 
 			logrus.WithError(err).Error("Failed to get metadata from URI")
 			return response.Metadata, nil
 		}
-		med, err := media.MakePreviewsForMetadata(ctx, md, persist.Address(contractAddress), tid, asURI, ipfsClient, arweaveClient, stg)
+		med, err := media.MakePreviewsForMetadata(ctx, md, contractAddress.String(), tid, asURI, persist.ChainETH, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to make previews")
 			return response.Metadata, nil

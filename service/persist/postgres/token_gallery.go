@@ -40,6 +40,7 @@ type TokenGalleryRepository struct {
 }
 
 // NewTokenGalleryRepository creates a new TokenRepository
+// TODO joins on addresses
 func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -367,7 +368,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
 				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
-				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
+				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, ownership.Address.ID); err != nil {
 					return err
 				}
 				owners[ownership.Address.String()] = true
@@ -379,7 +380,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
 			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, token.OwnerAddress.ID); err != nil {
 				return err
 			}
 			if len(pTokens) < i+1 {
@@ -551,7 +552,7 @@ func (t *TokenGalleryRepository) Count(pCtx context.Context, pTokenType persist.
 	return count, nil
 }
 
-func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pOwnerAddress persist.Address) error {
+func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.DBID) error {
 	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
 	return err
 }

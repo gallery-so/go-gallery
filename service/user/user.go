@@ -117,7 +117,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 	}
 
 	user := persist.User{
-		Addresses: []persist.Wallet{pInput.Address},
+		Wallets: []persist.Wallet{pInput.Address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
@@ -194,7 +194,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	address := authResult.Addresses[0]
 
 	user := persist.User{
-		Addresses: []persist.Wallet{address},
+		Wallets: []persist.Wallet{address},
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
@@ -260,22 +260,15 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 		return err
 	}
 
-	if len(user.Addresses) <= len(pAddresses) {
+	if len(user.Wallets) <= len(pAddresses) {
 		return errUserCannotRemoveAllAddresses
-	}
-
-	for _, address := range pAddresses {
-		err = walletRepo.Upsert(pCtx, address.Address, address.Chain, "")
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-// AddAddressToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.Wallet, addressAuth auth.Authenticator,
+// AddWalletToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
+func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pWallet persist.Wallet, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -286,19 +279,14 @@ func AddAddressToUser(pCtx context.Context, pUserID persist.DBID, pAddress persi
 	addressUserID := authResult.UserID
 
 	if addressUserID != "" {
-		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
+		return ErrAddressOwnedByUser{Address: pWallet, OwnerID: addressUserID}
 	}
 
-	if !containsWallet(authResult.Addresses, pAddress) {
-		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
+	if !containsWallet(authResult.Addresses, pWallet) {
+		return ErrAddressNotOwnedByUser{Address: pWallet, UserID: addressUserID}
 	}
 
-	for _, address := range authResult.Addresses {
-		err = walletRepo.Upsert(pCtx, address.Address, address.Chain, pUserID)
-		if err != nil {
-			return err
-		}
-	}
+	// TODO insert wallet and update user with wallet
 
 	return nil
 }
@@ -344,7 +332,8 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 		}()
 	}()
 
-	err = walletRepo.Upsert(pCtx, pAddress.Address, pAddress.Chain, pUserID)
+	// TODO add address to user waterfalls to wallet and address table
+	_, err = walletRepo.Insert(pCtx, pAddress.Address, pAddress.Chain)
 	if err != nil {
 		return err
 	}
@@ -354,22 +343,15 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
+	userRepo persist.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
 
-	if len(user.Addresses) <= len(pInput.Addresses) {
+	if len(user.Wallets) <= len(pInput.Addresses) {
 		return errUserCannotRemoveAllAddresses
-	}
-
-	for _, address := range pInput.Addresses {
-		err = walletRepo.Upsert(pCtx, address.Address, address.Chain, "")
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -399,7 +381,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		if pInput.Chain == "" {
 			pInput.Chain = persist.ChainETH
 		}
-		user, err = userRepo.GetByAddress(pCtx, pInput.Address, pInput.Chain)
+		user, err = userRepo.GetByAddress(pCtx, pInput.Address.String(), pInput.Chain)
 		if err != nil {
 			return GetUserOutput{}, err
 		}
@@ -407,7 +389,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address.String(), Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
@@ -415,7 +397,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		Username:  user.Username.String(),
 		BioStr:    user.Bio.String(),
 		CreatedAt: user.CreationTime,
-		Addresses: user.Addresses,
+		Addresses: user.Wallets,
 	}
 
 	return output, nil
@@ -429,8 +411,8 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 			return err
 		}
 		can := false
-		for _, addr := range user.Addresses {
-			if resolves, _ := eth.ResolvesENS(pCtx, username, persist.EthereumAddress(addr.Address), ethClient); resolves {
+		for _, addr := range user.Wallets {
+			if resolves, _ := eth.ResolvesENS(pCtx, username, persist.EthereumAddress(addr.Address.Address), ethClient); resolves {
 				can = true
 				break
 			}
@@ -517,13 +499,17 @@ func ensureMediaContent(pCtx context.Context, pAddress persist.Wallet, tokenRepo
 }
 
 // DoesUserOwnWallets checks if a user owns any wallets
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Wallet, userRepo persist.UserRepository) (bool, error) {
+func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo persist.UserRepository) (bool, error) {
 	user, err := userRepo.GetByID(pCtx, userID)
 	if err != nil {
 		return false, err
 	}
+	walletIDs := make([]persist.DBID, len(user.Wallets))
+	for i, wallet := range user.Wallets {
+		walletIDs[i] = wallet.ID
+	}
 	for _, walletAddress := range walletAddresses {
-		if !ContainsWallets(user.Addresses, walletAddress) {
+		if !persist.ContainsDBID(walletAddresses, walletAddress) {
 			return false, nil
 		}
 	}

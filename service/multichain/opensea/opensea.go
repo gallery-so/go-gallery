@@ -137,7 +137,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 		return fmt.Errorf("failed to get user by id %s: %w", pUserID, err)
 	}
 	if len(pOwnerWalletAddresses) == 0 {
-		pOwnerWalletAddresses = persist.WalletsToEthereumAddresses(user.Addresses)
+		pOwnerWalletAddresses = persist.WalletsToEthereumAddresses(user.Wallets)
 	}
 
 	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)

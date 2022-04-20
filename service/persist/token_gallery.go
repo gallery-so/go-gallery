@@ -56,7 +56,7 @@ type TokenInCollection struct {
 	ID           DBID         `json:"id" binding:"required"`
 	CreationTime CreationTime `json:"created_at"`
 
-	ContractAddress Address `json:"contract_address"`
+	ContractAddress DBID `json:"contract_address"`
 
 	Chain Chain `json:"chain"`
 
@@ -67,7 +67,7 @@ type TokenInCollection struct {
 
 	TokenURI     TokenURI `json:"token_uri"`
 	TokenID      TokenID  `json:"token_id"`
-	OwnerAddress Address  `json:"owner_address"`
+	OwnerAddress DBID     `json:"owner_address"`
 
 	Media         Media         `json:"media"`
 	TokenMetadata TokenMetadata `json:"metadata"`
@@ -126,7 +126,7 @@ func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdenti
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s", t.ContractAddress, t.TokenID)
+	return fmt.Sprintf("%s+%s+%s", t.ContractAddress.Address, t.TokenID, t.ContractAddress.Chain)
 }
 
 // Value implements the driver.Valuer interface
@@ -145,8 +145,11 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 		return fmt.Errorf("invalid token identifiers: %v - %T", i, i)
 	}
 	*t = TokenIdentifiers{
-		TokenID:         TokenID(res[1]),
-		ContractAddress: Address(res[0]),
+		TokenID: TokenID(res[1]),
+		ContractAddress: Address{
+			Address: NullString(res[0]),
+			Chain:   Chain(res[2]),
+		},
 	}
 	return nil
 }

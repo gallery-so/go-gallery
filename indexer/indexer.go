@@ -668,7 +668,7 @@ func findOptionalFields(i *Indexer, key persist.EthereumTokenIdentifiers, to, fr
 		return
 	}
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(contractAddress), tokenID, tokenURI, i.ipfsClient, i.arweaveClient, i.storageClient)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient)
 	if err != nil {
 		logrus.WithError(err).Errorf("error making previews for %s", key)
 		return

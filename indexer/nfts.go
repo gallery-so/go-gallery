@@ -518,7 +518,7 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 				}
 			}
 
-			med, err := media.MakePreviewsForMetadata(pCtx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
+			med, err := media.MakePreviewsForMetadata(pCtx, metadata, token.ContractAddress.String(), token.TokenID, uri, token.Chain, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to make media for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
 				return

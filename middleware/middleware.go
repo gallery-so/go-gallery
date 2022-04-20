@@ -65,7 +65,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 				return
 			}
 			has := false
-			for _, addr := range user.Addresses {
+			for _, addr := range user.Wallets {
 				if addr.Chain != persist.ChainETH {
 					continue
 				}
@@ -78,7 +78,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 				}
 			}
 			if !has {
-				c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Addresses}.Error()})
+				c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Wallets}.Error()})
 				return
 			}
 		}

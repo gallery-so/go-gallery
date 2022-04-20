@@ -73,7 +73,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		body := persist.User{}
 		util.UnmarshallBody(&body, resp.Body)
 		assert.Equal(userID, body.ID)
-		assert.NotEmpty(body.Addresses)
+		assert.NotEmpty(body.Wallets)
 	})
 
 	t.Run("get current user with cookie includes user token", func(t *testing.T) {
@@ -226,7 +226,7 @@ func TestUserTokenRoutes(t *testing.T) {
 
 		updatedUser, err := tc.repos.UserRepository.GetByID(context.Background(), tc.user1.id)
 		assert.Nil(err)
-		assert.Equal(update.Address, updatedUser.Addresses[1])
+		assert.Equal(update.Address, updatedUser.Wallets[1])
 	})
 
 	t.Run("can't add address if wrong nonce", func(t *testing.T) {
@@ -251,7 +251,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"},
+			Wallets: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"},
 		}
 		_, err := tc.repos.UserRepository.Create(context.Background(), u)
 
@@ -274,7 +274,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		u := persist.User{
-			Addresses:          []persist.EthereumAddress{"0xcb1b78568d0ef81585f074b0dfd6b743959070d9", "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"},
+			Wallets:            []persist.EthereumAddress{"0xcb1b78568d0ef81585f074b0dfd6b743959070d9", "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"},
 			Username:           "TestUser",
 			UsernameIdempotent: "testuser",
 		}
@@ -338,7 +338,7 @@ func TestUserTokenRoutes(t *testing.T) {
 
 		user, err := tc.repos.UserRepository.GetByID(context.Background(), userID)
 		assert.Nil(err)
-		assert.Len(user.Addresses, 1)
+		assert.Len(user.Wallets, 1)
 
 	})
 
@@ -346,7 +346,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", "0xcb1b78568d0ef81585f074b0dfd6b743959070d9"},
+			Wallets: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", "0xcb1b78568d0ef81585f074b0dfd6b743959070d9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -376,7 +376,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		assert := setupTest(t, 2)
 
 		u := persist.User{
-			Addresses: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", "0xcb1b78568d0ef81585f074b0dfd6b743959070d9"},
+			Wallets: []persist.EthereumAddress{"0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", "0xcb1b78568d0ef81585f074b0dfd6b743959070d9"},
 		}
 		userID, err := tc.repos.UserRepository.Create(context.Background(), u)
 		assert.Nil(err)
@@ -385,7 +385,7 @@ func TestUserTokenRoutes(t *testing.T) {
 		assert.Nil(err)
 
 		update := user.RemoveUserAddressesInput{
-			Addresses: u.Addresses,
+			Addresses: u.Wallets,
 		}
 		j, err := cookiejar.New(nil)
 		client := &http.Client{Jar: j}

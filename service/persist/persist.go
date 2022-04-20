@@ -326,3 +326,12 @@ func RemoveDuplicateAddresses(a []EthereumAddress) []EthereumAddress {
 
 	return result
 }
+
+func ContainsDBID(pSrc []DBID, pID DBID) bool {
+	for _, v := range pSrc {
+		if v == pID {
+			return true
+		}
+	}
+	return false
+}

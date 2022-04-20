@@ -51,7 +51,7 @@ func createMockGallery(t *testing.T, a *assert.Assertions, db *sql.DB) (persist.
 	user := persist.User{
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Wallet{persist.Wallet{
+		Wallets: []persist.Wallet{persist.Wallet{
 			Address: persist.NullString(strings.ToLower(address)),
 			Chain:   persist.ChainETH,
 		}},

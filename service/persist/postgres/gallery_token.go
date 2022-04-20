@@ -36,6 +36,7 @@ type GalleryTokenRepository struct {
 }
 
 // NewGalleryTokenRepository creates a new GalleryTokenRepository
+// TODO another join to addresses
 func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -472,20 +473,11 @@ func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryTokenReposi
 
 func appendDifference(pDest []persist.DBID, pSrc []persist.DBID) []persist.DBID {
 	for _, v := range pSrc {
-		if !containsDBID(pDest, v) {
+		if !persist.ContainsDBID(pDest, v) {
 			pDest = append(pDest, v)
 		}
 	}
 	return pDest
-}
-
-func containsDBID(pSrc []persist.DBID, pID persist.DBID) bool {
-	for _, v := range pSrc {
-		if v == pID {
-			return true
-		}
-	}
-	return false
 }
 
 func addUnaccountedForCollectionsToken(pCtx context.Context, g *GalleryTokenRepository, pUserID persist.DBID, pColls []persist.DBID) ([]persist.DBID, error) {

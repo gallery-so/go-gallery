@@ -93,7 +93,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.EthereumA
 		return err
 	}
 
-	err = user.AddAddressToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
+	err = user.AddWalletToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
 	if err != nil {
 		return err
 	}

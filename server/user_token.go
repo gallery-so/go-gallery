@@ -157,7 +157,7 @@ func addUserAddress(userRepository persist.UserRepository, walletRepo persist.Wa
 			EthClient:  ethClient,
 		}
 
-		err := user.AddAddressToUser(c, userID, input.Address, authenticator, userRepository, walletRepo)
+		err := user.AddWalletToUser(c, userID, input.Address, authenticator, userRepository, walletRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -228,7 +228,7 @@ func removeAddressesToken(userRepository persist.UserRepository, walletRepo pers
 			return
 		}
 
-		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository, walletRepo)
+		err := user.RemoveAddressesFromUserToken(c, userID, input, userRepository)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

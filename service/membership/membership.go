@@ -345,7 +345,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 func fillMembershipOwner(ctx context.Context, pAddress persist.EthereumAddress, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.MembershipOwner {
 	membershipOwner := persist.MembershipOwner{Address: pAddress}
 
-	glryUser, err := userRepository.GetByAddress(ctx, persist.Address(pAddress), persist.ChainETH)
+	glryUser, err := userRepository.GetByAddress(ctx, pAddress.String(), persist.ChainETH)
 	if err != nil || glryUser.Username == "" {
 		logrus.WithError(err).Errorf("Failed to get user for address %s", pAddress)
 		return membershipOwner
@@ -367,7 +367,7 @@ func fillMembershipOwner(ctx context.Context, pAddress persist.EthereumAddress, 
 func fillMembershipOwnerToken(ctx context.Context, pAddress persist.EthereumAddress, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.MembershipOwner {
 	membershipOwner := persist.MembershipOwner{Address: pAddress}
 
-	glryUser, err := userRepository.GetByAddress(ctx, persist.Address(pAddress), persist.ChainETH)
+	glryUser, err := userRepository.GetByAddress(ctx, pAddress.String(), persist.ChainETH)
 	if err != nil || glryUser.Username == "" {
 		logrus.WithError(err).Errorf("Failed to get user for address %s", pAddress)
 		return membershipOwner
@@ -393,7 +393,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
-	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address(PremiumCards), -1, 0)
+	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address{Address: persist.NullString(PremiumCards), Chain: persist.ChainETH}, -1, 0)
 	if err != nil || len(tokens) == 0 {
 		logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 		return tier, nil
@@ -412,7 +412,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			membershipOwner := fillMembershipOwnerToken(ctx, persist.EthereumAddress(token.OwnerAddress), id, ethClient, userRepository, galleryRepository)
+			membershipOwner := fillMembershipOwnerToken(ctx, persist.EthereumAddress(token.OwnerAddress.Address), id, ethClient, userRepository, galleryRepository)
 			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
 				ownersChan <- membershipOwner
 			} else {

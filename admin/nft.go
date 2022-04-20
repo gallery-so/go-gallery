@@ -119,7 +119,7 @@ func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.
 			if err != nil {
 				return err
 			}
-			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
+			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Wallets, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
 			if err != nil {
 				return err
 			}

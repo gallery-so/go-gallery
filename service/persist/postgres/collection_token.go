@@ -38,9 +38,12 @@ type CollectionTokenRepository struct {
 	getUserAddressesStmt         *sql.Stmt
 	getUnassignedNFTsStmt        *sql.Stmt
 	checkOwnNFTsStmt             *sql.Stmt
+	getAddressByDetailsStmt      *sql.Stmt
+	getUserWalletsStmt           *sql.Stmt
 }
 
 // NewCollectionTokenRepository creates a new CollectionTokenRepository
+// TODO another join for addresses
 func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *CollectionTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -101,7 +104,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
+	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT a.ID FROM users u, unnest(u.WALLETS) WITH ORDINALITY AS u(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet LEFT JOIN addresses a on a.ID = w.ADDRESS WHERE u.ID = $1;`)
 	checkNoErr(err)
 
 	getUnassignedNFTsStmt, err := db.PrepareContext(ctx, `SELECT n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
@@ -113,7 +116,10 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
+	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
+	checkNoErr(err)
+
+	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getAddressByDetailsStmt: getAddressByDetailsStmt}
 }
 
 // Create creates a new collection in the database
@@ -419,14 +425,14 @@ func (c *CollectionTokenRepository) RemoveNFTsOfOldAddresses(pCtx context.Contex
 		return err
 	}
 
-	var addresses []persist.Address
-	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses)); err != nil {
+	var walletIDs []persist.DBID
+	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&walletIDs)); err != nil {
 		return err
 	}
 
 	for _, coll := range colls {
 		for _, nft := range coll.NFTs {
-			if !containsAddress(addresses, nft.OwnerAddress) {
+			if !persist.ContainsDBID(walletIDs, nft.OwnerAddress) {
 				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
 				if err != nil {
 					return err

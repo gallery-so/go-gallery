@@ -78,7 +78,7 @@ func generateTestUser(a *assert.Assertions, repos *persist.Repositories, jwt str
 	user := persist.User{
 		Username:           persist.NullString(username),
 		UsernameIdempotent: persist.NullString(strings.ToLower(username)),
-		Addresses:          []persist.Wallet{wallet.address},
+		Wallets:            []persist.Wallet{wallet.address},
 	}
 	id, err := repos.UserRepository.Create(ctx, user)
 	a.NoError(err)

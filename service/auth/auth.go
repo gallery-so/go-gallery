@@ -211,8 +211,8 @@ func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthRes
 			return nil, err
 		}
 
-		addresses = make([]persist.Wallet, len(user.Addresses), len(user.Addresses)+1)
-		copy(addresses, user.Addresses)
+		addresses = make([]persist.Wallet, len(user.Wallets), len(user.Wallets)+1)
+		copy(addresses, user.Wallets)
 
 		if !containsAddress(addresses, address) {
 			addresses = addresses[:cap(addresses)]
@@ -369,7 +369,7 @@ func VerifySignature(pSignatureStr string,
 		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
 		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
 		log.Println("pAddress:", pAddress)
-		if !strings.EqualFold(pubkeyAddressHexStr, pAddress.String()) {
+		if !strings.EqualFold(pubkeyAddressHexStr, pAddress.Address.String()) {
 			return false, errAddressSignatureMismatch
 		}
 
@@ -381,7 +381,7 @@ func VerifySignature(pSignatureStr string,
 	case WalletTypeGnosis:
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		sigValidator, err := contracts.NewISignatureValidator(pAddress.ToHexAddress(), ec)
+		sigValidator, err := contracts.NewISignatureValidator(pAddress.Address.ToHexAddress(), ec)
 		if err != nil {
 			return false, err
 		}
@@ -407,7 +407,7 @@ func VerifySignature(pSignatureStr string,
 func GetAuthNonce(pCtx context.Context, pAddress persist.Wallet, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*model.AuthNonce, error) {
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress.Address, pAddress.Chain)
+	user, err := userRepo.GetByAddress(pCtx, pAddress.Address.String(), pAddress.Chain)
 	if err != nil {
 		logrus.WithError(err).Error("error retrieving user by address to get login nonce")
 	}
@@ -426,7 +426,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Wallet, pPreAuthed bool
 			has := false
 			for k, v := range req {
 
-				hasNFT, err := eth.HasNFTs(pCtx, k, v, persist.EthereumAddress(pAddress.Address), ethClient)
+				hasNFT, err := eth.HasNFTs(pCtx, k, v, persist.EthereumAddress(pAddress.Address.Address), ethClient)
 				if err != nil {
 					return nil, err
 				}
@@ -436,7 +436,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Wallet, pPreAuthed bool
 				}
 			}
 			if !has {
-				return nil, ErrDoesNotOwnRequiredNFT{persist.EthereumAddress(pAddress.Address)}
+				return nil, ErrDoesNotOwnRequiredNFT{persist.EthereumAddress(pAddress.Address.Address)}
 			}
 
 		}
@@ -511,14 +511,14 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Wallet, userRepo pe
 
 	nonceValue = nonce.Value.String()
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress.Address, persist.ChainETH)
+	user, err := userRepo.GetByAddress(pCtx, pAddress.Address.String(), persist.ChainETH)
 	if err != nil {
 		return nonceValue, userID, err
 	}
 	if user.ID != "" {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress.Address, Chain: pAddress.Chain}
+		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress.Address.String(), Chain: pAddress.Chain}
 	}
 
 	return nonceValue, userID, nil

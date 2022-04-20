@@ -80,7 +80,7 @@ func getTokens(nftRepository persist.TokenGalleryRepository, ipfsClient *shell.S
 			return
 		}
 
-		if input.ID == "" && input.WalletAddress.String() == "" && input.ContractAddress == "" && input.TokenID == "" {
+		if input.ID == "" && input.WalletAddress.Address.Address == "" && input.ContractAddress.Address == "" && input.TokenID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, util.ErrInvalidInput{Reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
@@ -254,9 +254,9 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 			return nil, err
 		}
 		return []persist.TokenGallery{token}, nil
-	case input.WalletAddress.String() != "":
+	case input.WalletAddress.Address.String() != "":
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
-	case input.TokenID != "" && input.ContractAddress != "":
+	case input.TokenID != "" && input.ContractAddress.Address != "":
 		if strings.HasPrefix(string(input.TokenID), "0x") {
 			input.TokenID = input.TokenID[2:]
 		} else {
@@ -264,7 +264,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 		}
 
 		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
-	case input.ContractAddress != "":
+	case input.ContractAddress.Address != "":
 		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
 	}
 	return nil, nil
@@ -273,7 +273,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 
 func refreshMetadata(ctx context.Context, token persist.TokenGallery, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.TokenGallery, error) {
 
-	uri, err := rpc.GetTokenURI(ctx, token.TokenType, persist.EthereumAddress(token.ContractAddress), token.TokenID, ethcl)
+	uri, err := rpc.GetTokenURI(ctx, token.TokenType, persist.EthereumAddress(token.ContractAddress.Address), token.TokenID, ethcl)
 	if err != nil {
 		return token, fmt.Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
 	}
@@ -288,7 +288,7 @@ func refreshMetadata(ctx context.Context, token persist.TokenGallery, ethcl *eth
 	}
 	token.TokenMetadata = metadata
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress, token.TokenID, uri, ipfsClient, arweaveClient, storageClient)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, token.ContractAddress.String(), token.TokenID, uri, token.Chain, ipfsClient, arweaveClient, storageClient)
 	if err != nil {
 		return token, fmt.Errorf("failed to get token media for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
 	}
