@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -126,7 +127,7 @@ func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdenti
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%s", t.ContractAddress.Address, t.TokenID, t.ContractAddress.Chain)
+	return fmt.Sprintf("%s+%s+%d", t.ContractAddress.Address, t.TokenID, t.ContractAddress.Chain)
 }
 
 // Value implements the driver.Valuer interface
@@ -144,11 +145,15 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 	if len(res) != 2 {
 		return fmt.Errorf("invalid token identifiers: %v - %T", i, i)
 	}
+	chain, err := strconv.Atoi(res[2])
+	if err != nil {
+		return err
+	}
 	*t = TokenIdentifiers{
 		TokenID: TokenID(res[1]),
 		ContractAddress: Address{
 			Address: NullString(res[0]),
-			Chain:   Chain(res[2]),
+			Chain:   Chain(chain),
 		},
 	}
 	return nil

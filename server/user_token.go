@@ -147,7 +147,7 @@ func addUserAddress(userRepository persist.UserRepository, walletRepo persist.Wa
 			return
 		}
 
-		authenticator := auth.EthereumNonceAuthenticator{
+		authenticator := auth.NonceAuthenticator{
 			Address:    input.Address,
 			Nonce:      input.Nonce,
 			Signature:  input.Signature,
@@ -187,7 +187,7 @@ func addUserAddressToken(userRepository persist.UserRepository, walletRepo persi
 			return
 		}
 
-		authenticator := auth.EthereumNonceAuthenticator{
+		authenticator := auth.NonceAuthenticator{
 			Address:    input.Address,
 			Nonce:      input.Nonce,
 			Signature:  input.Signature,

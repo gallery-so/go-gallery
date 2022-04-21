@@ -47,7 +47,7 @@ func NewNonceRepository(db *sql.DB) *NonceRepository {
 }
 
 // Get returns a nonce from the DB by its address
-func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Wallet) (persist.UserNonce, error) {
+func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.DBID) (persist.UserNonce, error) {
 	var nonce persist.UserNonce
 	err := n.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&nonce.ID, &nonce.Value, &nonce.Address, &nonce.Version, &nonce.Deleted, &nonce.CreationTime, &nonce.LastUpdated)
 	if err != nil {
@@ -60,15 +60,15 @@ func (n *NonceRepository) Get(pCtx context.Context, pAddress persist.Wallet) (pe
 }
 
 // Create creates a new nonce in the DB
-func (n *NonceRepository) Create(pCtx context.Context, pNonce persist.UserNonce) error {
-	_, err := n.createStmt.ExecContext(pCtx, persist.GenerateID(), pNonce.Value, pNonce.Address, pNonce.Version, pNonce.Deleted)
+func (n *NonceRepository) Create(pCtx context.Context, pNonce persist.CreateNonceInput) error {
+	_, err := n.createStmt.ExecContext(pCtx, persist.GenerateID(), pNonce.Value, pNonce.Address, 0, false)
 	return err
 }
 
 // Create creates a new login attempt in the DB
-func (l *LoginRepository) Create(pCtx context.Context, pAttempt persist.UserLoginAttempt) (persist.DBID, error) {
+func (l *LoginRepository) Create(pCtx context.Context, pAttempt persist.CreateLoginAttemptInput) (persist.DBID, error) {
 	var id persist.DBID
-	err := l.createStmt.QueryRowContext(pCtx, pAttempt.ID, pAttempt.UserExists, pAttempt.Address, pAttempt.Version, pAttempt.NonceValue, pAttempt.ReqHeaders, pAttempt.ReqHostAddr, pAttempt.Signature, pAttempt.SignatureValid).Scan(&id)
+	err := l.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pAttempt.UserExists, pAttempt.Address.ID, 0, pAttempt.NonceValue, pAttempt.ReqHeaders, pAttempt.ReqHostAddr, pAttempt.Signature, pAttempt.SignatureValid).Scan(&id)
 	if err != nil {
 		return "", err
 	}

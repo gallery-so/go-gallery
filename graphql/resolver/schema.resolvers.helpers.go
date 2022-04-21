@@ -78,7 +78,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
 
 	ethNonceAuth := func(address persist.EthereumAddress, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
-		authenticator := auth.EthereumNonceAuthenticator{
+		authenticator := auth.NonceAuthenticator{
 			Address:    address,
 			Nonce:      nonce,
 			Signature:  signature,

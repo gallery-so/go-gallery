@@ -6,8 +6,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// DataRetriever is an interface for retrieving data from multiple chains
-type DataRetriever struct {
+// Provider is an interface for retrieving data from multiple chains
+type Provider struct {
 	TokenRepo    persist.TokenGalleryRepository
 	ContractRepo persist.ContractRepository
 	UserRepo     persist.UserRepository
@@ -32,17 +32,18 @@ type ChainDataRetriever interface {
 	// do we want to return the tokens we validate?
 	// bool is whether or not to update all of the tokens regardless of whether we know they exist already
 	ValidateTokensForWallet(context.Context, persist.Wallet, bool) error
-	VerifySignature(context.Context, persist.Wallet, string, int) (bool, error)
+	// ctx, address, chain, wallet type, nonce, sig
+	VerifySignature(context.Context, string, persist.WalletType, string, string) (bool, error)
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(chains ...ChainDataRetriever) *DataRetriever {
-	return &DataRetriever{
+func NewMultiChainDataRetriever(chains ...ChainDataRetriever) *Provider {
+	return &Provider{
 		Chains: chains,
 	}
 }
 
-func (d *DataRetriever) UpdateTokensForUser(ctx context.Context, userID persist.DBID) error {
+func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID) error {
 	// user, err := d.UserRepo.GetByID(ctx, userID)
 	// if err != nil {
 	// 	return err
@@ -54,4 +55,19 @@ func (d *DataRetriever) UpdateTokensForUser(ctx context.Context, userID persist.
 
 	// }
 	return nil
+}
+
+// VerifySignature verifies a signature for a wallet address
+func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress string, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
+	// user, err := d.UserRepo.GetByID(ctx, userID)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// errChan := make(chan error)
+
+	// for _, addr := range user.Addresses {
+
+	// }
+	return true, nil
 }

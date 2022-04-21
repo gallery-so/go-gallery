@@ -3,10 +3,8 @@ package nft
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/user"
 )
 
 var errInvalidPreviewsInput = errors.New("user_id or username required for previews")
@@ -127,24 +125,25 @@ outer:
 
 }
 
-func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
+// TODO this should be in multichain
+// func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
 
-	addresses := []persist.Wallet{}
-	if walletAddress != "" {
-		addresses = []persist.Wallet{}
-		addressesStrings := strings.Split(walletAddress, ",")
-		for _, address := range addressesStrings {
-			addresses = append(addresses, persist.Wallet{Address: persist.Address(address), Chain: persist.ChainETH})
-		}
-		ownsWallet, err := user.DoesUserOwnWallets(ctx, userID, addresses, userRepo)
-		if err != nil {
-			return err
-		}
+// 	addresses := []persist.Wallet{}
+// 	if walletAddress != "" {
+// 		addresses = []persist.Wallet{}
+// 		addressesStrings := strings.Split(walletAddress, ",")
+// 		for _, address := range addressesStrings {
+// 			addresses = append(addresses, persist.Wallet{Address: persist.Address(address), Chain: persist.ChainETH})
+// 		}
+// 		ownsWallet, err := user.DoesUserOwnWallets(ctx, userID, addresses, userRepo)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		if !ownsWallet {
-			return user.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
-		}
-	}
+// 		if !ownsWallet {
+// 			return user.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

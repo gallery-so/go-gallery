@@ -20,7 +20,7 @@ type UserNonce struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 	Value        NullString      `json:"value"`
-	Address      Wallet          `json:"address"`
+	Address      Address         `json:"address"`
 }
 
 // UserLoginAttempt represents a single attempt for a user to login despite the success
@@ -39,15 +39,33 @@ type UserLoginAttempt struct {
 	ReqHeaders     ReqHeaders   `json:"req_headers"`
 }
 
+// CreateLoginAttemptInput is a type that holds the input for creating a login attempt
+type CreateLoginAttemptInput struct {
+	Address        Wallet     `json:"address"`
+	Signature      string     `json:"signature"`
+	NonceValue     string     `json:"nonce_value"`
+	UserExists     bool       `json:"user_exists"`
+	SignatureValid bool       `json:"signature_valid"`
+	ReqHostAddr    string     `json:"req_host_addr"`
+	ReqHeaders     ReqHeaders `json:"req_headers"`
+}
+
+// CreateNonceInput is a type that holds the input for creating a nonce
+type CreateNonceInput struct {
+	Value   string `json:"value"`
+	Address string `json:"address"`
+	Chain   Chain  `json:"chain"`
+}
+
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, Wallet) (UserNonce, error)
-	Create(context.Context, UserNonce) error
+	Get(context.Context, DBID) (UserNonce, error)
+	Create(context.Context, CreateNonceInput) error
 }
 
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
 type LoginAttemptRepository interface {
-	Create(context.Context, UserLoginAttempt) (DBID, error)
+	Create(context.Context, CreateLoginAttemptInput) (DBID, error)
 }
 
 // Scan implements the sql.Scanner interface for the ReqHeaders type
@@ -66,7 +84,7 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	Address Wallet
+	Address DBID
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {

@@ -13,19 +13,30 @@ type Wallet struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address Address `json:"address"`
+	Address    Address    `json:"address"`
+	WalletType WalletType `json:"wallet_type"`
 }
+
+// WalletType is the type of wallet used to sign a message
+type WalletType int
+
+const (
+	// WalletTypeEOA represents an externally owned account (regular wallet address)
+	WalletTypeEOA WalletType = iota
+	// WalletTypeGnosis represents a smart contract gnosis safe
+	WalletTypeGnosis
+)
 
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
-	GetByAddressDetails(context.Context, Address, Chain) (Wallet, error)
+	GetByAddressDetails(context.Context, string, Chain) (Wallet, error)
 	GetByAddress(context.Context, DBID) (Wallet, error)
-	Insert(context.Context, Address, Chain) (DBID, error)
+	Insert(context.Context, string, Chain, WalletType) (DBID, error)
 }
 
 // ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination
 type ErrWalletNotFoundByAddressDetails struct {
-	Address Address
+	Address string
 	Chain   Chain
 }
 

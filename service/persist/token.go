@@ -58,13 +58,13 @@ const (
 
 const (
 	// ChainETH represents the Ethereum blockchain
-	ChainETH Chain = "ETH"
+	ChainETH Chain = iota
 	// ChainArbitrum represents the Arbitrum blockchain
-	ChainArbitrum Chain = "Arbitrum"
+	ChainArbitrum
 	// ChainPolygon represents the Polygon/Matic blockchain
-	ChainPolygon Chain = "Polygon"
+	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
-	ChainOptimism Chain = "Optimism"
+	ChainOptimism
 )
 
 const (
@@ -142,7 +142,7 @@ type URIType string
 type TokenCountType string
 
 // Chain represents which blockchain a token is on
-type Chain string
+type Chain int
 
 // TokenID represents the ID of an Ethereum token
 type TokenID string
@@ -303,10 +303,10 @@ func (c Chain) Value() (driver.Value, error) {
 // Scan implements the sql.Scanner interface for the Chain type
 func (c *Chain) Scan(src interface{}) error {
 	if src == nil {
-		*c = Chain("")
+		*c = Chain(0)
 		return nil
 	}
-	*c = Chain(src.(string))
+	*c = Chain(src.(int64))
 	return nil
 }
 
