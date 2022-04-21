@@ -99,7 +99,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
+		return CreateUserOutput{}, persist.ErrUserAlreadyExists{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != auth.WalletTypeEOA {
@@ -187,7 +187,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	}
 
 	if authResult.UserID != "" {
-		return "", "", ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -492,15 +492,6 @@ func ensureMediaContent(pCtx context.Context, pAddress persist.Address, tokenRep
 	}
 	return nil
 
-}
-
-type ErrUserAlreadyExists struct {
-	Address       persist.Address
-	Authenticator string
-}
-
-func (e ErrUserAlreadyExists) Error() string {
-	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
 }
 
 type ErrAddressOwnedByUser struct {
