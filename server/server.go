@@ -93,8 +93,10 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
-	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	// viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
+	// viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-mainnet.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("CONTRACT_ADDRESSES", "0xe01569ca9b39E55Bc7C0dFa09F05fa15CB4C7698=[0,1,2,3,4,5,6,7,8]|0xe3d0fe9b7e0b951663267a3ed1e6577f6f79757e=[0]")
 	viper.SetDefault("REQUIRE_NFTS", false)
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
@@ -157,10 +159,10 @@ func newEthClient() *ethclient.Client {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
-		log.Info("skipping sentry init")
-		return
-	}
+	// if viper.GetString("ENV") == "local" {
+	// 	log.Info("skipping sentry init")
+	// 	return
+	// }
 
 	log.Info("initializing sentry...")
 

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/spf13/viper"
@@ -41,22 +39,24 @@ func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
 }
 
 func sendMessage(ctx context.Context, message []byte) error {
-	client := http.Client{}
-	req, err := prepareRequest(ctx, message)
-	if err != nil {
-		return err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return errFailedToPostMessage{err}
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(string(body))
-	}
+	fmt.Println("sending %s to discord", message)
 	return nil
+	// client := http.Client{}
+	// req, err := prepareRequest(ctx, message)
+	// if err != nil {
+	// 	return err
+	// }
+	// resp, err := client.Do(req)
+	// if err != nil {
+	// 	return errFailedToPostMessage{err}
+	// }
+	// defer resp.Body.Close()
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return err
+	// }
+	// if resp.StatusCode != http.StatusOK {
+	// 	return errors.New(string(body))
+	// }
+	// return nil
 }

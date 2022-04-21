@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/event"
 	nftservice "github.com/mikeydub/go-gallery/service/nft"
@@ -144,5 +145,5 @@ func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID p
 		Data:   nftData,
 	}
 
-	nftHandlers.Dispatch(evt)
+	nftHandlers.Dispatch(ctx, evt)
 }

@@ -95,6 +95,14 @@ Run a migration locally:
 migrate -path db/migrations -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
 ```
 
+**Running the feedbot locally**
+This is a little quicker than deploying to the sandbox environment for local development. See [GCP Docs](https://cloud.google.com/appengine/docs/standard/python/tools/using-local-server) for more details.
+
+Start the local development server:
+```bash
+dev_appserver.py app-local-feedbot.yaml
+```
+
 ### Healthcheck
 
 Verify that the server is running by calling the `/v1/health` endpoint.

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -244,5 +245,5 @@ func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, u
 		Data:         collectionData,
 	}
 
-	collectionHandlers.Dispatch(evt)
+	collectionHandlers.Dispatch(ctx, evt)
 }

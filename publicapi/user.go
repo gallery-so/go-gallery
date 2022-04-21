@@ -1,8 +1,9 @@
 package publicapi
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
+
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
@@ -214,5 +215,5 @@ func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID 
 		Data:   userData,
 	}
 
-	userHandlers.Dispatch(evt)
+	userHandlers.Dispatch(ctx, evt)
 }
