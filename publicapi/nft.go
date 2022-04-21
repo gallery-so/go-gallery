@@ -5,7 +5,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/event"
-	nftservice "github.com/mikeydub/go-gallery/service/nft"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 
@@ -16,11 +16,12 @@ import (
 )
 
 type NftAPI struct {
-	repos     *persist.Repositories
-	queries   *sqlc.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
+	repos              *persist.Repositories
+	queries            *sqlc.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft, error) {
@@ -84,7 +85,7 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 		return err
 	}
 
-	err = nftservice.RefreshOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository)
+	err = api.multichainProvider.UpdateTokensForUser(ctx, userID)
 	if err != nil {
 		return err
 	}

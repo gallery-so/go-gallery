@@ -11,7 +11,7 @@ type Provider struct {
 	TokenRepo    persist.TokenGalleryRepository
 	ContractRepo persist.ContractRepository
 	UserRepo     persist.UserRepository
-	Chains       []ChainDataRetriever
+	Chains       []ChainProvider
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -20,8 +20,8 @@ type BlockchainInfo struct {
 	ChainID   int           `json:"chain_id"`
 }
 
-// ChainDataRetriever is an interface for retrieving data from a chain
-type ChainDataRetriever interface {
+// ChainProvider is an interface for retrieving data from a chain
+type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
 	GetTokensByWalletAddress(context.Context, persist.Wallet) ([]persist.TokenGallery, error)
 	GetTokensByContractAddress(context.Context, persist.Wallet) ([]persist.TokenGallery, error)
@@ -37,7 +37,7 @@ type ChainDataRetriever interface {
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(chains ...ChainDataRetriever) *Provider {
+func NewMultiChainDataRetriever(chains ...ChainProvider) *Provider {
 	return &Provider{
 		Chains: chains,
 	}

@@ -3,13 +3,23 @@ package opensea
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -18,8 +28,11 @@ import (
 
 var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
 
-type OpenseaDataRetriever struct {
+var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
+
+type Provider struct {
 	httpClient *http.Client
+	ethClient  *ethclient.Client
 
 	nftRepository  persist.NFTRepository
 	userRepository persist.UserRepository
@@ -450,6 +463,123 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.EthereumAddress
 	}
 
 	return result
+
+}
+
+// VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
+func (d *Provider) VerifySignature(pCtx context.Context,
+	pAddressStr string, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+
+	nonce := auth.NewNoncePrepend + pNonce
+	// personal_sign
+	validBool, err := verifySignature(pSignatureStr,
+		nonce,
+		pAddressStr, pWalletType,
+		true, d.ethClient)
+
+	if !validBool || err != nil {
+		// eth_sign
+		validBool, err = verifySignature(pSignatureStr,
+			nonce,
+			pAddressStr, pWalletType,
+			false, d.ethClient)
+		if err != nil || !validBool {
+			nonce = auth.NoncePrepend + pNonce
+			validBool, err = verifySignature(pSignatureStr,
+				nonce,
+				pAddressStr, pWalletType,
+				true, d.ethClient)
+			if err != nil || !validBool {
+				validBool, err = verifySignature(pSignatureStr,
+					nonce,
+					pAddressStr, pWalletType,
+					false, d.ethClient)
+			}
+		}
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return validBool, nil
+}
+
+func verifySignature(pSignatureStr string,
+	pData string,
+	pAddress string, pWalletType persist.WalletType,
+	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
+
+	// eth_sign:
+	// - https://goethereumbook.org/signature-verify/
+	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
+	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
+
+	var data string
+	if pUseDataHeaderBool {
+		data = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(pData), pData)
+	} else {
+		data = pData
+	}
+
+	switch pWalletType {
+	case persist.WalletTypeEOA:
+		dataHash := crypto.Keccak256Hash([]byte(data))
+
+		sig, err := hexutil.Decode(pSignatureStr)
+		if err != nil {
+			return false, err
+		}
+		// Ledger-produced signatures have v = 0 or 1
+		if sig[64] == 0 || sig[64] == 1 {
+			sig[64] += 27
+		}
+		v := sig[64]
+		if v != 27 && v != 28 {
+			return false, errors.New("invalid signature (V is not 27 or 28)")
+		}
+		sig[64] -= 27
+
+		sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), sig)
+		if err != nil {
+			return false, err
+		}
+
+		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
+		log.Println("pAddress:", pAddress)
+		if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
+			return false, auth.ErrAddressSignatureMismatch
+		}
+
+		publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
+
+		signatureNoRecoverID := sig[:len(sig)-1]
+
+		return crypto.VerifySignature(publicKeyBytes, dataHash.Bytes(), signatureNoRecoverID), nil
+	case persist.WalletTypeGnosis:
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		sigValidator, err := contracts.NewISignatureValidator(common.HexToAddress(pAddress), ec)
+		if err != nil {
+			return false, err
+		}
+
+		hashedData := crypto.Keccak256([]byte(data))
+		var input [32]byte
+		copy(input[:], hashedData)
+
+		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
+		if err != nil {
+			logrus.WithError(err).Error("IsValidSignature")
+			return false, nil
+		}
+
+		return result == eip1271MagicValue, nil
+	default:
+		return false, errors.New("wallet type not supported")
+	}
 
 }
 

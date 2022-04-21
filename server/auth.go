@@ -19,7 +19,7 @@ type authHasNFTOutput struct {
 	HasNFT bool `json:"has_nft"`
 }
 
-func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository persist.NonceRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := auth.GetPreflightInput{}
@@ -31,7 +31,7 @@ func getAuthPreflight(userRepository persist.UserRepository, authNonceRepository
 
 		authed := auth.GetUserAuthedFromCtx(c)
 
-		output, err := auth.GetAuthNonceREST(c, input, authed, userRepository, authNonceRepository, ethClient)
+		output, err := auth.GetAuthNonceREST(c, input, authed, userRepository, authNonceRepository, walletRepo, ethClient)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrNonceNotFoundForAddress); ok {
@@ -92,7 +92,7 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client,
 		}
 		has := false
 		for _, addr := range user.Wallets {
-			if addr.Chain != persist.ChainETH {
+			if addr.Address.Chain != persist.ChainETH {
 				continue
 			}
 			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, persist.EthereumAddress(addr.Address.Address), ethClient); res {

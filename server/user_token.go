@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -111,7 +112,7 @@ func getCurrentUser(userRepository persist.UserRepository) gin.HandlerFunc {
 	}
 }
 
-func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func createUserToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, galleryRepository persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -121,7 +122,7 @@ func createUserToken(userRepository persist.UserRepository, nonceRepository pers
 			return
 		}
 
-		output, err := user.CreateUserToken(c, input, userRepository, nonceRepository, galleryRepository, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
+		output, err := user.CreateUserToken(c, input, userRepository, nonceRepository, galleryRepository, tokenRepo, contractRepo, walletRepo, ethClient, ipfsClient, arweaveClient, stg, mcProvider)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -157,7 +158,7 @@ func addUserAddress(userRepository persist.UserRepository, walletRepo persist.Wa
 			EthClient:  ethClient,
 		}
 
-		err := user.AddWalletToUser(c, userID, input.Address, authenticator, userRepository, walletRepo)
+		err := user.AddWalletToUser(c, userID, input.Address, input.Chain, authenticator, userRepository, walletRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -171,7 +172,7 @@ func addUserAddress(userRepository persist.UserRepository, walletRepo persist.Wa
 
 	}
 }
-func addUserAddressToken(userRepository persist.UserRepository, walletRepo persist.WalletRepository, nonceRepository persist.NonceRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func addUserAddressToken(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		input := user.AddUserAddressesInput{}
@@ -197,7 +198,7 @@ func addUserAddressToken(userRepository persist.UserRepository, walletRepo persi
 			EthClient:  ethClient,
 		}
 
-		err := user.AddAddressToUserToken(c, userID, input.Address, authenticator, userRepository, walletRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
+		err := user.AddAddressToUserToken(c, userID, input.Address, input.Chain, input.WalletType, authenticator, userRepository, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -259,7 +260,7 @@ func getNFTPreviewsToken(galleryRepository persist.GalleryTokenRepository, userR
 
 	}
 }
-func mergeUsers(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func mergeUsers(userRepository persist.UserRepository, nonceRepository persist.NonceRepository, walletRepo persist.WalletRepository, mcProvider *multichain.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input user.MergeUsersInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -268,7 +269,7 @@ func mergeUsers(userRepository persist.UserRepository, nonceRepository persist.N
 		}
 		userID := auth.GetUserIDFromCtx(c)
 
-		if err := user.MergeUsers(c, userRepository, nonceRepository, userID, input, ethClient); err != nil {
+		if err := user.MergeUsers(c, userRepository, nonceRepository, walletRepo, userID, input, mcProvider); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}

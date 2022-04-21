@@ -45,7 +45,7 @@ func coreInit() (*gin.Engine, *Indexer) {
 	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash, foundationMintedEventHash, foundationTransferEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events)
+	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetInt("CHAIN")), events)
 
 	router := gin.Default()
 

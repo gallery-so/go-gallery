@@ -660,3 +660,11 @@ func normalizeAddress(address string) string {
 	}
 	return "0x" + withoutPrefix[len(withoutPrefix)-40:]
 }
+
+func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
+	result := make([]EthereumAddress, len(pWallets))
+	for i, wallet := range pWallets {
+		result[i] = EthereumAddress(wallet.Address.Address)
+	}
+	return result
+}

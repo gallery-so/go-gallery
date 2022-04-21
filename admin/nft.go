@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/service/opensea"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -119,7 +119,7 @@ func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.
 			if err != nil {
 				return err
 			}
-			err = opensea.UpdateAssetsForAcc(c, user.ID, user.Wallets, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
+			err = opensea.UpdateAssetsForAcc(c, user.ID, persist.WalletsToEthereumAddresses(user.Wallets), nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
 			if err != nil {
 				return err
 			}

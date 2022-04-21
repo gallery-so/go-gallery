@@ -21,8 +21,9 @@ import (
 )
 
 type Wallet struct {
-	Address string
-	Chain   persist.Chain
+	Address    string
+	Chain      persist.Chain
+	WalletType persist.WalletType
 }
 
 const (
@@ -209,7 +210,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		addresses = make([]persist.Wallet, len(user.Wallets), len(user.Wallets)+1)
 		copy(addresses, user.Wallets)
 
-		if !containsAddress(addresses, Wallet{Address: e.Address, Chain: e.Chain}) {
+		if !containsAddress(addresses, Wallet{Address: e.Address, Chain: e.Chain, WalletType: e.WalletType}) {
 			_, err := e.WalletRepo.Insert(pCtx, e.Address, e.Chain, e.WalletType)
 			if err != nil {
 				return nil, err
@@ -528,8 +529,9 @@ func toAuthWallets(pWallets []persist.Wallet) []Wallet {
 	res := make([]Wallet, len(pWallets))
 	for i, w := range pWallets {
 		res[i] = Wallet{
-			Address: w.Address.Address.String(),
-			Chain:   w.Address.Chain,
+			Address:    w.Address.Address.String(),
+			Chain:      w.Address.Chain,
+			WalletType: w.WalletType,
 		}
 	}
 	return res

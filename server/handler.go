@@ -21,20 +21,21 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider) *gin.Engine {
 
 	apiGroupV1 := router.Group("/glry/v1")
 	apiGroupV2 := router.Group("/glry/v2")
 	graphqlGroup := router.Group("/glry/graphql")
 
-	nftHandlersInit(apiGroupV1, repos, ethClient, stg, ipfsClient, arweaveClient, stg)
-	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, arweaveClient, stg)
+	nftHandlersInit(apiGroupV1, repos, ethClient, stg, ipfsClient, arweaveClient, stg, mcProvider)
+	tokenHandlersInit(apiGroupV2, repos, ethClient, ipfsClient, arweaveClient, stg, mcProvider)
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg)
 
 	return router
@@ -115,14 +116,14 @@ func graphqlPlaygroundHandler() gin.HandlerFunc {
 	}
 }
 
-func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider) {
 
 	usersGroup := parent.Group("/users")
 
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, ethClient))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, repos.WalletRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.UserRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
 	authGroup.POST("/logout", logout())
@@ -131,24 +132,24 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories,
 
 	usersGroup.POST("/login", login(repos.UserRepository, repos.NonceRepository, repos.LoginRepository, ethClient))
 	usersGroup.POST("/update/info", middleware.AuthRequired(repos.UserRepository, ethClient), updateUserInfo(repos.UserRepository, ethClient))
-	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddressToken(repos.UserRepository, repos.WalletRepository, repos.NonceRepository, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	usersGroup.POST("/update/addresses/add", middleware.AuthRequired(repos.UserRepository, ethClient), addUserAddressToken(repos.UserRepository, repos.NonceRepository, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	usersGroup.POST("/update/addresses/remove", middleware.AuthRequired(repos.UserRepository, ethClient), removeAddressesToken(repos.UserRepository, repos.WalletRepository))
 	usersGroup.GET("/get", middleware.AuthOptional(), getUser(repos.UserRepository))
 	usersGroup.GET("/get/current", middleware.AuthOptional(), getCurrentUser(repos.UserRepository))
 	usersGroup.GET("/membership", getMembershipTiersToken(repos.MembershipRepository, repos.UserRepository, repos.TokenRepository, repos.GalleryTokenRepository, ethClient))
-	usersGroup.POST("/create", createUserToken(repos.UserRepository, repos.NonceRepository, repos.GalleryTokenRepository, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	usersGroup.POST("/create", createUserToken(repos.UserRepository, repos.NonceRepository, repos.GalleryTokenRepository, repos.TokenRepository, repos.ContractRepository, repos.WalletRepository, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider))
 	usersGroup.GET("/previews", getNFTPreviewsToken(repos.GalleryTokenRepository, repos.UserRepository))
-	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
+	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, repos.WalletRepository, mcProvider))
 }
 
-func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider) {
 
 	usersGroup := parent.Group("/users")
 
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, ethClient))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, repos.WalletRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.UserRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
 	authGroup.POST("/logout", logout())
@@ -164,15 +165,15 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 	usersGroup.GET("/membership", getMembershipTiersREST(repos.MembershipRepository, repos.UserRepository, repos.GalleryRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	usersGroup.POST("/create", createUser(repos.UserRepository, repos.NonceRepository, repos.GalleryRepository, ethClient))
 	usersGroup.GET("/previews", getNFTPreviews(repos.GalleryRepository, repos.UserRepository))
-	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, ethClient))
+	usersGroup.POST("/merge", middleware.AuthRequired(repos.UserRepository, ethClient), mergeUsers(repos.UserRepository, repos.NonceRepository, repos.WalletRepository, mcProvider))
 
 }
 
-func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) {
+func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider) {
 
 	// AUTH
 
-	authHandlersInitToken(parent, repos, ethClient, ipfsClient, arweaveClient, stg)
+	authHandlersInitToken(parent, repos, ethClient, ipfsClient, arweaveClient, stg, mcProvider)
 
 	// GALLERIES
 
@@ -215,11 +216,11 @@ func tokenHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, eth
 
 }
 
-func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, stg *storage.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+func nftHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, ethClient *ethclient.Client, stg *storage.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider) {
 
 	// AUTH
 
-	authHandlersInitNFT(parent, repos, ethClient, ipfsClient, arweaveClient, stg)
+	authHandlersInitNFT(parent, repos, ethClient, ipfsClient, arweaveClient, stg, mcProvider)
 
 	// GALLERIES
 

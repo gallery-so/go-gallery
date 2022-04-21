@@ -79,7 +79,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.Ethereu
 	return &user, nil
 }
 
-func (api UserAPI) AddUserAddress(ctx context.Context, address persist.EthereumAddress, authenticator auth.Authenticator) error {
+func (api UserAPI) AddUserAddress(ctx context.Context, address string, chain persist.Chain, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address":       {address, "required,eth_addr"},
@@ -93,7 +93,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.EthereumA
 		return err
 	}
 
-	err = user.AddWalletToUser(ctx, userID, address, authenticator, api.repos.UserRepository)
+	err = user.AddWalletToUser(ctx, userID, address, chain, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.EthereumA
 	return nil
 }
 
-func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.EthereumAddress) error {
+func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []string, chains []persist.Chain) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"addresses": {addresses, "required,unique,dive,required,eth_addr"},
@@ -115,7 +115,7 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.
 		return err
 	}
 
-	err = user.RemoveAddressesFromUser(ctx, userID, addresses, api.repos.UserRepository)
+	err = user.RemoveAddressesFromUser(ctx, userID, addresses, chains, api.repos.UserRepository, api.repos.WalletRepository)
 	if err != nil {
 		return err
 	}

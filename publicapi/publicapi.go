@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 
 	"cloud.google.com/go/storage"
@@ -13,6 +14,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -31,7 +33,7 @@ type PublicAPI struct {
 	Nft        *NftAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider) {
 	loaders := dataloader.NewLoaders(ctx, queries)
 	validator := newValidator()
 
@@ -43,7 +45,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 	}
 
 	ctx.Set(apiContextKey, api)

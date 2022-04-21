@@ -146,7 +146,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pInput.Address, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+			err := ensureMediaContent(ctx, pInput.Address, pInput.Chain, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
@@ -160,7 +160,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 	output.JWTtoken = jwtTokenStr
 
-	err = auth.NonceRotate(pCtx, pInput.Address, userID, nonceRepo)
+	err = auth.NonceRotate(pCtx, pInput.Address, pInput.Chain, userID, nonceRepo)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
@@ -198,8 +198,10 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	// those addresses to the user's account here.
 	address := authResult.Addresses[0]
 
-	user := persist.User{
-		Wallets: []persist.Wallet{address},
+	user := persist.CreateUserInput{
+		Address:    address.Address,
+		Chain:      address.Chain,
+		WalletType: address.WalletType,
 	}
 
 	userID, err := userRepo.Create(pCtx, user)
@@ -257,8 +259,11 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 }
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Wallet,
+func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []string, pChains []persist.Chain,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
+	if len(pAddresses) != len(pChains) {
+		return fmt.Errorf("number of addresses (%d) does not match number of chains (%d)", len(pAddresses), len(pChains))
+	}
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -267,6 +272,11 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 
 	if len(user.Wallets) <= len(pAddresses) {
 		return errUserCannotRemoveAllAddresses
+	}
+	for i := 0; i < len(pAddresses); i++ {
+		if err := userRepo.RemoveWallet(pCtx, pUserID, pAddresses[i], pChains[i]); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -287,8 +297,8 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress string
 		return ErrAddressOwnedByUser{Address: pAddress, Chain: pChain, OwnerID: addressUserID}
 	}
 
-	if !containsWallet(authResult.Addresses, pWallet) {
-		return ErrAddressNotOwnedByUser{Address: pWallet, UserID: addressUserID}
+	if !auth.ContainsWallet(authResult.Addresses, auth.Wallet{Address: pAddress, Chain: pChain}) {
+		return ErrAddressNotOwnedByUser{Address: pAddress, Chain: pChain, UserID: addressUserID}
 	}
 
 	// TODO insert wallet and update user with wallet
@@ -330,7 +340,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+			err := ensureMediaContent(ctx, pAddress, pChain, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
 				logrus.WithError(err).Error("ensureMediaForUser")
 			}
@@ -382,9 +392,6 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		}
 		break
 	case pInput.Address.String() != "":
-		if pInput.Chain == "" {
-			pInput.Chain = persist.ChainETH
-		}
 		user, err = userRepo.GetByAddress(pCtx, pInput.Address.String(), pInput.Chain)
 		if err != nil {
 			return GetUserOutput{}, err
@@ -442,8 +449,8 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 }
 
 // MergeUsers merges two users together
-func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
-	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, userRepo, nonceRepo)
+func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, pInput.Chain, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
 		return auth.ErrNonceNotFound{Address: pInput.Address}
 	}
@@ -451,7 +458,7 @@ func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo
 		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
 	}
 
-	if pInput.WalletType != auth.WalletTypeEOA {
+	if pInput.WalletType != persist.WalletTypeEOA {
 		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
 			return auth.ErrNonceMismatch
 		}
@@ -459,7 +466,7 @@ func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo
 
 	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature,
 		nonce,
-		pInput.Address, pInput.WalletType, ethClient)
+		pInput.Address, pInput.Chain, pInput.WalletType)
 	if err != nil {
 		return err
 	}

@@ -27,16 +27,16 @@ import (
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
-// DataRetriever is an the struct for retrieving data from the Ethereum blockchain
-type DataRetriever struct {
+// Provider is an the struct for retrieving data from the Ethereum blockchain
+type Provider struct {
 	indexerBaseURL string
 	httpClient     *http.Client
 	ethClient      *ethclient.Client
 }
 
 // NewDataRetriever creates a new DataRetriever
-func NewDataRetriever(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *DataRetriever {
-	return &DataRetriever{
+func NewDataRetriever(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
+	return &Provider{
 		indexerBaseURL: indexerBaseURL,
 		httpClient:     httpClient,
 		ethClient:      ec,
@@ -44,7 +44,7 @@ func NewDataRetriever(indexerBaseURL string, httpClient *http.Client, ec *ethcli
 }
 
 // GetBlockchainInfo retrieves blockchain info for ETH
-func (d *DataRetriever) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
 	return multichain.BlockchainInfo{
 		ChainName: persist.ChainETH,
 		ChainID:   0,
@@ -52,7 +52,7 @@ func (d *DataRetriever) GetBlockchainInfo(ctx context.Context) (multichain.Block
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *DataRetriever) GetTokensByWalletAddress(ctx context.Context, addr persist.EthereumAddress) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.EthereumAddress) ([]persist.TokenGallery, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens?address=%s&limit=-1", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (d *DataRetriever) GetTokensByWalletAddress(ctx context.Context, addr persi
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
-func (d *DataRetriever) GetTokensByContractAddress(ctx context.Context, contractAddress persist.EthereumAddress) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.EthereumAddress) ([]persist.TokenGallery, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=-1", d.indexerBaseURL, contractAddress), nil)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (d *DataRetriever) GetTokensByContractAddress(ctx context.Context, contract
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *DataRetriever) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) ([]persist.TokenGallery, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=-1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID), nil)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (d *DataRetriever) GetTokensByTokenIdentifiers(ctx context.Context, tokenId
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
-func (d *DataRetriever) GetContractByAddress(ctx context.Context, addr persist.EthereumAddress) (persist.ContractGallery, error) {
+func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.EthereumAddress) (persist.ContractGallery, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return persist.ContractGallery{}, err
@@ -173,7 +173,7 @@ func (d *DataRetriever) GetContractByAddress(ctx context.Context, addr persist.E
 }
 
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
-func (d *DataRetriever) UpdateMediaForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
+func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
 
 	input := indexer.UpdateMediaInput{
 		OwnerAddress: wallet,
@@ -210,7 +210,7 @@ func (d *DataRetriever) UpdateMediaForWallet(ctx context.Context, wallet persist
 }
 
 // ValidateTokensForWallet validates tokens for a wallet address on the Ethereum Blockchain
-func (d *DataRetriever) ValidateTokensForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
+func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
 	input := indexer.ValidateUsersNFTsInput{Wallet: wallet, All: all}
 
 	asJSON, err := json.Marshal(input)
@@ -244,7 +244,7 @@ func (d *DataRetriever) ValidateTokensForWallet(ctx context.Context, wallet pers
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
-func (d *DataRetriever) VerifySignature(pCtx context.Context,
+func (d *Provider) VerifySignature(pCtx context.Context,
 	pAddressStr string, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
