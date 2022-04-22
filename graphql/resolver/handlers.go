@@ -21,6 +21,9 @@ import (
 	"strings"
 )
 
+const scrubText = "<scrubbed>"
+const scrubDirectiveName = "scrub"
+
 var requestLogger *logrus.Logger
 
 // Gets (or creates) a logger for GraphQL requests and responses. Not thread-safe; only call during handler initialization.
@@ -185,19 +188,98 @@ func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gq
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
 		oc := gqlgen.GetOperationContext(ctx)
-		fmt.Printf("variables: %v\n", oc.Variables)
-		scrubbedQuery := getScrubbedQuery(schema, oc.Doc, oc.RawQuery)
+		scrubbedQuery, scrubbedVariables := getScrubbedQuery(schema, oc.Doc, oc.RawQuery, oc.Variables)
 		logger.WithFields(logrus.Fields{
-			"authenticated": userId != "",
-			"userId":        userId,
-			"scrubbedQuery": scrubbedQuery,
+			"authenticated":     userId != "",
+			"userId":            userId,
+			"scrubbedQuery":     scrubbedQuery,
+			"scrubbedVariables": scrubbedVariables,
 		}).Info("Received GraphQL query")
 
 		return next(ctx)
 	}
 }
 
-func scrubChildren(value *ast.Value, positions map[int]*ast.Position) {
+func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schema, allQueryVariables map[string]interface{}, scrubbedOutput map[string]interface{}) {
+	definition := schema.Types[variableDefinition.Type.NamedType]
+	scrubField := false
+
+	for _, directive := range definition.Directives {
+		if directive.Name == scrubDirectiveName {
+			scrubField = true
+			break
+		}
+	}
+
+	if scrubField {
+		scrubbedOutput[variableDefinition.Variable] = scrubText
+	}
+
+	if len(definition.Fields) == 0 {
+		if !scrubField {
+			scrubbedOutput[variableDefinition.Variable] = allQueryVariables[variableDefinition.Variable]
+		}
+		return
+	}
+
+	outputForDefinition := make(map[string]interface{})
+	if !scrubField {
+		scrubbedOutput[variableDefinition.Variable] = outputForDefinition
+	}
+
+	varsForDefinition, ok := allQueryVariables[variableDefinition.Variable].(map[string]interface{})
+	if !ok {
+		logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		return
+	}
+
+	for _, field := range definition.Fields {
+		scrubVariableField(schema, field, varsForDefinition, outputForDefinition)
+	}
+}
+
+func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variables map[string]interface{}, scrubbedOutput map[string]interface{}) {
+	scrubField := false
+	fieldValue, hasField := variables[field.Name]
+
+	for _, directive := range field.Directives {
+		if directive.Name == scrubDirectiveName {
+			scrubField = true
+			break
+		}
+	}
+
+	if hasField && scrubField {
+		scrubbedOutput[field.Name] = scrubText
+	}
+
+	definition := schema.Types[field.Type.NamedType]
+
+	if len(definition.Fields) == 0 {
+		if hasField && !scrubField {
+			scrubbedOutput[field.Name] = fieldValue
+		}
+		return
+	}
+
+	outputForDefinition := make(map[string]interface{})
+
+	if hasField && !scrubField {
+		scrubbedOutput[field.Name] = outputForDefinition
+	}
+
+	varsForDefinition, ok := variables[field.Name].(map[string]interface{})
+	if !ok {
+		logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		return
+	}
+
+	for _, childField := range definition.Fields {
+		scrubVariableField(schema, childField, varsForDefinition, outputForDefinition)
+	}
+}
+
+func scrubChildren(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Position) {
 	if value.Children == nil {
 		scrubPosition := value.Position
 		positions[scrubPosition.Start] = scrubPosition
@@ -205,15 +287,15 @@ func scrubChildren(value *ast.Value, positions map[int]*ast.Position) {
 	}
 
 	for _, child := range value.Children {
-		scrubChildren(child.Value, positions)
+		scrubChildren(child.Value, schema, positions)
 	}
 }
 
-func scrubValue(value *ast.Value, positions map[int]*ast.Position) {
+func scrubValue(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Position) {
 	if value.Definition == nil || value.Definition.Fields == nil {
 		return
 	}
-
+	
 	// Look through all the fields defined for this value
 	for _, field := range value.Definition.Fields {
 		if field.Directives == nil {
@@ -223,7 +305,11 @@ func scrubValue(value *ast.Value, positions map[int]*ast.Position) {
 		// Find field definitions with directives on them
 		for _, directive := range field.Directives {
 			// Look for a directive named "scrub"
-			if directive.Name != "scrub" {
+			if directive.Name != scrubDirectiveName {
+				continue
+			}
+
+			if value.Children == nil {
 				continue
 			}
 
@@ -233,7 +319,7 @@ func scrubValue(value *ast.Value, positions map[int]*ast.Position) {
 			// If the value has children, it's not a scalar. Don't try to scrub a non-scalar value directly;
 			// recursively scrub its children instead
 			if childValue.Children != nil {
-				scrubChildren(childValue, positions)
+				scrubChildren(childValue, schema, positions)
 			} else {
 				// It's a scalar -- scrub it!
 				scrubPosition := childValue.Position
@@ -243,12 +329,17 @@ func scrubValue(value *ast.Value, positions map[int]*ast.Position) {
 	}
 }
 
-func getScrubbedQuery(schema *ast.Schema, queryDoc *ast.QueryDocument, rawQuery string) string {
+func getScrubbedQuery(schema *ast.Schema, queryDoc *ast.QueryDocument, rawQuery string, allQueryVariables map[string]interface{}) (string, map[string]interface{}) {
 	scrubPositions := make(map[int]*ast.Position)
+	scrubbedVariables := make(map[string]interface{})
 
 	observers := validator.Events{}
 	observers.OnValue(func(walker *validator.Walker, value *ast.Value) {
-		scrubValue(value, scrubPositions)
+		scrubValue(value, schema, scrubPositions)
+	})
+
+	observers.OnVariable(func(walker *validator.Walker, variableDefinition *ast.VariableDefinition) {
+		scrubVariable(variableDefinition, schema, allQueryVariables, scrubbedVariables)
 	})
 
 	validator.Walk(schema, queryDoc, &observers)
@@ -269,13 +360,13 @@ func getScrubbedQuery(schema *ast.Schema, queryDoc *ast.QueryDocument, rawQuery 
 	for _, key := range sortedKeys {
 		position := scrubPositions[key]
 		writeRunes(&builder, runes[strIndex:position.Start])
-		builder.WriteString("<scrubbed>")
+		builder.WriteString(scrubText)
 		strIndex = position.End
 	}
 
 	writeRunes(&builder, runes[strIndex:])
 
-	return builder.String()
+	return builder.String(), scrubbedVariables
 }
 
 func writeRunes(builder *strings.Builder, runes []rune) {
