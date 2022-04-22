@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -38,6 +39,12 @@ func RemapErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, er
 
 	fc := gqlgen.GetFieldContext(ctx)
 	typeName := fc.Field.Field.Definition.Type.NamedType
+
+	// Unwrap any gqlerror.Error wrappers to get the underlying error type
+	var gqlErr *gqlerror.Error
+	for errors.As(err, &gqlErr) {
+		err = gqlErr.Unwrap()
+	}
 
 	// If a resolver returns an error that can be mapped to that resolver's expected GQL type,
 	// remap it and return the appropriate GQL model instead of an error. This is common for

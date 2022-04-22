@@ -471,6 +471,7 @@ union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer

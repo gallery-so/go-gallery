@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	userservice "github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -56,7 +55,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case userservice.ErrUserAlreadyExists:
+	case persist.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}

@@ -2365,6 +2365,7 @@ union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer
@@ -11749,6 +11750,13 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrUserAlreadyExists:
+		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
+	case *model.ErrUserAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12635,7 +12643,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayloadOrError"}
+var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "UpdateUserInfoPayloadOrError", "Error", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserAlreadyExists) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserAlreadyExistsImplementors)

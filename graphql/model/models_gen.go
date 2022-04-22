@@ -327,8 +327,9 @@ type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserAlreadyExists) IsError()                    {}
-func (ErrUserAlreadyExists) IsCreateUserPayloadOrError() {}
+func (ErrUserAlreadyExists) IsUpdateUserInfoPayloadOrError() {}
+func (ErrUserAlreadyExists) IsError()                        {}
+func (ErrUserAlreadyExists) IsCreateUserPayloadOrError()     {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
