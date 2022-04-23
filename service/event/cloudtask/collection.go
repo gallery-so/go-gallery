@@ -22,7 +22,7 @@ func (c CollectionFeedTask) Handle(record persist.CollectionEventRecord) {
 		return
 	}
 
-	err = createTask(ctx, time.Time(record.CreationTime), eventID, record.Code)
+	err = createTaskForService(ctx, time.Time(record.CreationTime), eventID, record.Code, "feedbot", "/tasks/feed-event")
 	if err != nil {
 		logrus.Errorf("failed to create task: %s", err)
 		return

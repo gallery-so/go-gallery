@@ -22,7 +22,7 @@ func (u UserFeedTask) Handle(event persist.UserEventRecord) {
 		return
 	}
 
-	err = createTask(ctx, time.Time(event.CreationTime), eventID, event.Code)
+	err = createTaskForService(ctx, time.Time(event.CreationTime), eventID, event.Code, "feedbot", "/tasks/feed-event")
 	if err != nil {
 		logrus.Errorf("failed to create task: %s", err)
 		return
