@@ -70,3 +70,7 @@ func createTaskForService(ctx context.Context, createdOn time.Time, eventID pers
 	_, err = client.CreateTask(ctx, req)
 	return err
 }
+
+func createTaskForFeedbot(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode) error {
+	return createTaskForService(ctx, createdOn, eventID, eventCode, "feedbot", "/tasks/feed-event")
+}

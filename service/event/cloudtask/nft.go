@@ -22,7 +22,7 @@ func (t NftFeedEvent) Handle(event persist.NftEventRecord) {
 		return
 	}
 
-	err = createTaskForService(ctx, time.Time(event.CreationTime), eventID, event.Code, "feedbot", "/tasks/feed-event")
+	err = createTaskForFeedbot(ctx, time.Time(event.CreationTime), eventID, event.Code)
 	if err != nil {
 		logrus.Errorf("failed to create task: %s", err)
 		return
