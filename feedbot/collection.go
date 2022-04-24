@@ -130,17 +130,19 @@ func handleCollectionTokensAdded(ctx context.Context, userRepo persist.UserRepos
 	}
 
 	newTokensAdded := false
-	for _, i := range event.Data.NFTs {
-		contains := false
-		for _, j := range eventBefore.Data.NFTs {
-			if i == j {
-				contains = true
+	if eventBefore != nil {
+		for _, i := range event.Data.NFTs {
+			contains := false
+			for _, j := range eventBefore.Data.NFTs {
+				if i == j {
+					contains = true
+					break
+				}
+			}
+			if !contains {
+				newTokensAdded = true
 				break
 			}
-		}
-		if !contains {
-			newTokensAdded = true
-			break
 		}
 	}
 

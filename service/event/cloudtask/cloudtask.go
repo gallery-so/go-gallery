@@ -32,7 +32,7 @@ func newClient(ctx context.Context) (*gcptasks.Client, error) {
 	}
 }
 
-func createTask(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode) error {
+func createTaskForService(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode, service string, uri string) error {
 	client, err := newClient(ctx)
 	if err != nil {
 		return err
@@ -49,8 +49,9 @@ func createTask(ctx context.Context, createdOn time.Time, eventID persist.DBID, 
 			ScheduleTime: timestamppb.New(scheduleOn),
 			MessageType: &taskspb.Task_AppEngineHttpRequest{
 				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-					HttpMethod:  taskspb.HttpMethod_POST,
-					RelativeUri: "/tasks/feed-event",
+					HttpMethod:       taskspb.HttpMethod_POST,
+					AppEngineRouting: &taskspb.AppEngineRouting{Service: service},
+					RelativeUri:      uri,
 					Headers: map[string]string{
 						"Content-type":  "application/json",
 						"Authorization": "Basic " + viper.GetString("FEEDBOT_SECRET"),
@@ -68,4 +69,8 @@ func createTask(ctx context.Context, createdOn time.Time, eventID persist.DBID, 
 	req.Task.GetAppEngineHttpRequest().Body = body
 	_, err = client.CreateTask(ctx, req)
 	return err
+}
+
+func createTaskForFeedbot(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode) error {
+	return createTaskForService(ctx, createdOn, eventID, eventCode, "feedbot", "/tasks/feed-event")
 }
