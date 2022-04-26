@@ -164,6 +164,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrOpenSeaRefreshFailed struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrUserAlreadyExists struct {
 		Message func(childComplexity int) int
 	}
@@ -805,6 +809,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
+
+	case "ErrOpenSeaRefreshFailed.message":
+		if e.complexity.ErrOpenSeaRefreshFailed.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrOpenSeaRefreshFailed.Message(childComplexity), true
 
 	case "ErrUserAlreadyExists.message":
 		if e.complexity.ErrUserAlreadyExists.Message == nil {
@@ -2374,6 +2385,7 @@ type UpdateUserInfoPayload {
 union RefreshOpenSeaNftsPayloadOrError =
     RefreshOpenSeaNftsPayload
     | ErrNotAuthorized
+    | ErrOpenSeaRefreshFailed
 
 type RefreshOpenSeaNftsPayload {
     viewer: Viewer
@@ -2427,6 +2439,10 @@ type ErrInvalidToken implements Error {
 }
 
 type ErrDoesNotOwnRequiredNFT implements Error {
+    message: String!
+}
+
+type ErrOpenSeaRefreshFailed implements Error {
     message: String!
 }
 
@@ -4502,6 +4518,41 @@ func (ec *executionContext) _ErrNotAuthorized_cause(ctx context.Context, field g
 	res := resTmp.(model.AuthorizationError)
 	fc.Result = res
 	return ec.marshalNAuthorizationError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthorizationError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrOpenSeaRefreshFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrOpenSeaRefreshFailed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrOpenSeaRefreshFailed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrUserAlreadyExists_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrUserAlreadyExists) (ret graphql.Marshaler) {
@@ -11202,6 +11253,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+	case model.ErrOpenSeaRefreshFailed:
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
+	case *model.ErrOpenSeaRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11540,6 +11598,13 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrOpenSeaRefreshFailed:
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
+	case *model.ErrOpenSeaRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12625,6 +12690,37 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 		case "cause":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrNotAuthorized_cause(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+
+func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrOpenSeaRefreshFailed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errOpenSeaRefreshFailedImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrOpenSeaRefreshFailed")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrOpenSeaRefreshFailed_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

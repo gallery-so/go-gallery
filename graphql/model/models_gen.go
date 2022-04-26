@@ -323,6 +323,13 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsRefreshOpenSeaNftsPayloadOrError()       {}
 func (ErrNotAuthorized) IsError()                                  {}
 
+type ErrOpenSeaRefreshFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrOpenSeaRefreshFailed) IsRefreshOpenSeaNftsPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                            {}
+
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }

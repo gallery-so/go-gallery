@@ -22,6 +22,16 @@ type NftAPI struct {
 	ethClient *ethclient.Client
 }
 
+// ErrOpenSeaRefreshFailed is a generic error that wraps all other OpenSea sync failures.
+// Should be removed once we stop using OpenSea to sync NFTs.
+type ErrOpenSeaRefreshFailed struct {
+	Message string
+}
+
+func (e ErrOpenSeaRefreshFailed) Error() string {
+	return e.Message
+}
+
 func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -80,7 +90,8 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 
 	err = nftservice.GetOpenseaNFTs(ctx, userID, addresses, api.repos.NftRepository, api.repos.UserRepository, api.repos.CollectionRepository, api.repos.GalleryRepository, api.repos.BackupRepository)
 	if err != nil {
-		return err
+		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
+		return ErrOpenSeaRefreshFailed{Message: err.Error()}
 	}
 
 	api.loaders.ClearAllCaches()
