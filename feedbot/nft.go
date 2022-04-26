@@ -35,8 +35,8 @@ func handleNftCollectorsNoteAdded(ctx context.Context, userRepo persist.UserRepo
 		return err
 	}
 
-	// Don't send with empty notes.
-	if event.Data.CollectorsNote == "" {
+	// Don't send with empty notes or if a collection is not associated with it.
+	if event.Data.CollectorsNote == "" || event.Data.CollectionID == "" {
 		return nil
 	}
 

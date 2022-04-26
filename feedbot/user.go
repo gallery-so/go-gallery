@@ -57,7 +57,7 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 		return err
 	}
 
-	// Only send if its a new user
+	// Only send if its a new user.
 	if eventBefore != nil {
 		return nil
 	}
