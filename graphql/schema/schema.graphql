@@ -432,6 +432,10 @@ type UpdateGalleryCollectionsPayload {
 input UpdateNftInfoInput {
     nftId: DBID!
     collectorsNote: String!
+
+    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Currently used to generate feedbot URLs.
+    collectionId: DBID
 }
 
 union UpdateNftInfoPayloadOrError =

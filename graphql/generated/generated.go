@@ -2326,6 +2326,10 @@ type UpdateGalleryCollectionsPayload {
 input UpdateNftInfoInput {
     nftId: DBID!
     collectorsNote: String!
+
+    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Currently used to generate feedbot URLs.
+    collectionId: DBID
 }
 
 union UpdateNftInfoPayloadOrError =
@@ -10830,6 +10834,14 @@ func (ec *executionContext) unmarshalInputUpdateNftInfoInput(ctx context.Context
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectorsNote"))
 			it.CollectorsNote, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "collectionId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
+			it.CollectionID, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}

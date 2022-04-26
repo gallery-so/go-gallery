@@ -573,8 +573,9 @@ type UpdateGalleryCollectionsPayload struct {
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
 
 type UpdateNftInfoInput struct {
-	NftID          persist.DBID `json:"nftId"`
-	CollectorsNote string       `json:"collectorsNote"`
+	NftID          persist.DBID  `json:"nftId"`
+	CollectorsNote string        `json:"collectorsNote"`
+	CollectionID   *persist.DBID `json:"collectionId"`
 }
 
 type UpdateNftInfoPayload struct {

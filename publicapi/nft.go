@@ -88,7 +88,7 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 	return nil
 }
 
-func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectorsNote string) error {
+func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"nftID":          {nftID, "required"},
@@ -117,7 +117,7 @@ func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collect
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	nftData := persist.NftEvent{CollectorsNote: persist.NullString(collectorsNote)}
+	nftData := persist.NftEvent{CollectionID: collectionID, CollectorsNote: persist.NullString(collectorsNote)}
 	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, nftID, nftData)
 
 	return nil
