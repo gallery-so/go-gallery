@@ -256,7 +256,12 @@ func (r *mutationResolver) UpdateCollectionHidden(ctx context.Context, input mod
 func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Nft.UpdateNftInfo(ctx, input.NftID, input.CollectorsNote)
+	collectionID := persist.DBID("")
+	if input.CollectionID != nil {
+		collectionID = *input.CollectionID
+	}
+
+	err := api.Nft.UpdateNftInfo(ctx, input.NftID, collectionID, input.CollectorsNote)
 	if err != nil {
 		return nil, err
 	}
