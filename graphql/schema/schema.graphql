@@ -484,6 +484,7 @@ type UpdateUserInfoPayload {
 union RefreshOpenSeaNftsPayloadOrError =
     RefreshOpenSeaNftsPayload
     | ErrNotAuthorized
+    | ErrOpenSeaRefreshFailed
 
 type RefreshOpenSeaNftsPayload {
     viewer: Viewer
@@ -537,6 +538,10 @@ type ErrInvalidToken implements Error {
 }
 
 type ErrDoesNotOwnRequiredNFT implements Error {
+    message: String!
+}
+
+type ErrOpenSeaRefreshFailed implements Error {
     message: String!
 }
 
