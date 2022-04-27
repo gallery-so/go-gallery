@@ -22,7 +22,7 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 
 	createStmt, err := db.PrepareContext(ctx,
 		`INSERT INTO collection_events (ID, USER_ID, COLLECTION_ID, VERSION, EVENT_CODE, DATA) VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING ID;`,
+		 RETURNING ID, USER_ID, COLLECTION_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED;`,
 	)
 	checkNoErr(err)
 
@@ -56,13 +56,14 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 	}
 }
 
-func (e *CollectionEventRepository) Add(ctx context.Context, event persist.CollectionEventRecord) (persist.DBID, error) {
-	var id persist.DBID
-	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.CollectionID, event.Version, event.Code, event.Data).Scan(&id)
+func (e *CollectionEventRepository) Add(ctx context.Context, event persist.CollectionEventRecord) (*persist.CollectionEventRecord, error) {
+	var evt persist.CollectionEventRecord
+	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.CollectionID, event.Version, event.Code, event.Data).Scan(
+		&evt.ID, &evt.UserID, &evt.CollectionID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return id, nil
+	return &evt, nil
 }
 
 func (e *CollectionEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.CollectionEventRecord, error) {
