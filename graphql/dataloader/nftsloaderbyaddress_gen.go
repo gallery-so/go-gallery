@@ -13,7 +13,7 @@ import (
 // NftsLoaderByAddressConfig captures the config to create a new NftsLoaderByAddress
 type NftsLoaderByAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.EthereumAddress) ([][]sqlc.Nft, []error)
+	Fetch func(keys []persist.Address) ([][]sqlc.Nft, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewNftsLoaderByAddress(config NftsLoaderByAddressConfig) *NftsLoaderByAddre
 // NftsLoaderByAddress batches and caches requests
 type NftsLoaderByAddress struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.EthereumAddress) ([][]sqlc.Nft, []error)
+	fetch func(keys []persist.Address) ([][]sqlc.Nft, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type NftsLoaderByAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.EthereumAddress][]sqlc.Nft
+	cache map[persist.Address][]sqlc.Nft
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,7 +56,7 @@ type NftsLoaderByAddress struct {
 }
 
 type nftsLoaderByAddressBatch struct {
-	keys    []persist.EthereumAddress
+	keys    []persist.Address
 	data    [][]sqlc.Nft
 	error   []error
 	closing bool
@@ -64,14 +64,14 @@ type nftsLoaderByAddressBatch struct {
 }
 
 // Load a Nft by key, batching and caching will be applied automatically
-func (l *NftsLoaderByAddress) Load(key persist.EthereumAddress) ([]sqlc.Nft, error) {
+func (l *NftsLoaderByAddress) Load(key persist.Address) ([]sqlc.Nft, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Nft.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *NftsLoaderByAddress) LoadThunk(key persist.EthereumAddress) func() ([]sqlc.Nft, error) {
+func (l *NftsLoaderByAddress) LoadThunk(key persist.Address) func() ([]sqlc.Nft, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -114,7 +114,7 @@ func (l *NftsLoaderByAddress) LoadThunk(key persist.EthereumAddress) func() ([]s
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *NftsLoaderByAddress) LoadAll(keys []persist.EthereumAddress) ([][]sqlc.Nft, []error) {
+func (l *NftsLoaderByAddress) LoadAll(keys []persist.Address) ([][]sqlc.Nft, []error) {
 	results := make([]func() ([]sqlc.Nft, error), len(keys))
 
 	for i, key := range keys {
@@ -132,7 +132,7 @@ func (l *NftsLoaderByAddress) LoadAll(keys []persist.EthereumAddress) ([][]sqlc.
 // LoadAllThunk returns a function that when called will block waiting for a Nfts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *NftsLoaderByAddress) LoadAllThunk(keys []persist.EthereumAddress) func() ([][]sqlc.Nft, []error) {
+func (l *NftsLoaderByAddress) LoadAllThunk(keys []persist.Address) func() ([][]sqlc.Nft, []error) {
 	results := make([]func() ([]sqlc.Nft, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -150,7 +150,7 @@ func (l *NftsLoaderByAddress) LoadAllThunk(keys []persist.EthereumAddress) func(
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *NftsLoaderByAddress) Prime(key persist.EthereumAddress, value []sqlc.Nft) bool {
+func (l *NftsLoaderByAddress) Prime(key persist.Address, value []sqlc.Nft) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -165,22 +165,22 @@ func (l *NftsLoaderByAddress) Prime(key persist.EthereumAddress, value []sqlc.Nf
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *NftsLoaderByAddress) Clear(key persist.EthereumAddress) {
+func (l *NftsLoaderByAddress) Clear(key persist.Address) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *NftsLoaderByAddress) unsafeSet(key persist.EthereumAddress, value []sqlc.Nft) {
+func (l *NftsLoaderByAddress) unsafeSet(key persist.Address, value []sqlc.Nft) {
 	if l.cache == nil {
-		l.cache = map[persist.EthereumAddress][]sqlc.Nft{}
+		l.cache = map[persist.Address][]sqlc.Nft{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *nftsLoaderByAddressBatch) keyIndex(l *NftsLoaderByAddress, key persist.EthereumAddress) int {
+func (b *nftsLoaderByAddressBatch) keyIndex(l *NftsLoaderByAddress, key persist.Address) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

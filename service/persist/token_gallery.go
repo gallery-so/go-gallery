@@ -94,7 +94,7 @@ type TokenUpdateMediaInput struct {
 type TokenGalleryRepository interface {
 	CreateBulk(context.Context, []TokenGallery) ([]DBID, error)
 	Create(context.Context, TokenGallery) (DBID, error)
-	GetByWallet(context.Context, Wallet, int64, int64) ([]TokenGallery, error)
+	GetByWallet(context.Context, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
 	GetByContract(context.Context, Address, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]TokenGallery, error)
@@ -152,7 +152,7 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 	*t = TokenIdentifiers{
 		TokenID: TokenID(res[1]),
 		ContractAddress: Address{
-			Address: NullString(res[0]),
+			Address: AddressValue(res[0]),
 			Chain:   Chain(chain),
 		},
 	}

@@ -29,9 +29,9 @@ const (
 
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
-	GetByAddressDetails(context.Context, string, Chain) (Wallet, error)
+	GetByAddressDetails(context.Context, AddressValue, Chain) (Wallet, error)
 	GetByAddress(context.Context, DBID) (Wallet, error)
-	Insert(context.Context, string, Chain, WalletType) (DBID, error)
+	Insert(context.Context, AddressValue, Chain, WalletType) (DBID, error)
 }
 
 // ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination

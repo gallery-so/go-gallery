@@ -10,6 +10,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+func (r *Address) ID() GqlID {
+	return GqlID(fmt.Sprintf("Address:%s", r.Dbid))
+}
+
 func (r *Collection) ID() GqlID {
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
@@ -45,17 +49,18 @@ func (r *Nft) ID() GqlID {
 }
 
 func (r *Wallet) ID() GqlID {
-	return GqlID(fmt.Sprintf("Wallet:%s", *r.Address))
+	return GqlID(fmt.Sprintf("Wallet:%s", r.Dbid))
 }
 
 type NodeFetcher struct {
+	OnAddress        func(ctx context.Context, dbid persist.DBID) (*Address, error)
 	OnCollection     func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionNft  func(ctx context.Context, nftId string, collectionId string) (*CollectionNft, error)
 	OnGallery        func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
 	OnNft            func(ctx context.Context, dbid persist.DBID) (*Nft, error)
-	OnWallet         func(ctx context.Context, address persist.EthereumAddress) (*Wallet, error)
+	OnWallet         func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -68,6 +73,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 	ids := parts[1:]
 
 	switch typeName {
+	case "Address":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Address' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnAddress(ctx, persist.DBID(ids[0]))
 	case "Collection":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -102,7 +112,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnWallet(ctx, persist.EthereumAddress(ids[0]))
+		return n.OnWallet(ctx, persist.DBID(ids[0]))
 	}
 
 	return nil, ErrInvalidIDFormat{typeName}
@@ -110,6 +120,8 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 
 func (n *NodeFetcher) ValidateHandlers() {
 	switch {
+	case n.OnAddress == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnAddress")
 	case n.OnCollection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
 	case n.OnCollectionNft == nil:

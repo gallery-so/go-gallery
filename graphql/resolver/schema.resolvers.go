@@ -16,6 +16,10 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+func (r *addressResolver) Nfts(ctx context.Context, obj *model.Address) ([]*model.Nft, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
 
@@ -62,6 +66,10 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
@@ -70,7 +78,7 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.EthereumAddress, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.AddressValue, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
@@ -90,7 +98,7 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.E
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.EthereumAddress) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue) (model.RemoveUserAddressesPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	err := api.User.RemoveUserAddresses(ctx, addresses)
@@ -276,7 +284,7 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses str
 	return output, nil
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.EthereumAddress) (model.GetAuthNoncePayloadOrError, error) {
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.AddressValue) (model.GetAuthNoncePayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	authed := auth.GetUserAuthedFromCtx(gc)
@@ -396,20 +404,12 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
-func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByOwnerAddress(ctx, *obj.Address)
-
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]*model.Nft, len(nfts))
-	for i, nft := range nfts {
-		output[i] = nftToModel(ctx, nft)
-	}
-
-	return output, nil
+func (r *walletResolver) Address(ctx context.Context, obj *model.Wallet) (*model.Address, error) {
+	panic(fmt.Errorf("not implemented"))
 }
+
+// Address returns generated.AddressResolver implementation.
+func (r *Resolver) Address() generated.AddressResolver { return &addressResolver{r} }
 
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
@@ -443,6 +443,7 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 // Wallet returns generated.WalletResolver implementation.
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
+type addressResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }

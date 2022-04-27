@@ -52,9 +52,9 @@ type CreateLoginAttemptInput struct {
 
 // CreateNonceInput is a type that holds the input for creating a nonce
 type CreateNonceInput struct {
-	Value   string `json:"value"`
-	Address string `json:"address"`
-	Chain   Chain  `json:"chain"`
+	Value   string       `json:"value"`
+	Address AddressValue `json:"address"`
+	Chain   Chain        `json:"chain"`
 }
 
 // NonceRepository is the interface for interacting with the auth nonce persistence layer

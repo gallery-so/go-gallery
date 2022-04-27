@@ -263,7 +263,7 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) f
 
 		b.QueryRow(func(i int, user sqlc.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{Address: addresses[i]}
+				err = persist.ErrUserNotFound{Address: addresses[i].String()}
 			}
 
 			// Add results to other loaders' caches

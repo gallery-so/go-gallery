@@ -33,7 +33,7 @@ type ChainProvider interface {
 	// bool is whether or not to update all of the tokens regardless of whether we know they exist already
 	ValidateTokensForWallet(context.Context, persist.Wallet, bool) error
 	// ctx, address, chain, wallet type, nonce, sig
-	VerifySignature(context.Context, string, persist.WalletType, string, string) (bool, error)
+	VerifySignature(context.Context, persist.AddressValue, persist.WalletType, string, string) (bool, error)
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
@@ -58,7 +58,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 }
 
 // VerifySignature verifies a signature for a wallet address
-func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress string, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
+func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress persist.AddressValue, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
 	// user, err := d.UserRepo.GetByID(ctx, userID)
 	// if err != nil {
 	// 	return err

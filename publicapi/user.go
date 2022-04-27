@@ -79,7 +79,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.Ethereu
 	return &user, nil
 }
 
-func (api UserAPI) AddUserAddress(ctx context.Context, address string, chain persist.Chain, authenticator auth.Authenticator) error {
+func (api UserAPI) AddUserAddress(ctx context.Context, address persist.AddressValue, chain persist.Chain, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address":       {address, "required,eth_addr"},

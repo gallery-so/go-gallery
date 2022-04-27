@@ -43,9 +43,9 @@ autobind:
 # modelgen, the others will be allowed when binding to fields. Configure them to
 # your liking
 models:
-  Address:
+  AddressValue:
     model:
-      - github.com/mikeydub/go-gallery/service/persist.Address
+      - github.com/mikeydub/go-gallery/service/persist.AddressValue
   DBID:
     model:
       - github.com/mikeydub/go-gallery/service/persist.DBID

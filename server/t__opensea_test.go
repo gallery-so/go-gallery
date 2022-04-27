@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/opensea"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 

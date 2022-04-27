@@ -33,10 +33,10 @@ type UpdateUserInput struct {
 
 // GetUserInput is the input for the user get pipeline
 type GetUserInput struct {
-	UserID   persist.DBID    `json:"user_id" form:"user_id"`
-	Address  persist.Address `json:"address" form:"address"`
-	Chain    persist.Chain   `json:"chain" form:"chain"`
-	Username string          `json:"username" form:"username"`
+	UserID   persist.DBID         `json:"user_id" form:"user_id"`
+	Address  persist.AddressValue `json:"address" form:"address"`
+	Chain    persist.Chain        `json:"chain" form:"chain"`
+	Username string               `json:"username" form:"username"`
 }
 
 // GetUserOutput is the output of the user get pipeline
@@ -53,11 +53,11 @@ type AddUserAddressesInput struct {
 
 	// needed because this is a new user that cant be logged into, and the client creating
 	// the user still needs to prove ownership of their address.
-	Signature  string             `json:"signature" binding:"signature"`
-	Nonce      string             `json:"nonce"`
-	Address    string             `json:"address"   binding:"required"`
-	Chain      persist.Chain      `json:"chain"`
-	WalletType persist.WalletType `json:"wallet_type"`
+	Signature  string               `json:"signature" binding:"signature"`
+	Nonce      string               `json:"nonce"`
+	Address    persist.AddressValue `json:"address"   binding:"required"`
+	Chain      persist.Chain        `json:"chain"`
+	WalletType persist.WalletType   `json:"wallet_type"`
 }
 
 // AddUserAddressOutput is the output of the user add address pipeline
@@ -80,12 +80,12 @@ type CreateUserOutput struct {
 
 // MergeUsersInput is the input for the user merge pipeline
 type MergeUsersInput struct {
-	SecondUserID persist.DBID       `json:"second_user_id" binding:"required"`
-	Signature    string             `json:"signature" binding:"signature"`
-	Nonce        string             `json:"nonce"`
-	Address      string             `json:"address"   binding:"required"`
-	Chain        persist.Chain      `json:"chain"`
-	WalletType   persist.WalletType `json:"wallet_type"`
+	SecondUserID persist.DBID         `json:"second_user_id" binding:"required"`
+	Signature    string               `json:"signature" binding:"signature"`
+	Nonce        string               `json:"nonce"`
+	Address      persist.AddressValue `json:"address"   binding:"required"`
+	Chain        persist.Chain        `json:"chain"`
+	WalletType   persist.WalletType   `json:"wallet_type"`
 }
 
 // CreateUserToken creates a JWT token for the user
@@ -283,7 +283,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 }
 
 // AddWalletToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress string, pChain persist.Chain, addressAuth auth.Authenticator,
+func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.AddressValue, pChain persist.Chain, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -307,7 +307,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress string
 }
 
 // AddAddressToUserToken adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress string, pChain persist.Chain, pWalletType persist.WalletType, addressAuth auth.Authenticator,
+func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress persist.AddressValue, pChain persist.Chain, pWalletType persist.WalletType, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -392,7 +392,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		}
 		break
 	case pInput.Address.String() != "":
-		user, err = userRepo.GetByAddress(pCtx, pInput.Address.String(), pInput.Chain)
+		user, err = userRepo.GetByAddress(pCtx, pInput.Address, pInput.Chain)
 		if err != nil {
 			return GetUserOutput{}, err
 		}
@@ -494,7 +494,7 @@ func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo pe
 }
 
 // TODO need interface for interacting with other chains for this
-func ensureMediaContent(pCtx context.Context, pAddress string, pChain persist.Chain, tokenRepo persist.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+func ensureMediaContent(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, tokenRepo persist.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	// input := indexer.UpdateMediaInput{
 	// 	OwnerAddress: pAddress,
@@ -548,7 +548,7 @@ func (e ErrDoesNotOwnWallets) Error() string {
 }
 
 type ErrUserAlreadyExists struct {
-	Address       string
+	Address       persist.AddressValue
 	Chain         persist.Chain
 	Authenticator string
 }
@@ -558,7 +558,7 @@ func (e ErrUserAlreadyExists) Error() string {
 }
 
 type ErrAddressOwnedByUser struct {
-	Address string
+	Address persist.AddressValue
 	Chain   persist.Chain
 	OwnerID persist.DBID
 }
@@ -568,7 +568,7 @@ func (e ErrAddressOwnedByUser) Error() string {
 }
 
 type ErrAddressNotOwnedByUser struct {
-	Address string
+	Address persist.AddressValue
 	Chain   persist.Chain
 	UserID  persist.DBID
 }

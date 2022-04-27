@@ -21,7 +21,7 @@ import (
 )
 
 type Wallet struct {
-	Address    string
+	Address    persist.AddressValue
 	Chain      persist.Chain
 	WalletType persist.WalletType
 }
@@ -66,11 +66,11 @@ var ErrSignatureInvalid = errors.New("signature invalid")
 
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
-	Signature  string             `json:"signature" binding:"signature"`
-	Address    string             `json:"address"   binding:"required"`
-	Chain      persist.Chain      `json:"chain"`
-	WalletType persist.WalletType `json:"wallet_type"`
-	Nonce      string             `json:"nonce"`
+	Signature  string               `json:"signature" binding:"signature"`
+	Address    persist.AddressValue `json:"address"   binding:"required"`
+	Chain      persist.Chain        `json:"chain"`
+	WalletType persist.WalletType   `json:"wallet_type"`
+	Nonce      string               `json:"nonce"`
 }
 
 // LoginOutput is the output of the login pipeline
@@ -81,7 +81,7 @@ type LoginOutput struct {
 
 // GetPreflightInput is the input to the preflight pipeline
 type GetPreflightInput struct {
-	Address string `json:"address" form:"address" binding:"required"`
+	Address persist.AddressValue `json:"address" form:"address" binding:"required"`
 	Chain   persist.Chain
 }
 
@@ -138,7 +138,7 @@ func (e ErrDoesNotOwnRequiredNFT) Error() string {
 }
 
 type ErrNonceNotFound struct {
-	Address string
+	Address persist.AddressValue
 	Chain   persist.Chain
 }
 
@@ -155,7 +155,7 @@ func GenerateNonce() string {
 }
 
 type NonceAuthenticator struct {
-	Address            string
+	Address            persist.AddressValue
 	Chain              persist.Chain
 	Nonce              string
 	Signature          string
@@ -298,7 +298,7 @@ func Login(pCtx context.Context, authenticator Authenticator) (*model.LoginPaylo
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pAddress string, pChain persist.Chain, pPreAuthed bool,
+func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (*model.AuthNonce, error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress, pChain)
@@ -390,7 +390,7 @@ func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed
 }
 
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pAddress string, pChain persist.Chain, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+func NonceRotate(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := persist.CreateNonceInput{
 		Value:   GenerateNonce(),
@@ -408,7 +408,7 @@ func NonceRotate(pCtx context.Context, pAddress string, pChain persist.Chain, pU
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pAddress string, pChain persist.Chain, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+func GetUserWithNonce(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
 
 	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
 	if err != nil {
@@ -490,7 +490,7 @@ func GetAllowlistContracts() map[persist.EthereumAddress][]persist.TokenID {
 // containsAddress checks whether an address exists in a slice
 func containsAddress(a []persist.Wallet, b Wallet) bool {
 	for _, v := range a {
-		if v.Address.String() == b.Address && v.Address.Chain == b.Chain {
+		if v.Address.String() == b.Address.String() && v.Address.Chain == b.Chain {
 			return true
 		}
 	}
@@ -529,7 +529,7 @@ func toAuthWallets(pWallets []persist.Wallet) []Wallet {
 	res := make([]Wallet, len(pWallets))
 	for i, w := range pWallets {
 		res[i] = Wallet{
-			Address:    w.Address.Address.String(),
+			Address:    w.Address.Address,
 			Chain:      w.Address.Chain,
 			WalletType: w.WalletType,
 		}

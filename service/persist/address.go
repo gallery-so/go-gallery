@@ -2,6 +2,8 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -14,13 +16,16 @@ type Address struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address NullString `json:"address"`
-	Chain   Chain      `json:"chain"`
+	Address AddressValue `json:"address"`
+	Chain   Chain        `json:"chain"`
 }
+
+// AddressValue represents the value of an address
+type AddressValue string
 
 // AddressRepository represents a repository for interacting with persisted wallets
 type AddressRepository interface {
-	GetByDetails(context.Context, Address, Chain) (Address, error)
+	GetByDetails(context.Context, AddressValue, Chain) (Address, error)
 	GetByID(context.Context, DBID) (Address, error)
 	Insert(context.Context, Address, Chain) error
 }
@@ -43,4 +48,26 @@ func (a Address) ToHexAddress() common.Address {
 	default:
 		return common.Address{}
 	}
+}
+
+func (n AddressValue) String() string {
+	return string(n)
+}
+
+// Value implements the database/sql driver Valuer interface for the NullString type
+func (n AddressValue) Value() (driver.Value, error) {
+	if n.String() == "" {
+		return "", nil
+	}
+	return strings.ToValidUTF8(strings.ReplaceAll(n.String(), "\\u0000", ""), ""), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullString type
+func (n *AddressValue) Scan(value interface{}) error {
+	if value == nil {
+		*n = AddressValue("")
+		return nil
+	}
+	*n = AddressValue(value.(string))
+	return nil
 }

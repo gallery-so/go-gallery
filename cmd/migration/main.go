@@ -16,7 +16,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/service/opensea"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -396,7 +396,7 @@ func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Ether
 		}
 	default:
 		t.TokenType = persist.TokenTypeERC721
-		t.OwnershipHistory = []persist.EthereumAddressAtBlock{
+		t.OwnershipHistory = []persist.AddressAtBlock{
 			{
 				Address: persist.ZeroAddress,
 				Block:   persist.BlockNumber(block - 1),
