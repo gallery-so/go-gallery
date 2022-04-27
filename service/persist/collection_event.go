@@ -36,7 +36,7 @@ func (c *CollectionEvent) Scan(value interface{}) error {
 }
 
 type CollectionEventRepository interface {
-	Add(context.Context, CollectionEventRecord) (DBID, error)
+	Add(context.Context, CollectionEventRecord) (*CollectionEventRecord, error)
 	Get(context.Context, DBID) (CollectionEventRecord, error)
 	GetEventsSince(context.Context, CollectionEventRecord, time.Time) ([]CollectionEventRecord, error)
 	GetEventBefore(context.Context, CollectionEventRecord) (*CollectionEventRecord, error)

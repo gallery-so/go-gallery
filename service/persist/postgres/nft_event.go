@@ -22,7 +22,7 @@ func NewNftEventRepository(db *sql.DB) *NftEventRepository {
 
 	createStmt, err := db.PrepareContext(ctx,
 		`INSERT INTO nft_events (ID, USER_ID, NFT_ID, VERSION, EVENT_CODE, DATA) VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING ID;`,
+		 RETURNING ID, USER_ID, NFT_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED;`,
 	)
 	checkNoErr(err)
 
@@ -56,13 +56,14 @@ func NewNftEventRepository(db *sql.DB) *NftEventRepository {
 	}
 }
 
-func (e *NftEventRepository) Add(ctx context.Context, event persist.NftEventRecord) (persist.DBID, error) {
-	var id persist.DBID
-	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.NftID, event.Version, event.Code, event.Data).Scan(&id)
+func (e *NftEventRepository) Add(ctx context.Context, event persist.NftEventRecord) (*persist.NftEventRecord, error) {
+	var evt persist.NftEventRecord
+	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.NftID, event.Version, event.Code, event.Data).Scan(
+		&evt.ID, &evt.UserID, &evt.NftID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return id, nil
+	return &evt, nil
 }
 
 func (e *NftEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.NftEventRecord, error) {

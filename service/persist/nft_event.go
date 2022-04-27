@@ -36,7 +36,7 @@ func (n *NftEvent) Scan(value interface{}) error {
 }
 
 type NftEventRepository interface {
-	Add(context.Context, NftEventRecord) (DBID, error)
+	Add(context.Context, NftEventRecord) (*NftEventRecord, error)
 	Get(context.Context, DBID) (NftEventRecord, error)
 	GetEventsSince(context.Context, NftEventRecord, time.Time) ([]NftEventRecord, error)
 	GetEventBefore(context.Context, NftEventRecord) (*NftEventRecord, error)
