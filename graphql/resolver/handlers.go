@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"os"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
@@ -150,6 +152,30 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		return next(ctx)
+	}
+}
+
+func RequestTracer() func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
+	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
+		oc := gqlgen.GetOperationContext(ctx)
+
+		span := sentry.StartSpan(ctx, oc.Operation.Name)
+		result := next(logger.NewContextWithSpan(ctx, span))
+		span.Finish()
+
+		return result
+	}
+}
+
+func ResponseTracer() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		oc := gqlgen.GetOperationContext(ctx)
+
+		span := sentry.StartSpan(ctx, oc.Operation.Name)
+		result := next(logger.NewContextWithSpan(ctx, span))
+		span.Finish()
+
+		return result
 	}
 }
 

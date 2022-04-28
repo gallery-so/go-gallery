@@ -55,10 +55,15 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
+
+	h.AroundOperations(graphql.RequestTracer())
+	h.AroundResponses(graphql.ResponseTracer())
+
 	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
+	h.AroundResponses(graphql.ResponseLogger())
+
 	h.AroundFields(graphql.RemapErrors)
 	h.AroundResponses(graphql.AddErrorsToGin)
-	h.AroundResponses(graphql.ResponseLogger())
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		gc := util.GinContextFromContext(ctx)
