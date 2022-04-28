@@ -57,8 +57,8 @@ func handleUserCreated(ctx context.Context, userRepo persist.UserRepository, use
 		return err
 	}
 
-	// Don't send if the username is the same as before.
-	if eventBefore != nil && (event.Data.Username == eventBefore.Data.Username) {
+	// Only send if its a new user.
+	if eventBefore != nil {
 		return nil
 	}
 

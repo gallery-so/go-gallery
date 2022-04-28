@@ -1,15 +1,22 @@
 package sentry
 
 import (
+	"context"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/util"
 )
+
+type sentryContextKey string
 
 const (
 	AuthSentryContextName  = "auth context"
 	ErrorSentryContextName = "error context"
+	SentryHubContextKey    = sentryContextKey("sentryHub")
 )
 
 type SentryAuthContext struct {
@@ -38,4 +45,29 @@ func SetSentryAuthContext(gc *gin.Context, hub *sentry.Hub) {
 
 	hub.Scope().SetContext(AuthSentryContextName, authCtx)
 	hub.Scope().SetUser(userCtx)
+}
+
+func NewSentryHubContext(ctx context.Context, hub *sentry.Hub) context.Context {
+	var cpy *sentry.Hub
+
+	if hub != nil {
+		cpy = hub.Clone()
+	}
+
+	return context.WithValue(ctx, SentryHubContextKey, cpy)
+}
+
+func SentryHubFromContext(ctx context.Context) *sentry.Hub {
+	// Use request-scoped hub if available
+	gc := util.GinContextFromContext(ctx)
+	if hub := sentrygin.GetHubFromContext(gc); hub != nil {
+		return hub
+	}
+
+	hub, ok := ctx.Value(SentryHubContextKey).(*sentry.Hub)
+	if !ok {
+		return nil
+	}
+
+	return hub
 }

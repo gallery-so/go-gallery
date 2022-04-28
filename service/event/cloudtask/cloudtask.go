@@ -32,35 +32,30 @@ func newClient(ctx context.Context) (*gcptasks.Client, error) {
 	}
 }
 
-func createTask(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode) error {
+func createTaskForService(ctx context.Context, queuePath string, scheduleOn time.Time, service string, uri string, headers map[string]string, message EventMessage) error {
 	client, err := newClient(ctx)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	queuePath := viper.GetString("GCLOUD_FEED_TASK_QUEUE")
-	scheduleOn := createdOn.Add(time.Duration(viper.GetInt("GCLOUD_FEED_TASK_BUFFER_SECS")) * time.Second)
-
 	req := &taskspb.CreateTaskRequest{
 		Parent: queuePath,
 		Task: &taskspb.Task{
-			Name:         queuePath + "/tasks/" + eventID.String(),
+			Name:         queuePath + "/tasks/" + message.ID.String(),
 			ScheduleTime: timestamppb.New(scheduleOn),
 			MessageType: &taskspb.Task_AppEngineHttpRequest{
 				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-					HttpMethod:  taskspb.HttpMethod_POST,
-					RelativeUri: "/tasks/feed-event",
-					Headers: map[string]string{
-						"Content-type":  "application/json",
-						"Authorization": "Basic " + viper.GetString("FEEDBOT_SECRET"),
-					},
+					HttpMethod:       taskspb.HttpMethod_POST,
+					AppEngineRouting: &taskspb.AppEngineRouting{Service: service},
+					RelativeUri:      uri,
+					Headers:          headers,
 				},
 			},
 		},
 	}
 
-	body, err := json.Marshal(EventMessage{eventID, eventCode})
+	body, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
@@ -68,4 +63,19 @@ func createTask(ctx context.Context, createdOn time.Time, eventID persist.DBID, 
 	req.Task.GetAppEngineHttpRequest().Body = body
 	_, err = client.CreateTask(ctx, req)
 	return err
+}
+
+func createTaskForFeedbot(ctx context.Context, createdOn time.Time, eventID persist.DBID, eventCode persist.EventCode) error {
+	queuePath := viper.GetString("GCLOUD_FEED_TASK_QUEUE")
+	buffer := viper.GetInt("GCLOUD_FEED_TASK_BUFFER_SECS")
+	scheduleOn := createdOn.Add(time.Duration(buffer) * time.Second)
+
+	headers := map[string]string{
+		"Content-type":  "application/json",
+		"Authorization": "Basic " + viper.GetString("FEEDBOT_SECRET"),
+	}
+
+	message := EventMessage{ID: eventID, EventCode: eventCode}
+
+	return createTaskForService(ctx, queuePath, scheduleOn, "feedbot", "/tasks/feed-event", headers, message)
 }

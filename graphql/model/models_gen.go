@@ -132,6 +132,7 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
+	DebugAuth   *DebugAuth       `json:"debugAuth"`
 	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
 	GnosisSafe  *GnosisSafeAuth  `json:"gnosisSafe"`
 }
@@ -215,6 +216,11 @@ type CreateUserPayload struct {
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type DebugAuth struct {
+	UserID    *persist.DBID     `json:"userId"`
+	Addresses []persist.Address `json:"addresses"`
+}
 
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
@@ -317,12 +323,20 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsRefreshOpenSeaNftsPayloadOrError()       {}
 func (ErrNotAuthorized) IsError()                                  {}
 
+type ErrOpenSeaRefreshFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrOpenSeaRefreshFailed) IsRefreshOpenSeaNftsPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                            {}
+
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserAlreadyExists) IsError()                    {}
-func (ErrUserAlreadyExists) IsCreateUserPayloadOrError() {}
+func (ErrUserAlreadyExists) IsUpdateUserInfoPayloadOrError() {}
+func (ErrUserAlreadyExists) IsError()                        {}
+func (ErrUserAlreadyExists) IsCreateUserPayloadOrError()     {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
@@ -566,8 +580,9 @@ type UpdateGalleryCollectionsPayload struct {
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
 
 type UpdateNftInfoInput struct {
-	NftID          persist.DBID `json:"nftId"`
-	CollectorsNote string       `json:"collectorsNote"`
+	NftID          persist.DBID  `json:"nftId"`
+	CollectorsNote string        `json:"collectorsNote"`
+	CollectionID   *persist.DBID `json:"collectionId"`
 }
 
 type UpdateNftInfoPayload struct {

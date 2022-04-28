@@ -7,6 +7,8 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 
@@ -15,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	userservice "github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -54,7 +55,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case userservice.ErrUserAlreadyExists:
+	case persist.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
@@ -62,6 +63,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrNftNotFound{Message: message}
 	case persist.ErrCommunityNotFound:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
+	case publicapi.ErrOpenSeaRefreshFailed:
+		mappedErr = model.ErrOpenSeaRefreshFailed{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -80,6 +83,16 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 	authApi := publicapi.For(ctx).Auth
+
+	if debugtools.Enabled {
+		if viper.GetString("ENV") == "local" && m.DebugAuth != nil {
+			userID := persist.DBID("")
+			if m.DebugAuth.UserID != nil {
+				userID = *m.DebugAuth.UserID
+			}
+			return debugtools.NewDebugAuthenticator(userID, m.DebugAuth.Addresses), nil
+		}
+	}
 
 	if m.EthereumEoa != nil {
 		return authApi.NewEthereumNonceAuthenticator(m.EthereumEoa.Address, m.EthereumEoa.Nonce, m.EthereumEoa.Signature, auth.WalletTypeEOA), nil

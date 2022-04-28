@@ -51,7 +51,8 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
-	AuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -160,6 +161,10 @@ type ComplexityRoot struct {
 
 	ErrNotAuthorized struct {
 		Cause   func(childComplexity int) int
+		Message func(childComplexity int) int
+	}
+
+	ErrOpenSeaRefreshFailed struct {
 		Message func(childComplexity int) int
 	}
 
@@ -804,6 +809,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
+
+	case "ErrOpenSeaRefreshFailed.message":
+		if e.complexity.ErrOpenSeaRefreshFailed.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrOpenSeaRefreshFailed.Message(childComplexity), true
 
 	case "ErrUserAlreadyExists.message":
 		if e.complexity.ErrUserAlreadyExists.Message == nil {
@@ -1909,6 +1921,11 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
 
+# Use @restrictEnvironment to choose which values of the ENV environment variable the annotated field/object
+# should be usable in (case-insensitive). Example: @restrictEnvironment(allowed:["local", "development"]) would
+# allow a field in "local" and "development" environments but not in "production"
+directive @restrictEnvironment(allowed:[String!]!) on INPUT_FIELD_DEFINITION | INPUT_OBJECT | FIELD_DEFINITION | OBJECT
+
 # All types that implement Node must have a unique GqlID set in their "id" field. For types with
 # a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
 # so those types will automatically have an ID function generated for them (which gqlgen will find
@@ -2320,6 +2337,10 @@ type UpdateGalleryCollectionsPayload {
 input UpdateNftInfoInput {
     nftId: DBID!
     collectorsNote: String!
+
+    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Currently used to generate feedbot URLs.
+    collectionId: DBID
 }
 
 union UpdateNftInfoPayloadOrError =
@@ -2359,6 +2380,7 @@ union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer
@@ -2367,6 +2389,7 @@ type UpdateUserInfoPayload {
 union RefreshOpenSeaNftsPayloadOrError =
     RefreshOpenSeaNftsPayload
     | ErrNotAuthorized
+    | ErrOpenSeaRefreshFailed
 
 type RefreshOpenSeaNftsPayload {
     viewer: Viewer
@@ -2423,9 +2446,21 @@ type ErrDoesNotOwnRequiredNFT implements Error {
     message: String!
 }
 
+type ErrOpenSeaRefreshFailed implements Error {
+    message: String!
+}
+
 input AuthMechanism {
+    debugAuth: DebugAuth
     ethereumEoa: EthereumEoaAuth
     gnosisSafe: GnosisSafeAuth
+}
+
+# DebugAuth always succeeds and returns the supplied userId and addresses.
+# Only available for local development.
+input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    userId: DBID
+    addresses: [Address!]!
 }
 
 input EthereumEoaAuth {
@@ -2503,6 +2538,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []string
+	if tmp, ok := rawArgs["allowed"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allowed"))
+		arg0, err = ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["allowed"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_addUserAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -4472,6 +4522,41 @@ func (ec *executionContext) _ErrNotAuthorized_cause(ctx context.Context, field g
 	res := resTmp.(model.AuthorizationError)
 	fc.Result = res
 	return ec.marshalNAuthorizationError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthorizationError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrOpenSeaRefreshFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrOpenSeaRefreshFailed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrOpenSeaRefreshFailed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrUserAlreadyExists_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrUserAlreadyExists) (ret graphql.Marshaler) {
@@ -10355,6 +10440,36 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
+		case "debugAuth":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugAuth"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*model.DebugAuth); ok {
+				it.DebugAuth = data
+			} else if tmp == nil {
+				it.DebugAuth = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugAuth`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
 		case "ethereumEoa":
 			var err error
 
@@ -10456,6 +10571,81 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
 			if err != nil {
 				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj interface{}) (model.DebugAuth, error) {
+	var it model.DebugAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "userId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*persist.DBID); ok {
+				it.UserID = data
+			} else if tmp == nil {
+				it.UserID = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/service/persist.DBID`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+		case "addresses":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
+			directive0 := func(ctx context.Context) (interface{}, error) {
+				return ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, v)
+			}
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.([]persist.Address); ok {
+				it.Addresses = data
+			} else if tmp == nil {
+				it.Addresses = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be []github.com/mikeydub/go-gallery/service/persist.Address`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
 	}
@@ -10695,6 +10885,14 @@ func (ec *executionContext) unmarshalInputUpdateNftInfoInput(ctx context.Context
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectorsNote"))
 			it.CollectorsNote, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "collectionId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
+			it.CollectionID, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11067,6 +11265,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+	case model.ErrOpenSeaRefreshFailed:
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
+	case *model.ErrOpenSeaRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11405,6 +11610,13 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrOpenSeaRefreshFailed:
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
+	case *model.ErrOpenSeaRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11615,6 +11827,13 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrUserAlreadyExists:
+		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
+	case *model.ErrUserAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12501,7 +12720,38 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayloadOrError"}
+var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+
+func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrOpenSeaRefreshFailed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errOpenSeaRefreshFailedImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrOpenSeaRefreshFailed")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrOpenSeaRefreshFailed_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "UpdateUserInfoPayloadOrError", "Error", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserAlreadyExists) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserAlreadyExistsImplementors)
@@ -15664,6 +15914,14 @@ func (ec *executionContext) marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	}
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx context.Context, v interface{}) (*model.DebugAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDebugAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteCollectionPayloadOrError) graphql.Marshaler {

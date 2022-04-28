@@ -16,6 +16,11 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
 
+# Use @restrictEnvironment to choose which values of the ENV environment variable the annotated field/object
+# should be usable in (case-insensitive). Example: @restrictEnvironment(allowed:["local", "development"]) would
+# allow a field in "local" and "development" environments but not in "production"
+directive @restrictEnvironment(allowed:[String!]!) on INPUT_FIELD_DEFINITION | INPUT_OBJECT | FIELD_DEFINITION | OBJECT
+
 # All types that implement Node must have a unique GqlID set in their "id" field. For types with
 # a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
 # so those types will automatically have an ID function generated for them (which gqlgen will find
@@ -427,6 +432,10 @@ type UpdateGalleryCollectionsPayload {
 input UpdateNftInfoInput {
     nftId: DBID!
     collectorsNote: String!
+
+    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Currently used to generate feedbot URLs.
+    collectionId: DBID
 }
 
 union UpdateNftInfoPayloadOrError =
@@ -466,6 +475,7 @@ union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer
@@ -474,6 +484,7 @@ type UpdateUserInfoPayload {
 union RefreshOpenSeaNftsPayloadOrError =
     RefreshOpenSeaNftsPayload
     | ErrNotAuthorized
+    | ErrOpenSeaRefreshFailed
 
 type RefreshOpenSeaNftsPayload {
     viewer: Viewer
@@ -530,9 +541,21 @@ type ErrDoesNotOwnRequiredNFT implements Error {
     message: String!
 }
 
+type ErrOpenSeaRefreshFailed implements Error {
+    message: String!
+}
+
 input AuthMechanism {
+    debugAuth: DebugAuth
     ethereumEoa: EthereumEoaAuth
     gnosisSafe: GnosisSafeAuth
+}
+
+# DebugAuth always succeeds and returns the supplied userId and addresses.
+# Only available for local development.
+input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    userId: DBID
+    addresses: [Address!]!
 }
 
 input EthereumEoaAuth {
