@@ -47,7 +47,6 @@ func SetSentryAuthContext(gc *gin.Context, hub *sentry.Hub) {
 	hub.Scope().SetUser(userCtx)
 }
 
-// Creates a
 func NewSentryHubContext(ctx context.Context, hub *sentry.Hub) context.Context {
 	cpy := hub.Clone()
 	return context.WithValue(ctx, SentryHubContextKey, cpy)
@@ -60,5 +59,10 @@ func SentryHubFromContext(ctx context.Context) *sentry.Hub {
 		return hub
 	}
 
-	return ctx.Value(SentryHubContextKey).(*sentry.Hub)
+	hub, ok := ctx.Value(SentryHubContextKey).(*sentry.Hub)
+	if !ok {
+		return nil
+	}
+
+	return hub
 }
