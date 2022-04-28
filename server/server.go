@@ -51,7 +51,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
+	router.Use(middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		log.Info("registering validation")
@@ -167,6 +167,7 @@ func initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
+		SampleRate:       viper.GetFloat64("SENTRY_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 			if event.Request == nil {

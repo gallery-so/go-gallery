@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/getsentry/sentry-go"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"strings"
 
@@ -212,6 +214,26 @@ func GinContextToContext() gin.HandlerFunc {
 		ctx := context.WithValue(c.Request.Context(), util.GinContextKey, c)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
+	}
+}
+
+func Tracing() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// TODO: TransactionName should probably be overwritten in the GraphQL handler with an operation name
+		// Taken from the HTTP handler implementation in sentryhttp.go.
+		span := sentry.StartSpan(c, "gin.server",
+			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),
+			sentry.ContinueFromRequest(c.Request),
+		)
+
+		loggingCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
+			"trace-id": span.TraceID,
+		})
+
+		c.Request = c.Request.WithContext(loggingCtx)
+
+		c.Next()
+		span.Finish()
 	}
 }
 
