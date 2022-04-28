@@ -4,16 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/getsentry/sentry-go"
-	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"os"
-
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -25,36 +23,6 @@ import (
 
 const scrubText = "<scrubbed>"
 const scrubDirectiveName = "scrub"
-
-var requestLogger *logrus.Logger
-
-// Gets (or creates) a logger for GraphQL requests and responses. Not thread-safe; only call during handler initialization.
-func getGraphQLRequestLogger() *logrus.Logger {
-	if requestLogger != nil {
-		return requestLogger
-	}
-
-	requestLogger = logrus.New()
-
-	// To make queries show up in a readable format in a local console, we want a text formatter that
-	// doesn't escape newlines. To make queries readable in GCP logs, we actually want a JSON formatter;
-	// otherwise, each individual line of the query will be treated as a separate log entry.
-	if viper.GetString("ENV") == "local" {
-		requestLogger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
-	} else {
-		requestLogger.SetFormatter(&logrus.JSONFormatter{})
-	}
-
-	// Optionally, log to a file instead of stdout. This can be helpful in local development environments,
-	// where requests tend to fill up the console and make it harder to see other useful logging info.
-	logFilePath := viper.GetString("GQL_REQUEST_LOGFILE")
-	if logFilePath != "" {
-		logFile, _ := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		requestLogger.SetOutput(logFile)
-	}
-
-	return requestLogger
-}
 
 func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	response := next(ctx)
@@ -180,8 +148,6 @@ func ResponseTracer() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 }
 
 func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-	logger := getGraphQLRequestLogger()
-
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 		response := next(ctx)
 
@@ -197,7 +163,7 @@ func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
 
-		logger.WithFields(logrus.Fields{
+		logger.For(ctx).WithFields(logrus.Fields{
 			"authenticated": userId != "",
 			"userId":        userId,
 			"response":      message,
@@ -208,14 +174,12 @@ func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 }
 
 func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-	logger := getGraphQLRequestLogger()
-
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
 		oc := gqlgen.GetOperationContext(ctx)
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(schema, oc.Doc, oc.RawQuery, oc.Variables)
-		logger.WithFields(logrus.Fields{
+		logger.For(ctx).WithFields(logrus.Fields{
 			"authenticated":     userId != "",
 			"userId":            userId,
 			"scrubbedQuery":     scrubbedQuery,
@@ -321,7 +285,7 @@ func scrubValue(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Pos
 	if value.Definition == nil || value.Definition.Fields == nil {
 		return
 	}
-	
+
 	// Look through all the fields defined for this value
 	for _, field := range value.Definition.Fields {
 		if field.Directives == nil {

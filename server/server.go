@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"strings"
 
@@ -22,7 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/validate"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
@@ -31,6 +32,7 @@ import (
 func Init() {
 	setDefaults()
 
+	initLogger()
 	initSentry()
 
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
@@ -41,12 +43,9 @@ func Init() {
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
 func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
-	log.Info("initializing server...")
-
-	log.SetReportCaller(true)
+	logger.NoCtx().Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
-		log.SetLevel(log.DebugLevel)
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -54,7 +53,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	router.Use(middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		log.Info("registering validation")
+		logger.NoCtx().Info("registering validation")
 		validate.RegisterCustomValidators(v)
 	}
 
@@ -73,7 +72,7 @@ func newStorageClient() *storage.Client {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
-		log.Errorf("error creating storage client: %v", err)
+		logger.NoCtx().Errorf("error creating storage client: %v", err)
 	}
 	return s
 }
@@ -156,13 +155,32 @@ func newEthClient() *ethclient.Client {
 	return client
 }
 
+func initLogger() {
+	optionsFunc := func(logger *logrus.Logger) {
+		logger.SetReportCaller(true)
+
+		if viper.GetString("ENV") != "production" {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+
+		if viper.GetString("ENV") == "local" {
+			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+		} else {
+			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
+			logger.SetFormatter(&logrus.JSONFormatter{})
+		}
+	}
+
+	logger.SetLoggerOptions(optionsFunc)
+}
+
 func initSentry() {
 	if viper.GetString("ENV") == "local" {
-		log.Info("skipping sentry init")
+		logger.NoCtx().Info("skipping sentry init")
 		return
 	}
 
-	log.Info("initializing sentry...")
+	logger.NoCtx().Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
@@ -189,6 +207,6 @@ func initSentry() {
 	})
 
 	if err != nil {
-		log.Fatalf("failed to start sentry: %s", err)
+		logger.NoCtx().Fatalf("failed to start sentry: %s", err)
 	}
 }

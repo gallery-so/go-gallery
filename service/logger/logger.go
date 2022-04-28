@@ -9,7 +9,8 @@ import (
 
 const loggerContextKey = "logger.logger"
 
-var defaultLogger = logrus.NewEntry(logrus.StandardLogger())
+var defaultLogger = logrus.New()
+var defaultEntry = logrus.NewEntry(defaultLogger)
 
 func NewContextWithFields(parent context.Context, fields logrus.Fields) context.Context {
 	return context.WithValue(parent, loggerContextKey, For(parent).WithFields(fields))
@@ -20,6 +21,10 @@ func NewContextWithSpan(parent context.Context, span *sentry.Span) context.Conte
 		"span-id":        span.SpanID,
 		"parent-span-id": span.ParentSpanID,
 	})
+}
+
+func SetLoggerOptions(optionsFunc func(logger *logrus.Logger)) {
+	optionsFunc(defaultLogger)
 }
 
 func For(ctx context.Context) *logrus.Entry {
@@ -37,5 +42,5 @@ func For(ctx context.Context) *logrus.Entry {
 }
 
 func NoCtx() *logrus.Entry {
-	return defaultLogger
+	return defaultEntry
 }
