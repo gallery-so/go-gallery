@@ -54,7 +54,7 @@ func NewSentryHubContext(ctx context.Context, hub *sentry.Hub) context.Context {
 }
 
 func SentryHubFromContext(ctx context.Context) *sentry.Hub {
-	// Use request scoped hub if available
+	// Use request-scoped hub if available
 	gc := util.GinContextFromContext(ctx)
 	if hub := sentrygin.GetHubFromContext(gc); hub != nil {
 		return hub

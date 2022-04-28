@@ -21,7 +21,7 @@ func (c CollectionFeedTask) Handle(ctx context.Context, record persist.Collectio
 
 	saved, err := c.CollectionEventRepo.Add(ctx, record)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("failed to add event to collection event repo: %s", err)
 
 		if hub != nil {
 			hub.CaptureException(err)
@@ -32,7 +32,7 @@ func (c CollectionFeedTask) Handle(ctx context.Context, record persist.Collectio
 
 	err = createTaskForFeedbot(ctx, time.Time(saved.CreationTime), saved.ID, saved.Code)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("failed to create task: %s", err)
 
 		if hub != nil {
 			hub.CaptureException(err)
