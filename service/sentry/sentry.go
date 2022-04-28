@@ -48,7 +48,12 @@ func SetSentryAuthContext(gc *gin.Context, hub *sentry.Hub) {
 }
 
 func NewSentryHubContext(ctx context.Context, hub *sentry.Hub) context.Context {
-	cpy := hub.Clone()
+	var cpy *sentry.Hub
+
+	if hub != nil {
+		cpy = hub.Clone()
+	}
+
 	return context.WithValue(ctx, SentryHubContextKey, cpy)
 }
 
