@@ -17,17 +17,21 @@ type EventHandlers struct {
 	Nft        *NftDispatcher
 }
 
+// Register specific event handlers
 func AddTo(ctx *gin.Context, repos *persist.Repositories) {
+	// Collection events
 	collectionDispatcher := CollectionDispatcher{Handlers: map[persist.EventCode][]CollectionEventHandler{}}
 	collectionTask := cloudtask.CollectionFeedTask{CollectionEventRepo: repos.CollectionEventRepository}
 	collectionDispatcher.Handle(persist.CollectionCreatedEvent, &collectionTask)
 	collectionDispatcher.Handle(persist.CollectionCollectorsNoteAdded, &collectionTask)
 	collectionDispatcher.Handle(persist.CollectionTokensAdded, &collectionTask)
 
+	// User events
 	userDispatcher := UserDispatcher{Handlers: map[persist.EventCode][]UserEventHandler{}}
 	userTask := cloudtask.UserFeedTask{UserEventRepo: repos.UserEventRepository}
 	userDispatcher.Handle(persist.UserCreatedEvent, &userTask)
 
+	// Nft events
 	nftDispatcher := NftDispatcher{Handlers: map[persist.EventCode][]NftEventHandler{}}
 	nftTask := cloudtask.NftFeedEvent{NftEventRepo: repos.NftEventRepository}
 	nftDispatcher.Handle(persist.NftCollectorsNoteAddedEvent, &nftTask)
