@@ -211,11 +211,14 @@ func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 		// requests and responses into the same transaction.
 		requestID := ctx.Value(gqlRequestIdContextKey)
 
+		// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
+		// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
+		// limit is 256kb per entry), we want to make sure all of our fields are visible.
 		logger.For(ctx).WithFields(logrus.Fields{
 			"authenticated": userId != "",
 			"userId":        userId,
 			"gqlRequestId":  requestID,
-			"response":      message,
+			"zzz_response":  message,
 		}).Info("Sending GraphQL response")
 
 		return response
@@ -230,12 +233,16 @@ func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gq
 		userId := auth.GetUserIDFromCtx(gc)
 		oc := gqlgen.GetOperationContext(ctx)
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(schema, oc.Doc, oc.RawQuery, oc.Variables)
+
+		// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
+		// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
+		// limit is 256kb per entry), we want to make sure all of our fields are visible.
 		logger.For(ctx).WithFields(logrus.Fields{
 			"authenticated":     userId != "",
 			"userId":            userId,
 			"gqlRequestId":      requestID,
-			"scrubbedQuery":     scrubbedQuery,
 			"scrubbedVariables": scrubbedVariables,
+			"zzz_scrubbedQuery": scrubbedQuery,
 		}).Info("Received GraphQL query")
 
 		// Add the requestID to the context so the ResponseLogger can find it
