@@ -29,6 +29,12 @@ const scrubDirectiveName = "scrub"
 
 const gqlRequestIdContextKey = "graphql.gqlRequestId"
 
+// Google Cloud Logging limits our log entries to 256kb. This is too small for some large GraphQL responses,
+// so we truncate those fields. If we don't truncate them manually, Cloud Logging will do it for us, but in
+// the process it may wipe out other logging fields that we care about (like traceId). Note that our limit
+// is set to 240kb (not 256kb) to allow space for additional logging fields.
+const cloudLoggingMaxBytes = 240 * 1024
+
 func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	response := next(ctx)
 	gc := util.GinContextFromContext(ctx)
@@ -190,6 +196,19 @@ func FieldTracer() func(ctx context.Context, next gqlgen.Resolver) (res interfac
 	}
 }
 
+// truncateField returns a string no larger than maxBytes length. It slices based on
+// bytes, and as a result, the final rune in the output may be invalid. This is okay
+// for our purposes here (it should just display as an invalid character in log entries),
+// and allowing this means we don't need to spend cycles converting a gigantic string to
+// runes.
+func truncateField(text string, maxBytes int) string {
+	if len(text) < maxBytes {
+		return text
+	}
+
+	return text[:maxBytes]
+}
+
 func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 		response := next(ctx)
@@ -215,7 +234,7 @@ func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 			"authenticated": userId != "",
 			"userId":        userId,
 			"gqlRequestId":  requestID,
-			"response":      message,
+			"response":      truncateField(message, cloudLoggingMaxBytes),
 		}).Info("Sending GraphQL response")
 
 		return response
@@ -234,7 +253,7 @@ func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gq
 			"authenticated":     userId != "",
 			"userId":            userId,
 			"gqlRequestId":      requestID,
-			"scrubbedQuery":     scrubbedQuery,
+			"scrubbedQuery":     truncateField(scrubbedQuery, cloudLoggingMaxBytes),
 			"scrubbedVariables": scrubbedVariables,
 		}).Info("Received GraphQL query")
 
