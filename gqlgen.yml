@@ -46,9 +46,18 @@ models:
   AddressValue:
     model:
       - github.com/mikeydub/go-gallery/service/persist.AddressValue
+  Chain:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Chain
   DBID:
     model:
       - github.com/mikeydub/go-gallery/service/persist.DBID
+  WalletType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.WalletType
+  EthereumAddress:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.EthereumAddress
   ID:
     model:
       - github.com/mikeydub/go-gallery/graphql/model.GqlID

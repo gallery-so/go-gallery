@@ -67,7 +67,8 @@ type AddUserAddressOutput struct {
 
 // RemoveUserAddressesInput is the input for the user remove addresses pipeline
 type RemoveUserAddressesInput struct {
-	Addresses []persist.Wallet `json:"addresses"   binding:"required"`
+	Addresses []persist.AddressValue `json:"addresses"   binding:"required"`
+	Chains    []persist.Chain        `json:"chains"      binding:"required"`
 }
 
 // CreateUserOutput is the output of the user create pipeline
@@ -259,7 +260,7 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 }
 
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []string, pChains []persist.Chain,
+func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.AddressValue, pChains []persist.Chain,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 	if len(pAddresses) != len(pChains) {
 		return fmt.Errorf("number of addresses (%d) does not match number of chains (%d)", len(pAddresses), len(pChains))
@@ -400,7 +401,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address.String(), Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
@@ -423,7 +424,7 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 		}
 		can := false
 		for _, addr := range user.Wallets {
-			if resolves, _ := eth.ResolvesENS(pCtx, username, persist.EthereumAddress(addr.Address.Address), ethClient); resolves {
+			if resolves, _ := eth.ResolvesENS(pCtx, username, persist.EthereumAddress(addr.Address.AddressValue), ethClient); resolves {
 				can = true
 				break
 			}

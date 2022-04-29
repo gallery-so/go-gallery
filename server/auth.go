@@ -95,7 +95,7 @@ func hasNFTs(userRepository persist.UserRepository, ethClient *ethclient.Client,
 			if addr.Address.Chain != persist.ChainETH {
 				continue
 			}
-			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, persist.EthereumAddress(addr.Address.Address), ethClient); res {
+			if res, _ := eth.HasNFTs(c, contractAddress, tokenIDs, persist.EthereumAddress(addr.Address.AddressValue), ethClient); res {
 				has = true
 				break
 			}

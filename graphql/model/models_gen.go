@@ -116,7 +116,7 @@ func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
 type Address struct {
 	Dbid    persist.DBID          `json:"dbid"`
 	Address *persist.AddressValue `json:"address"`
-	Chain   *Chain                `json:"chain"`
+	Chain   *persist.Chain        `json:"chain"`
 	Nfts    []*Nft                `json:"nfts"`
 }
 
@@ -133,8 +133,8 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
-	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
-	GnosisSafe  *GnosisSafeAuth  `json:"gnosisSafe"`
+	Eoa        *EoaAuth        `json:"eoa"`
+	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
 }
 
 type AuthNonce struct {
@@ -203,6 +203,13 @@ type DeleteCollectionPayload struct {
 }
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
+
+type EoaAuth struct {
+	Address   persist.AddressValue `json:"address"`
+	Chain     persist.Chain        `json:"chain"`
+	Nonce     string               `json:"nonce"`
+	Signature string               `json:"signature"`
+}
 
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
@@ -305,12 +312,6 @@ func (ErrUserNotFound) IsUserByUsernameOrError() {}
 func (ErrUserNotFound) IsError()                 {}
 func (ErrUserNotFound) IsLoginPayloadOrError()   {}
 
-type EthereumEoaAuth struct {
-	Address   persist.AddressValue `json:"address"`
-	Nonce     string               `json:"nonce"`
-	Signature string               `json:"signature"`
-}
-
 type Gallery struct {
 	Dbid        persist.DBID  `json:"dbid"`
 	Owner       *GalleryUser  `json:"owner"`
@@ -401,10 +402,10 @@ type LoginPayload struct {
 func (LoginPayload) IsLoginPayloadOrError() {}
 
 type MembershipOwner struct {
-	Dbid        persist.DBID          `json:"dbid"`
-	Address     *persist.AddressValue `json:"address"`
-	User        *GalleryUser          `json:"user"`
-	PreviewNfts []*string             `json:"previewNfts"`
+	Dbid        persist.DBID             `json:"dbid"`
+	Address     *persist.EthereumAddress `json:"address"`
+	User        *GalleryUser             `json:"user"`
+	PreviewNfts []*string                `json:"previewNfts"`
 }
 
 type MembershipTier struct {
@@ -418,26 +419,26 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	Dbid                  persist.DBID          `json:"dbid"`
-	CreationTime          *time.Time            `json:"creationTime"`
-	LastUpdated           *time.Time            `json:"lastUpdated"`
-	CollectorsNote        *string               `json:"collectorsNote"`
-	Media                 MediaSubtype          `json:"media"`
-	TokenType             *TokenType            `json:"tokenType"`
-	Chain                 *Chain                `json:"chain"`
-	Name                  *string               `json:"name"`
-	Description           *string               `json:"description"`
-	TokenURI              *string               `json:"tokenUri"`
-	TokenID               *string               `json:"tokenId"`
-	Quantity              *string               `json:"quantity"`
-	Owner                 GalleryUserOrWallet   `json:"owner"`
-	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
-	TokenMetadata         *string               `json:"tokenMetadata"`
-	ContractAddress       *persist.AddressValue `json:"contractAddress"`
-	ExternalURL           *string               `json:"externalUrl"`
-	BlockNumber           *string               `json:"blockNumber"`
-	CreatorAddress        *persist.AddressValue `json:"creatorAddress"`
-	OpenseaCollectionName *string               `json:"openseaCollectionName"`
+	Dbid                  persist.DBID        `json:"dbid"`
+	CreationTime          *time.Time          `json:"creationTime"`
+	LastUpdated           *time.Time          `json:"lastUpdated"`
+	CollectorsNote        *string             `json:"collectorsNote"`
+	Media                 MediaSubtype        `json:"media"`
+	TokenType             *TokenType          `json:"tokenType"`
+	Chain                 *persist.Chain      `json:"chain"`
+	Name                  *string             `json:"name"`
+	Description           *string             `json:"description"`
+	TokenURI              *string             `json:"tokenUri"`
+	TokenID               *string             `json:"tokenId"`
+	Quantity              *string             `json:"quantity"`
+	Owner                 GalleryUserOrWallet `json:"owner"`
+	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
+	TokenMetadata         *string             `json:"tokenMetadata"`
+	ContractAddress       *Address            `json:"contractAddress"`
+	ExternalURL           *string             `json:"externalUrl"`
+	BlockNumber           *string             `json:"blockNumber"`
+	CreatorAddress        *Address            `json:"creatorAddress"`
+	OpenseaCollectionName *string             `json:"openseaCollectionName"`
 }
 
 func (Nft) IsNode()           {}
@@ -573,58 +574,13 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	Dbid       persist.DBID `json:"dbid"`
-	Address    *Address     `json:"address"`
-	WalletType *WalletType  `json:"walletType"`
+	Dbid       persist.DBID        `json:"dbid"`
+	Address    *Address            `json:"address"`
+	WalletType *persist.WalletType `json:"walletType"`
 }
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
-
-type Chain string
-
-const (
-	ChainEthereum Chain = "Ethereum"
-	ChainArbitrum Chain = "Arbitrum"
-	ChainPolygon  Chain = "Polygon"
-	ChainOptimism Chain = "Optimism"
-)
-
-var AllChain = []Chain{
-	ChainEthereum,
-	ChainArbitrum,
-	ChainPolygon,
-	ChainOptimism,
-}
-
-func (e Chain) IsValid() bool {
-	switch e {
-	case ChainEthereum, ChainArbitrum, ChainPolygon, ChainOptimism:
-		return true
-	}
-	return false
-}
-
-func (e Chain) String() string {
-	return string(e)
-}
-
-func (e *Chain) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = Chain(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Chain", str)
-	}
-	return nil
-}
-
-func (e Chain) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
 
 type TokenType string
 
@@ -666,46 +622,5 @@ func (e *TokenType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e TokenType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-type WalletType string
-
-const (
-	WalletTypeDefault WalletType = "Default"
-	WalletTypeEoa     WalletType = "EOA"
-)
-
-var AllWalletType = []WalletType{
-	WalletTypeDefault,
-	WalletTypeEoa,
-}
-
-func (e WalletType) IsValid() bool {
-	switch e {
-	case WalletTypeDefault, WalletTypeEoa:
-		return true
-	}
-	return false
-}
-
-func (e WalletType) String() string {
-	return string(e)
-}
-
-func (e *WalletType) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = WalletType(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid WalletType", str)
-	}
-	return nil
-}
-
-func (e WalletType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

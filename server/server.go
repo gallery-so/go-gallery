@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -61,7 +62,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	if err := redis.ClearCache(); err != nil {
 		panic(err)
 	}
-	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient())
+	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), multichain.NewMultiChainDataRetriever())
 }
 
 func newStorageClient() *storage.Client {

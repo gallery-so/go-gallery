@@ -187,7 +187,8 @@ func (t *TokenGalleryRepository) Create(pCtx context.Context, pToken persist.Tok
 }
 
 // GetByWallet retrieves all tokens associated with a wallet
-func (t *TokenGalleryRepository) GetByWallet(pCtx context.Context, pAddress persist.Wallet, limit int64, page int64) ([]persist.TokenGallery, error) {
+// TODO Update statement and querycontext values
+func (t *TokenGalleryRepository) GetByWallet(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
@@ -226,7 +227,7 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 	}
 	tokens := make([]persist.TokenGallery, 0, 10)
 	for i, address := range addresses {
-		t, err := t.GetByWallet(pCtx, address, limit, int64(i))
+		t, err := t.GetByWallet(pCtx, address.Address.AddressValue, address.Address.Chain, limit, int64(i))
 		if err != nil {
 			return nil, err
 		}

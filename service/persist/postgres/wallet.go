@@ -49,7 +49,7 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 // GetByAddress returns a wallet by address and chain
 func (w *WalletRepository) GetByAddress(ctx context.Context, pAddressID persist.DBID) (persist.Wallet, error) {
 	var wallet persist.Wallet
-	err := w.getByAddressStmt.QueryRowContext(ctx, pAddressID).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address.ID, &wallet.Address.Address, &wallet.Address.Chain)
+	err := w.getByAddressStmt.QueryRowContext(ctx, pAddressID).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address.ID, &wallet.Address.AddressValue, &wallet.Address.Chain)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return wallet, persist.ErrWalletNotFoundByAddress{Address: pAddressID}
@@ -61,9 +61,9 @@ func (w *WalletRepository) GetByAddress(ctx context.Context, pAddressID persist.
 }
 
 // GetByAddressDetails returns a wallet by address and chain
-func (w *WalletRepository) GetByAddressDetails(ctx context.Context, addr string, chain persist.Chain) (persist.Wallet, error) {
+func (w *WalletRepository) GetByAddressDetails(ctx context.Context, addr persist.AddressValue, chain persist.Chain) (persist.Wallet, error) {
 	var wallet persist.Wallet
-	err := w.getByAddressDetailStmt.QueryRowContext(ctx, addr, chain).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address.ID, &wallet.Address.Address, &wallet.Address.Chain)
+	err := w.getByAddressDetailStmt.QueryRowContext(ctx, addr, chain).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address.ID, &wallet.Address.AddressValue, &wallet.Address.Chain)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return wallet, persist.ErrWalletNotFoundByAddressDetails{Address: addr, Chain: chain}
@@ -75,7 +75,7 @@ func (w *WalletRepository) GetByAddressDetails(ctx context.Context, addr string,
 }
 
 // Insert inserts a wallet by its address and chain
-func (w *WalletRepository) Insert(ctx context.Context, addr string, chain persist.Chain, walletType persist.WalletType) (persist.DBID, error) {
+func (w *WalletRepository) Insert(ctx context.Context, addr persist.AddressValue, chain persist.Chain, walletType persist.WalletType) (persist.DBID, error) {
 
 	_, err := w.insertAddressStmt.ExecContext(ctx, persist.GenerateID(), 0, addr, chain, walletType)
 	if err != nil {

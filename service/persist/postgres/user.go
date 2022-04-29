@@ -139,7 +139,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 // ExistsByAddress checks if a user exists with the given address
 // TODO use string and chain to get the user
-func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain) (bool, error) {
+func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (bool, error) {
 
 	res, err := u.existsByAddressStmt.QueryContext(pCtx, pAddress, pChain)
 	if err != nil {
@@ -189,7 +189,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 // GetByAddress gets the user with the given address in their list of addresses
 // TODO use string and chain to get the user
-func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress string, pChain persist.Chain) (persist.User, error) {
+func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.User, error) {
 
 	var user persist.User
 	err := u.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
@@ -220,7 +220,7 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 }
 
 // AddWallet adds an address to user as well as ensures that the wallet and address exists
-func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, pAddress string, pChain persist.Chain, pWalletType persist.WalletType) error {
+func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, pAddress persist.AddressValue, pChain persist.Chain, pWalletType persist.WalletType) error {
 	if _, err := u.createAddressStmt.ExecContext(pCtx, pAddress, pChain); err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 }
 
 // RemoveWallet removes an address from user
-func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pAddress string, pChain persist.Chain) error {
+func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pAddress persist.AddressValue, pChain persist.Chain) error {
 	var addrID persist.DBID
 	err := u.getAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addrID)
 	if err != nil {

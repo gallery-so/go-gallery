@@ -3,20 +3,23 @@ package graphql
 import (
 	"context"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/publicapi"
+
+	"sort"
+	"strings"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/validator"
-	"sort"
-	"strings"
 )
 
 func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
@@ -93,9 +96,12 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 
 			has := false
 			for _, addr := range user.Addresses {
+				if addr.Address.Chain != persist.ChainETH {
+					continue
+				}
 				allowlist := auth.GetAllowlistContracts()
 				for k, v := range allowlist {
-					if found, _ := eth.HasNFTs(gc, k, v, addr, ethClient); found {
+					if found, _ := eth.HasNFTs(gc, k, v, persist.EthereumAddress(addr.Address.AddressValue), ethClient); found {
 						has = true
 						break
 					}

@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS nonces (
     VALUE varchar(255)
 );
 
+
+-- create a table to store tokens in indexer with persist.Token struct
 CREATE TABLE IF NOT EXISTS tokens (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -104,7 +106,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     CONTRACT_ADDRESS varchar(255),
     COLLECTORS_NOTE varchar,
     MEDIA jsonb,
-    CHAIN varchar,
+    CHAIN int,
     OWNER_ADDRESS varchar(255),
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
@@ -126,17 +128,19 @@ CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
 
 CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 
+
+-- create new table for indexer contracts for persist.Contract struct
 CREATE TABLE IF NOT EXISTS contracts (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHAIN int,
     NAME varchar,
     SYMBOL varchar,
     ADDRESS varchar(255),
     CREATOR_ADDRESS varchar(255),
-    LATEST_BLOCK bigint
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS address_idx ON contracts (ADDRESS);

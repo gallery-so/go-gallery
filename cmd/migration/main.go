@@ -377,7 +377,7 @@ func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.Ether
 	switch nft.Contract.ContractSchemaName {
 	case "ERC1155":
 		t.TokenType = persist.TokenTypeERC1155
-		ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethClient)
+		ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.AddressValue(), ethClient)
 		if err != nil {
 			return nil, fmt.Errorf("error getting ERC1155 contract: %s", err)
 		}

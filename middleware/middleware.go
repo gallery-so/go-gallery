@@ -71,7 +71,7 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 				}
 				allowlist := auth.GetAllowlistContracts()
 				for k, v := range allowlist {
-					if res, _ := eth.HasNFTs(c, k, v, persist.EthereumAddress(addr.Address.Address), ethClient); res {
+					if res, _ := eth.HasNFTs(c, k, v, persist.EthereumAddress(addr.Address.AddressValue), ethClient); res {
 						has = true
 						break
 					}

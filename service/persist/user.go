@@ -38,7 +38,7 @@ type UserRepository interface {
 	ExistsByAddress(context.Context, AddressValue, Chain) (bool, error)
 	Create(context.Context, CreateUserInput) (DBID, error)
 	AddWallet(context.Context, DBID, AddressValue, Chain, WalletType) error
-	RemoveWallet(context.Context, DBID, string, Chain) error
+	RemoveWallet(context.Context, DBID, AddressValue, Chain) error
 	GetByID(context.Context, DBID) (User, error)
 	GetByAddress(context.Context, AddressValue, Chain) (User, error)
 	GetByUsername(context.Context, string) (User, error)
@@ -49,6 +49,7 @@ type UserRepository interface {
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
 	UserID        DBID
+	WalletID      DBID
 	Address       AddressValue
 	Chain         Chain
 	Username      string
@@ -56,5 +57,5 @@ type ErrUserNotFound struct {
 }
 
 func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, username: %s, authenticator: %s", e.Address, e.UserID, e.Username, e.Authenticator)
+	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s,username: %s, authenticator: %s", e.Address, e.WalletID, e.UserID, e.Username, e.Authenticator)
 }

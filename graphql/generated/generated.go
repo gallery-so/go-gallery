@@ -239,14 +239,14 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserAddress           func(childComplexity int, address persist.AddressValue, authMechanism model.AuthMechanism) int
+		AddUserAddress           func(childComplexity int, address persist.AddressValue, chain persist.Chain, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
-		GetAuthNonce             func(childComplexity int, address persist.AddressValue) int
+		GetAuthNonce             func(childComplexity int, address persist.AddressValue, chain persist.Chain) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses string) int
-		RemoveUserAddresses      func(childComplexity int, addresses []persist.AddressValue) int
+		RemoveUserAddresses      func(childComplexity int, addresses []persist.AddressValue, chains []persist.Chain) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
 		UpdateGalleryCollections func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
@@ -393,8 +393,8 @@ type MembershipOwnerResolver interface {
 	User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error)
 }
 type MutationResolver interface {
-	AddUserAddress(ctx context.Context, address persist.AddressValue, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
-	RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue) (model.RemoveUserAddressesPayloadOrError, error)
+	AddUserAddress(ctx context.Context, address persist.AddressValue, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
+	RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error)
 	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
@@ -403,7 +403,7 @@ type MutationResolver interface {
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
 	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
 	RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error)
-	GetAuthNonce(ctx context.Context, address persist.AddressValue) (model.GetAuthNoncePayloadOrError, error)
+	GetAuthNonce(ctx context.Context, address persist.AddressValue, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 }
@@ -1078,7 +1078,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddUserAddress(childComplexity, args["address"].(persist.AddressValue), args["authMechanism"].(model.AuthMechanism)), true
+		return e.complexity.Mutation.AddUserAddress(childComplexity, args["address"].(persist.AddressValue), args["chain"].(persist.Chain), args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
@@ -1126,7 +1126,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["address"].(persist.AddressValue)), true
+		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["address"].(persist.AddressValue), args["chain"].(persist.Chain)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -1162,7 +1162,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.AddressValue)), true
+		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.AddressValue), args["chains"].([]persist.Chain)), true
 
 	case "Mutation.updateCollectionInfo":
 		if e.complexity.Mutation.UpdateCollectionInfo == nil {
@@ -1801,6 +1801,7 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar AddressValue
+scalar EthereumAddress
 scalar DBID
 
 interface Node {
@@ -1970,8 +1971,8 @@ enum Chain {
   Optimism
 }
 enum WalletType {
-  Default
   EOA
+  GnosisSafe
 }
 
 type Nft implements Node {
@@ -1991,12 +1992,12 @@ type Nft implements Node {
   owner: GalleryUserOrWallet @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: AddressValue
+  contractAddress: Address
   externalUrl: String
   blockNumber: String # source is uint64
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
-  creatorAddress: AddressValue
+  creatorAddress: Address
   openseaCollectionName: String
 }
 
@@ -2040,7 +2041,7 @@ type Gallery implements Node {
 
 type MembershipOwner {
   dbid: DBID!
-  address: AddressValue
+  address: EthereumAddress
   user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
 }
@@ -2274,12 +2275,13 @@ type ErrDoesNotOwnRequiredNFT implements Error {
 }
 
 input AuthMechanism {
-  ethereumEoa: EthereumEoaAuth
+  eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
 }
 
-input EthereumEoaAuth {
+input EoaAuth {
   address: AddressValue!
+  chain: Chain!
   nonce: String!
   signature: String! @scrub
 }
@@ -2314,10 +2316,12 @@ type Mutation {
   # User Mutations
   addUserAddress(
     address: AddressValue!
+    chain: Chain!
     authMechanism: AuthMechanism!
   ): AddUserAddressPayloadOrError @authRequired
   removeUserAddresses(
     addresses: [AddressValue!]!
+    chains: [Chain!]!
   ): RemoveUserAddressesPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
     @authRequired
@@ -2348,7 +2352,10 @@ type Mutation {
   refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
     @authRequired
 
-  getAuthNonce(address: AddressValue!): GetAuthNoncePayloadOrError
+  getAuthNonce(
+    address: AddressValue!
+    chain: Chain!
+  ): GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
@@ -2373,15 +2380,24 @@ func (ec *executionContext) field_Mutation_addUserAddress_args(ctx context.Conte
 		}
 	}
 	args["address"] = arg0
-	var arg1 model.AuthMechanism
-	if tmp, ok := rawArgs["authMechanism"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
-		arg1, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
+	var arg1 persist.Chain
+	if tmp, ok := rawArgs["chain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+		arg1, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["authMechanism"] = arg1
+	args["chain"] = arg1
+	var arg2 model.AuthMechanism
+	if tmp, ok := rawArgs["authMechanism"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
+		arg2, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["authMechanism"] = arg2
 	return args, nil
 }
 
@@ -2442,6 +2458,15 @@ func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context
 		}
 	}
 	args["address"] = arg0
+	var arg1 persist.Chain
+	if tmp, ok := rawArgs["chain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+		arg1, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chain"] = arg1
 	return args, nil
 }
 
@@ -2487,6 +2512,15 @@ func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.
 		}
 	}
 	args["addresses"] = arg0
+	var arg1 []persist.Chain
+	if tmp, ok := rawArgs["chains"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
+		arg1, err = ec.unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chains"] = arg1
 	return args, nil
 }
 
@@ -2878,9 +2912,9 @@ func (ec *executionContext) _Address_chain(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Chain)
+	res := resTmp.(*persist.Chain)
 	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx, field.Selections, res)
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Address_nfts(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
@@ -5373,9 +5407,9 @@ func (ec *executionContext) _MembershipOwner_address(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.AddressValue)
+	res := resTmp.(*persist.EthereumAddress)
 	fc.Result = res
-	return ec.marshalOAddressValue2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, field.Selections, res)
+	return ec.marshalOEthereumAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEthereumAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MembershipOwner_user(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
@@ -5666,7 +5700,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.AddressValue), args["authMechanism"].(model.AuthMechanism))
+			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.AddressValue), args["chain"].(persist.Chain), args["authMechanism"].(model.AuthMechanism))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -5725,7 +5759,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.AddressValue))
+			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.AddressValue), args["chains"].([]persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6255,7 +6289,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["address"].(persist.AddressValue))
+		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["address"].(persist.AddressValue), args["chain"].(persist.Chain))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6604,9 +6638,9 @@ func (ec *executionContext) _Nft_chain(ctx context.Context, field graphql.Collec
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Chain)
+	res := resTmp.(*persist.Chain)
 	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx, field.Selections, res)
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_name(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
@@ -6892,9 +6926,9 @@ func (ec *executionContext) _Nft_contractAddress(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.AddressValue)
+	res := resTmp.(*model.Address)
 	fc.Result = res
-	return ec.marshalOAddressValue2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, field.Selections, res)
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_externalUrl(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
@@ -6988,9 +7022,9 @@ func (ec *executionContext) _Nft_creatorAddress(ctx context.Context, field graph
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.AddressValue)
+	res := resTmp.(*model.Address)
 	fc.Result = res
-	return ec.marshalOAddressValue2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, field.Selections, res)
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_openseaCollectionName(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
@@ -8535,9 +8569,9 @@ func (ec *executionContext) _Wallet_walletType(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.WalletType)
+	res := resTmp.(*persist.WalletType)
 	fc.Result = res
-	return ec.marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWalletType(ctx, field.Selections, res)
+	return ec.marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -9735,11 +9769,11 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
-		case "ethereumEoa":
+		case "eoa":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ethereumEoa"))
-			it.EthereumEoa, err = ec.unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("eoa"))
+			it.Eoa, err = ec.unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -9843,8 +9877,8 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, obj interface{}) (model.EthereumEoaAuth, error) {
-	var it model.EthereumEoaAuth
+func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj interface{}) (model.EoaAuth, error) {
+	var it model.EoaAuth
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -9857,6 +9891,14 @@ func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, o
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
 			it.Address, err = ec.unmarshalNAddressValue2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "chain":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+			it.Chain, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -14019,6 +14061,77 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (persist.Chain, error) {
+	var res persist.Chain
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v persist.Chain) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, v interface{}) ([]persist.Chain, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.Chain, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Chain) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
 	res, err := ec.unmarshalInputCollectionLayoutInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -14522,16 +14635,16 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx context.Context, v interface{}) (*model.Chain, error) {
+func (ec *executionContext) unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (*persist.Chain, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(model.Chain)
+	var res = new(persist.Chain)
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx context.Context, sel ast.SelectionSet, v *model.Chain) graphql.Marshaler {
+func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v *persist.Chain) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -14693,12 +14806,29 @@ func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcom�
 	return ec._DeleteCollectionPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx context.Context, v interface{}) (*model.EthereumEoaAuth, error) {
+func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx context.Context, v interface{}) (*model.EoaAuth, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := ec.unmarshalInputEthereumEoaAuth(ctx, v)
+	res, err := ec.unmarshalInputEoaAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOEthereumAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEthereumAddress(ctx context.Context, v interface{}) (*persist.EthereumAddress, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.EthereumAddress(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOEthereumAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEthereumAddress(ctx context.Context, sel ast.SelectionSet, v *persist.EthereumAddress) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalString(string(*v))
+	return res
 }
 
 func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v []*model.Gallery) graphql.Marshaler {
@@ -15313,16 +15443,16 @@ func (ec *executionContext) marshalOWallet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgal
 	return ec._Wallet(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWalletType(ctx context.Context, v interface{}) (*model.WalletType, error) {
+func (ec *executionContext) unmarshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx context.Context, v interface{}) (*persist.WalletType, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(model.WalletType)
+	var res = new(persist.WalletType)
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWalletType(ctx context.Context, sel ast.SelectionSet, v *model.WalletType) graphql.Marshaler {
+func (ec *executionContext) marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx context.Context, sel ast.SelectionSet, v *persist.WalletType) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

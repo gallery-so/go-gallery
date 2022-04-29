@@ -365,8 +365,8 @@ func tokensToTokensGallery(tokens []persist.Token) []persist.TokenGallery {
 	for i, token := range tokens {
 		res[i] = persist.TokenGallery{
 			TokenID:          token.TokenID,
-			ContractAddress:  persist.Address{Address: persist.AddressValue(token.ContractAddress.String()), Chain: persist.ChainETH},
-			OwnerAddress:     persist.Address{Address: persist.AddressValue(token.OwnerAddress.String()), Chain: persist.ChainETH},
+			ContractAddress:  persist.Address{AddressValue: persist.AddressValue(token.ContractAddress.String()), Chain: persist.ChainETH},
+			OwnerAddress:     persist.Address{AddressValue: persist.AddressValue(token.OwnerAddress.String()), Chain: persist.ChainETH},
 			TokenURI:         token.TokenURI,
 			Media:            token.Media,
 			TokenType:        token.TokenType,
@@ -385,7 +385,7 @@ func tokensToTokensGallery(tokens []persist.Token) []persist.TokenGallery {
 
 func contractToContractGallery(contract persist.Contract) persist.ContractGallery {
 	return persist.ContractGallery{
-		Address:        persist.Address{Address: persist.AddressValue(contract.Address.String()), Chain: persist.ChainETH},
+		Address:        persist.Address{AddressValue: persist.AddressValue(contract.Address.String()), Chain: persist.ChainETH},
 		Name:           contract.Name,
 		Symbol:         contract.Symbol,
 		CreatorAddress: contract.CreatorAddress,
@@ -396,7 +396,7 @@ func ethereumAddressAtBlockToGallery(addrs []persist.EthereumAddressAtBlock) []p
 	res := make([]persist.AddressAtBlock, len(addrs))
 	for i, addr := range addrs {
 		res[i] = persist.AddressAtBlock{
-			Address: persist.Address{Address: persist.AddressValue(addr.Address.String()), Chain: persist.ChainETH},
+			Address: persist.Address{AddressValue: persist.AddressValue(addr.Address.String()), Chain: persist.ChainETH},
 			Block:   addr.Block,
 		}
 	}

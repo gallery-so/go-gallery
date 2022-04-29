@@ -16,12 +16,17 @@ type Address struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Address AddressValue `json:"address"`
-	Chain   Chain        `json:"chain"`
+	AddressValue AddressValue `json:"address"`
+	Chain        Chain        `json:"chain"`
 }
 
 // AddressValue represents the value of an address
 type AddressValue string
+
+type AddressDetails struct {
+	AddressValue AddressValue `json:"address"`
+	Chain        Chain        `json:"chain"`
+}
 
 // AddressRepository represents a repository for interacting with persisted wallets
 type AddressRepository interface {
@@ -37,7 +42,7 @@ type ErrAddressNotFoundByDetails struct {
 }
 
 func (a Address) String() string {
-	return string(a.Address)
+	return string(a.AddressValue)
 }
 
 // ToHexAddress returns the address as a hex byte array (ethereum based)

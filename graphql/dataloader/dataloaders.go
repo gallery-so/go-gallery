@@ -1,5 +1,5 @@
 //go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Gallery
 //go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Gallery
@@ -7,8 +7,13 @@
 //go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Collection
 //go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Nft
 //go:generate go run github.com/vektah/dataloaden NftsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Nft
-//go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/db/sqlc.Nft
+//go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Nft
 //go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Membership
+//go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden AddressLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Address
+//go:generate go run github.com/vektah/dataloaden AddressLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Address
 
 package dataloader
 
@@ -44,6 +49,11 @@ type Loaders struct {
 	NftsByOwnerAddress       NftsLoaderByAddress
 	NftsByCollectionId       NftsLoaderByID
 	MembershipByMembershipId MembershipLoaderById
+	WalletByWalletId         WalletLoaderById
+	WalletByAddress          WalletLoaderByAddress
+	WalletByAddressDetails   WalletLoaderByAddressDetails
+	AddressByAddressId       AddressLoaderByID
+	AddressByAddressDetails  AddressLoaderByAddressDetails
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -120,6 +130,7 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		wait:     defaultWaitTime,
 		fetch:    loadMembershipByMembershipId(ctx, loaders, q),
 	}
+	// TODO new loaders
 
 	return loaders
 }
@@ -209,7 +220,7 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 			if err == nil {
 				loaders.UserByUsername.Prime(user.Username.String, user)
 				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address, user)
+					loaders.UserByAddress.Prime(address.ID, user)
 				}
 			}
 
@@ -237,7 +248,7 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			if err == nil {
 				loaders.UserByUserId.Prime(user.ID, user)
 				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address, user)
+					loaders.UserByAddress.Prime(address.ID, user)
 				}
 			}
 
@@ -248,8 +259,8 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.EthereumAddress) ([]sqlc.User, []error) {
-	return func(addresses []persist.EthereumAddress) ([]sqlc.User, []error) {
+func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
+	return func(addresses []persist.DBID) ([]sqlc.User, []error) {
 		users := make([]sqlc.User, len(addresses))
 		errors := make([]error, len(addresses))
 
@@ -263,7 +274,7 @@ func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) f
 
 		b.QueryRow(func(i int, user sqlc.User, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{Address: addresses[i].String()}
+				err = persist.ErrUserNotFound{WalletID: addresses[i]}
 			}
 
 			// Add results to other loaders' caches
@@ -426,8 +437,8 @@ func loadNftByNftId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 	}
 }
 
-func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.EthereumAddress) ([][]sqlc.Nft, []error) {
-	return func(addresses []persist.EthereumAddress) ([][]sqlc.Nft, []error) {
+func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Nft, []error) {
+	return func(addresses []persist.DBID) ([][]sqlc.Nft, []error) {
 		nfts := make([][]sqlc.Nft, len(addresses))
 		errors := make([]error, len(addresses))
 

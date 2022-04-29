@@ -77,7 +77,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
 
-	ethNonceAuth := func(address persist.EthereumAddress, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
+	ethNonceAuth := func(address persist.AddressValue, chain persist.Chain, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
 		authenticator := auth.NonceAuthenticator{
 			Address:    address,
 			Nonce:      nonce,
@@ -90,13 +90,13 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 		return authenticator
 	}
 
-	if m.EthereumEoa != nil {
-		return ethNonceAuth(m.EthereumEoa.Address, m.EthereumEoa.Nonce, m.EthereumEoa.Signature, auth.WalletTypeEOA), nil
+	if m.Eoa != nil {
+		return ethNonceAuth(m.Eoa.Address, m.Eoa.Chain, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return ethNonceAuth(m.GnosisSafe.Address, m.GnosisSafe.Nonce, "0x", auth.WalletTypeGnosis), nil
+		return ethNonceAuth(m.GnosisSafe.Address, persist.ChainETH, m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -122,7 +122,7 @@ func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.
 	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, address persist.EthereumAddress) (*model.GalleryUser, error) {
+func resolveGalleryUserByAddress(ctx context.Context, address persist.DBID) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err != nil {
@@ -223,7 +223,7 @@ func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (model.Gall
 	return resolveGalleryUserOrWalletByAddress(ctx, nft.OwnerAddress)
 }
 
-func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.EthereumAddress) (model.GalleryUserOrWallet, error) {
+func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.DBID) (model.GalleryUserOrWallet, error) {
 	owner, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
 
 	if err == nil {
@@ -237,10 +237,10 @@ func resolveGalleryUserOrWalletByAddress(ctx context.Context, address persist.Et
 	return nil, err
 }
 
-func resolveWalletByAddress(ctx context.Context, address persist.EthereumAddress) (*model.Wallet, error) {
+func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.Wallet, error) {
+
 	wallet := model.Wallet{
-		Address: &address,
-		Nfts:    nil, // handled by dedicated resolver
+		// TODO
 	}
 
 	return &wallet, nil
@@ -306,10 +306,16 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 }
 
-func addressToModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
+func addressToModel(ctx context.Context, address persist.Wallet) *model.Wallet {
 	return &model.Wallet{
-		Address: &address,
-		Nfts:    nil, // handled by dedicated resolver
+		Dbid:       address.ID,
+		WalletType: &address.WalletType,
+		Address: &model.Address{
+			Dbid:    address.Address.ID,
+			Address: &address.Address.AddressValue,
+			Chain:   &address.Address.Chain,
+			Nfts:    nil, // handled by dedicated resolver
+		},
 	}
 }
 
@@ -367,7 +373,6 @@ func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.
 	for i, nft := range membershipOwner.PreviewNFTs {
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
-
 	return &model.MembershipOwner{
 		Dbid:        membershipOwner.UserID,
 		Address:     &membershipOwner.Address,
@@ -377,7 +382,7 @@ func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.
 }
 
 func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
-	chainEthereum := model.ChainEthereum
+	chainEthereum := persist.ChainETH
 
 	return &model.Nft{
 		Dbid:             nft.ID,
@@ -395,12 +400,12 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  &nft.Contract.ContractAddress,
+		ContractAddress:  nil, // handled by dedicated resolver
 		ExternalURL:      &nft.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
-		CreatorAddress:        &nft.CreatorAddress,
+		CreatorAddress:        nil, // handled by dedicated resolver
 		OpenseaCollectionName: &nft.TokenCollectionName.String,
 	}
 }

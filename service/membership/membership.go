@@ -393,7 +393,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	}
 	logrus.Infof("Fetching membership tier: %s", id)
 
-	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address{Address: persist.AddressValue(PremiumCards), Chain: persist.ChainETH}, -1, 0)
+	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address{AddressValue: persist.AddressValue(PremiumCards), Chain: persist.ChainETH}, -1, 0)
 	if err != nil || len(tokens) == 0 {
 		logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 		return tier, nil
@@ -412,7 +412,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			membershipOwner := fillMembershipOwnerToken(ctx, persist.EthereumAddress(token.OwnerAddress.Address), id, ethClient, userRepository, galleryRepository)
+			membershipOwner := fillMembershipOwnerToken(ctx, persist.EthereumAddress(token.OwnerAddress.AddressValue), id, ethClient, userRepository, galleryRepository)
 			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
 				ownersChan <- membershipOwner
 			} else {

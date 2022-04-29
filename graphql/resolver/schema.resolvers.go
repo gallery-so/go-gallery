@@ -78,7 +78,7 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.AddressValue, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.AddressValue, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(authMechanism)
@@ -86,7 +86,7 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 		return nil, err
 	}
 
-	err = api.User.AddUserAddress(ctx, address, authenticator)
+	err = api.User.AddUserAddress(ctx, address, chain, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +98,10 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.User.RemoveUserAddresses(ctx, addresses)
+	err := api.User.RemoveUserAddresses(ctx, addresses, chains)
 	if err != nil {
 		return nil, err
 	}
@@ -284,11 +284,11 @@ func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses str
 	return output, nil
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.AddressValue) (model.GetAuthNoncePayloadOrError, error) {
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.AddressValue, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error) {
 	gc := util.GinContextFromContext(ctx)
 
 	authed := auth.GetUserAuthedFromCtx(gc)
-	output, err := auth.GetAuthNonce(gc, address, authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.EthClient)
+	output, err := auth.GetAuthNonce(gc, address, chain, authed, r.Repos.UserRepository, r.Repos.NonceRepository, r.Repos.WalletRepository, r.EthClient)
 
 	if err != nil {
 		return nil, err

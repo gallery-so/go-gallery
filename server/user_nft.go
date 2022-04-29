@@ -49,7 +49,7 @@ func removeAddresses(userRepository persist.UserRepository, walletRepo persist.W
 			return
 		}
 
-		err := user.RemoveAddressesFromUser(c, userID, input.Addresses, userRepository, walletRepo)
+		err := user.RemoveAddressesFromUser(c, userID, input.Addresses, input.Chains, userRepository, walletRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

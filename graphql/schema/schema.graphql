@@ -33,6 +33,7 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar AddressValue
+scalar EthereumAddress
 scalar DBID
 
 interface Node {
@@ -202,8 +203,8 @@ enum Chain {
   Optimism
 }
 enum WalletType {
-  Default
   EOA
+  GnosisSafe
 }
 
 type Nft implements Node {
@@ -223,12 +224,12 @@ type Nft implements Node {
   owner: GalleryUserOrWallet @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: AddressValue
+  contractAddress: Address
   externalUrl: String
   blockNumber: String # source is uint64
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
-  creatorAddress: AddressValue
+  creatorAddress: Address
   openseaCollectionName: String
 }
 
@@ -272,7 +273,7 @@ type Gallery implements Node {
 
 type MembershipOwner {
   dbid: DBID!
-  address: AddressValue
+  address: EthereumAddress
   user: GalleryUser @goField(forceResolver: true)
   previewNfts: [String]
 }
@@ -506,12 +507,13 @@ type ErrDoesNotOwnRequiredNFT implements Error {
 }
 
 input AuthMechanism {
-  ethereumEoa: EthereumEoaAuth
+  eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
 }
 
-input EthereumEoaAuth {
+input EoaAuth {
   address: AddressValue!
+  chain: Chain!
   nonce: String!
   signature: String! @scrub
 }
@@ -546,10 +548,12 @@ type Mutation {
   # User Mutations
   addUserAddress(
     address: AddressValue!
+    chain: Chain!
     authMechanism: AuthMechanism!
   ): AddUserAddressPayloadOrError @authRequired
   removeUserAddresses(
     addresses: [AddressValue!]!
+    chains: [Chain!]!
   ): RemoveUserAddressesPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
     @authRequired
@@ -580,7 +584,10 @@ type Mutation {
   refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
     @authRequired
 
-  getAuthNonce(address: AddressValue!): GetAuthNoncePayloadOrError
+  getAuthNonce(
+    address: AddressValue!
+    chain: Chain!
+  ): GetAuthNoncePayloadOrError
 
   createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError

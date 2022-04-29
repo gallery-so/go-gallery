@@ -326,7 +326,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			continue
 		}
 		var contractAddr persist.Address
-		if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddr.Address, &contractAddr.Chain); err != nil {
+		if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddr.AddressValue, &contractAddr.Chain); err != nil {
 			return err
 		}
 		for _, ownership := range token.OwnershipHistory {
@@ -344,7 +344,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
 			var contractAddress persist.Address
-			if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddress.Address, &contractAddress.Chain); err != nil {
+			if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddress.AddressValue, &contractAddress.Chain); err != nil {
 				return err
 			}
 			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(contractAddress, token.TokenID))

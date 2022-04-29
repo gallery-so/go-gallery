@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -297,7 +298,7 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
-	return string(c), nil
+	return c, nil
 }
 
 // Scan implements the sql.Scanner interface for the Chain type
@@ -308,6 +309,22 @@ func (c *Chain) Scan(src interface{}) error {
 	}
 	*c = Chain(src.(int64))
 	return nil
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (c *Chain) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(int)
+	if !ok {
+		return fmt.Errorf("Chain must be an int")
+	}
+
+	*c = Chain(n)
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (c Chain) MarshalGQL(w io.Writer) {
+	w.Write([]byte{uint8(c)})
 }
 
 // URL turns a token's URI into a URL
@@ -664,7 +681,7 @@ func normalizeAddress(address string) string {
 func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
 	result := make([]EthereumAddress, len(pWallets))
 	for i, wallet := range pWallets {
-		result[i] = EthereumAddress(wallet.Address.Address)
+		result[i] = EthereumAddress(wallet.Address.AddressValue)
 	}
 	return result
 }

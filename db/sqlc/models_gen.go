@@ -24,6 +24,16 @@ type Access struct {
 	IsAdmin             sql.NullBool
 }
 
+type Address struct {
+	ID           persist.DBID
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	Deleted      bool
+	Version      sql.NullInt32
+	AddressValue persist.AddressValue
+	Chain        persist.Chain
+}
+
 type Backup struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -74,15 +84,16 @@ type CollectionsV2 struct {
 }
 
 type Contract struct {
-	ID          persist.DBID
-	Deleted     bool
-	Version     sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Name        sql.NullString
-	Symbol      sql.NullString
-	Address     sql.NullString
-	LatestBlock sql.NullInt64
+	ID             persist.DBID
+	Deleted        bool
+	Version        sql.NullInt32
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	Name           sql.NullString
+	Symbol         sql.NullString
+	Address        sql.NullString
+	CreatorAddress persist.DBID
+	LatestBlock    sql.NullInt64
 }
 
 type Feature struct {
@@ -147,9 +158,9 @@ type Nft struct {
 	Description          sql.NullString
 	CollectorsNote       sql.NullString
 	ExternalUrl          sql.NullString
-	CreatorAddress       persist.EthereumAddress
+	CreatorAddress       persist.DBID
 	CreatorName          sql.NullString
-	OwnerAddress         persist.EthereumAddress
+	OwnerAddress         persist.DBID
 	MultipleOwners       sql.NullBool
 	Contract             persist.NFTContract
 	OpenseaID            sql.NullInt64
@@ -199,7 +210,7 @@ type Token struct {
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
 	Chain            sql.NullString
-	OwnerAddress     persist.EthereumAddress
+	OwnerAddress     persist.DBID
 	TokenUri         sql.NullString
 	TokenType        sql.NullString
 	TokenID          sql.NullString
@@ -218,7 +229,7 @@ type User struct {
 	CreatedAt          time.Time
 	Username           sql.NullString
 	UsernameIdempotent sql.NullString
-	Addresses          persist.EthereumAddressList
+	Addresses          persist.WalletList
 	Bio                sql.NullString
 }
 
@@ -230,4 +241,14 @@ type UserEvent struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Data        pgtype.JSONB
+}
+
+type Wallet struct {
+	ID          persist.DBID
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
+	Version     sql.NullInt32
+	Address     persist.DBID
+	WalletType  persist.WalletType
 }

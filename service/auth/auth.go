@@ -529,7 +529,7 @@ func toAuthWallets(pWallets []persist.Wallet) []Wallet {
 	res := make([]Wallet, len(pWallets))
 	for i, w := range pWallets {
 		res[i] = Wallet{
-			Address:    w.Address.Address,
+			Address:    w.Address.AddressValue,
 			Chain:      w.Address.Chain,
 			WalletType: w.WalletType,
 		}

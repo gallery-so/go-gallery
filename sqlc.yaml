@@ -15,7 +15,7 @@ overrides:
 
 # Users
   - column: "users.addresses"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.AddressList"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
 
 # Galleries
   - column: "galleries.collections"
@@ -34,6 +34,17 @@ overrides:
 # Membership
   - column: "membership.owners"
     go_type: "github.com/mikeydub/go-gallery/service/persist.MembershipOwnerList"
+# Wallet
+  - column: "wallets.address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "wallets.wallet_type"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.WalletType"
+  
+# Address
+  - column: "addresses.address_value"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.AddressValue"
+  - column: "addresses.chain"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
 
 # Wildcards
 # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
@@ -42,6 +53,6 @@ overrides:
   - column: "*.owner_user_id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "*.owner_address"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "*.creator_address"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"

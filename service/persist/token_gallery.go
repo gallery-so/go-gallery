@@ -127,7 +127,7 @@ func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdenti
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%d", t.ContractAddress.Address, t.TokenID, t.ContractAddress.Chain)
+	return fmt.Sprintf("%s+%s+%d", t.ContractAddress.AddressValue, t.TokenID, t.ContractAddress.Chain)
 }
 
 // Value implements the driver.Valuer interface
@@ -152,8 +152,8 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 	*t = TokenIdentifiers{
 		TokenID: TokenID(res[1]),
 		ContractAddress: Address{
-			Address: AddressValue(res[0]),
-			Chain:   Chain(chain),
+			AddressValue: AddressValue(res[0]),
+			Chain:        Chain(chain),
 		},
 	}
 	return nil

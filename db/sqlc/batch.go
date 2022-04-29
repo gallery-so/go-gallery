@@ -11,6 +11,108 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const getAddressByDetailsBatch = `-- name: GetAddressByDetailsBatch :batchone
+SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false
+`
+
+type GetAddressByDetailsBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetAddressByDetailsBatchParams struct {
+	AddressValue persist.AddressValue
+	Chain        persist.Chain
+}
+
+func (q *Queries) GetAddressByDetailsBatch(ctx context.Context, arg []GetAddressByDetailsBatchParams) *GetAddressByDetailsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.AddressValue,
+			a.Chain,
+		}
+		batch.Queue(getAddressByDetailsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAddressByDetailsBatchBatchResults{br, 0}
+}
+
+func (b *GetAddressByDetailsBatchBatchResults) QueryRow(f func(int, Address, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Address
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.AddressValue,
+			&i.Chain,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetAddressByDetailsBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getAddressByIDBatch = `-- name: GetAddressByIDBatch :batchone
+SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE id = $1 AND deleted = false
+`
+
+type GetAddressByIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetAddressByIDBatch(ctx context.Context, id []persist.DBID) *GetAddressByIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getAddressByIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAddressByIDBatchBatchResults{br, 0}
+}
+
+func (b *GetAddressByIDBatchBatchResults) QueryRow(f func(int, Address, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Address
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.AddressValue,
+			&i.Chain,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetAddressByIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getCollectionByIdBatch = `-- name: GetCollectionByIdBatch :batchone
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout FROM collections WHERE id = $1 AND deleted = false
 `
@@ -480,7 +582,7 @@ type GetNftsByOwnerAddressBatchBatchResults struct {
 	ind int
 }
 
-func (q *Queries) GetNftsByOwnerAddressBatch(ctx context.Context, ownerAddress []persist.EthereumAddress) *GetNftsByOwnerAddressBatchBatchResults {
+func (q *Queries) GetNftsByOwnerAddressBatch(ctx context.Context, ownerAddress []persist.DBID) *GetNftsByOwnerAddressBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range ownerAddress {
 		vals := []interface{}{
@@ -692,5 +794,53 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 }
 
 func (b *GetUserByUsernameBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getWalletByIDBatch = `-- name: GetWalletByIDBatch :batchone
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false
+`
+
+type GetWalletByIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetWalletByIDBatch(ctx context.Context, id []persist.DBID) *GetWalletByIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getWalletByIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetWalletByIDBatchBatchResults{br, 0}
+}
+
+func (b *GetWalletByIDBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Wallet
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetWalletByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }

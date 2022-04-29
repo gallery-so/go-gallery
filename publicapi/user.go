@@ -63,7 +63,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
-func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.EthereumAddress) (*sqlc.User, error) {
+func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.DBID) (*sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address": {address, "required,eth_addr"},
@@ -102,7 +102,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.AddressVa
 	return nil
 }
 
-func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []string, chains []persist.Chain) error {
+func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue, chains []persist.Chain) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"addresses": {addresses, "required,unique,dive,required,eth_addr"},

@@ -81,3 +81,24 @@ SELECT * FROM membership WHERE id = $1 AND deleted = false;
 
 -- name: GetMembershipByMembershipIdBatch :batchone
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
+
+-- name: GetWalletByID :one
+SELECT * FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false;
+
+-- name: GetWalletByIDBatch :batchone
+SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false;
+
+-- name: GetWalletByAddress :one
+SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
+
+-- name: GetAddressByID :one
+SELECT * FROM addresses WHERE id = $1 AND deleted = false;
+
+-- name: GetAddressByIDBatch :batchone
+SELECT * FROM addresses WHERE id = $1 AND deleted = false;
+
+-- name: GetAddressByDetails :one
+SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;
+
+-- name: GetAddressByDetailsBatch :batchone
+SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;

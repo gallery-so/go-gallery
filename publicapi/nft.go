@@ -56,7 +56,7 @@ func (api NftAPI) GetNftsByCollectionId(ctx context.Context, collectionID persis
 	return nfts, nil
 }
 
-func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.EthereumAddress) ([]sqlc.Nft, error) {
+func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.DBID) ([]sqlc.Nft, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"ownerAddress": {ownerAddress, "required,eth_addr"},
