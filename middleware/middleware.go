@@ -219,7 +219,6 @@ func GinContextToContext() gin.HandlerFunc {
 
 func Tracing() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: TransactionName should probably be overwritten in the GraphQL handler with an operation name
 		// Taken from the HTTP handler implementation in sentryhttp.go.
 		span := sentry.StartSpan(c.Request.Context(), "gin.server",
 			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),
