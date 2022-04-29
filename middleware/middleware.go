@@ -221,12 +221,12 @@ func Tracing() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: TransactionName should probably be overwritten in the GraphQL handler with an operation name
 		// Taken from the HTTP handler implementation in sentryhttp.go.
-		span := sentry.StartSpan(c, "gin.server",
+		span := sentry.StartSpan(c.Request.Context(), "gin.server",
 			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),
 			sentry.ContinueFromRequest(c.Request),
 		)
 
-		loggingCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
+		loggingCtx := logger.NewContextWithFields(span.Context(), logrus.Fields{
 			"trace-id": span.TraceID,
 		})
 

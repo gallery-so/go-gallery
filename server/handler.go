@@ -57,6 +57,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 
 	h.AroundOperations(graphql.RequestTracer())
 	h.AroundResponses(graphql.ResponseTracer())
+	h.AroundFields(graphql.FieldTracer())
 
 	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
 	h.AroundResponses(graphql.ResponseLogger())
