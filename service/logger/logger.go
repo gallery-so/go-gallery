@@ -18,8 +18,8 @@ func NewContextWithFields(parent context.Context, fields logrus.Fields) context.
 
 func NewContextWithSpan(parent context.Context, span *sentry.Span) context.Context {
 	return NewContextWithFields(parent, logrus.Fields{
-		"span-id":        span.SpanID,
-		"parent-span-id": span.ParentSpanID,
+		"spanID":       span.SpanID,
+		"parentSpanID": span.ParentSpanID,
 	})
 }
 

@@ -227,7 +227,7 @@ func Tracing() gin.HandlerFunc {
 		)
 
 		loggingCtx := logger.NewContextWithFields(span.Context(), logrus.Fields{
-			"trace-id": span.TraceID,
+			"traceID": span.TraceID,
 		})
 
 		c.Request = c.Request.WithContext(loggingCtx)
