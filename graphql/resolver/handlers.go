@@ -153,7 +153,8 @@ func RequestTracer() func(ctx context.Context, next gqlgen.OperationHandler) gql
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 		oc := gqlgen.GetOperationContext(ctx)
 
-		span := sentry.StartSpan(ctx, oc.Operation.Name)
+		span := sentry.StartSpan(ctx, "gql.request")
+		span.Description = oc.Operation.Name
 		result := next(logger.NewContextWithSpan(span.Context(), span))
 		span.Finish()
 
@@ -165,7 +166,8 @@ func ResponseTracer() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 		oc := gqlgen.GetOperationContext(ctx)
 
-		span := sentry.StartSpan(ctx, oc.Operation.Name)
+		span := sentry.StartSpan(ctx, "gql.response")
+		span.Description = oc.Operation.Name
 		result := next(logger.NewContextWithSpan(span.Context(), span))
 		span.Finish()
 
@@ -182,7 +184,8 @@ func FieldTracer() func(ctx context.Context, next gqlgen.Resolver) (res interfac
 			return next(ctx)
 		}
 
-		span := sentry.StartSpan(ctx, fc.Field.Name)
+		span := sentry.StartSpan(ctx, "gql.resolve")
+		span.Description = fc.Field.Name
 		res, err = next(logger.NewContextWithSpan(span.Context(), span))
 		span.Finish()
 
