@@ -123,6 +123,10 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		span.Data["sql"] = sqlStr
 	}
 
+	if rows, ok := data["rowCount"]; ok {
+		span.Data["rowCount"] = rows
+	}
+
 	span.Data["logMessage"] = msg
 
 	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.

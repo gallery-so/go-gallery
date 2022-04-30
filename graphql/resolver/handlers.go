@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	gqlgen "github.com/99designs/gqlgen/graphql"
@@ -203,15 +202,6 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 
 		response := next(ctx)
 
-		var message string
-		messageBytes, err := json.Marshal(&response.Data)
-
-		if err != nil {
-			message = "failed to marshal json.RawMessage; unable to log GraphQL response"
-		} else {
-			message = string(messageBytes)
-		}
-
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
 
@@ -228,14 +218,27 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 				"authenticated": userId != "",
 				"userId":        userId,
 				"gqlRequestId":  requestID,
-				"zzz_response":  message,
+				"zzz_response":  &response.Data,
 			}).Info("Sending GraphQL response")
 		}
 
 		if span != nil {
-			addEventDataToSpan(map[string]interface{}{
-				"response": message,
-			}, span)
+			eventData := make(map[string]interface{})
+
+			// The max payload size for a Sentry event is 200kB, and if we exceed that
+			// size, the event will be dropped entirely. Send the message if it's under
+			// our limit (192kB to allow for some wiggle room and other data). Note:
+			// requests are typically compressed, and the 200kB limitation applies to
+			// the compressed size, so we could probably get away with a significantly
+			// higher limit...but we really don't want to risk dropping events.
+			const maxBytes = 192 * 1024
+			if len(response.Data) <= maxBytes {
+				eventData["response"] = &response.Data
+			} else {
+				eventData["response"] = fmt.Sprintf("response too large to send with Sentry event (%d bytes)", len(response.Data))
+			}
+
+			addEventDataToSpan(eventData, span)
 
 			span.Finish()
 		}
@@ -277,10 +280,21 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 		result := next(ctx)
 
 		if span != nil {
-			addEventDataToSpan(map[string]interface{}{
+			eventData := map[string]interface{}{
 				"scrubbedVariables": scrubbedVariables,
-				"scrubbedQuery":     scrubbedQuery,
-			}, span)
+			}
+
+			// As with ResponseReporter above, we're being careful about how much data we attach so Sentry
+			// doesn't drop our event. The 100kB maxBytes here should leave plenty of room for scrubbedVariables
+			// data, and our queries should rarely (if ever) exceed 100kB.
+			const maxBytes = 100 * 1024
+			if len(scrubbedQuery) <= maxBytes {
+				eventData["scrubbedQuery"] = scrubbedQuery
+			} else {
+				eventData["scrubbedQuery"] = fmt.Sprintf("scrubbedQuery too large to send with Sentry event (%d bytes)", len(scrubbedQuery))
+			}
+
+			addEventDataToSpan(eventData, span)
 
 			span.Finish()
 		}
