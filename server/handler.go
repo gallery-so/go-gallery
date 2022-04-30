@@ -55,16 +55,13 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
 
-	h.AroundOperations(graphql.RequestTracer())
-	h.AroundResponses(graphql.ResponseTracer())
-	h.AroundFields(graphql.FieldTracer())
-
 	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
 	// It might be worth logging top-level queries and mutations in a single log line, though.
-	if viper.GetString("ENV") != "local" {
-		h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
-		h.AroundResponses(graphql.ResponseLogger())
-	}
+	enableLogging := viper.GetString("ENV") != "local"
+
+	h.AroundOperations(graphql.RequestReporter(schema.Schema(), enableLogging, true))
+	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))
+	h.AroundFields(graphql.FieldReporter(true))
 
 	h.AroundFields(graphql.RemapErrors)
 	h.AroundResponses(graphql.AddErrorsToGin)

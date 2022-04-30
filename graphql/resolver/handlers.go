@@ -29,6 +29,16 @@ const scrubDirectiveName = "scrub"
 
 const gqlRequestIdContextKey = "graphql.gqlRequestId"
 
+func addEventDataToSpan(eventData map[string]interface{}, span *sentry.Span) {
+	if span.Data == nil {
+		span.Data = make(map[string]interface{})
+	}
+
+	for k, v := range eventData {
+		span.Data[k] = v
+	}
+}
+
 func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	response := next(ctx)
 	gc := util.GinContextFromContext(ctx)
@@ -108,7 +118,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		if viper.GetBool("REQUIRE_NFTS") {
 			span := sentry.StartSpan(ctx, "gql.directive")
 			defer span.Finish()
-			
+
 			span.Description = "REQUIRE_NFTS"
 
 			spanCtx := logger.NewContextWithSpan(span.Context(), span)
@@ -155,52 +165,42 @@ func RestrictEnvironmentDirectiveHandler() func(ctx context.Context, obj interfa
 	}
 }
 
-func RequestTracer() func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-		oc := gqlgen.GetOperationContext(ctx)
-
-		span := sentry.StartSpan(ctx, "gql.request")
-		span.Description = oc.Operation.Name
-		result := next(logger.NewContextWithSpan(span.Context(), span))
-		span.Finish()
-
-		return result
-	}
-}
-
-func ResponseTracer() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-		oc := gqlgen.GetOperationContext(ctx)
-
-		span := sentry.StartSpan(ctx, "gql.response")
-		span.Description = oc.Operation.Name
-		result := next(logger.NewContextWithSpan(span.Context(), span))
-		span.Finish()
-
-		return result
-	}
-}
-
-func FieldTracer() func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
+func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
 	return func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
-		fc := gqlgen.GetFieldContext(ctx)
+		var span *sentry.Span
 
-		// Only trace resolvers
-		if !fc.IsResolver {
-			return next(ctx)
+		if trace {
+			fc := gqlgen.GetFieldContext(ctx)
+
+			// Only trace resolvers
+			if fc.IsResolver {
+				span = sentry.StartSpan(ctx, "gql.resolve")
+				span.Description = fc.Field.Name
+				ctx = logger.NewContextWithSpan(span.Context(), span)
+			}
 		}
 
-		span := sentry.StartSpan(ctx, "gql.resolve")
-		span.Description = fc.Field.Name
-		res, err = next(logger.NewContextWithSpan(span.Context(), span))
-		span.Finish()
+		res, err = next(ctx)
+
+		if span != nil {
+			span.Finish()
+		}
 
 		return res, err
 	}
 }
 
-func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		var span *sentry.Span
+
+		if trace {
+			oc := gqlgen.GetOperationContext(ctx)
+			span = sentry.StartSpan(ctx, "gql.response")
+			span.Description = oc.Operation.Name
+			ctx = logger.NewContextWithSpan(span.Context(), span)
+		}
+
 		response := next(ctx)
 
 		var message string
@@ -220,43 +220,72 @@ func ResponseLogger() func(ctx context.Context, next gqlgen.ResponseHandler) *gq
 		// requests and responses into the same transaction.
 		requestID := ctx.Value(gqlRequestIdContextKey)
 
-		// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-		// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-		// limit is 256kb per entry), we want to make sure all of our fields are visible.
-		logger.For(ctx).WithFields(logrus.Fields{
-			"authenticated": userId != "",
-			"userId":        userId,
-			"gqlRequestId":  requestID,
-			"zzz_response":  message,
-		}).Info("Sending GraphQL response")
+		if log {
+			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
+			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
+			// limit is 256kb per entry), we want to make sure all of our fields are visible.
+			logger.For(ctx).WithFields(logrus.Fields{
+				"authenticated": userId != "",
+				"userId":        userId,
+				"gqlRequestId":  requestID,
+				"zzz_response":  message,
+			}).Info("Sending GraphQL response")
+		}
+
+		if span != nil {
+			addEventDataToSpan(map[string]interface{}{
+				"response": message,
+			}, span)
+
+			span.Finish()
+		}
 
 		return response
 	}
 }
 
-func ScrubbedRequestLogger(schema *ast.Schema) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
+func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-		requestID := ksuid.New().String()
+		var span *sentry.Span
+		oc := gqlgen.GetOperationContext(ctx)
+
+		if trace {
+			span = sentry.StartSpan(ctx, "gql.request")
+			span.Description = oc.Operation.Name
+			ctx = logger.NewContextWithSpan(span.Context(), span)
+		}
+
+		gqlRequestId := ksuid.New().String()
 
 		gc := util.GinContextFromContext(ctx)
 		userId := auth.GetUserIDFromCtx(gc)
-		oc := gqlgen.GetOperationContext(ctx)
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(schema, oc.Doc, oc.RawQuery, oc.Variables)
 
-		// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-		// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-		// limit is 256kb per entry), we want to make sure all of our fields are visible.
-		logger.For(ctx).WithFields(logrus.Fields{
-			"authenticated":     userId != "",
-			"userId":            userId,
-			"gqlRequestId":      requestID,
-			"scrubbedVariables": scrubbedVariables,
-			"zzz_scrubbedQuery": scrubbedQuery,
-		}).Info("Received GraphQL query")
+		if log {
+			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
+			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
+			// limit is 256kb per entry), we want to make sure all of our fields are visible.
+			logger.For(ctx).WithFields(logrus.Fields{
+				"authenticated":     userId != "",
+				"userId":            userId,
+				"gqlRequestId":      gqlRequestId,
+				"scrubbedVariables": scrubbedVariables,
+				"zzz_scrubbedQuery": scrubbedQuery,
+			}).Info("Received GraphQL query")
+		}
 
-		// Add the requestID to the context so the ResponseLogger can find it
-		requestCtx := context.WithValue(ctx, gqlRequestIdContextKey, requestID)
-		return next(requestCtx)
+		result := next(ctx)
+
+		if span != nil {
+			addEventDataToSpan(map[string]interface{}{
+				"scrubbedVariables": scrubbedVariables,
+				"scrubbedQuery":     scrubbedQuery,
+			}, span)
+
+			span.Finish()
+		}
+
+		return result
 	}
 }
 
