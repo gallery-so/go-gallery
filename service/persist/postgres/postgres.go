@@ -92,7 +92,7 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 	} else if strings.EqualFold(msg, "exec") {
 		operation = "exec"
 	}
-	
+
 	description := msg
 
 	sqlStr, ok := data["sql"].(string)
@@ -111,6 +111,8 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 	}
 
 	span := sentry.StartSpan(ctx, "db."+operation)
+	defer span.Finish()
+
 	span.Description = description
 
 	if span.Data == nil {
@@ -126,7 +128,6 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.
 	// We can use that to update our span so it reflects the correct start time.
 	span.StartTime = time.Now().Add(-duration)
-	span.Finish()
 }
 
 func generateValuesPlaceholders(l, offset int) string {

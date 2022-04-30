@@ -106,7 +106,13 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		if viper.GetBool("REQUIRE_NFTS") {
-			user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+			span := sentry.StartSpan(ctx, "gql.directive")
+			defer span.Finish()
+			
+			span.Description = "REQUIRE_NFTS"
+
+			spanCtx := logger.NewContextWithSpan(span.Context(), span)
+			user, err := publicapi.For(spanCtx).User.GetUserById(spanCtx, userID)
 
 			if err != nil {
 				return nil, err
