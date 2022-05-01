@@ -225,13 +225,10 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 		if span != nil {
 			eventData := make(map[string]interface{})
 
-			// The max payload size for a Sentry event is 200kB, and if we exceed that
-			// size, the event will be dropped entirely. Send the message if it's under
-			// our limit (192kB to allow for some wiggle room and other data). Note:
-			// requests are typically compressed, and the 200kB limitation applies to
-			// the compressed size, so we could probably get away with a significantly
-			// higher limit...but we really don't want to risk dropping events.
-			const maxBytes = 192 * 1024
+			// Only include the response payload if it's fairly small. Larger response payloads (up to 256kb)
+			// can be viewed in our logging, and we don't want to risk going over the total size limit for
+			// event data and having Sentry drop our entire trace.
+			const maxBytes = 8 * 1024
 			if len(response.Data) <= maxBytes {
 				eventData["response"] = &response.Data
 			} else {
@@ -284,10 +281,10 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 				"scrubbedVariables": scrubbedVariables,
 			}
 
-			// As with ResponseReporter above, we're being careful about how much data we attach so Sentry
-			// doesn't drop our event. The 100kB maxBytes here should leave plenty of room for scrubbedVariables
-			// data, and our queries should rarely (if ever) exceed 100kB.
-			const maxBytes = 100 * 1024
+			// Only include the request payload if it's fairly small. Larger request payloads (up to 256kb)
+			// can be viewed in our logging, and we don't want to risk going over the total size limit for
+			// event data and having Sentry drop our entire trace.
+			const maxBytes = 8 * 1024
 			if len(scrubbedQuery) <= maxBytes {
 				eventData["scrubbedQuery"] = scrubbedQuery
 			} else {
