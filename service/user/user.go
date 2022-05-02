@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/graphql/model"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -97,10 +95,10 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, pInput.Chain, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
-		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
+		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address, Chain: pInput.Chain}
 	}
 	if id != "" {
-		return CreateUserOutput{}, persist.ErrUserAlreadyExists{Address: pInput.Address}
+		return CreateUserOutput{}, persist.ErrUserAlreadyExists{Address: pInput.Address, Chain: pInput.Chain}
 	}
 
 	if pInput.WalletType != persist.WalletTypeEOA {
@@ -554,6 +552,7 @@ type ErrUserAlreadyExists struct {
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
 }
+
 type ErrAddressOwnedByUser struct {
 	Address persist.AddressValue
 	Chain   persist.Chain

@@ -478,3 +478,35 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (GetWallet
 	)
 	return i, err
 }
+
+const getWalletsByUserID = `-- name: GetWalletsByUserID :many
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false
+`
+
+func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {
+	rows, err := q.db.Query(ctx, getWalletsByUserID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Wallet
+	for rows.Next() {
+		var i Wallet
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

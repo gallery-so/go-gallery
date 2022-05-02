@@ -9,7 +9,8 @@ import (
 )
 
 type getCommunityInput struct {
-	ContractAddress persist.EthereumAddress `form:"contract_address" binding:"required"`
+	ContractAddress persist.AddressValue `form:"contract_address" binding:"required"`
+	Chain           persist.Chain        `form:"chain"`
 }
 
 type getCommunityOutput struct {
@@ -24,7 +25,7 @@ func getCommunity(communityRepo persist.CommunityRepository) gin.HandlerFunc {
 			return
 		}
 
-		community, err := communityRepo.GetByAddress(c, input.ContractAddress)
+		community, err := communityRepo.GetByAddress(c, input.ContractAddress, input.Chain)
 		if err != nil {
 			if _, ok := err.(persist.ErrCommunityNotFound); ok {
 				util.ErrResponse(c, http.StatusNotFound, err)

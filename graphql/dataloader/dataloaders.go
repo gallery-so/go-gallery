@@ -12,6 +12,7 @@
 //go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden WalletLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden WalletLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden AddressLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Address
 //go:generate go run github.com/vektah/dataloaden AddressLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Address
 
@@ -51,6 +52,7 @@ type Loaders struct {
 	MembershipByMembershipId MembershipLoaderById
 	WalletByWalletId         WalletLoaderById
 	WalletByAddress          WalletLoaderByAddress
+	WalletByUserID           WalletLoaderByUserID
 	WalletByAddressDetails   WalletLoaderByAddressDetails
 	AddressByAddressId       AddressLoaderByID
 	AddressByAddressDetails  AddressLoaderByAddressDetails

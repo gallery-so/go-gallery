@@ -388,7 +388,7 @@ func contractToContractGallery(contract persist.Contract) persist.ContractGaller
 		Address:        persist.Address{AddressValue: persist.AddressValue(contract.Address.String()), Chain: persist.ChainETH},
 		Name:           contract.Name,
 		Symbol:         contract.Symbol,
-		CreatorAddress: contract.CreatorAddress,
+		CreatorAddress: persist.Address{AddressValue: persist.AddressValue(contract.CreatorAddress.String()), Chain: persist.ChainETH},
 	}
 }
 

@@ -92,8 +92,8 @@ type Contract struct {
 	Name           sql.NullString
 	Symbol         sql.NullString
 	Address        sql.NullString
-	CreatorAddress persist.DBID
 	LatestBlock    sql.NullInt64
+	CreatorAddress persist.DBID
 }
 
 type Feature struct {

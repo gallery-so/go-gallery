@@ -125,7 +125,6 @@ type Address struct {
 	Dbid    persist.DBID          `json:"dbid"`
 	Address *persist.AddressValue `json:"address"`
 	Chain   *persist.Chain        `json:"chain"`
-	Nfts    []*Nft                `json:"nfts"`
 }
 
 func (Address) IsNode() {}
@@ -143,6 +142,7 @@ func (AudioMedia) IsMedia()        {}
 type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
+	Debug      *DebugAuth      `json:"debug"`
 }
 
 type AuthNonce struct {
@@ -186,9 +186,11 @@ func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type Community struct {
+	HelperCommunityData
 	LastUpdated     *time.Time        `json:"lastUpdated"`
-	ContractAddress *persist.Address  `json:"contractAddress"`
-	CreatorAddress  *persist.Address  `json:"creatorAddress"`
+	ContractAddress *Address          `json:"contractAddress"`
+	CreatorAddress  *Address          `json:"creatorAddress"`
+	Chain           *persist.Chain    `json:"chain"`
 	Name            *string           `json:"name"`
 	Description     *string           `json:"description"`
 	PreviewImage    *string           `json:"previewImage"`
@@ -199,8 +201,8 @@ func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
 type CommunityOwner struct {
-	Address  *persist.Address `json:"address"`
-	Username *string          `json:"username"`
+	Address  *Wallet `json:"address"`
+	Username *string `json:"username"`
 }
 
 type CreateCollectionInput struct {
@@ -226,8 +228,9 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
-	UserID    *persist.DBID     `json:"userId"`
-	Addresses []persist.Address `json:"addresses"`
+	UserID    *persist.DBID          `json:"userId"`
+	Addresses []persist.AddressValue `json:"addresses"`
+	Chains    []persist.Chain        `json:"chains"`
 }
 
 type DeleteCollectionPayload struct {
@@ -643,6 +646,7 @@ type Wallet struct {
 	Dbid       persist.DBID        `json:"dbid"`
 	Address    *Address            `json:"address"`
 	WalletType *persist.WalletType `json:"walletType"`
+	Nfts       []*Nft              `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}

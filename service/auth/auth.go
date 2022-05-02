@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -313,7 +312,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain pe
 
 	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
 	if err != nil {
-		return nil, err
+		return "", false, err
 	}
 	if !userExists {
 
@@ -340,7 +339,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain pe
 
 		dbNonce, err := nonceRepo.Get(pCtx, wallet.ID)
 		if err != nil || dbNonce.ID == "" {
-			dbNonce = persist.UserNonce{
+			create := persist.CreateNonceInput{
 				Address: pAddress,
 				Value:   GenerateNonce(),
 				Chain:   pChain,
@@ -348,10 +347,10 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain pe
 
 			err = nonceRepo.Create(pCtx, create)
 			if err != nil {
-				return nil, err
+				return "", false, err
 			}
 
-			nonce, err = nonceRepo.Get(pCtx, wallet.ID)
+			dbNonce, err = nonceRepo.Get(pCtx, wallet.ID)
 			if err != nil {
 				return "", false, err
 			}
@@ -360,7 +359,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain pe
 		nonce = NewNoncePrepend + dbNonce.Value.String()
 
 	} else {
-		nonce, err := nonceRepo.Get(pCtx, wallet.ID)
+		dbNonce, err := nonceRepo.Get(pCtx, wallet.ID)
 		if err != nil {
 			return "", false, err
 		}

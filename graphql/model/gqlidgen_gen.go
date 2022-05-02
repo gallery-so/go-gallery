@@ -33,7 +33,16 @@ func (r *CollectionNft) ID() GqlID {
 }
 
 func (r *Community) ID() GqlID {
-	return GqlID(fmt.Sprintf("Community:%s", *r.ContractAddress))
+	//-----------------------------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------------------------
+	// Some fields specified by @goGqlId require manual binding because one of the following is true:
+	// (a) the field does not exist on the Community type, or
+	// (b) the field exists but is not a string type
+	//-----------------------------------------------------------------------------------------------
+	// Please create binding methods on the Community type with the following signatures:
+	// func (r *Community) GetGqlIDField_ContractAddressID() string
+	//-----------------------------------------------------------------------------------------------
+	return GqlID(fmt.Sprintf("Community:%s", r.GetGqlIDField_ContractAddressID()))
 }
 
 func (r *Gallery) ID() GqlID {
@@ -60,7 +69,7 @@ type NodeFetcher struct {
 	OnAddress        func(ctx context.Context, dbid persist.DBID) (*Address, error)
 	OnCollection     func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionNft  func(ctx context.Context, nftId string, collectionId string) (*CollectionNft, error)
-	OnCommunity      func(ctx context.Context, contractAddress persist.Address) (*Community, error)
+	OnCommunity      func(ctx context.Context, contractAddressId string) (*Community, error)
 	OnGallery        func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
@@ -97,7 +106,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCommunity(ctx, persist.Address(ids[0]))
+		return n.OnCommunity(ctx, string(ids[0]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}

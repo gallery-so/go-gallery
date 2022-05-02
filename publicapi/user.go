@@ -3,8 +3,6 @@ package publicapi
 import (
 	"context"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
-
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
@@ -192,7 +190,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	return &membership, nil
 }
 
-func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*persist.Community, error) {
+func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.AddressValue, chain persist.Chain) (*persist.Community, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required,eth_addr"},
@@ -200,7 +198,7 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 		return nil, err
 	}
 
-	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress)
+	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress, chain)
 	if err != nil {
 		return nil, err
 	}

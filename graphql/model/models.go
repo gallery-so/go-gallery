@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -15,9 +16,17 @@ func (r *CollectionNft) GetGqlIDField_CollectionID() string {
 	return r.CollectionId.String()
 }
 
+func (r *Community) GetGqlIDField_ContractAddressID() string {
+	return r.ContractAddressID.String()
+}
+
 type HelperCollectionNftData struct {
 	NftId        persist.DBID
 	CollectionId persist.DBID
+}
+
+type HelperCommunityData struct {
+	ContractAddressID persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

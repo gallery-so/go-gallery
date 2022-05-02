@@ -61,7 +61,8 @@ func (e ErrUserNotFound) Error() string {
 }
 
 type ErrUserAlreadyExists struct {
-	Address       Address
+	Address       AddressValue
+	Chain         Chain
 	Authenticator string
 	Username      string
 }

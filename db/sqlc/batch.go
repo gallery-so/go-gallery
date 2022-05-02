@@ -844,3 +844,59 @@ func (b *GetWalletByIDBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
 func (b *GetWalletByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
+
+const getWalletsByUserIDBatch = `-- name: GetWalletsByUserIDBatch :batchmany
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false
+`
+
+type GetWalletsByUserIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetWalletsByUserIDBatch(ctx context.Context, id []persist.DBID) *GetWalletsByUserIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getWalletsByUserIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetWalletsByUserIDBatchBatchResults{br, 0}
+}
+
+func (b *GetWalletsByUserIDBatchBatchResults) Query(f func(int, []Wallet, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Wallet
+		for rows.Next() {
+			var i Wallet
+			if err := rows.Scan(
+				&i.ID,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.Deleted,
+				&i.Version,
+				&i.Address,
+				&i.WalletType,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetWalletsByUserIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}

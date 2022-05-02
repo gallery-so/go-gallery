@@ -1,9 +1,10 @@
 package publicapi
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
+
+	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -22,7 +23,7 @@ type MiscAPI struct {
 	storageClient *storage.Client
 }
 
-func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.Address, error) {
+func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.EthereumAddress, error) {
 	// Nothing to validate
 
 	bucket := viper.GetString("SNAPSHOT_BUCKET")
@@ -35,7 +36,7 @@ func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.Address, 
 		return nil, err
 	}
 
-	var addresses []persist.Address
+	var addresses []persist.EthereumAddress
 	err = json.NewDecoder(r).Decode(&addresses)
 	if err != nil {
 		return nil, err

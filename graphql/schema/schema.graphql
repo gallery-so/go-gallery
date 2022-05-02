@@ -64,6 +64,7 @@ type Wallet implements Node {
   dbid: DBID!
   address: Address @goField(forceResolver: true)
   walletType: WalletType
+  nfts: [Nft] @goField(forceResolver: true)
 }
 
 type Address implements Node {
@@ -71,7 +72,6 @@ type Address implements Node {
   dbid: DBID!
   address: AddressValue
   chain: Chain
-  nfts: [Nft] @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -229,12 +229,12 @@ type Nft implements Node {
   owner: GalleryUserOrWallet @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: Address
+  contractAddress: Address @goField(forceResolver: true)
   externalUrl: String
   blockNumber: String # source is uint64
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
-  creatorAddress: Address
+  creatorAddress: Address @goField(forceResolver: true)
   openseaCollectionName: String
 }
 
@@ -293,17 +293,18 @@ type MembershipTier implements Node {
 }
 
 type CommunityOwner {
-    address: Address
+    address: Wallet 
     username: String
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress"]) {
+type Community implements Node @goEmbedHelper @goGqlId(fields: ["contractAddressId"]) {
     id: ID!
 
     lastUpdated: Time
 
     contractAddress: Address
     creatorAddress: Address
+    chain: Chain
     name: String
     description: String
     previewImage: String
@@ -352,7 +353,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   nftById(id: DBID!): NftByIdOrError
   collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(contractAddress: AddressValue!, chain: Chain!): CommunityByAddressOrError
+  communityByAddress(communityAddress: AddressValue!, chain: Chain!): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
 }
 
@@ -565,6 +566,7 @@ type ErrOpenSeaRefreshFailed implements Error {
 input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
+  debug: DebugAuth
 }
 
 input EoaAuth {
@@ -578,7 +580,8 @@ input EoaAuth {
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
+    addresses: [AddressValue!]!
+    chains: [Chain!]!
 }
 
 input GnosisSafeAuth {

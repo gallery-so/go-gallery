@@ -91,6 +91,12 @@ SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresse
 -- name: GetWalletByAddress :one
 SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
 
+-- name: GetWalletsByUserID :many
+SELECT w.* FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false;
+
+-- name: GetWalletsByUserIDBatch :batchmany
+SELECT w.* FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false;
+
 -- name: GetAddressByID :one
 SELECT * FROM addresses WHERE id = $1 AND deleted = false;
 

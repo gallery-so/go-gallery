@@ -7,17 +7,17 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/debugtools"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -29,7 +29,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByContractAddress,
+	OnCommunity:      resolveCommunityByID,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
@@ -81,27 +81,43 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 }
 
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
-func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Authenticator, error) {
+func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 
-	ethNonceAuth := func(address persist.AddressValue, chain persist.Chain, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
-		authenticator := auth.NonceAuthenticator{
-			Address:    address,
-			Nonce:      nonce,
-			Signature:  signature,
-			WalletType: walletType,
-			UserRepo:   r.Repos.UserRepository,
-			NonceRepo:  r.Repos.NonceRepository,
-			EthClient:  r.EthClient,
+	authApi := publicapi.For(ctx).Auth
+
+	if debugtools.Enabled {
+		if viper.GetString("ENV") == "local" && m.Debug != nil {
+			userID := persist.DBID("")
+			if m.Debug.UserID != nil {
+				userID = *m.Debug.UserID
+			}
+			addresses := make([]persist.Address, 0, len(m.Debug.Addresses))
+			for i := range m.Debug.Addresses {
+				address, err := publicapi.For(ctx).Address.GetAddressByDetails(ctx, m.Debug.Addresses[i], m.Debug.Chains[i])
+				if err != nil {
+					return nil, err
+				}
+				addresses = append(addresses, persist.Address{
+					ID:           address.ID,
+					Version:      persist.NullInt64(address.Version.Int32),
+					CreationTime: persist.CreationTime(address.CreatedAt),
+					Deleted:      persist.NullBool(address.Deleted),
+					LastUpdated:  persist.LastUpdatedTime(address.LastUpdated),
+					AddressValue: address.AddressValue,
+					Chain:        address.Chain,
+				})
+			}
+			return debugtools.NewDebugAuthenticator(userID, addresses), nil
 		}
 	}
 
 	if m.Eoa != nil {
-		return ethNonceAuth(m.Eoa.Address, m.Eoa.Chain, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
+		return authApi.NewNonceAuthenticator(m.Eoa.Address, m.Eoa.Chain, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return ethNonceAuth(m.GnosisSafe.Address, persist.ChainETH, m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
+		return authApi.NewNonceAuthenticator(m.Eoa.Address, persist.ChainETH, m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -274,14 +290,72 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress)
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.AddressValue, chain persist.Chain) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return communityToModel(ctx, *community), nil
+}
+
+func resolveCommunityByID(ctx context.Context, communityAddressID string) (*model.Community, error) {
+	address, err := publicapi.For(ctx).Address.GetAddressById(ctx, persist.DBID(communityAddressID))
+
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, address.AddressValue, address.Chain)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
+}
+
+func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
+	addresses, err := publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]*model.Wallet, 0, len(addresses))
+
+	for _, address := range addresses {
+		output = append(output, ethAddressToWalletModel(ctx, address))
+	}
+
+	return output, nil
+}
+
+func resolveAddressByID(ctx context.Context, addressID persist.DBID) (*model.Address, error) {
+	address, err := publicapi.For(ctx).Address.GetAddressById(ctx, persist.DBID(addressID))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return addressToModelSqlc(ctx, address), nil
+}
+
+func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Wallet, error) {
+	addresses, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]*model.Wallet, 0, len(addresses))
+
+	for _, address := range addresses {
+		output = append(output, walletToModelSqlc(ctx, address))
+	}
+
+	return output, nil
 }
 
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
@@ -312,7 +386,7 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 
 	wallets := make([]*model.Wallet, len(user.Addresses))
 	for i, address := range user.Addresses {
-		wallets[i] = addressToModel(ctx, address)
+		wallets[i] = walletToModelPersist(ctx, address)
 	}
 
 	return &model.GalleryUser{
@@ -325,16 +399,21 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 }
 
-func addressToModel(ctx context.Context, address persist.Wallet) *model.Wallet {
+func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {
 	return &model.Wallet{
-		Dbid:       address.ID,
-		WalletType: &address.WalletType,
-		Address: &model.Address{
-			Dbid:    address.Address.ID,
-			Address: &address.Address.AddressValue,
-			Chain:   &address.Address.Chain,
-			Nfts:    nil, // handled by dedicated resolver
-		},
+		Dbid:       wallet.ID,
+		WalletType: &wallet.WalletType,
+		Address:    addressToModelPersist(ctx, wallet.Address),
+		Nfts:       nil, // handled by dedicated resolver
+	}
+}
+
+func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
+	return &model.Wallet{
+		Dbid:       wallet.ID,
+		WalletType: &wallet.WalletType,
+		Address:    nil, // handled by dedicated resolver
+		Nfts:       nil, // handled by dedicated resolver
 	}
 }
 
@@ -433,21 +512,51 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 	lastUpdated := community.LastUpdated.Time()
 
 	owners := make([]*model.CommunityOwner, len(community.Owners))
-	for i, _ := range community.Owners {
+	for i := range community.Owners {
 		owners[i] = &model.CommunityOwner{
-			Address:  &community.Owners[i].Address,
+			Address:  walletToModelPersist(ctx, community.Owners[i].Wallet),
 			Username: util.StringToPointer(community.Owners[i].Username.String()),
 		}
 	}
 
 	return &model.Community{
 		LastUpdated:     &lastUpdated,
-		ContractAddress: &community.ContractAddress,
-		CreatorAddress:  &community.CreatorAddress,
+		ContractAddress: addressToModelPersist(ctx, community.ContractAddress),
+		CreatorAddress:  addressToModelPersist(ctx, community.CreatorAddress),
 		Name:            util.StringToPointer(community.Name.String()),
 		Description:     util.StringToPointer(community.Description.String()),
 		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
 		Owners:          owners,
+	}
+}
+
+func addressToModelPersist(ctx context.Context, address persist.Address) *model.Address {
+	return &model.Address{
+		Dbid:    address.ID,
+		Address: &address.AddressValue,
+		Chain:   &address.Chain,
+	}
+}
+
+func addressToModelSqlc(ctx context.Context, address *sqlc.Address) *model.Address {
+	return &model.Address{
+		Dbid:    address.ID,
+		Address: &address.AddressValue,
+		Chain:   &address.Chain,
+	}
+}
+func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
+	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByDetails(ctx, persist.AddressValue(address.String()), persist.ChainETH)
+	dbAddr, _ := publicapi.For(ctx).Address.GetAddressByDetails(ctx, persist.AddressValue(address.String()), persist.ChainETH)
+	return &model.Wallet{
+		Dbid:       dbWallet.ID,
+		WalletType: &dbWallet.WalletType,
+		Address: &model.Address{
+			Dbid:    dbAddr.ID,
+			Address: &dbAddr.AddressValue,
+			Chain:   &dbAddr.Chain,
+		},
+		Nfts: nil, // handled by dedicated resolver
 	}
 }
 
