@@ -24,6 +24,16 @@ type NftAPI struct {
 	multichainProvider *multichain.Provider
 }
 
+// ErrOpenSeaRefreshFailed is a generic error that wraps all other OpenSea sync failures.
+// Should be removed once we stop using OpenSea to sync NFTs.
+type ErrOpenSeaRefreshFailed struct {
+	Message string
+}
+
+func (e ErrOpenSeaRefreshFailed) Error() string {
+	return e.Message
+}
+
 func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -73,12 +83,7 @@ func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 }
 
 func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) error {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"addresses": {addresses, "required"},
-	}); err != nil {
-		return err
-	}
+	// No validation to do here -- addresses is an optional comma-separated list of addresses
 
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
@@ -87,7 +92,8 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 
 	err = api.multichainProvider.UpdateTokensForUser(ctx, userID)
 	if err != nil {
-		return err
+		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
+		return ErrOpenSeaRefreshFailed{Message: err.Error()}
 	}
 
 	api.loaders.ClearAllCaches()
@@ -95,7 +101,7 @@ func (api NftAPI) RefreshOpenSeaNfts(ctx context.Context, addresses string) erro
 	return nil
 }
 
-func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectorsNote string) error {
+func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"nftID":          {nftID, "required"},
@@ -124,7 +130,7 @@ func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collect
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	nftData := persist.NftEvent{CollectorsNote: persist.NullString(collectorsNote)}
+	nftData := persist.NftEvent{CollectionID: collectionID, CollectorsNote: persist.NullString(collectorsNote)}
 	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, nftID, nftData)
 
 	return nil
@@ -140,5 +146,5 @@ func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID p
 		Data:   nftData,
 	}
 
-	nftHandlers.Dispatch(evt)
+	nftHandlers.Dispatch(ctx, evt)
 }

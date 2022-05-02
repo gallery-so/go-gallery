@@ -22,7 +22,7 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 
 	createStmt, err := db.PrepareContext(ctx,
 		`INSERT INTO user_events (ID, USER_ID, VERSION, EVENT_CODE, DATA) VALUES ($1, $2, $3, $4, $5)
-		 RETURNING ID;`,
+		 RETURNING ID, USER_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED;`,
 	)
 	checkNoErr(err)
 
@@ -56,13 +56,14 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 	}
 }
 
-func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRecord) (persist.DBID, error) {
-	var id persist.DBID
-	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.Version, event.Code, event.Data).Scan(&id)
+func (e *UserEventRepository) Add(ctx context.Context, event persist.UserEventRecord) (*persist.UserEventRecord, error) {
+	var evt persist.UserEventRecord
+	err := e.createStmt.QueryRowContext(ctx, persist.GenerateID(), event.UserID, event.Version, event.Code, event.Data).Scan(
+		&evt.ID, &evt.UserID, &evt.Version, &evt.Code, &evt.Data, &evt.CreationTime, &evt.LastUpdated)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return id, nil
+	return &evt, nil
 }
 
 func (e *UserEventRepository) Get(ctx context.Context, eventID persist.DBID) (persist.UserEventRecord, error) {

@@ -27,11 +27,13 @@ type PublicAPI struct {
 	queries    *sqlc.Queries
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
+	Auth       *AuthAPI
 	Collection *CollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
 	Nft        *NftAPI
 	Address    *AddressApi
+	Misc       *MiscAPI
 }
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider) {
@@ -43,11 +45,13 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		queries:    queries,
 		loaders:    loaders,
 		validator:  validator,
+		Auth:       &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
 		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Address:    &AddressApi{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Misc:       &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 	}
 
 	ctx.Set(apiContextKey, api)

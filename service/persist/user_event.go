@@ -35,7 +35,7 @@ func (u *UserEvent) Scan(value interface{}) error {
 }
 
 type UserEventRepository interface {
-	Add(context.Context, UserEventRecord) (DBID, error)
+	Add(context.Context, UserEventRecord) (*UserEventRecord, error)
 	Get(context.Context, DBID) (UserEventRecord, error)
 	GetEventsSince(context.Context, UserEventRecord, time.Time) ([]UserEventRecord, error)
 	GetEventBefore(context.Context, UserEventRecord) (*UserEventRecord, error)

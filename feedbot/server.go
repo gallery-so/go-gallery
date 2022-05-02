@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	log "github.com/sirupsen/logrus"
 )
 
 func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.NftEventRepository, collectionEventRepo persist.CollectionEventRepository) gin.HandlerFunc {
@@ -27,6 +28,8 @@ func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEv
 		case persist.UserEventCode:
 			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
 			if err != nil {
+				log.Errorf("error handling user event: %s", err)
+
 				if err == errInvalidUserEvent || err == errMissingUserEvent {
 					util.ErrResponse(c, http.StatusOK, err)
 					return
@@ -38,21 +41,27 @@ func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEv
 		case persist.NftEventCode:
 			err := handleNftEvents(ctx, userRepo, tokenEventRepo, input)
 			if err != nil {
+				log.Errorf("error handling nft event: %s", err)
+
 				if err == errInvalidNftEvent || err == errMissingNftEvent {
 					util.ErrResponse(c, http.StatusOK, err)
 					return
 				} else {
 					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
 				}
 			}
 		case persist.CollectionEventCode:
 			err := handleCollectionEvents(ctx, userRepo, collectionEventRepo, input)
 			if err != nil {
+				log.Errorf("error handling collection event: %s", err)
+
 				if err == errInvalidCollectionEvent || err == errMissingCollectionEvent {
 					util.ErrResponse(c, http.StatusOK, err)
 					return
 				} else {
 					util.ErrResponse(c, http.StatusInternalServerError, err)
+					return
 				}
 			}
 		default:

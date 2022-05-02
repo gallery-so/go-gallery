@@ -23,6 +23,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"CommunityByAddressOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommunityByAddressOrError)
+		return obj, ok
+	},
+
 	"CreateCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CreateCollectionPayloadOrError)
 		return obj, ok
@@ -85,6 +90,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"RemoveUserAddressesPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RemoveUserAddressesPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateCollectionHiddenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateCollectionHiddenPayloadOrError)
 		return obj, ok
 	},
 

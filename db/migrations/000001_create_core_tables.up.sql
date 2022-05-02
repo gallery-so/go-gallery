@@ -133,7 +133,6 @@ CREATE TABLE IF NOT EXISTS contracts (
     NAME varchar,
     SYMBOL varchar,
     ADDRESS varchar(255),
-    CREATOR_ADDRESS varchar(255),
     LATEST_BLOCK bigint
 );
 

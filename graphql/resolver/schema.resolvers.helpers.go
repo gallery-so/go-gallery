@@ -7,6 +7,8 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 
@@ -15,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -28,6 +29,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
+	OnCommunity:      resolveCommunityByContractAddress,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
@@ -53,12 +55,16 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
-	case user.ErrUserAlreadyExists:
+	case persist.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrNFTNotFoundByID:
 		mappedErr = model.ErrNftNotFound{Message: message}
+	case persist.ErrCommunityNotFound:
+		mappedErr = model.ErrCommunityNotFound{Message: message}
+	case publicapi.ErrOpenSeaRefreshFailed:
+		mappedErr = model.ErrOpenSeaRefreshFailed{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -87,7 +93,6 @@ func (r *Resolver) authMechanismToAuthenticator(m model.AuthMechanism) (auth.Aut
 			NonceRepo:  r.Repos.NonceRepository,
 			EthClient:  r.EthClient,
 		}
-		return authenticator
 	}
 
 	if m.Eoa != nil {
@@ -247,6 +252,10 @@ func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.W
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
+	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
+		return nil
+	}
+
 	viewer := &model.Viewer{
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
@@ -263,6 +272,16 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	}
 
 	return membershipToModel(ctx, *tier), nil
+}
+
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
 }
 
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
@@ -288,8 +307,8 @@ func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.Collecti
 
 // userToModel converts a sqlc.User to a model.User
 func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
-	gc := util.GinContextFromContext(ctx)
-	isAuthenticatedUser := auth.GetUserAuthedFromCtx(gc) && auth.GetUserIDFromCtx(gc) == user.ID
+	userApi := publicapi.For(ctx).User
+	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
 
 	wallets := make([]*model.Wallet, len(user.Addresses))
 	for i, address := range user.Addresses {
@@ -407,6 +426,28 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
 		CreatorAddress:        nil, // handled by dedicated resolver
 		OpenseaCollectionName: &nft.TokenCollectionName.String,
+	}
+}
+
+func communityToModel(ctx context.Context, community persist.Community) *model.Community {
+	lastUpdated := community.LastUpdated.Time()
+
+	owners := make([]*model.CommunityOwner, len(community.Owners))
+	for i, _ := range community.Owners {
+		owners[i] = &model.CommunityOwner{
+			Address:  &community.Owners[i].Address,
+			Username: util.StringToPointer(community.Owners[i].Username.String()),
+		}
+	}
+
+	return &model.Community{
+		LastUpdated:     &lastUpdated,
+		ContractAddress: &community.ContractAddress,
+		CreatorAddress:  &community.CreatorAddress,
+		Name:            util.StringToPointer(community.Name.String()),
+		Description:     util.StringToPointer(community.Description.String()),
+		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
+		Owners:          owners,
 	}
 }
 

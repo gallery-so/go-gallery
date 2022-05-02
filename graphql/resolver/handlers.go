@@ -2,9 +2,11 @@ package graphql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"sort"
 	"strings"
@@ -41,6 +43,12 @@ func RemapErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, er
 	fc := gqlgen.GetFieldContext(ctx)
 	typeName := fc.Field.Field.Definition.Type.NamedType
 
+	// Unwrap any gqlerror.Error wrappers to get the underlying error type
+	var gqlErr *gqlerror.Error
+	for errors.As(err, &gqlErr) {
+		err = gqlErr.Unwrap()
+	}
+
 	// If a resolver returns an error that can be mapped to that resolver's expected GQL type,
 	// remap it and return the appropriate GQL model instead of an error. This is common for
 	// union types where the result could be an object or a set of errors.
@@ -65,6 +73,11 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		if authError := auth.GetAuthErrorFromCtx(gc); authError != nil {
+			if authError != auth.ErrNoCookie {
+				// Clear the user's cookie on any auth error (except for ErrNoCookie, since there is no cookie set)
+				auth.Logout(ctx)
+			}
+
 			var gqlModel model.AuthorizationError
 			errorMsg := authError.Error()
 
@@ -116,6 +129,21 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		}
 
 		return next(ctx)
+	}
+}
+
+func RestrictEnvironmentDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
+	env := viper.GetString("ENV")
+	restrictionErr := errors.New("schema restriction: functionality not allowed in the current environment")
+
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
+		for _, allowedEnv := range allowed {
+			if strings.EqualFold(env, allowedEnv) {
+				return next(ctx)
+			}
+		}
+
+		return nil, restrictionErr
 	}
 }
 

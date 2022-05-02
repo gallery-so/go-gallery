@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -71,7 +72,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 	}
 	defer rows.Close()
 
-	seen := map[persist.EthereumAddress]bool{}
+	seenAddress := map[persist.Address]bool{}
 	for rows.Next() {
 		var address persist.EthereumAddress
 		err = rows.Scan(&address, &contract, &community.Name, &community.CreatorAddress, &community.PreviewImage)
@@ -79,17 +80,17 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 			return persist.Community{}, fmt.Errorf("error scanning community info: %w", err)
 		}
 
-		if !seen[address] {
+		if !seenAddress[address] {
 			addresses = append(addresses, address)
 		}
-		seen[address] = true
+		seenAddress[address] = true
 	}
 
 	if err = rows.Err(); err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community info: %w", err)
 	}
 
-	if len(seen) == 0 {
+	if len(seenAddress) == 0 {
 		return persist.Community{}, persist.ErrCommunityNotFound{CommunityAddress: pAddress}
 	}
 
@@ -102,14 +103,22 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		community.Name = contract.ContractName
 	}
 
+	seenUsername := map[string]bool{}
 	community.Owners = make([]persist.CommunityOwner, 0, len(addresses))
 	for _, address := range addresses {
 		var username persist.NullString
 		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&username)
 		if err != nil {
-			return persist.Community{}, fmt.Errorf("error getting user by address: %w", err)
+			logrus.Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
+			continue
 		}
-		community.Owners = append(community.Owners, persist.CommunityOwner{Address: address, Username: username})
+
+		// Don't include users who haven't picked a username yet
+		usernameStr := username.String()
+		if usernameStr != "" && !seenUsername[usernameStr] {
+			community.Owners = append(community.Owners, persist.CommunityOwner{Address: address, Username: username})
+			seenUsername[usernameStr] = true
+		}
 	}
 
 	community.LastUpdated = persist.LastUpdatedTime(time.Now())

@@ -27,6 +27,10 @@ type CollectionNftByIDOrError interface {
 	IsCollectionNftByIDOrError()
 }
 
+type CommunityByAddressOrError interface {
+	IsCommunityByAddressOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -77,6 +81,10 @@ type RefreshOpenSeaNftsPayloadOrError interface {
 
 type RemoveUserAddressesPayloadOrError interface {
 	IsRemoveUserAddressesPayloadOrError()
+}
+
+type UpdateCollectionHiddenPayloadOrError interface {
+	IsUpdateCollectionHiddenPayloadOrError()
 }
 
 type UpdateCollectionInfoPayloadOrError interface {
@@ -177,6 +185,24 @@ type CollectionNft struct {
 func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
+type Community struct {
+	LastUpdated     *time.Time        `json:"lastUpdated"`
+	ContractAddress *persist.Address  `json:"contractAddress"`
+	CreatorAddress  *persist.Address  `json:"creatorAddress"`
+	Name            *string           `json:"name"`
+	Description     *string           `json:"description"`
+	PreviewImage    *string           `json:"previewImage"`
+	Owners          []*CommunityOwner `json:"owners"`
+}
+
+func (Community) IsNode()                      {}
+func (Community) IsCommunityByAddressOrError() {}
+
+type CommunityOwner struct {
+	Address  *persist.Address `json:"address"`
+	Username *string          `json:"username"`
+}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
 	Name           string                 `json:"name"`
@@ -194,9 +220,15 @@ func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
 type CreateUserPayload struct {
 	UserID    *persist.DBID `json:"userId"`
 	GalleryID *persist.DBID `json:"galleryId"`
+	Viewer    *Viewer       `json:"viewer"`
 }
 
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
+
+type DebugAuth struct {
+	UserID    *persist.DBID     `json:"userId"`
+	Addresses []persist.Address `json:"addresses"`
+}
 
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
@@ -229,6 +261,13 @@ func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionNftByIDOrError()       {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
 
+type ErrCommunityNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
+func (ErrCommunityNotFound) IsError()                     {}
+
 type ErrDoesNotOwnRequiredNft struct {
 	Message string `json:"message"`
 }
@@ -250,6 +289,7 @@ func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrInvalidInput) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrInvalidInput) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
@@ -289,6 +329,7 @@ func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
 func (ErrNotAuthorized) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
@@ -297,12 +338,20 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsRefreshOpenSeaNftsPayloadOrError()       {}
 func (ErrNotAuthorized) IsError()                                  {}
 
+type ErrOpenSeaRefreshFailed struct {
+	Message string `json:"message"`
+}
+
+func (ErrOpenSeaRefreshFailed) IsRefreshOpenSeaNftsPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                            {}
+
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserAlreadyExists) IsError()                    {}
-func (ErrUserAlreadyExists) IsCreateUserPayloadOrError() {}
+func (ErrUserAlreadyExists) IsUpdateUserInfoPayloadOrError() {}
+func (ErrUserAlreadyExists) IsError()                        {}
+func (ErrUserAlreadyExists) IsCreateUserPayloadOrError()     {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
@@ -397,9 +446,14 @@ func (JSONMedia) IsMedia()        {}
 
 type LoginPayload struct {
 	UserID *persist.DBID `json:"userId"`
+	Viewer *Viewer       `json:"viewer"`
 }
 
 func (LoginPayload) IsLoginPayloadOrError() {}
+
+type LogoutPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
 
 type MembershipOwner struct {
 	Dbid        persist.DBID             `json:"dbid"`
@@ -488,6 +542,17 @@ type UnknownMedia struct {
 func (UnknownMedia) IsMediaSubtype() {}
 func (UnknownMedia) IsMedia()        {}
 
+type UpdateCollectionHiddenInput struct {
+	CollectionID persist.DBID `json:"collectionId"`
+	Hidden       bool         `json:"hidden"`
+}
+
+type UpdateCollectionHiddenPayload struct {
+	Collection *Collection `json:"collection"`
+}
+
+func (UpdateCollectionHiddenPayload) IsUpdateCollectionHiddenPayloadOrError() {}
+
 type UpdateCollectionInfoInput struct {
 	CollectionID   persist.DBID `json:"collectionId"`
 	Name           string       `json:"name"`
@@ -524,8 +589,9 @@ type UpdateGalleryCollectionsPayload struct {
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
 
 type UpdateNftInfoInput struct {
-	NftID          persist.DBID `json:"nftId"`
-	CollectorsNote string       `json:"collectorsNote"`
+	NftID          persist.DBID  `json:"nftId"`
+	CollectorsNote string        `json:"collectorsNote"`
+	CollectionID   *persist.DBID `json:"collectionId"`
 }
 
 type UpdateNftInfoPayload struct {

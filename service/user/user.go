@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -99,7 +100,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address}
 	}
 	if id != "" {
-		return CreateUserOutput{}, ErrUserAlreadyExists{Address: pInput.Address}
+		return CreateUserOutput{}, persist.ErrUserAlreadyExists{Address: pInput.Address}
 	}
 
 	if pInput.WalletType != persist.WalletTypeEOA {
@@ -180,16 +181,16 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (*model.CreateUserPayload, error) {
+	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
 	if err != nil {
-		return nil, auth.ErrAuthenticationFailed{WrappedErr: err}
+		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
 	if authResult.UserID != "" {
-		return nil, ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -205,31 +206,27 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		WalletType: address.WalletType,
 	}
 
-	userID, err := userRepo.Create(pCtx, user)
+	userID, err = userRepo.Create(pCtx, user)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
-	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
+	galleryID, err = galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
+	auth.SetAuthStateForCtx(gc, userID, nil)
 	auth.SetJWTCookie(gc, jwtTokenStr)
 
-	output := model.CreateUserPayload{
-		UserID:    &userID,
-		GalleryID: &galleryID,
-	}
-
-	return &output, nil
+	return userID, galleryID, nil
 }
 
 // CreateUserREST creates a new user
@@ -245,15 +242,15 @@ func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo
 		EthClient:  ethClient,
 	}
 
-	gqlOutput, err := CreateUser(pCtx, authenticator, userRepo, galleryRepo)
+	userID, galleryID, err := CreateUser(pCtx, authenticator, userRepo, galleryRepo)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
 
 	output := CreateUserOutput{
 		SignatureValid: true,
-		UserID:         *gqlOutput.UserID,
-		GalleryID:      *gqlOutput.GalleryID,
+		UserID:         userID,
+		GalleryID:      galleryID,
 	}
 
 	return output, nil
@@ -557,7 +554,6 @@ type ErrUserAlreadyExists struct {
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
 }
-
 type ErrAddressOwnedByUser struct {
 	Address persist.AddressValue
 	Chain   persist.Chain

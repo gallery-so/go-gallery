@@ -59,3 +59,13 @@ type ErrUserNotFound struct {
 func (e ErrUserNotFound) Error() string {
 	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s,username: %s, authenticator: %s", e.Address, e.WalletID, e.UserID, e.Username, e.Authenticator)
 }
+
+type ErrUserAlreadyExists struct {
+	Address       Address
+	Authenticator string
+	Username      string
+}
+
+func (e ErrUserAlreadyExists) Error() string {
+	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.Address, e.Authenticator)
+}

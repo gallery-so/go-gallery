@@ -1,6 +1,11 @@
 package event
 
-import "github.com/mikeydub/go-gallery/service/persist"
+import (
+	"context"
+
+	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+)
 
 type CollectionDispatcher struct {
 	Handlers map[persist.EventCode][]CollectionEventHandler
@@ -10,16 +15,20 @@ func (c CollectionDispatcher) Handle(eventCode persist.EventCode, handler Collec
 	c.Handlers[eventCode] = append(c.Handlers[eventCode], handler)
 }
 
-func (c CollectionDispatcher) Dispatch(event persist.CollectionEventRecord) {
+func (c CollectionDispatcher) Dispatch(ctx context.Context, event persist.CollectionEventRecord) {
+	currentHub := sentryutil.SentryHubFromContext(ctx)
+
 	go func() {
+		ctx := sentryutil.NewSentryHubContext(ctx, currentHub)
+
 		if handlers, ok := c.Handlers[event.Code]; ok {
 			for _, handler := range handlers {
-				handler.Handle(event)
+				handler.Handle(ctx, event)
 			}
 		}
 	}()
 }
 
 type CollectionEventHandler interface {
-	Handle(persist.CollectionEventRecord)
+	Handle(context.Context, persist.CollectionEventRecord)
 }
