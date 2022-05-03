@@ -383,9 +383,12 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 		scrubbedOutput[variableDefinition.Variable] = outputForDefinition
 	}
 
-	varsForDefinition, ok := allQueryVariables[variableDefinition.Variable].(map[string]interface{})
+	varsInterface := allQueryVariables[variableDefinition.Variable]
+	varsForDefinition, ok := varsInterface.(map[string]interface{})
 	if !ok {
-		logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		if varsInterface != nil {
+			logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		}
 		return
 	}
 
@@ -424,9 +427,12 @@ func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variable
 		scrubbedOutput[field.Name] = outputForDefinition
 	}
 
-	varsForDefinition, ok := variables[field.Name].(map[string]interface{})
+	varsInterface := variables[field.Name]
+	varsForDefinition, ok := varsInterface.(map[string]interface{})
 	if !ok {
-		logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		if varsInterface != nil {
+			logrus.Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+		}
 		return
 	}
 
