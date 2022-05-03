@@ -1,31 +1,28 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"database/sql"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"net/http"
-	"strings"
-
-	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
-	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
+	"net/http"
 )
 
 // Init initializes the server
@@ -50,7 +47,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
+	router.Use(middleware.Sentry(), middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		logger.NoCtx().Info("registering validation")
@@ -187,23 +184,7 @@ func initSentry() {
 		Environment:      viper.GetString("ENV"),
 		SampleRate:       viper.GetFloat64("SENTRY_SAMPLE_RATE"),
 		AttachStacktrace: true,
-		BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
-			if event.Request == nil {
-				return event
-			}
-
-			var scrubbed []string
-			for _, c := range strings.Split(event.Request.Cookies, "; ") {
-				if !strings.HasPrefix(c, auth.JWTCookieKey) {
-					scrubbed = append(scrubbed, c)
-				}
-			}
-			cookies := strings.Join(scrubbed, "; ")
-
-			event.Request.Cookies = cookies
-			event.Request.Headers["Cookie"] = cookies
-			return event
-		},
+		BeforeSend:       sentryutil.ScrubEventCookies,
 	})
 
 	if err != nil {

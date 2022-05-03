@@ -2,6 +2,7 @@ package sentry
 
 import (
 	"context"
+	"strings"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,24 @@ type SentryAuthContext struct {
 type SentryErrorContext struct {
 	Mapped   bool
 	MappedTo string
+}
+
+func ScrubEventCookies(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+	if event.Request == nil {
+		return event
+	}
+
+	var scrubbed []string
+	for _, c := range strings.Split(event.Request.Cookies, "; ") {
+		if !strings.HasPrefix(c, auth.JWTCookieKey) {
+			scrubbed = append(scrubbed, c)
+		}
+	}
+	cookies := strings.Join(scrubbed, "; ")
+
+	event.Request.Cookies = cookies
+	event.Request.Headers["Cookie"] = cookies
+	return event
 }
 
 func SetSentryAuthContext(gc *gin.Context, hub *sentry.Hub) {

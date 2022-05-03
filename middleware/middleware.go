@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"net/http"
 	"strings"
 
@@ -217,13 +219,35 @@ func GinContextToContext() gin.HandlerFunc {
 	}
 }
 
+func Sentry() gin.HandlerFunc {
+	handler := sentrygin.New(sentrygin.Options{Repanic: true})
+
+	return func(c *gin.Context) {
+		// Clone a new hub for each request
+		hub := sentry.CurrentHub().Clone()
+
+		// We scrub JWT cookies from error events with a BeforeSend hook on our Sentry client, but
+		// according to Sentry docs, BeforeSend isn't called for tracing transactions. Instead, we
+		// have to use an event processor to scrub JWT cookies from transactions, so add one here.
+		// See: https://develop.sentry.dev/sdk/performance/#interaction-with-beforesend-and-event-processors
+		hub.Scope().AddEventProcessor(sentryutil.ScrubEventCookies)
+
+		// Add the cloned hub to the request context so sentrygin will find it
+		c.Request = c.Request.WithContext(sentry.SetHubOnContext(c.Request.Context(), hub))
+
+		// Invoke the sentrygin handler
+		handler(c)
+	}
+}
+
 func Tracing() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Taken from the HTTP handler implementation in sentryhttp.go.
 		span := sentry.StartSpan(c.Request.Context(), "gin.server",
 			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),
 			sentry.ContinueFromRequest(c.Request),
 		)
+
+		defer span.Finish()
 
 		loggingCtx := logger.NewContextWithFields(span.Context(), logrus.Fields{
 			"traceId": span.TraceID,
@@ -232,7 +256,6 @@ func Tracing() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(loggingCtx)
 
 		c.Next()
-		span.Finish()
 	}
 }
 
