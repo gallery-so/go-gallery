@@ -22,7 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/spf13/viper"
 )
 

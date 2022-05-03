@@ -7,7 +7,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"net/http"
 	"strings"
 

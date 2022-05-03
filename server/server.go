@@ -17,7 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"

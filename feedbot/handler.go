@@ -47,7 +47,7 @@ func TaskRequired() gin.HandlerFunc {
 func CaptureExceptions() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
-		if hub := sentry.SentryHubFromContext(c); hub != nil {
+		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			for _, err := range c.Errors {
 				hub.CaptureException(err)
 			}

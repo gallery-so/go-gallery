@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type UserDispatcher struct {
