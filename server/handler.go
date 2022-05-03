@@ -1,10 +1,9 @@
 package server
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
-
-	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -40,11 +39,62 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
-	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
+	parent.POST("/query", middleware.AddAuthToContext(), captureGinExceptions(), captureGqlExceptions(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
 		parent.GET("/playground", graphqlPlaygroundHandler())
+	}
+}
+
+func captureGinExceptions() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		c.Next()
+
+		hub := sentryutil.SentryHubFromContext(c.Request.Context())
+		if hub == nil {
+			return
+		}
+
+		for _, err := range c.Errors {
+			hub.WithScope(func(scope *sentry.Scope) {
+				sentryutil.SetErrorContext(scope, false, "")
+				hub.CaptureException(err)
+			})
+		}
+	}
+}
+
+func captureGqlExceptions() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		graphql.AddGqlErrorContextToContext(c, &graphql.GraphQLErrorContext{})
+
+		c.Next()
+
+		hub := sentryutil.SentryHubFromContext(c.Request.Context())
+		if hub == nil {
+			return
+		}
+
+		gqlErrCtx := graphql.GqlErrorContextFromContext(c)
+
+		if gqlErrCtx == nil {
+			return
+		}
+
+		for _, mappedErr := range gqlErrCtx.Errors() {
+			hub.WithScope(func(scope *sentry.Scope) {
+
+				if mappedErr.Model != nil {
+					sentryutil.SetErrorContext(scope, true, fmt.Sprintf("%T", mappedErr.Model))
+					scope.SetTag("remappedGqlError", "true")
+				} else {
+					sentryutil.SetErrorContext(scope, false, "")
+				}
+
+				hub.CaptureException(mappedErr.Error)
+			})
+		}
 	}
 }
 
@@ -76,35 +126,10 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	})
 
 	return func(c *gin.Context) {
-		c.Set(graphql.GraphQLErrorsKey, &graphql.GraphQLErrorContext{})
-
 		hub := sentryutil.SentryHubFromContext(c)
 		if hub != nil {
-			sentryutil.SetSentryAuthContext(c, hub)
+			sentryutil.SetAuthContext(hub.Scope(), c)
 		}
-
-		defer func() {
-			if hub != nil {
-				for _, err := range c.Errors {
-					hub.Scope().SetContext(sentryutil.ErrorSentryContextName, sentryutil.SentryErrorContext{})
-					hub.CaptureException(err)
-				}
-
-				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
-					for _, mappedErr := range gqlErrCtx.Errors() {
-						errCtx := sentryutil.SentryErrorContext{}
-
-						if mappedErr.Model != nil {
-							errCtx.Mapped = true
-							errCtx.MappedTo = fmt.Sprintf("%T", mappedErr.Model)
-						}
-
-						hub.Scope().SetContext(sentryutil.ErrorSentryContextName, errCtx)
-						hub.CaptureException(mappedErr.Error)
-					}
-				}
-			}
-		}()
 
 		hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			// Filter the request body here because it may contain sensitive variables. Note that other

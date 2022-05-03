@@ -7,7 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-const GraphQLErrorsKey = "gql.errors"
+const errorsKey = "gql.errors"
 
 type GraphQLErrorContext struct {
 	errors []*GQLError
@@ -46,9 +46,14 @@ func addError(ctx context.Context, err error, gqlModel interface{}) {
 	}
 }
 
+func AddGqlErrorContextToContext(ctx context.Context, errorContext *GraphQLErrorContext) {
+	gc := util.GinContextFromContext(ctx)
+	gc.Set(errorsKey, errorContext)
+}
+
 func GqlErrorContextFromContext(ctx context.Context) *GraphQLErrorContext {
 	gc := util.GinContextFromContext(ctx)
-	if gqlErrKey, ok := gc.Get(GraphQLErrorsKey); ok {
+	if gqlErrKey, ok := gc.Get(errorsKey); ok {
 		if gqlErrCtx, ok := gqlErrKey.(*GraphQLErrorContext); ok {
 			return gqlErrCtx
 		}
