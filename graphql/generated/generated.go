@@ -41,11 +41,11 @@ type ResolverRoot interface {
 	Collection() CollectionResolver
 	Gallery() GalleryResolver
 	GalleryUser() GalleryUserResolver
-	MembershipOwner() MembershipOwnerResolver
 	Mutation() MutationResolver
 	Nft() NftResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
+	TokenHolder() TokenHolderResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 }
@@ -104,11 +104,6 @@ type ComplexityRoot struct {
 		Name            func(childComplexity int) int
 		Owners          func(childComplexity int) int
 		PreviewImage    func(childComplexity int) int
-	}
-
-	CommunityOwner struct {
-		Address  func(childComplexity int) int
-		Username func(childComplexity int) int
 	}
 
 	CreateCollectionPayload struct {
@@ -244,13 +239,6 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
-	MembershipOwner struct {
-		Address     func(childComplexity int) int
-		Dbid        func(childComplexity int) int
-		PreviewNfts func(childComplexity int) int
-		User        func(childComplexity int) int
-	}
-
 	MembershipTier struct {
 		AssetURL func(childComplexity int) int
 		Dbid     func(childComplexity int) int
@@ -317,7 +305,7 @@ type ComplexityRoot struct {
 	Query struct {
 		CollectionByID     func(childComplexity int, id persist.DBID) int
 		CollectionNftByID  func(childComplexity int, nftID persist.DBID, collectionID persist.DBID) int
-		CommunityByAddress func(childComplexity int, contractAddress persist.Address) int
+		CommunityByAddress func(childComplexity int, contractAddress persist.Address, forceRefresh *bool) int
 		GeneralAllowlist   func(childComplexity int) int
 		MembershipTiers    func(childComplexity int, forceRefresh *bool) int
 		NftByID            func(childComplexity int, id persist.DBID) int
@@ -339,6 +327,13 @@ type ComplexityRoot struct {
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
+	}
+
+	TokenHolder struct {
+		Address     func(childComplexity int) int
+		Dbid        func(childComplexity int) int
+		PreviewNfts func(childComplexity int) int
+		User        func(childComplexity int) int
 	}
 
 	UnknownMedia struct {
@@ -414,9 +409,6 @@ type GalleryResolver interface {
 type GalleryUserResolver interface {
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 }
-type MembershipOwnerResolver interface {
-	User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error)
-}
 type MutationResolver interface {
 	AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
 	RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error)
@@ -448,8 +440,11 @@ type QueryResolver interface {
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
 	NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error)
 	CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error)
-	CommunityByAddress(ctx context.Context, contractAddress persist.Address) (model.CommunityByAddressOrError, error)
+	CommunityByAddress(ctx context.Context, contractAddress persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]persist.Address, error)
+}
+type TokenHolderResolver interface {
+	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
@@ -676,20 +671,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.PreviewImage(childComplexity), true
-
-	case "CommunityOwner.address":
-		if e.complexity.CommunityOwner.Address == nil {
-			break
-		}
-
-		return e.complexity.CommunityOwner.Address(childComplexity), true
-
-	case "CommunityOwner.username":
-		if e.complexity.CommunityOwner.Username == nil {
-			break
-		}
-
-		return e.complexity.CommunityOwner.Username(childComplexity), true
 
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
@@ -1096,34 +1077,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LogoutPayload.Viewer(childComplexity), true
-
-	case "MembershipOwner.address":
-		if e.complexity.MembershipOwner.Address == nil {
-			break
-		}
-
-		return e.complexity.MembershipOwner.Address(childComplexity), true
-
-	case "MembershipOwner.dbid":
-		if e.complexity.MembershipOwner.Dbid == nil {
-			break
-		}
-
-		return e.complexity.MembershipOwner.Dbid(childComplexity), true
-
-	case "MembershipOwner.previewNfts":
-		if e.complexity.MembershipOwner.PreviewNfts == nil {
-			break
-		}
-
-		return e.complexity.MembershipOwner.PreviewNfts(childComplexity), true
-
-	case "MembershipOwner.user":
-		if e.complexity.MembershipOwner.User == nil {
-			break
-		}
-
-		return e.complexity.MembershipOwner.User(childComplexity), true
 
 	case "MembershipTier.assetUrl":
 		if e.complexity.MembershipTier.AssetURL == nil {
@@ -1565,7 +1518,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["contractAddress"].(persist.Address)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["contractAddress"].(persist.Address), args["forceRefresh"].(*bool)), true
 
 	case "Query.generalAllowlist":
 		if e.complexity.Query.GeneralAllowlist == nil {
@@ -1670,6 +1623,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TextMedia.PreviewURLs(childComplexity), true
+
+	case "TokenHolder.address":
+		if e.complexity.TokenHolder.Address == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.Address(childComplexity), true
+
+	case "TokenHolder.dbid":
+		if e.complexity.TokenHolder.Dbid == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.Dbid(childComplexity), true
+
+	case "TokenHolder.previewNfts":
+		if e.complexity.TokenHolder.PreviewNfts == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.PreviewNfts(childComplexity), true
+
+	case "TokenHolder.user":
+		if e.complexity.TokenHolder.User == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.User(childComplexity), true
 
 	case "UnknownMedia.contentRenderURL":
 		if e.complexity.UnknownMedia.ContentRenderURL == nil {
@@ -2167,7 +2148,7 @@ type Gallery implements Node {
     collections: [Collection] @goField(forceResolver: true)
 }
 
-type MembershipOwner {
+type TokenHolder {
     dbid: DBID!
     address: Address
     user: GalleryUser @goField(forceResolver: true)
@@ -2180,12 +2161,7 @@ type MembershipTier implements Node {
     name: String
     assetUrl: String
     tokenId: String
-    owners: [MembershipOwner]
-}
-
-type CommunityOwner {
-    address: Address
-    username: String
+    owners: [TokenHolder]
 }
 
 type Community implements Node @goGqlId(fields: ["contractAddress"]) {
@@ -2199,7 +2175,7 @@ type Community implements Node @goGqlId(fields: ["contractAddress"]) {
     description: String
     previewImage: String
 
-    owners: [CommunityOwner]
+    owners: [TokenHolder]
 }
 
 # We have this extra type in case we need to stick authed data
@@ -2240,7 +2216,7 @@ type Query {
     collectionById(id: DBID!): CollectionByIdOrError
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-    communityByAddress(contractAddress: Address!): CommunityByAddressOrError
+    communityByAddress(contractAddress: Address!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [Address!]
 }
 
@@ -2839,6 +2815,15 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["contractAddress"] = arg0
+	var arg1 *bool
+	if tmp, ok := rawArgs["forceRefresh"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceRefresh"))
+		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["forceRefresh"] = arg1
 	return args, nil
 }
 
@@ -3875,73 +3860,9 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.CommunityOwner)
+	res := resTmp.([]*model.TokenHolder)
 	fc.Result = res
-	return ec.marshalOCommunityOwner2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityOwner(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CommunityOwner_address(ctx context.Context, field graphql.CollectedField, obj *model.CommunityOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CommunityOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Address)
-	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CommunityOwner_username(ctx context.Context, field graphql.CollectedField, obj *model.CommunityOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CommunityOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Username, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateCollectionPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.CreateCollectionPayload) (ret graphql.Marshaler) {
@@ -5857,137 +5778,6 @@ func (ec *executionContext) _LogoutPayload_viewer(ctx context.Context, field gra
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _MembershipOwner_dbid(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "MembershipOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _MembershipOwner_address(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "MembershipOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Address)
-	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _MembershipOwner_user(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "MembershipOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.MembershipOwner().User(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryUser)
-	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _MembershipOwner_previewNfts(ctx context.Context, field graphql.CollectedField, obj *model.MembershipOwner) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "MembershipOwner",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewNfts, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*string)
-	fc.Result = res
-	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _MembershipTier_id(ctx context.Context, field graphql.CollectedField, obj *model.MembershipTier) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6181,9 +5971,9 @@ func (ec *executionContext) _MembershipTier_owners(ctx context.Context, field gr
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.MembershipOwner)
+	res := resTmp.([]*model.TokenHolder)
 	fc.Result = res
-	return ec.marshalOMembershipOwner2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipOwner(ctx, field.Selections, res)
+	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -8165,7 +7955,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, args["contractAddress"].(persist.Address))
+		return ec.resolvers.Query().CommunityByAddress(rctx, args["contractAddress"].(persist.Address), args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8472,6 +8262,137 @@ func (ec *executionContext) _TextMedia_contentRenderURL(ctx context.Context, fie
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolder_dbid(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolder",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolder_address(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolder",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Address, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolder_user(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolder",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenHolder().User(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolder_previewNfts(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolder",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PreviewNfts, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*string)
+	fc.Result = res
+	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnknownMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
@@ -12278,41 +12199,6 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
-var communityOwnerImplementors = []string{"CommunityOwner"}
-
-func (ec *executionContext) _CommunityOwner(ctx context.Context, sel ast.SelectionSet, obj *model.CommunityOwner) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, communityOwnerImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("CommunityOwner")
-		case "address":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CommunityOwner_address(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "username":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CommunityOwner_username(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var createCollectionPayloadImplementors = []string{"CreateCollectionPayload", "CreateCollectionPayloadOrError"}
 
 func (ec *executionContext) _CreateCollectionPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CreateCollectionPayload) graphql.Marshaler {
@@ -13331,68 +13217,6 @@ func (ec *executionContext) _LogoutPayload(ctx context.Context, sel ast.Selectio
 	return out
 }
 
-var membershipOwnerImplementors = []string{"MembershipOwner"}
-
-func (ec *executionContext) _MembershipOwner(ctx context.Context, sel ast.SelectionSet, obj *model.MembershipOwner) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, membershipOwnerImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("MembershipOwner")
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MembershipOwner_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "address":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MembershipOwner_address(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "user":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._MembershipOwner_user(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "previewNfts":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MembershipOwner_previewNfts(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var membershipTierImplementors = []string{"MembershipTier", "Node"}
 
 func (ec *executionContext) _MembershipTier(ctx context.Context, sel ast.SelectionSet, obj *model.MembershipTier) graphql.Marshaler {
@@ -14189,6 +14013,68 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._TextMedia_contentRenderURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var tokenHolderImplementors = []string{"TokenHolder"}
+
+func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionSet, obj *model.TokenHolder) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenHolderImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenHolder")
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHolder_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "address":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHolder_address(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenHolder_user(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "previewNfts":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHolder_previewNfts(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15837,54 +15723,6 @@ func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmik
 	return ec._CommunityByAddressOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCommunityOwner2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityOwner(ctx context.Context, sel ast.SelectionSet, v []*model.CommunityOwner) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOCommunityOwner2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityOwner(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOCommunityOwner2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityOwner(ctx context.Context, sel ast.SelectionSet, v *model.CommunityOwner) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._CommunityOwner(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOCreateCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateCollectionPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -16090,54 +15928,6 @@ func (ec *executionContext) marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return ec._MediaSubtype(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOMembershipOwner2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipOwner(ctx context.Context, sel ast.SelectionSet, v []*model.MembershipOwner) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOMembershipOwner2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipOwner(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOMembershipOwner2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipOwner(ctx context.Context, sel ast.SelectionSet, v *model.MembershipOwner) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._MembershipOwner(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMembershipTier2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMembershipTier(ctx context.Context, sel ast.SelectionSet, v []*model.MembershipTier) graphql.Marshaler {
@@ -16381,6 +16171,54 @@ func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel
 	}
 	res := graphql.MarshalTime(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx context.Context, sel ast.SelectionSet, v []*model.TokenHolder) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOTokenHolder2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOTokenHolder2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx context.Context, sel ast.SelectionSet, v *model.TokenHolder) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenHolder(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {

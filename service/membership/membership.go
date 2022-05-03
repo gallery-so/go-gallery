@@ -188,7 +188,7 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
@@ -198,7 +198,7 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 	}
 	receivedOwners := map[persist.Address]bool{}
 	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
+	newOwners := make([]persist.TokenHolder, 0, len(tier.Owners))
 	for i := 0; i < len(tier.Owners); i++ {
 		owner := <-ownersChan
 		if receivedOwners[owner.Address] || owner.Address == "" {
@@ -236,7 +236,7 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
@@ -246,7 +246,7 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 	}
 	receivedOwners := map[persist.Address]bool{}
 	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
+	newOwners := make([]persist.TokenHolder, 0, len(tier.Owners))
 	for i := 0; i < len(tier.Owners); i++ {
 		owner := <-ownersChan
 		if receivedOwners[owner.Address] || owner.Address == "" {
@@ -287,9 +287,9 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 	tier.AssetURL = persist.NullString(metadata.Image)
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
-	tier.Owners = make([]persist.MembershipOwner, 0, len(owners))
+	tier.Owners = make([]persist.TokenHolder, 0, len(owners))
 
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for i, o := range owners {
 		addr := o
@@ -304,12 +304,12 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 					ownersChan <- membershipOwner
 				} else {
 					logrus.Debugf("Skipping membership owner %s for ID %s", membershipOwner.Address, id)
-					ownersChan <- persist.MembershipOwner{}
+					ownersChan <- persist.TokenHolder{}
 				}
 				return
 			}
 			logrus.Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
-			ownersChan <- persist.MembershipOwner{}
+			ownersChan <- persist.TokenHolder{}
 		})
 
 	}
@@ -343,8 +343,8 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 	return tier, nil
 }
 
-func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{Address: pAddress}
+func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{Address: pAddress}
 
 	glryUser, err := userRepository.GetByAddress(ctx, pAddress)
 	if err != nil || glryUser.Username == "" {
@@ -365,8 +365,8 @@ func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persi
 	return membershipOwner
 }
 
-func fillMembershipOwnerToken(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{Address: pAddress}
+func fillMembershipOwnerToken(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{Address: pAddress}
 
 	hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, pAddress, ethClient)
 	if hasNFT {
@@ -408,9 +408,9 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 
 	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 
-	tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
+	tier.Owners = make([]persist.TokenHolder, 0, len(tokens))
 
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for _, t := range tokens {
 		token := t
@@ -419,7 +419,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
 				ownersChan <- membershipOwner
 			} else {
-				ownersChan <- persist.MembershipOwner{}
+				ownersChan <- persist.TokenHolder{}
 			}
 		})
 

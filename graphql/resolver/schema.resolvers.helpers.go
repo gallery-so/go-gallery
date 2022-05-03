@@ -7,10 +7,11 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/debugtools"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -273,8 +274,18 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
+func resolveCommunityByContractAddressWithRefresh(ctx context.Context, contractAddress persist.Address, forceRefresh bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return communityToModel(ctx, *community), nil
+}
+
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress)
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, false)
 
 	if err != nil {
 		return nil, err
@@ -347,7 +358,7 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 }
 
 func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
 			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
@@ -364,7 +375,7 @@ func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *mod
 }
 
 func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
 			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
@@ -380,13 +391,13 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 	}
 }
 
-func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
+func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.TokenHolder) *model.TokenHolder {
 	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
 	for i, nft := range membershipOwner.PreviewNFTs {
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	return &model.MembershipOwner{
+	return &model.TokenHolder{
 		Dbid:        membershipOwner.UserID,
 		Address:     &membershipOwner.Address,
 		User:        nil, // handled by dedicated resolver
@@ -426,11 +437,17 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {
 	lastUpdated := community.LastUpdated.Time()
 
-	owners := make([]*model.CommunityOwner, len(community.Owners))
-	for i, _ := range community.Owners {
-		owners[i] = &model.CommunityOwner{
-			Address:  &community.Owners[i].Address,
-			Username: util.StringToPointer(community.Owners[i].Username.String()),
+	owners := make([]*model.TokenHolder, len(community.Owners))
+	for i, o := range community.Owners {
+		previewNfts := make([]*string, len(o.PreviewNFTs))
+		for i, nft := range o.PreviewNFTs {
+			previewNfts[i] = util.StringToPointer(nft.String())
+		}
+		owners[i] = &model.TokenHolder{
+			Address:     &community.Owners[i].Address,
+			User:        nil, // handled by dedicated resolver,
+			PreviewNfts: previewNfts,
+			Dbid:        o.UserID,
 		}
 	}
 

@@ -63,10 +63,6 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
-func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, obj.Dbid)
-}
-
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
@@ -413,12 +409,16 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddress(ctx, contractAddress)
+func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddressWithRefresh(ctx, contractAddress, *forceRefresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address, error) {
 	return publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
+}
+
+func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
@@ -468,11 +468,6 @@ func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
-// MembershipOwner returns generated.MembershipOwnerResolver implementation.
-func (r *Resolver) MembershipOwner() generated.MembershipOwnerResolver {
-	return &membershipOwnerResolver{r}
-}
-
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -485,6 +480,9 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// TokenHolder returns generated.TokenHolderResolver implementation.
+func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
+
 // Viewer returns generated.ViewerResolver implementation.
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
 
@@ -494,10 +492,10 @@ func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r}
 type collectionResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
-type membershipOwnerResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type nftResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type tokenHolderResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
