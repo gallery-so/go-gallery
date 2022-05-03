@@ -10,6 +10,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -21,7 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/spf13/viper"
 )
 
@@ -67,7 +68,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	h.AroundResponses(graphql.AddErrorsToGin)
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
-		if hub := sentry.SentryHubFromContext(ctx); hub != nil {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 			hub.Recover(err)
 		}
 
@@ -77,33 +78,42 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	return func(c *gin.Context) {
 		c.Set(graphql.GraphQLErrorsKey, &graphql.GraphQLErrorContext{})
 
-		hub := sentry.SentryHubFromContext(c)
+		hub := sentryutil.SentryHubFromContext(c)
 		if hub != nil {
-			sentry.SetSentryAuthContext(c, hub)
+			sentryutil.SetSentryAuthContext(c, hub)
 		}
 
 		defer func() {
 			if hub != nil {
 				for _, err := range c.Errors {
-					hub.Scope().SetContext(sentry.ErrorSentryContextName, sentry.SentryErrorContext{})
+					hub.Scope().SetContext(sentryutil.ErrorSentryContextName, sentryutil.SentryErrorContext{})
 					hub.CaptureException(err)
 				}
 
 				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
 					for _, mappedErr := range gqlErrCtx.Errors() {
-						errCtx := sentry.SentryErrorContext{}
+						errCtx := sentryutil.SentryErrorContext{}
 
 						if mappedErr.Model != nil {
 							errCtx.Mapped = true
 							errCtx.MappedTo = fmt.Sprintf("%T", mappedErr.Model)
 						}
 
-						hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
+						hub.Scope().SetContext(sentryutil.ErrorSentryContextName, errCtx)
 						hub.CaptureException(mappedErr.Error)
 					}
 				}
 			}
 		}()
+
+		hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			// Filter the request body here because it may contain sensitive variables. Note that other
+			// middleware (e.g. RequestReporter) may still update the request body with an appropriately
+			// scrubbed version of the query; all we're doing here is preventing the unscrubbed query from
+			// ending up in Sentry.
+			event.Request.Data = "[filtered]"
+			return event
+		})
 
 		event.AddTo(c, repos)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient)
