@@ -96,7 +96,7 @@ type TokenGalleryRepository interface {
 	CreateBulk(context.Context, []TokenGallery) ([]DBID, error)
 	Create(context.Context, TokenGallery) (DBID, error)
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
-	GetByContract(context.Context, Address, int64, int64) ([]TokenGallery, error)
+	GetByContract(context.Context, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	GetByID(context.Context, DBID) (TokenGallery, error)
@@ -110,7 +110,8 @@ type TokenGalleryRepository interface {
 }
 
 type ErrTokensGalleryNotFoundByContract struct {
-	ContractAddress Address
+	ContractAddress AddressValue
+	Chain           Chain
 }
 
 type ErrTokenGalleryNotFoundByIdentifiers struct {

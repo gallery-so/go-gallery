@@ -218,13 +218,13 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 }
 
 // GetByContract retrieves all tokens associated with a contract
-func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAddress persist.Address, limit int64, page int64) ([]persist.TokenGallery, error) {
+func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAddress persist.AddressValue, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, limit, page)
+		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, pChain, limit, page)
 	} else {
-		rows, err = t.getByContractStmt.QueryContext(pCtx, pContractAddress)
+		rows, err = t.getByContractStmt.QueryContext(pCtx, pContractAddress, pChain)
 	}
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAd
 	}
 
 	if len(tokens) == 0 {
-		return nil, persist.ErrTokensGalleryNotFoundByContract{ContractAddress: pContractAddress}
+		return nil, persist.ErrTokensGalleryNotFoundByContract{ContractAddress: pContractAddress, Chain: pChain}
 	}
 
 	return tokens, nil

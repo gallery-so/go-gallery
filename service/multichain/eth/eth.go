@@ -52,7 +52,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.EthereumAddress) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens?address=%s&limit=-1", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return nil, err
@@ -78,12 +78,12 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Et
 		return nil, err
 	}
 
-	return tokensToTokensGallery(tokens.NFTs), nil
+	return tokensToChainAgnostic(tokens.NFTs), nil
 
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.EthereumAddress) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=-1", d.indexerBaseURL, contractAddress), nil)
 	if err != nil {
 		return nil, err
@@ -109,11 +109,11 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		return nil, err
 	}
 
-	return tokensToTokensGallery(tokens.NFTs), nil
+	return tokensToChainAgnostic(tokens.NFTs), nil
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) ([]persist.TokenGallery, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=-1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID), nil)
 	if err != nil {
 		return nil, err
@@ -139,18 +139,18 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		return nil, err
 	}
 
-	return tokensToTokensGallery(tokens.NFTs), nil
+	return tokensToChainAgnostic(tokens.NFTs), nil
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
-func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.EthereumAddress) (persist.ContractGallery, error) {
+func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.AddressValue) (multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
-		return persist.ContractGallery{}, err
+		return multichain.ChainAgnosticContract{}, err
 	}
 	res, err := d.httpClient.Do(req)
 	if err != nil {
-		return persist.ContractGallery{}, err
+		return multichain.ChainAgnosticContract{}, err
 	}
 	defer res.Body.Close()
 
@@ -158,25 +158,25 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Ethere
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
-			return persist.ContractGallery{}, err
+			return multichain.ChainAgnosticContract{}, err
 		}
-		return persist.ContractGallery{}, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+		return multichain.ChainAgnosticContract{}, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
 	}
 	var contract indexer.GetContractOutput
 	err = json.NewDecoder(res.Body).Decode(&contract)
 	if err != nil {
-		return persist.ContractGallery{}, err
+		return multichain.ChainAgnosticContract{}, err
 	}
 
-	return contractToContractGallery(contract.Contract), nil
+	return contractToChainAgnostic(contract.Contract), nil
 
 }
 
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
-func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
+func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.AddressValue, all bool) error {
 
 	input := indexer.UpdateMediaInput{
-		OwnerAddress: wallet,
+		OwnerAddress: persist.EthereumAddress(wallet.String()),
 		UpdateAll:    all,
 	}
 
@@ -210,8 +210,8 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Ethe
 }
 
 // ValidateTokensForWallet validates tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.EthereumAddress, all bool) error {
-	input := indexer.ValidateUsersNFTsInput{Wallet: wallet, All: all}
+func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.AddressValue, all bool) error {
+	input := indexer.ValidateUsersNFTsInput{Wallet: persist.EthereumAddress(wallet.String()), All: all}
 
 	asJSON, err := json.Marshal(input)
 	if err != nil {
@@ -245,7 +245,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.E
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr string, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.AddressValue, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
@@ -284,7 +284,7 @@ func (d *Provider) VerifySignature(pCtx context.Context,
 
 func verifySignature(pSignatureStr string,
 	pData string,
-	pAddress string, pWalletType persist.WalletType,
+	pAddress persist.AddressValue, pWalletType persist.WalletType,
 	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
 
 	// eth_sign:
@@ -325,7 +325,7 @@ func verifySignature(pSignatureStr string,
 		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
 		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
 		log.Println("pAddress:", pAddress)
-		if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
+		if !strings.EqualFold(pubkeyAddressHexStr, pAddress.String()) {
 			return false, auth.ErrAddressSignatureMismatch
 		}
 
@@ -338,7 +338,7 @@ func verifySignature(pSignatureStr string,
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		sigValidator, err := contracts.NewISignatureValidator(common.HexToAddress(pAddress), ec)
+		sigValidator, err := contracts.NewISignatureValidator(common.HexToAddress(pAddress.String()), ec)
 		if err != nil {
 			return false, err
 		}
@@ -360,43 +360,42 @@ func verifySignature(pSignatureStr string,
 
 }
 
-func tokensToTokensGallery(tokens []persist.Token) []persist.TokenGallery {
-	res := make([]persist.TokenGallery, len(tokens))
+func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticToken {
+	res := make([]multichain.ChainAgnosticToken, len(tokens))
 	for i, token := range tokens {
-		res[i] = persist.TokenGallery{
+		res[i] = multichain.ChainAgnosticToken{
 			TokenID:          token.TokenID,
-			ContractAddress:  persist.Address{AddressValue: persist.AddressValue(token.ContractAddress.String()), Chain: persist.ChainETH},
-			OwnerAddress:     persist.Address{AddressValue: persist.AddressValue(token.OwnerAddress.String()), Chain: persist.ChainETH},
+			ContractAddress:  persist.AddressValue(token.ContractAddress.String()),
+			OwnerAddress:     persist.AddressValue(token.OwnerAddress.String()),
 			TokenURI:         token.TokenURI,
 			Media:            token.Media,
 			TokenType:        token.TokenType,
-			Chain:            token.Chain,
-			Name:             token.Name,
-			Description:      token.Description,
+			Name:             token.Name.String(),
+			Description:      token.Description.String(),
 			Quantity:         token.Quantity,
-			OwnershipHistory: ethereumAddressAtBlockToGallery(token.OwnershipHistory),
+			OwnershipHistory: ethereumAddressAtBlockToChainAgnostic(token.OwnershipHistory),
 			TokenMetadata:    token.TokenMetadata,
-			ExternalURL:      token.ExternalURL,
+			ExternalURL:      token.ExternalURL.String(),
 			BlockNumber:      token.BlockNumber,
 		}
 	}
 	return res
 }
 
-func contractToContractGallery(contract persist.Contract) persist.ContractGallery {
-	return persist.ContractGallery{
-		Address:        persist.Address{AddressValue: persist.AddressValue(contract.Address.String()), Chain: persist.ChainETH},
-		Name:           contract.Name,
-		Symbol:         contract.Symbol,
-		CreatorAddress: persist.Address{AddressValue: persist.AddressValue(contract.CreatorAddress.String()), Chain: persist.ChainETH},
+func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnosticContract {
+	return multichain.ChainAgnosticContract{
+		Address:        persist.AddressValue(contract.Address.String()),
+		Name:           contract.Name.String(),
+		Symbol:         contract.Symbol.String(),
+		CreatorAddress: persist.AddressValue(contract.CreatorAddress.String()),
 	}
 }
 
-func ethereumAddressAtBlockToGallery(addrs []persist.EthereumAddressAtBlock) []persist.AddressAtBlock {
-	res := make([]persist.AddressAtBlock, len(addrs))
+func ethereumAddressAtBlockToChainAgnostic(addrs []persist.EthereumAddressAtBlock) []multichain.ChainAgnosticAddressAtBlock {
+	res := make([]multichain.ChainAgnosticAddressAtBlock, len(addrs))
 	for i, addr := range addrs {
-		res[i] = persist.AddressAtBlock{
-			Address: persist.Address{AddressValue: persist.AddressValue(addr.Address.String()), Chain: persist.ChainETH},
+		res[i] = multichain.ChainAgnosticAddressAtBlock{
+			Address: persist.AddressValue(addr.Address.String()),
 			Block:   addr.Block,
 		}
 	}

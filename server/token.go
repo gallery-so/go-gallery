@@ -23,12 +23,12 @@ import (
 var errNoTokensToRefresh = errors.New("no tokens to refresh metadata for")
 
 type getTokensInput struct {
-	ID              persist.DBID    `form:"id"`
-	WalletAddress   persist.Wallet  `form:"address"`
-	ContractAddress persist.Address `form:"contract_address"`
-	TokenID         persist.TokenID `form:"token_id"`
-	Page            int64           `form:"page"`
-	Limit           int64           `form:"limit"`
+	ID              persist.DBID         `form:"id"`
+	ContractAddress persist.AddressValue `form:"contract_address"`
+	Chain           persist.Chain        `form:"chain"`
+	TokenID         persist.TokenID      `form:"token_id"`
+	Page            int64                `form:"page"`
+	Limit           int64                `form:"limit"`
 }
 
 type getTokensByUserIDInput struct {
@@ -55,8 +55,9 @@ type updateTokenByIDInput struct {
 }
 
 type refreshMetadataInput struct {
-	TokenID         persist.TokenID `form:"token_id,required"`
-	ContractAddress persist.Address `form:"contract_address,required"`
+	TokenID         persist.TokenID      `form:"token_id,required"`
+	ContractAddress persist.AddressValue `form:"contract_address,required"`
+	Chain           persist.Chain        `form:"chain"`
 }
 
 type refreshMetadataOutput struct {
@@ -80,7 +81,7 @@ func getTokens(nftRepository persist.TokenGalleryRepository, ipfsClient *shell.S
 			return
 		}
 
-		if input.ID == "" && input.WalletAddress.Address.AddressValue == "" && input.ContractAddress.AddressValue == "" && input.TokenID == "" {
+		if input.ID == "" && input.ContractAddress.AddressValue == "" && input.TokenID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, util.ErrInvalidInput{Reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
@@ -204,7 +205,7 @@ func refreshMetadataForToken(tokenRepository persist.TokenGalleryRepository, eth
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, -1, -1)
+		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, input.Chain, -1, -1)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -254,18 +255,16 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 			return nil, err
 		}
 		return []persist.TokenGallery{token}, nil
-	case input.WalletAddress.Address.String() != "":
-		return tokenRepo.GetByWallet(pCtx, input.WalletAddress.Address.AddressValue, input.WalletAddress.Address.Chain, input.Limit, input.Page)
-	case input.TokenID != "" && input.ContractAddress.AddressValue != "":
+	case input.TokenID != "" && input.ContractAddress != "":
 		if strings.HasPrefix(string(input.TokenID), "0x") {
 			input.TokenID = input.TokenID[2:]
 		} else {
 			input.TokenID = persist.TokenID(input.TokenID.BigInt().Text(16))
 		}
 
-		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
-	case input.ContractAddress.AddressValue != "":
-		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
+		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Chain, input.Limit, input.Page)
+	case input.ContractAddress != "":
+		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Chain, input.Limit, input.Page)
 	}
 	return nil, nil
 
