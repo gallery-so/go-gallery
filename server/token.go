@@ -81,7 +81,7 @@ func getTokens(nftRepository persist.TokenGalleryRepository, ipfsClient *shell.S
 			return
 		}
 
-		if input.ID == "" && input.ContractAddress.AddressValue == "" && input.TokenID == "" {
+		if input.ID == "" && input.ContractAddress == "" && input.TokenID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, util.ErrInvalidInput{Reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
