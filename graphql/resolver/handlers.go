@@ -73,36 +73,17 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 		err = gqlErr.Unwrap()
 	}
 
-	reportError := func(originalErr error, remappedErr interface{}) {
-		hub := sentry.GetHubFromContext(ctx)
-		if hub == nil {
-			logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
-			return
-		}
-
-		scope := hub.Scope()
-
-		if remappedErr != nil {
-			sentryutil.SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
-			scope.SetTag("remappedGqlError", "true")
-		} else {
-			sentryutil.SetErrorContext(scope, false, "")
-		}
-
-		hub.CaptureException(originalErr)
-	}
-
 	// If a resolver returns an error that can be mapped to that resolver's expected GQL type,
 	// remap it and return the appropriate GQL model instead of an error. This is common for
 	// union types where the result could be an object or a set of errors.
 	if fc.IsResolver {
 		if remapped, ok := errorToGraphqlType(ctx, err, typeName); ok {
-			reportError(err, remapped)
+			sentryutil.ReportRemappedError(ctx, err, remapped)
 			return remapped, nil
 		}
 	}
 
-	reportError(err, nil)
+	sentryutil.ReportError(ctx, err)
 	return res, err
 }
 
@@ -128,11 +109,12 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 
 			switch authError {
 			case auth.ErrNoCookie:
+				// Don't report this error -- it just means the user isn't logged in
 				gqlModel = model.ErrNoCookie{Message: errorMsg}
-				addError(ctx, authError, gqlModel)
 			case auth.ErrInvalidJWT:
+				// Report this error for now, since there may be value in knowing whose token expired when
 				gqlModel = model.ErrInvalidToken{Message: errorMsg}
-				addError(ctx, authError, gqlModel)
+				sentryutil.ReportRemappedError(ctx, authError, gqlModel)
 			default:
 				return nil, authError
 			}

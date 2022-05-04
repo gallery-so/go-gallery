@@ -72,7 +72,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
-			addError(ctx, err, converted)
 			return converted, true
 		}
 	}

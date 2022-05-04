@@ -2,6 +2,8 @@ package sentryutil
 
 import (
 	"context"
+	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
@@ -26,6 +28,29 @@ type authContext struct {
 type errorContext struct {
 	Mapped   bool
 	MappedTo string
+}
+
+func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
+		return
+	}
+
+	scope := hub.Scope()
+
+	if remappedErr != nil {
+		SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
+		scope.SetTag("remappedError", "true")
+	} else {
+		SetErrorContext(scope, false, "")
+	}
+
+	hub.CaptureException(originalErr)
+}
+
+func ReportError(ctx context.Context, err error) {
+	ReportRemappedError(ctx, err, nil)
 }
 
 func ScrubEventCookies(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {

@@ -3,7 +3,6 @@ package server
 import (
 	"cloud.google.com/go/storage"
 	"context"
-	"fmt"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -60,39 +59,6 @@ func captureGinExceptions() func(c *gin.Context) {
 			hub.WithScope(func(scope *sentry.Scope) {
 				sentryutil.SetErrorContext(scope, false, "")
 				hub.CaptureException(err)
-			})
-		}
-	}
-}
-
-func captureGqlExceptions() func(c *gin.Context) {
-	return func(c *gin.Context) {
-		graphql.AddGqlErrorContextToContext(c, &graphql.GraphQLErrorContext{})
-
-		c.Next()
-
-		hub := sentryutil.SentryHubFromContext(c.Request.Context())
-		if hub == nil {
-			return
-		}
-
-		gqlErrCtx := graphql.GqlErrorContextFromContext(c)
-
-		if gqlErrCtx == nil {
-			return
-		}
-
-		for _, mappedErr := range gqlErrCtx.Errors() {
-			hub.WithScope(func(scope *sentry.Scope) {
-
-				if mappedErr.Model != nil {
-					sentryutil.SetErrorContext(scope, true, fmt.Sprintf("%T", mappedErr.Model))
-					scope.SetTag("remappedGqlError", "true")
-				} else {
-					sentryutil.SetErrorContext(scope, false, "")
-				}
-
-				hub.CaptureException(mappedErr.Error)
 			})
 		}
 	}
