@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/segmentio/ksuid"
 	"github.com/sirupsen/logrus"
@@ -56,16 +57,7 @@ func getOperationName(oc *gqlgen.OperationContext) string {
 	return oc.Operation.Name
 }
 
-func AddErrorsToGin(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-	response := next(ctx)
-	gc := util.GinContextFromContext(ctx)
-	for _, err := range response.Errors {
-		gc.Error(err)
-	}
-	return response
-}
-
-func RemapErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
+func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
 	res, err = next(ctx)
 
 	if err == nil {
@@ -81,15 +73,36 @@ func RemapErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, er
 		err = gqlErr.Unwrap()
 	}
 
+	reportError := func(originalErr error, remappedErr interface{}) {
+		hub := sentry.GetHubFromContext(ctx)
+		if hub == nil {
+			logger.For(ctx).Warnln("could not report error to Sentry because hub is nil")
+			return
+		}
+
+		scope := hub.Scope()
+
+		if remappedErr != nil {
+			sentryutil.SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
+			scope.SetTag("remappedGqlError", "true")
+		} else {
+			sentryutil.SetErrorContext(scope, false, "")
+		}
+
+		hub.CaptureException(originalErr)
+	}
+
 	// If a resolver returns an error that can be mapped to that resolver's expected GQL type,
 	// remap it and return the appropriate GQL model instead of an error. This is common for
 	// union types where the result could be an object or a set of errors.
 	if fc.IsResolver {
 		if remapped, ok := errorToGraphqlType(ctx, err, typeName); ok {
+			reportError(err, remapped)
 			return remapped, nil
 		}
 	}
 
+	reportError(err, nil)
 	return res, err
 }
 
@@ -191,6 +204,13 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 			// Only trace resolvers
 			if fc.IsResolver {
+				// Sentry docs say we need to clone a new hub per thread/goroutine to avoid concurrency issues,
+				// and gqlgen will run resolvers concurrently, so we need to clone a hub per resolver.
+				// Fortunately, cloning a hub is not an expensive operation.
+				if parentHub := sentry.GetHubFromContext(ctx); parentHub != nil {
+					ctx = sentry.SetHubOnContext(ctx, parentHub.Clone())
+				}
+
 				span = sentry.StartSpan(ctx, "gql.resolve")
 				span.Description = getFieldName(fc)
 				ctx = logger.NewContextWithSpan(span.Context(), span)

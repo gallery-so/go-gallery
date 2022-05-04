@@ -39,7 +39,7 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
-	parent.POST("/query", middleware.AddAuthToContext(), captureGinExceptions(), captureGqlExceptions(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
+	parent.POST("/query", middleware.AddAuthToContext(), captureGinExceptions(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
@@ -114,8 +114,8 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))
 	h.AroundFields(graphql.FieldReporter(true))
 
-	h.AroundFields(graphql.RemapErrors)
-	h.AroundResponses(graphql.AddErrorsToGin)
+	// Should happen after FieldReporter, so Sentry trace context is set up prior to error reporting
+	h.AroundFields(graphql.RemapAndReportErrors)
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
@@ -132,7 +132,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 		}
 
 		hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-			// Filter the request body here because it may contain sensitive variables. Note that other
+			// Filter the request body here because it may contain sensitive data. Note that other
 			// middleware (e.g. RequestReporter) may still update the request body with an appropriately
 			// scrubbed version of the query; all we're doing here is preventing the unscrubbed query from
 			// ending up in Sentry.
