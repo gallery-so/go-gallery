@@ -184,7 +184,11 @@ func initSentry() {
 		Environment:      viper.GetString("ENV"),
 		SampleRate:       viper.GetFloat64("SENTRY_SAMPLE_RATE"),
 		AttachStacktrace: true,
-		BeforeSend:       sentryutil.ScrubEventCookies,
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			event = sentryutil.ScrubEventCookies(event, hint)
+			event = sentryutil.UpdateErrorFingerprints(event, hint)
+			return event
+		},
 	})
 
 	if err != nil {

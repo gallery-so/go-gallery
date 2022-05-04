@@ -54,8 +54,8 @@ func ReportError(ctx context.Context, err error) {
 	ReportRemappedError(ctx, err, nil)
 }
 
-func ScrubEventCookies(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
-	if event.Request == nil {
+func ScrubEventCookies(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event == nil || event.Request == nil {
 		return event
 	}
 
@@ -69,6 +69,22 @@ func ScrubEventCookies(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 
 	event.Request.Cookies = cookies
 	event.Request.Headers["Cookie"] = cookies
+	return event
+}
+
+func UpdateErrorFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event == nil || hint == nil || hint.OriginalException == nil {
+		return event
+	}
+
+	// This is a hacky way to do this -- we'd rather check the actual type than a string, but
+	// the errors.errorString type isn't exported and we'd really like a way to separate those
+	// errors on Sentry. It's not very useful to group every error created with errors.New().
+	exceptionType := fmt.Sprintf("%T", hint.OriginalException)
+	if exceptionType == "*errors.errorString" {
+		event.Fingerprint = []string{"{{ default }}", hint.OriginalException.Error()}
+	}
+
 	return event
 }
 
