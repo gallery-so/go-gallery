@@ -247,6 +247,9 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 }
 
 func Tracing() gin.HandlerFunc {
+	// Trace outgoing HTTP requests
+	http.DefaultTransport = sentryutil.NewTracingTransport(http.DefaultTransport, true)
+
 	return func(c *gin.Context) {
 		span := sentry.StartSpan(c.Request.Context(), "gin.server",
 			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"io"
 	"math/big"
 	"net"
@@ -33,13 +34,13 @@ import (
 var keepAliveTimeout = 600 * time.Second
 var client = &http.Client{
 	Timeout: time.Second * 30,
-	Transport: &http.Transport{
+	Transport: sentryutil.NewTracingTransport(&http.Transport{
 		Dial: (&net.Dialer{
 			KeepAlive: keepAliveTimeout,
 		}).Dial,
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 100,
-	},
+	}, true),
 }
 
 // Transfer represents a Transfer from the RPC response
