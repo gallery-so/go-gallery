@@ -346,6 +346,10 @@ func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryU
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
 
+func (r *nftResolver) OwnerAddresses(ctx context.Context, obj *model.Nft) ([]*model.Address, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *nftResolver) ContractAddress(ctx context.Context, obj *model.Nft) (*model.Address, error) {
 	panic(fmt.Errorf("not implemented"))
 }

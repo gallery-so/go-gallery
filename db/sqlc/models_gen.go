@@ -84,16 +84,15 @@ type CollectionsV2 struct {
 }
 
 type Contract struct {
-	ID             persist.DBID
-	Deleted        bool
-	Version        sql.NullInt32
-	CreatedAt      time.Time
-	LastUpdated    time.Time
-	Name           sql.NullString
-	Symbol         sql.NullString
-	Address        sql.NullString
-	LatestBlock    sql.NullInt64
-	CreatorAddress persist.DBID
+	ID          persist.DBID
+	Deleted     bool
+	Version     sql.NullInt32
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Name        sql.NullString
+	Symbol      sql.NullString
+	Address     sql.NullString
+	LatestBlock sql.NullInt64
 }
 
 type Feature struct {

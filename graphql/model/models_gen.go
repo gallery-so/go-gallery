@@ -489,6 +489,7 @@ type Nft struct {
 	TokenID               *string             `json:"tokenId"`
 	Quantity              *string             `json:"quantity"`
 	Owner                 GalleryUserOrWallet `json:"owner"`
+	OwnerAddresses        []*Address          `json:"ownerAddresses"`
 	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
 	TokenMetadata         *string             `json:"tokenMetadata"`
 	ContractAddress       *Address            `json:"contractAddress"`

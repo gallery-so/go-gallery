@@ -492,6 +492,7 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		Chain:            &chainEthereum, // Everything's Ethereum right now
 		Name:             &nft.Name.String,
 		Description:      &nft.Description.String,
+		OwnerAddresses:   nil, // handled by dedicated resolver
 		TokenURI:         nil, // TODO: later
 		TokenID:          &nft.OpenseaTokenID.String,
 		Quantity:         nil, // TODO: later

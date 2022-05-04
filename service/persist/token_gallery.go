@@ -27,10 +27,11 @@ type TokenGallery struct {
 	Name        NullString `json:"name"`
 	Description NullString `json:"description"`
 
-	TokenURI         TokenURI         `json:"token_uri"`
-	TokenID          TokenID          `json:"token_id"`
-	Quantity         HexString        `json:"quantity"`
-	OwnerAddress     Address          `json:"owner_address"`
+	TokenURI         TokenURI  `json:"token_uri"`
+	TokenID          TokenID   `json:"token_id"`
+	Quantity         HexString `json:"quantity"`
+	OwnerUserID      DBID
+	OwnerAddresses   []Address        `json:"owner_addresses"`
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	ContractAddress  Address          `json:"contract_address"`
@@ -94,17 +95,16 @@ type TokenUpdateMediaInput struct {
 type TokenGalleryRepository interface {
 	CreateBulk(context.Context, []TokenGallery) ([]DBID, error)
 	Create(context.Context, TokenGallery) (DBID, error)
-	GetByWallet(context.Context, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
 	GetByContract(context.Context, Address, int64, int64) ([]TokenGallery, error)
-	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]TokenGallery, error)
+	GetByTokenIdentifiers(context.Context, TokenID, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	GetByID(context.Context, DBID) (TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
 	Upsert(context.Context, TokenGallery) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, interface{}) error
+	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, AddressValue, Chain, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
@@ -115,7 +115,8 @@ type ErrTokensGalleryNotFoundByContract struct {
 
 type ErrTokenGalleryNotFoundByIdentifiers struct {
 	TokenID         TokenID
-	ContractAddress Address
+	ContractAddress AddressValue
+	Chain           Chain
 }
 
 // NewTokenIdentifiers creates a new token identifiers
