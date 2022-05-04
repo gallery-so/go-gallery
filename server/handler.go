@@ -38,29 +38,11 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
-	parent.POST("/query", middleware.AddAuthToContext(), captureGinExceptions(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
+	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
 		parent.GET("/playground", graphqlPlaygroundHandler())
-	}
-}
-
-func captureGinExceptions() func(c *gin.Context) {
-	return func(c *gin.Context) {
-		c.Next()
-
-		hub := sentryutil.SentryHubFromContext(c.Request.Context())
-		if hub == nil {
-			return
-		}
-
-		for _, err := range c.Errors {
-			hub.WithScope(func(scope *sentry.Scope) {
-				sentryutil.SetErrorContext(scope, false, "")
-				hub.CaptureException(err)
-			})
-		}
 	}
 }
 
@@ -92,19 +74,16 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	})
 
 	return func(c *gin.Context) {
-		hub := sentryutil.SentryHubFromContext(c)
-		if hub != nil {
+		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			sentryutil.SetAuthContext(hub.Scope(), c)
-		}
 
-		hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-			// Filter the request body here because it may contain sensitive data. Note that other
-			// middleware (e.g. RequestReporter) may still update the request body with an appropriately
-			// scrubbed version of the query; all we're doing here is preventing the unscrubbed query from
-			// ending up in Sentry.
-			event.Request.Data = "[filtered]"
-			return event
-		})
+			hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				// Filter the request body because queries may contain sensitive data. Other middleware (e.g. RequestReporter)
+				// can update the request body later with an appropriately scrubbed version of the query.
+				event.Request.Data = "[filtered]"
+				return event
+			})
+		}
 
 		event.AddTo(c, repos)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient)

@@ -219,7 +219,7 @@ func GinContextToContext() gin.HandlerFunc {
 	}
 }
 
-func Sentry() gin.HandlerFunc {
+func Sentry(reportGinErrors bool) gin.HandlerFunc {
 	handler := sentrygin.New(sentrygin.Options{Repanic: true})
 
 	return func(c *gin.Context) {
@@ -237,6 +237,12 @@ func Sentry() gin.HandlerFunc {
 
 		// Invoke the sentrygin handler
 		handler(c)
+
+		if reportGinErrors {
+			for _, err := range c.Errors {
+				sentryutil.ReportError(c, err)
+			}
+		}
 	}
 }
 

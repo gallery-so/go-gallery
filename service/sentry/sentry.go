@@ -37,16 +37,17 @@ func ReportRemappedError(ctx context.Context, originalErr error, remappedErr int
 		return
 	}
 
-	scope := hub.Scope()
+	// Use a new scope so our error context and tag don't persist beyond this error
+	hub.WithScope(func(scope *sentry.Scope) {
+		if remappedErr != nil {
+			SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
+			scope.SetTag("remappedError", "true")
+		} else {
+			SetErrorContext(scope, false, "")
+		}
 
-	if remappedErr != nil {
-		SetErrorContext(scope, true, fmt.Sprintf("%T", remappedErr))
-		scope.SetTag("remappedError", "true")
-	} else {
-		SetErrorContext(scope, false, "")
-	}
-
-	hub.CaptureException(originalErr)
+		hub.CaptureException(originalErr)
+	})
 }
 
 func ReportError(ctx context.Context, err error) {
