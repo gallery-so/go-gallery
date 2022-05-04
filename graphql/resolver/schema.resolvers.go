@@ -418,7 +418,7 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address
 }
 
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
