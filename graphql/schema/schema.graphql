@@ -224,6 +224,9 @@ type Nft implements Node {
     # struct and may ultimately end up elsewhere
     creatorAddress: Address
     openseaCollectionName: String
+
+    # temporary field while we're dependent on opensea
+    openseaId: Int
 }
 
 type OwnerAtBlock {

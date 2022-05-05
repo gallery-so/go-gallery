@@ -7,10 +7,11 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/debugtools"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -396,6 +397,7 @@ func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.
 
 func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 	chainEthereum := model.ChainEthereum
+	openseaID := int(nft.OpenseaID.Int64)
 
 	return &model.Nft{
 		Dbid:             nft.ID,
@@ -409,6 +411,7 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		Description:      &nft.Description.String,
 		TokenURI:         nil, // TODO: later
 		TokenID:          &nft.OpenseaTokenID.String,
+		OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
