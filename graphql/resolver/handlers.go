@@ -359,7 +359,12 @@ func limitEventDataSize(length int, maxLength int, name string, locatorId string
 }
 
 func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schema, allQueryVariables map[string]interface{}, scrubbedOutput map[string]interface{}) {
-	definition := schema.Types[variableDefinition.Type.NamedType]
+	namedType := variableDefinition.Type.NamedType
+	if namedType == "" && variableDefinition.Type.Elem != nil {
+		namedType = variableDefinition.Type.Elem.NamedType
+	}
+
+	definition := schema.Types[namedType]
 	scrubField := false
 
 	for _, directive := range definition.Directives {
@@ -373,7 +378,7 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 		scrubbedOutput[variableDefinition.Variable] = scrubText
 	}
 
-	if len(definition.Fields) == 0 {
+	if definition == nil || len(definition.Fields) == 0 {
 		if !scrubField {
 			scrubbedOutput[variableDefinition.Variable] = allQueryVariables[variableDefinition.Variable]
 		}
@@ -414,9 +419,14 @@ func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variable
 		scrubbedOutput[field.Name] = scrubText
 	}
 
-	definition := schema.Types[field.Type.NamedType]
+	namedType := field.Type.NamedType
+	if namedType == "" && field.Type.Elem != nil {
+		namedType = field.Type.Elem.NamedType
+	}
 
-	if len(definition.Fields) == 0 {
+	definition := schema.Types[namedType]
+
+	if definition == nil || len(definition.Fields) == 0 {
 		if hasField && !scrubField {
 			scrubbedOutput[field.Name] = fieldValue
 		}
