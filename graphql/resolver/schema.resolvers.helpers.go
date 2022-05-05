@@ -63,7 +63,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrNftNotFound{Message: message}
 	case persist.ErrCommunityNotFound:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
-	case publicapi.ErrOpenSeaRefreshFailed:
+	case publicapi.ErrTokenRefreshFailed:
 		mappedErr = model.ErrOpenSeaRefreshFailed{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)

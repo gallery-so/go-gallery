@@ -15,7 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type NftAPI struct {
+type TokenAPI struct {
 	repos              *persist.Repositories
 	queries            *sqlc.Queries
 	loaders            *dataloader.Loaders
@@ -24,17 +24,7 @@ type NftAPI struct {
 	multichainProvider *multichain.Provider
 }
 
-// ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
-// Should be removed once we stop using OpenSea to sync NFTs.
-type ErrTokenRefreshFailed struct {
-	Message string
-}
-
-func (e ErrTokenRefreshFailed) Error() string {
-	return e.Message
-}
-
-func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft, error) {
+func (api TokenAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"nftID": {nftID, "required"},
@@ -42,7 +32,7 @@ func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft
 		return nil, err
 	}
 
-	nft, err := api.loaders.NftByNftId.Load(nftID)
+	nft, err := api.loaders.TokenByID.Load(nftID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +40,7 @@ func (api NftAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Nft
 	return &nft, nil
 }
 
-func (api NftAPI) GetNftsByCollectionId(ctx context.Context, collectionID persist.DBID) ([]sqlc.Nft, error) {
+func (api TokenAPI) GetNftsByCollectionId(ctx context.Context, collectionID persist.DBID) ([]sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -58,7 +48,7 @@ func (api NftAPI) GetNftsByCollectionId(ctx context.Context, collectionID persis
 		return nil, err
 	}
 
-	nfts, err := api.loaders.NftsByCollectionId.Load(collectionID)
+	nfts, err := api.loaders.TokensByCollectionID.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,15 +56,15 @@ func (api NftAPI) GetNftsByCollectionId(ctx context.Context, collectionID persis
 	return nfts, nil
 }
 
-func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.DBID) ([]sqlc.Nft, error) {
+func (api TokenAPI) GetNftsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"ownerAddress": {ownerAddress, "required,eth_addr"},
+		"ownerUserID": {userID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	nfts, err := api.loaders.NftsByOwnerAddress.Load(ownerAddress)
+	nfts, err := api.loaders.TokenByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +72,7 @@ func (api NftAPI) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 	return nfts, nil
 }
 
-func (api NftAPI) RefreshTokens(ctx context.Context, addresses []*persist.AddressValue) error {
+func (api TokenAPI) RefreshTokens(ctx context.Context, addresses []*persist.AddressValue) error {
 	// No validation to do here -- addresses is an optional comma-separated list of addresses
 
 	userID, err := getAuthenticatedUser(ctx)
@@ -101,7 +91,7 @@ func (api NftAPI) RefreshTokens(ctx context.Context, addresses []*persist.Addres
 	return nil
 }
 
-func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
+func (api TokenAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"nftID":          {nftID, "required"},
@@ -118,11 +108,11 @@ func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collect
 		return err
 	}
 
-	update := persist.NFTUpdateInfoInput{
+	update := persist.TokenUpdateInfoInput{
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	err = api.repos.NftRepository.UpdateByID(ctx, nftID, userID, update)
+	err = api.repos.TokenRepository.UpdateByID(ctx, nftID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -136,7 +126,7 @@ func (api NftAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collect
 	return nil
 }
 
-func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
+func dispatchTokenEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
 	gc := util.GinContextFromContext(ctx)
 	nftHandlers := event.For(gc).Nft
 	evt := persist.NftEventRecord{

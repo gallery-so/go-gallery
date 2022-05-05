@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     NAME varchar,
     SYMBOL varchar,
     ADDRESS varchar(255),
-    CREATOR_ADDRESS varchar(255),
+    CREATOR_ADDRESS varchar(255)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS address_idx ON contracts (ADDRESS);

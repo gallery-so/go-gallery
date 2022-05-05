@@ -15,6 +15,11 @@
 //go:generate go run github.com/vektah/dataloaden WalletLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden AddressLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Address
 //go:generate go run github.com/vektah/dataloaden AddressLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Address
+//go:generate go run github.com/vektah/dataloaden TokenLoaderByManyID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
+//go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Contract
 
 package dataloader
 
@@ -56,6 +61,12 @@ type Loaders struct {
 	WalletByAddressDetails   WalletLoaderByAddressDetails
 	AddressByAddressId       AddressLoaderByID
 	AddressByAddressDetails  AddressLoaderByAddressDetails
+	TokenByUserID            TokenLoaderByManyID
+	TokenByID                TokenLoaderByID
+	TokenByCollectionID      TokenLoaderByManyID
+	ContractByContractId     ContractLoaderByID
+	ContractByAddress        ContractLoaderByAddress
+	ContractByAddressDetails ContractLoaderByAddressDetails
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {

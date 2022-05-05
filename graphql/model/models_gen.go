@@ -75,8 +75,8 @@ type Node interface {
 	IsNode()
 }
 
-type RefreshOpenSeaNftsPayloadOrError interface {
-	IsRefreshOpenSeaNftsPayloadOrError()
+type RefreshTokensPayloadOrError interface {
+	IsRefreshTokensPayloadOrError()
 }
 
 type RemoveUserAddressesPayloadOrError interface {
@@ -338,15 +338,15 @@ func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
 func (ErrNotAuthorized) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
-func (ErrNotAuthorized) IsRefreshOpenSeaNftsPayloadOrError()       {}
+func (ErrNotAuthorized) IsRefreshTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                  {}
 
 type ErrOpenSeaRefreshFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrOpenSeaRefreshFailed) IsRefreshOpenSeaNftsPayloadOrError() {}
-func (ErrOpenSeaRefreshFailed) IsError()                            {}
+func (ErrOpenSeaRefreshFailed) IsRefreshTokensPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                       {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -514,11 +514,11 @@ type PreviewURLSet struct {
 	Large  *string `json:"large"`
 }
 
-type RefreshOpenSeaNftsPayload struct {
+type RefreshTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (RefreshOpenSeaNftsPayload) IsRefreshOpenSeaNftsPayloadOrError() {}
+func (RefreshTokensPayload) IsRefreshTokensPayloadOrError() {}
 
 type RemoveUserAddressesPayload struct {
 	Viewer *Viewer `json:"viewer"`

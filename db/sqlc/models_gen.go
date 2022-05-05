@@ -84,15 +84,17 @@ type CollectionsV2 struct {
 }
 
 type Contract struct {
-	ID          persist.DBID
-	Deleted     bool
-	Version     sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Name        sql.NullString
-	Symbol      sql.NullString
-	Address     sql.NullString
-	LatestBlock sql.NullInt64
+	ID             persist.DBID
+	Deleted        bool
+	Version        sql.NullInt32
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	Name           sql.NullString
+	Symbol         sql.NullString
+	Address        sql.NullString
+	LatestBlock    sql.NullInt64
+	CreatorAddress persist.DBID
+	Chain          sql.NullInt32
 }
 
 type Feature struct {
@@ -209,7 +211,6 @@ type Token struct {
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
 	Chain            sql.NullString
-	OwnerAddress     persist.DBID
 	TokenUri         sql.NullString
 	TokenType        sql.NullString
 	TokenID          sql.NullString
@@ -218,6 +219,8 @@ type Token struct {
 	TokenMetadata    pgtype.JSONB
 	ExternalUrl      sql.NullString
 	BlockNumber      sql.NullInt64
+	OwnerUserID      persist.DBID
+	OwnerAddresses   []string
 }
 
 type User struct {

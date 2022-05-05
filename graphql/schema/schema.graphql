@@ -500,12 +500,12 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
-union RefreshOpenSeaNftsPayloadOrError =
-    RefreshOpenSeaNftsPayload
+union RefreshTokensPayloadOrError =
+    RefreshTokensPayload
     | ErrNotAuthorized
     | ErrOpenSeaRefreshFailed
 
-type RefreshOpenSeaNftsPayload {
+type RefreshTokensPayload {
   viewer: Viewer
 }
 
@@ -656,7 +656,7 @@ type Mutation {
     @authRequired
 
   # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
+  refreshTokens(addresses: [AddressValue]!, chains: [Chain]!): RefreshTokensPayloadOrError
     @authRequired
 
   getAuthNonce(

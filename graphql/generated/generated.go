@@ -276,7 +276,7 @@ type ComplexityRoot struct {
 		GetAuthNonce             func(childComplexity int, address persist.AddressValue, chain persist.Chain) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
-		RefreshOpenSeaNfts       func(childComplexity int, addresses string) int
+		RefreshTokens            func(childComplexity int, addresses []*persist.AddressValue, chains []*persist.Chain) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.AddressValue, chains []persist.Chain) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
@@ -334,7 +334,7 @@ type ComplexityRoot struct {
 		Viewer             func(childComplexity int) int
 	}
 
-	RefreshOpenSeaNftsPayload struct {
+	RefreshTokensPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -438,7 +438,7 @@ type MutationResolver interface {
 	UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error)
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
 	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
-	RefreshOpenSeaNfts(ctx context.Context, addresses string) (model.RefreshOpenSeaNftsPayloadOrError, error)
+	RefreshTokens(ctx context.Context, addresses []*persist.AddressValue, chains []*persist.Chain) (model.RefreshTokensPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, address persist.AddressValue, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
@@ -1298,17 +1298,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Logout(childComplexity), true
 
-	case "Mutation.refreshOpenSeaNfts":
-		if e.complexity.Mutation.RefreshOpenSeaNfts == nil {
+	case "Mutation.refreshTokens":
+		if e.complexity.Mutation.RefreshTokens == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_refreshOpenSeaNfts_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_refreshTokens_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RefreshOpenSeaNfts(childComplexity, args["addresses"].(string)), true
+		return e.complexity.Mutation.RefreshTokens(childComplexity, args["addresses"].([]*persist.AddressValue), args["chains"].([]*persist.Chain)), true
 
 	case "Mutation.removeUserAddresses":
 		if e.complexity.Mutation.RemoveUserAddresses == nil {
@@ -1676,12 +1676,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Viewer(childComplexity), true
 
-	case "RefreshOpenSeaNftsPayload.viewer":
-		if e.complexity.RefreshOpenSeaNftsPayload.Viewer == nil {
+	case "RefreshTokensPayload.viewer":
+		if e.complexity.RefreshTokensPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.RefreshOpenSeaNftsPayload.Viewer(childComplexity), true
+		return e.complexity.RefreshTokensPayload.Viewer(childComplexity), true
 
 	case "RemoveUserAddressesPayload.viewer":
 		if e.complexity.RemoveUserAddressesPayload.Viewer == nil {
@@ -2466,12 +2466,12 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
-union RefreshOpenSeaNftsPayloadOrError =
-    RefreshOpenSeaNftsPayload
+union RefreshTokensPayloadOrError =
+    RefreshTokensPayload
     | ErrNotAuthorized
     | ErrOpenSeaRefreshFailed
 
-type RefreshOpenSeaNftsPayload {
+type RefreshTokensPayload {
   viewer: Viewer
 }
 
@@ -2622,7 +2622,7 @@ type Mutation {
     @authRequired
 
   # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshOpenSeaNfts(addresses: String!): RefreshOpenSeaNftsPayloadOrError
+  refreshTokens(addresses: [AddressValue]!, chains: [Chain]!): RefreshTokensPayloadOrError
     @authRequired
 
   getAuthNonce(
@@ -2774,18 +2774,27 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_refreshOpenSeaNfts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_refreshTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 []*persist.AddressValue
 	if tmp, ok := rawArgs["addresses"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		arg0, err = ec.unmarshalNAddressValue2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["addresses"] = arg0
+	var arg1 []*persist.Chain
+	if tmp, ok := rawArgs["chains"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
+		arg1, err = ec.unmarshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chains"] = arg1
 	return args, nil
 }
 
@@ -7007,7 +7016,7 @@ func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field g
 	return ec.marshalOUpdateNftInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_refreshTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -7024,7 +7033,7 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_refreshOpenSeaNfts_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_refreshTokens_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -7033,7 +7042,7 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RefreshOpenSeaNfts(rctx, args["addresses"].(string))
+			return ec.resolvers.Mutation().RefreshTokens(rctx, args["addresses"].([]*persist.AddressValue), args["chains"].([]*persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -7049,10 +7058,10 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.RefreshOpenSeaNftsPayloadOrError); ok {
+		if data, ok := tmp.(model.RefreshTokensPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RefreshOpenSeaNftsPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RefreshTokensPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7061,9 +7070,9 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.RefreshOpenSeaNftsPayloadOrError)
+	res := resTmp.(model.RefreshTokensPayloadOrError)
 	fc.Result = res
-	return ec.marshalORefreshOpenSeaNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshOpenSeaNftsPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -8545,7 +8554,7 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 	return ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RefreshOpenSeaNftsPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _RefreshTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RefreshTokensPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8553,7 +8562,7 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayload_viewer(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "RefreshOpenSeaNftsPayload",
+		Object:     "RefreshTokensPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -11967,17 +11976,17 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	}
 }
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshOpenSeaNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _RefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshTokensPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.RefreshOpenSeaNftsPayload:
-		return ec._RefreshOpenSeaNftsPayload(ctx, sel, &obj)
-	case *model.RefreshOpenSeaNftsPayload:
+	case model.RefreshTokensPayload:
+		return ec._RefreshTokensPayload(ctx, sel, &obj)
+	case *model.RefreshTokensPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._RefreshOpenSeaNftsPayload(ctx, sel, obj)
+		return ec._RefreshTokensPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -13116,7 +13125,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -13157,7 +13166,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrOpenSeaRefreshFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errOpenSeaRefreshFailedImplementors)
@@ -13991,9 +14000,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "refreshOpenSeaNfts":
+		case "refreshTokens":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_refreshOpenSeaNfts(ctx, field)
+				return ec._Mutation_refreshTokens(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -14576,19 +14585,19 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	return out
 }
 
-var refreshOpenSeaNftsPayloadImplementors = []string{"RefreshOpenSeaNftsPayload", "RefreshOpenSeaNftsPayloadOrError"}
+var refreshTokensPayloadImplementors = []string{"RefreshTokensPayload", "RefreshTokensPayloadOrError"}
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshOpenSeaNftsPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, refreshOpenSeaNftsPayloadImplementors)
+func (ec *executionContext) _RefreshTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshTokensPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, refreshTokensPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("RefreshOpenSeaNftsPayload")
+			out.Values[i] = graphql.MarshalString("RefreshTokensPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._RefreshOpenSeaNftsPayload_viewer(ctx, field, obj)
+				return ec._RefreshTokensPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15632,6 +15641,32 @@ func (ec *executionContext) marshalNAddressValue2ᚕgithubᚗcomᚋmikeydubᚋgo
 	return ret
 }
 
+func (ec *executionContext) unmarshalNAddressValue2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx context.Context, v interface{}) ([]*persist.AddressValue, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.AddressValue, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalOAddressValue2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNAddressValue2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx context.Context, sel ast.SelectionSet, v []*persist.AddressValue) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalOAddressValue2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressValue(ctx, sel, v[i])
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -15729,6 +15764,61 @@ func (ec *executionContext) marshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgall
 			return graphql.Null
 		}
 	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) ([]*persist.Chain, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.Chain, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v []*persist.Chain) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
 
 	return ret
 }
@@ -16912,11 +17002,11 @@ func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._PreviewURLSet(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalORefreshOpenSeaNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshOpenSeaNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshOpenSeaNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshTokensPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._RefreshOpenSeaNftsPayloadOrError(ctx, sel, v)
+	return ec._RefreshTokensPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserAddressesPayloadOrError) graphql.Marshaler {

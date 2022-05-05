@@ -118,6 +118,80 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 	return items, nil
 }
 
+const getContractByAddress = `-- name: GetContractByAddress :one
+select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND deleted = false
+`
+
+func (q *Queries) GetContractByAddress(ctx context.Context, address sql.NullString) (Contract, error) {
+	row := q.db.QueryRow(ctx, getContractByAddress, address)
+	var i Contract
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Symbol,
+		&i.Address,
+		&i.LatestBlock,
+		&i.CreatorAddress,
+		&i.Chain,
+	)
+	return i, err
+}
+
+const getContractByDetails = `-- name: GetContractByDetails :one
+select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false
+`
+
+type GetContractByDetailsParams struct {
+	AddressValue persist.AddressValue
+	Chain        persist.Chain
+}
+
+func (q *Queries) GetContractByDetails(ctx context.Context, arg GetContractByDetailsParams) (Contract, error) {
+	row := q.db.QueryRow(ctx, getContractByDetails, arg.AddressValue, arg.Chain)
+	var i Contract
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Symbol,
+		&i.Address,
+		&i.LatestBlock,
+		&i.CreatorAddress,
+		&i.Chain,
+	)
+	return i, err
+}
+
+const getContractByID = `-- name: GetContractByID :one
+select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
+	row := q.db.QueryRow(ctx, getContractByID, id)
+	var i Contract
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Symbol,
+		&i.Address,
+		&i.LatestBlock,
+		&i.CreatorAddress,
+		&i.Chain,
+	)
+	return i, err
+}
+
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
@@ -338,6 +412,85 @@ func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 			&i.AnimationOriginalUrl,
 			&i.AcquisitionDate,
 			&i.TokenMetadataUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokenByID = `-- name: GetTokenByID :one
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, error) {
+	row := q.db.QueryRow(ctx, getTokenByID, id)
+	var i Token
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Description,
+		&i.ContractAddress,
+		&i.CollectorsNote,
+		&i.Media,
+		&i.Chain,
+		&i.TokenUri,
+		&i.TokenType,
+		&i.TokenID,
+		&i.Quantity,
+		&i.OwnershipHistory,
+		&i.TokenMetadata,
+		&i.ExternalUrl,
+		&i.BlockNumber,
+		&i.OwnerUserID,
+		&i.OwnerAddresses,
+	)
+	return i, err
+}
+
+const getTokensByUserID = `-- name: GetTokensByUserID :many
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
+`
+
+func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByUserID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.ContractAddress,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.Chain,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnerAddresses,
 		); err != nil {
 			return nil, err
 		}

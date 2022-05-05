@@ -76,6 +76,18 @@ SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
 -- name: GetNftsByOwnerAddressBatch :batchmany
 SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
 
+-- name: GetTokensByUserID :many
+SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
+
+-- name: GetTokensByUserIDBatch :batchmany
+SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
+
+-- name: GetTokenByID :one
+SELECT * FROM tokens WHERE id = $1 AND deleted = false;
+
+-- name: GetTokenByIDBatch :batchone
+SELECT * FROM tokens WHERE id = $1 AND deleted = false;
+
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
 
@@ -108,3 +120,21 @@ SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = fa
 
 -- name: GetAddressByDetailsBatch :batchone
 SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;
+
+-- name: GetContractByID :one
+select * FROM contracts WHERE id = $1 AND deleted = false;
+
+-- name: GetContractByIDBatch :batchone
+select * FROM contracts WHERE id = $1 AND deleted = false;
+
+-- name: GetContractByAddress :one
+select * FROM contracts WHERE address = $1 AND deleted = false;
+
+-- name: GetContractByAddressBatch :batchone
+select * FROM contracts WHERE address = $1 AND deleted = false;
+
+-- name: GetContractByDetails :one
+select * FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false;
+
+-- name: GetContractByDetailsBatch :batchone
+select * FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false;

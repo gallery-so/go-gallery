@@ -83,8 +83,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"RefreshOpenSeaNftsPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(RefreshOpenSeaNftsPayloadOrError)
+	"RefreshTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RefreshTokensPayloadOrError)
 		return obj, ok
 	},
 
