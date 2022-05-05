@@ -152,7 +152,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 				return nil, fmt.Errorf("timed out fetching membership cards %d at url: %s", tokenID.Base10Int(), urlStr)
 			}
 
-			logger.NoCtx().Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
+			logger.For(nil).Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
 			time.Sleep(time.Second * 2 * time.Duration(pRetry+1))
 			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset, pRetry+1)
 		}

@@ -242,20 +242,20 @@ func getImageMedia(pCtx context.Context, name string, storageClient *storage.Cli
 func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
 
 	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
-		logger.NoCtx().Infof("found initial animation url for %s: %s", name, it)
+		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
 		vURL = it
 	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
-		logger.NoCtx().Infof("found initial video url for %s: %s", name, it)
+		logger.For(nil).Infof("found initial video url for %s: %s", name, it)
 		vURL = it
 	}
 
 	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
-		logger.NoCtx().Infof("found initial image url for %s: %s", name, it)
+		logger.For(nil).Infof("found initial image url for %s: %s", name, it)
 		imgURL = it
 	}
 
 	if imgURL == "" {
-		logger.NoCtx().Infof("no image url found for %s - using token URI %s", name, turi)
+		logger.For(nil).Infof("no image url found for %s - using token URI %s", name, turi)
 		imgURL = turi.String()
 	}
 	return imgURL, vURL

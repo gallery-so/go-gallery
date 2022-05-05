@@ -28,6 +28,10 @@ func SetLoggerOptions(optionsFunc func(logger *logrus.Logger)) {
 }
 
 func For(ctx context.Context) *logrus.Entry {
+	if ctx == nil {
+		return defaultEntry
+	}
+	
 	// If ctx is a *gin.Context, get the underlying request context
 	if gc, ok := ctx.(*gin.Context); ok {
 		ctx = gc.Request.Context()
@@ -38,9 +42,5 @@ func For(ctx context.Context) *logrus.Entry {
 		return logger
 	}
 
-	return NoCtx()
-}
-
-func NoCtx() *logrus.Entry {
 	return defaultEntry
 }

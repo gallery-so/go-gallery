@@ -31,7 +31,7 @@ func getSqlConnectionString() string {
 func NewClient() *sql.DB {
 	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
-		logger.NoCtx().WithError(err).Fatal("could not open database connection")
+		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
@@ -50,7 +50,7 @@ func NewPgxClient() *pgxpool.Pool {
 
 	config, err := pgxpool.ParseConfig(getSqlConnectionString())
 	if err != nil {
-		logger.NoCtx().WithError(err).Fatal("could not parse pgx connection string")
+		logger.For(nil).WithError(err).Fatal("could not parse pgx connection string")
 		panic(err)
 	}
 
@@ -58,7 +58,7 @@ func NewPgxClient() *pgxpool.Pool {
 
 	db, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
-		logger.NoCtx().WithError(err).Fatal("could not open database connection")
+		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 

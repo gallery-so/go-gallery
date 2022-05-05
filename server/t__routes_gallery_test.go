@@ -73,7 +73,7 @@ func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []
 	for index, element := range collections {
 		assert.Equal(element, retreivedCollections[index].ID)
 	}
-	logger.NoCtx().Infof("Collections in gallery: %v", retreivedCollections)
+	logger.For(nil).Infof("Collections in gallery: %v", retreivedCollections)
 }
 
 func updateTestGallery(assert *assert.Assertions, update interface{}) {

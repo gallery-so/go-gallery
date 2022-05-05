@@ -24,10 +24,10 @@ func main() {
 	server.Init()
 
 	if appengine.IsAppEngine() {
-		logger.NoCtx().Info("Running in App Engine Mode")
+		logger.For(nil).Info("Running in App Engine Mode")
 		appengine.Main()
 	} else {
-		logger.NoCtx().Info("Running in Default Mode")
+		logger.For(nil).Info("Running in Default Mode")
 		http.ListenAndServe(":4000", nil)
 	}
 }

@@ -40,7 +40,7 @@ func Init() {
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
 func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
-	logger.NoCtx().Info("initializing server...")
+	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -50,7 +50,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		logger.NoCtx().Info("registering validation")
+		logger.For(nil).Info("registering validation")
 		validate.RegisterCustomValidators(v)
 	}
 
@@ -69,7 +69,7 @@ func newStorageClient() *storage.Client {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
-		logger.NoCtx().Errorf("error creating storage client: %v", err)
+		logger.For(nil).Errorf("error creating storage client: %v", err)
 	}
 	return s
 }
@@ -171,11 +171,11 @@ func initLogger() {
 
 func initSentry() {
 	if viper.GetString("ENV") == "local" {
-		logger.NoCtx().Info("skipping sentry init")
+		logger.For(nil).Info("skipping sentry init")
 		return
 	}
 
-	logger.NoCtx().Info("initializing sentry...")
+	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
@@ -190,6 +190,6 @@ func initSentry() {
 	})
 
 	if err != nil {
-		logger.NoCtx().Fatalf("failed to start sentry: %s", err)
+		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
 }

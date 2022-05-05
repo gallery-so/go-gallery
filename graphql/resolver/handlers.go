@@ -389,7 +389,7 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 	varsForDefinition, ok := varsInterface.(map[string]interface{})
 	if !ok {
 		if varsInterface != nil {
-			logger.NoCtx().Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
 		}
 		return
 	}
@@ -433,7 +433,7 @@ func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variable
 	varsForDefinition, ok := varsInterface.(map[string]interface{})
 	if !ok {
 		if varsInterface != nil {
-			logger.NoCtx().Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
 		}
 		return
 	}

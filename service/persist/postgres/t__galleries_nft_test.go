@@ -70,7 +70,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 
 	a.Len(galleries, 1)
 
-	logger.NoCtx().Infof("%+v", galleries)
+	logger.For(nil).Infof("%+v", galleries)
 
 	a.Equal(userID, galleries[0].OwnerUserID)
 	a.Len(galleries[0].Collections, 1)

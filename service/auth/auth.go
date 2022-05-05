@@ -552,7 +552,7 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 	addrs := viper.GetString("CONTRACT_ADDRESSES")
 	spl := strings.Split(addrs, "|")
-	logger.NoCtx().Info("contract addresses:", spl)
+	logger.For(nil).Info("contract addresses:", spl)
 	res := make(map[persist.Address][]persist.TokenID)
 	for _, addr := range spl {
 		nextSpl := strings.Split(addr, "=")
@@ -563,9 +563,9 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 		tokens := nextSpl[1]
 		tokens = strings.TrimLeft(tokens, "[")
 		tokens = strings.TrimRight(tokens, "]")
-		logger.NoCtx().Info("token_ids:", tokens)
+		logger.For(nil).Info("token_ids:", tokens)
 		tokenIDs := strings.Split(tokens, ",")
-		logger.NoCtx().Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
+		logger.For(nil).Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
 		res[persist.Address(addr)] = make([]persist.TokenID, len(tokenIDs))
 		for i, tokenID := range tokenIDs {
 			res[persist.Address(addr)][i] = persist.TokenID(tokenID)

@@ -361,7 +361,7 @@ func TestCollectionRoutes(t *testing.T) {
 		util.UnmarshallBody(&body, resp.Body)
 		assert.NotNil(body.Collection)
 		assert.Empty(body.Error)
-		logger.NoCtx().Infof("nfts body: %v", body.Collection.NFTs)
+		logger.For(nil).Infof("nfts body: %v", body.Collection.NFTs)
 		assert.Equal(update.Nfts[1], body.Collection.NFTs[1].ID)
 	})
 }
