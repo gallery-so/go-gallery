@@ -7,13 +7,13 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
 	"time"
 
 	// register postgres driver
 	// _ "github.com/lib/pq"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -31,7 +31,7 @@ func getSqlConnectionString() string {
 func NewClient() *sql.DB {
 	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
-		logrus.WithError(err).Fatal("could not open database connection")
+		logger.NoCtx().WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
@@ -50,7 +50,7 @@ func NewPgxClient() *pgxpool.Pool {
 
 	config, err := pgxpool.ParseConfig(getSqlConnectionString())
 	if err != nil {
-		logrus.WithError(err).Fatal("could not parse pgx connection string")
+		logger.NoCtx().WithError(err).Fatal("could not parse pgx connection string")
 		panic(err)
 	}
 
@@ -58,7 +58,7 @@ func NewPgxClient() *pgxpool.Pool {
 
 	db, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
-		logrus.WithError(err).Fatal("could not open database connection")
+		logger.NoCtx().WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 

@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +73,7 @@ func validateCollectionsOrderInGallery(assert *assert.Assertions, collections []
 	for index, element := range collections {
 		assert.Equal(element, retreivedCollections[index].ID)
 	}
-	logrus.Infof("Collections in gallery: %v", retreivedCollections)
+	logger.NoCtx().Infof("Collections in gallery: %v", retreivedCollections)
 }
 
 func updateTestGallery(assert *assert.Assertions, update interface{}) {

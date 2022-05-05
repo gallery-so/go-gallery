@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"io"
 	"math/big"
@@ -27,7 +28,6 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -139,10 +139,10 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
 	d, _ := ctx.Deadline()
-	logrus.Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	logger.For(ctx).Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
 	asString := turi.String()
 
-	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())
+	logger.For(ctx).Debugf("Getting data from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
@@ -237,10 +237,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *persist.TokenMetadata, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
 
 	d, _ := ctx.Deadline()
-	logrus.Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	logger.For(ctx).Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
 	asString := turi.String()
 
-	logrus.Debugf("Getting data from %s with type %s", asString, turi.Type())
+	logger.For(ctx).Debugf("Getting data from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON:
@@ -370,7 +370,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return "", err
 		}
 
-		logrus.Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
+		logger.For(ctx).Debugf("Token ID: %s\tToken Address: %s", pTokenID.String(), contract.Hex())
 
 		turi, err := instance.TokenURI(&bind.CallOpts{
 			Context: ctx,
@@ -387,7 +387,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 			return "", err
 		}
 
-		logrus.Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
+		logger.For(ctx).Debugf("Token ID: %d\tToken Address: %s", pTokenID.BigInt().Uint64(), contract.Hex())
 
 		turi, err := instance.Uri(&bind.CallOpts{
 			Context: ctx,

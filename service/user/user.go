@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
 )
 
 var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
@@ -139,7 +139,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 			defer cancel()
 			err := validateNFTsForUser(ctx, userID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("validateNFTsForUser")
+				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
 			}
 		}()
 		go func() {
@@ -147,7 +147,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 			defer cancel()
 			err := ensureMediaContent(ctx, pInput.Address, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("ensureMediaForUser")
+				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
@@ -321,7 +321,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 			defer cancel()
 			err := validateNFTsForUser(ctx, pUserID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("validateNFTsForUser")
+				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
 			}
 		}()
 		go func() {
@@ -329,7 +329,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 			defer cancel()
 			err := ensureMediaContent(ctx, pAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("ensureMediaForUser")
+				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
@@ -473,7 +473,7 @@ func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo pe
 
 	_, err := indexer.ValidateNFTs(pCtx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
-		logrus.Errorf("Error validating user NFTs %s: %s", pUserID, err)
+		logger.For(pCtx).Errorf("Error validating user NFTs %s: %s", pUserID, err)
 		return err
 	}
 	return nil
@@ -487,7 +487,7 @@ func ensureMediaContent(pCtx context.Context, pAddress persist.Address, tokenRep
 
 	err := indexer.UpdateMedia(pCtx, input, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
-		logrus.Errorf("Error ensuring media content for address %s: %s", pAddress, err)
+		logger.For(pCtx).Errorf("Error ensuring media content for address %s: %s", pAddress, err)
 		return err
 	}
 	return nil

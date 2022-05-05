@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -109,7 +109,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		var username persist.NullString
 		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&username)
 		if err != nil {
-			logrus.Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
+			logger.For(ctx).Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
 			continue
 		}
 

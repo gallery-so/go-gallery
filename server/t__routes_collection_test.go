@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"math/rand"
 	"net/http"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -361,7 +361,7 @@ func TestCollectionRoutes(t *testing.T) {
 		util.UnmarshallBody(&body, resp.Body)
 		assert.NotNil(body.Collection)
 		assert.Empty(body.Error)
-		logrus.Infof("nfts body: %v", body.Collection.NFTs)
+		logger.NoCtx().Infof("nfts body: %v", body.Collection.NFTs)
 		assert.Equal(update.Nfts[1], body.Collection.NFTs[1].ID)
 	})
 }
