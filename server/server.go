@@ -153,7 +153,7 @@ func newEthClient() *ethclient.Client {
 }
 
 func initLogger() {
-	optionsFunc := func(logger *logrus.Logger) {
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.SetReportCaller(true)
 
 		if viper.GetString("ENV") != "production" {
@@ -166,9 +166,7 @@ func initLogger() {
 			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
 			logger.SetFormatter(&logrus.JSONFormatter{})
 		}
-	}
-
-	logger.SetLoggerOptions(optionsFunc)
+	})
 }
 
 func initSentry() {
