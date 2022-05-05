@@ -450,33 +450,16 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 	defer tx.Rollback()
 
 	deleteManyStmt := tx.StmtContext(pCtx, c.deleteNFTsStmt)
-	deleteStmt := tx.StmtContext(pCtx, c.deleteNFTStmt)
 	removeFromCollStmt := tx.StmtContext(pCtx, c.removeNFTFromCollectionsStmt)
-	updateOwnerStmt := tx.StmtContext(pCtx, c.updateOwnerAddressStmt)
 
 	nftsToRemoveIDs := make([]persist.DBID, 0, len(removing))
 
 	for removeID, removeOpenseaID := range removing {
 		remove := true
-		for id, openseaID := range newOpenseaIDs {
+		for _, openseaID := range newOpenseaIDs {
 			if removeOpenseaID == openseaID {
 				remove = false
-
-				var newAddress persist.NullString
-				err := c.getOwnerAddressStmt.QueryRowContext(pCtx, id).Scan(&newAddress)
-				if err != nil {
-					return err
-				}
-
-				_, err = deleteStmt.ExecContext(pCtx, id)
-				if err != nil {
-					return err
-				}
-
-				_, err = updateOwnerStmt.ExecContext(pCtx, newAddress, removeID)
-				if err != nil {
-					return err
-				}
+				break
 			}
 		}
 		if remove {

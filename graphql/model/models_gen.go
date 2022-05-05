@@ -484,6 +484,7 @@ type Nft struct {
 	BlockNumber           *string             `json:"blockNumber"`
 	CreatorAddress        *persist.Address    `json:"creatorAddress"`
 	OpenseaCollectionName *string             `json:"openseaCollectionName"`
+	OpenseaID             *int                `json:"openseaId"`
 }
 
 func (Nft) IsNode()           {}

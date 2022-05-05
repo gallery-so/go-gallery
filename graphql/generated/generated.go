@@ -293,6 +293,7 @@ type ComplexityRoot struct {
 		Media                 func(childComplexity int) int
 		Name                  func(childComplexity int) int
 		OpenseaCollectionName func(childComplexity int) int
+		OpenseaID             func(childComplexity int) int
 		Owner                 func(childComplexity int) int
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
@@ -1440,6 +1441,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Nft.OpenseaCollectionName(childComplexity), true
 
+	case "Nft.openseaId":
+		if e.complexity.Nft.OpenseaID == nil {
+			break
+		}
+
+		return e.complexity.Nft.OpenseaID(childComplexity), true
+
 	case "Nft.owner":
 		if e.complexity.Nft.Owner == nil {
 			break
@@ -2129,6 +2137,9 @@ type Nft implements Node {
     # struct and may ultimately end up elsewhere
     creatorAddress: Address
     openseaCollectionName: String
+
+    # temporary field while we're dependent on opensea
+    openseaId: Int
 }
 
 type OwnerAtBlock {
@@ -7660,6 +7671,38 @@ func (ec *executionContext) _Nft_openseaCollectionName(ctx context.Context, fiel
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Nft_openseaId(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Nft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OpenseaID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OwnerAtBlock_owner(ctx context.Context, field graphql.CollectedField, obj *model.OwnerAtBlock) (ret graphql.Marshaler) {
@@ -13766,6 +13809,13 @@ func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj 
 		case "openseaCollectionName":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Nft_openseaCollectionName(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "openseaId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Nft_openseaId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
