@@ -63,7 +63,7 @@ func ScrubEventCookies(event *sentry.Event, hint *sentry.EventHint) *sentry.Even
 	var scrubbed []string
 	for _, c := range strings.Split(event.Request.Cookies, "; ") {
 		if strings.HasPrefix(c, auth.JWTCookieKey) {
-			scrubbed = append(scrubbed, "[filtered]")
+			scrubbed = append(scrubbed, auth.JWTCookieKey+"=[filtered]")
 		} else {
 			scrubbed = append(scrubbed, c)
 		}
