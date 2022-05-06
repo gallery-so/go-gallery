@@ -226,7 +226,7 @@ type Nft implements Node {
   tokenUri: String
   tokenId: String
   quantity: String # source is a hex string
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
+  owner: GalleryUser @goField(forceResolver: true)
   ownerAddresses: [Address] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here

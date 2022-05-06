@@ -35,6 +35,7 @@ type TokenGallery struct {
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	ContractAddress  Address          `json:"contract_address"`
+	CollectionName   NullString       `json:"collection_name"`
 
 	ExternalURL NullString `json:"external_url"`
 

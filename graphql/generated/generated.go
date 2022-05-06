@@ -445,7 +445,7 @@ type MutationResolver interface {
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 }
 type NftResolver interface {
-	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
+	Owner(ctx context.Context, obj *model.Nft) (*model.GalleryUser, error)
 	OwnerAddresses(ctx context.Context, obj *model.Nft) ([]*model.Address, error)
 
 	ContractAddress(ctx context.Context, obj *model.Nft) (*model.Address, error)
@@ -2192,7 +2192,7 @@ type Nft implements Node {
   tokenUri: String
   tokenId: String
   quantity: String # source is a hex string
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
+  owner: GalleryUser @goField(forceResolver: true)
   ownerAddresses: [Address] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
@@ -7673,9 +7673,9 @@ func (ec *executionContext) _Nft_owner(ctx context.Context, field graphql.Collec
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.GalleryUserOrWallet)
+	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalOGalleryUserOrWallet2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrWallet(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Nft_ownerAddresses(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {

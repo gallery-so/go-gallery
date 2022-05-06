@@ -24,6 +24,15 @@ type TokenAPI struct {
 	multichainProvider *multichain.Provider
 }
 
+// ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
+// Should be removed once we stop using OpenSea to sync NFTs.
+type ErrTokenRefreshFailed struct {
+	Message string
+}
+
+func (e ErrTokenRefreshFailed) Error() string {
+	return e.Message
+}
 func (api TokenAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -127,6 +136,19 @@ func (api TokenAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, colle
 }
 
 func dispatchTokenEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
+	gc := util.GinContextFromContext(ctx)
+	nftHandlers := event.For(gc).Nft
+	evt := persist.NftEventRecord{
+		UserID: userID,
+		NftID:  nftID,
+		Code:   eventCode,
+		Data:   nftData,
+	}
+
+	nftHandlers.Dispatch(ctx, evt)
+}
+
+func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
 	gc := util.GinContextFromContext(ctx)
 	nftHandlers := event.For(gc).Nft
 	evt := persist.NftEventRecord{

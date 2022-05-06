@@ -342,7 +342,7 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	return output, nil
 }
 
-func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
+func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (*model.GalleryUser, error) {
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
 

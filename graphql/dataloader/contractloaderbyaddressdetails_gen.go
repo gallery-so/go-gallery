@@ -13,7 +13,7 @@ import (
 // ContractLoaderByAddressDetailsConfig captures the config to create a new ContractLoaderByAddressDetails
 type ContractLoaderByAddressDetailsConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.AddressDetails) ([][]sqlc.Contract, []error)
+	Fetch func(keys []persist.AddressDetails) ([]sqlc.Contract, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewContractLoaderByAddressDetails(config ContractLoaderByAddressDetailsConf
 // ContractLoaderByAddressDetails batches and caches requests
 type ContractLoaderByAddressDetails struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.AddressDetails) ([][]sqlc.Contract, []error)
+	fetch func(keys []persist.AddressDetails) ([]sqlc.Contract, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type ContractLoaderByAddressDetails struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.AddressDetails][]sqlc.Contract
+	cache map[persist.AddressDetails]sqlc.Contract
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type ContractLoaderByAddressDetails struct {
 
 type contractLoaderByAddressDetailsBatch struct {
 	keys    []persist.AddressDetails
-	data    [][]sqlc.Contract
+	data    []sqlc.Contract
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Contract by key, batching and caching will be applied automatically
-func (l *ContractLoaderByAddressDetails) Load(key persist.AddressDetails) ([]sqlc.Contract, error) {
+func (l *ContractLoaderByAddressDetails) Load(key persist.AddressDetails) (sqlc.Contract, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Contract.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) func() ([]sqlc.Contract, error) {
+func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) func() (sqlc.Contract, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]sqlc.Contract, error) {
+		return func() (sqlc.Contract, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) f
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]sqlc.Contract, error) {
+	return func() (sqlc.Contract, error) {
 		<-batch.done
 
-		var data []sqlc.Contract
+		var data sqlc.Contract
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) f
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *ContractLoaderByAddressDetails) LoadAll(keys []persist.AddressDetails) ([][]sqlc.Contract, []error) {
-	results := make([]func() ([]sqlc.Contract, error), len(keys))
+func (l *ContractLoaderByAddressDetails) LoadAll(keys []persist.AddressDetails) ([]sqlc.Contract, []error) {
+	results := make([]func() (sqlc.Contract, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	contracts := make([][]sqlc.Contract, len(keys))
+	contracts := make([]sqlc.Contract, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		contracts[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *ContractLoaderByAddressDetails) LoadAll(keys []persist.AddressDetails) 
 // LoadAllThunk returns a function that when called will block waiting for a Contracts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByAddressDetails) LoadAllThunk(keys []persist.AddressDetails) func() ([][]sqlc.Contract, []error) {
-	results := make([]func() ([]sqlc.Contract, error), len(keys))
+func (l *ContractLoaderByAddressDetails) LoadAllThunk(keys []persist.AddressDetails) func() ([]sqlc.Contract, []error) {
+	results := make([]func() (sqlc.Contract, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]sqlc.Contract, []error) {
-		contracts := make([][]sqlc.Contract, len(keys))
+	return func() ([]sqlc.Contract, []error) {
+		contracts := make([]sqlc.Contract, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			contracts[i], errors[i] = thunk()
@@ -150,15 +150,11 @@ func (l *ContractLoaderByAddressDetails) LoadAllThunk(keys []persist.AddressDeta
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *ContractLoaderByAddressDetails) Prime(key persist.AddressDetails, value []sqlc.Contract) bool {
+func (l *ContractLoaderByAddressDetails) Prime(key persist.AddressDetails, value sqlc.Contract) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
-		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
-		// and end up with the whole cache pointing to the same value.
-		cpy := make([]sqlc.Contract, len(value))
-		copy(cpy, value)
-		l.unsafeSet(key, cpy)
+		l.unsafeSet(key, value)
 	}
 	l.mu.Unlock()
 	return !found
@@ -171,9 +167,9 @@ func (l *ContractLoaderByAddressDetails) Clear(key persist.AddressDetails) {
 	l.mu.Unlock()
 }
 
-func (l *ContractLoaderByAddressDetails) unsafeSet(key persist.AddressDetails, value []sqlc.Contract) {
+func (l *ContractLoaderByAddressDetails) unsafeSet(key persist.AddressDetails, value sqlc.Contract) {
 	if l.cache == nil {
-		l.cache = map[persist.AddressDetails][]sqlc.Contract{}
+		l.cache = map[persist.AddressDetails]sqlc.Contract{}
 	}
 	l.cache[key] = value
 }

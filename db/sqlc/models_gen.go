@@ -221,6 +221,7 @@ type Token struct {
 	BlockNumber      sql.NullInt64
 	OwnerUserID      persist.DBID
 	OwnerAddresses   []string
+	CollectionName   sql.NullString
 }
 
 type User struct {

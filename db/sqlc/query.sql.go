@@ -424,7 +424,7 @@ func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 }
 
 const getTokenByID = `-- name: GetTokenByID :one
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, error) {
@@ -452,12 +452,13 @@ func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, err
 		&i.BlockNumber,
 		&i.OwnerUserID,
 		&i.OwnerAddresses,
+		&i.CollectionName,
 	)
 	return i, err
 }
 
 const getTokensByUserID = `-- name: GetTokensByUserID :many
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE owner_user_id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
@@ -491,6 +492,7 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 			&i.BlockNumber,
 			&i.OwnerUserID,
 			&i.OwnerAddresses,
+			&i.CollectionName,
 		); err != nil {
 			return nil, err
 		}

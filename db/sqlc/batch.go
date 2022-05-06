@@ -811,7 +811,7 @@ func (b *GetNftsByOwnerAddressBatchBatchResults) Close() error {
 }
 
 const getTokenByIDBatch = `-- name: GetTokenByIDBatch :batchone
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE id = $1 AND deleted = false
 `
 
 type GetTokenByIDBatchBatchResults struct {
@@ -857,6 +857,7 @@ func (b *GetTokenByIDBatchBatchResults) QueryRow(f func(int, Token, error)) {
 			&i.BlockNumber,
 			&i.OwnerUserID,
 			&i.OwnerAddresses,
+			&i.CollectionName,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -873,7 +874,7 @@ func (b *GetTokenByIDBatchBatchResults) Close() error {
 }
 
 const getTokensByUserIDBatch = `-- name: GetTokensByUserIDBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE owner_user_id = $1 AND deleted = false
 `
 
 type GetTokensByUserIDBatchBatchResults struct {
@@ -925,6 +926,7 @@ func (b *GetTokensByUserIDBatchBatchResults) Query(f func(int, []Token, error)) 
 				&i.BlockNumber,
 				&i.OwnerUserID,
 				&i.OwnerAddresses,
+				&i.CollectionName,
 			); err != nil {
 				break
 			}
