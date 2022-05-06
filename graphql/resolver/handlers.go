@@ -293,8 +293,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 		}
 
 		userId := auth.GetUserIDFromCtx(gc)
-		// TODO: deferred recover in getScrubbedQuery
-		scrubbedQuery, scrubbedVariables := getScrubbedQuery(schema, oc.Doc, oc.RawQuery, oc.Variables)
+		scrubbedQuery, scrubbedVariables := getScrubbedQuery(ctx, schema, oc.Doc, oc.RawQuery, oc.Variables)
 
 		if log {
 			// Unique ID to connect this request with its associated response
@@ -512,9 +511,18 @@ func scrubValue(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Pos
 	}
 }
 
-func getScrubbedQuery(schema *ast.Schema, queryDoc *ast.QueryDocument, rawQuery string, allQueryVariables map[string]interface{}) (string, map[string]interface{}) {
+func getScrubbedQuery(ctx context.Context, schema *ast.Schema, queryDoc *ast.QueryDocument, rawQuery string, allQueryVariables map[string]interface{}) (scrubbedQuery string, scrubbedVariables map[string]interface{}) {
+	defer func() {
+		// If scrubbing fails for some reason, return placeholder values
+		if r := recover(); r != nil {
+			scrubbedQuery = fmt.Sprintf("<error occurred while scrubbing query: %v>", r)
+			scrubbedVariables = make(map[string]interface{})
+			sentryutil.ReportError(ctx, fmt.Errorf("getScrubbedQuery failed: %v", r))
+		}
+	}()
+
 	scrubPositions := make(map[int]*ast.Position)
-	scrubbedVariables := make(map[string]interface{})
+	scrubbedVariables = make(map[string]interface{})
 
 	observers := validator.Events{}
 	observers.OnValue(func(walker *validator.Walker, value *ast.Value) {
