@@ -30,6 +30,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
 	OnCommunity:      resolveCommunityByID,
+	OnAddress:        resolveAddressByID,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))

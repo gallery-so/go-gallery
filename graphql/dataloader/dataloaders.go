@@ -63,7 +63,7 @@ type Loaders struct {
 	AddressByAddressDetails  AddressLoaderByAddressDetails
 	TokenByUserID            TokenLoaderByManyID
 	TokenByID                TokenLoaderByID
-	TokenByCollectionID      TokenLoaderByManyID
+	TokensByCollectionID     TokenLoaderByManyID
 	ContractByContractId     ContractLoaderByID
 	ContractByAddress        ContractLoaderByAddress
 	ContractByAddressDetails ContractLoaderByAddressDetails

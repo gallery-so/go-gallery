@@ -93,6 +93,4 @@ type CollectionRepository interface {
 	// TODO move this to package multichain
 	RemoveNFTsOfOldAddresses(context.Context, DBID) error
 	Delete(context.Context, DBID, DBID) error
-	GetUnassigned(context.Context, DBID) (Collection, error)
-	RefreshUnassigned(context.Context, DBID) error
 }

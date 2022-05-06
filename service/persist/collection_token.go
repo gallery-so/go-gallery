@@ -110,8 +110,6 @@ type CollectionTokenRepository interface {
 	// TODO move this to package multichain
 	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error
 	Delete(context.Context, DBID, DBID) error
-	GetUnassigned(context.Context, DBID) (CollectionToken, error)
-	RefreshUnassigned(context.Context, DBID) error
 }
 
 // ErrCollectionNotFoundByID is returned when a collection is not found by ID

@@ -21,7 +21,7 @@ type ContractGallery struct {
 
 // ContractGalleryRepository represents a repository for interacting with persisted contracts
 type ContractGalleryRepository interface {
-	GetByAddress(context.Context, Address, Chain) (Contract, error)
-	UpsertByAddress(context.Context, Address, Contract) error
-	BulkUpsert(context.Context, []Contract) error
+	GetByAddress(context.Context, AddressValue, Chain) (ContractGallery, error)
+	UpsertByAddress(context.Context, AddressValue, Chain, ContractGallery) error
+	BulkUpsert(context.Context, []ContractGallery) error
 }

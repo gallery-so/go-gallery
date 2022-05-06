@@ -28,13 +28,13 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 	insertStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE) VALUES ($1,$2,$3,$4) ON CONFLICT (ADDRESS) DO NOTHING;`)
 	checkNoErr(err)
 
-	insertAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID,VERSION,ADDRESS,CHAIN) VALUES ($1,$2,$3,$4) ON CONFLICT (ADDRESS,CHAIN) DO NOTHING`)
+	insertAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID,VERSION,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,$3,$4) ON CONFLICT (ADDRESS_VALUE,CHAIN) DO NOTHING`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ID = $1 AND DELETED = false);`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ID = $1 AND DELETED = false);`)
 	checkNoErr(err)
 
-	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false);`)
+	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	return &WalletRepository{

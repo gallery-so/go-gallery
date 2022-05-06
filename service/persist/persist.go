@@ -64,7 +64,7 @@ type Repositories struct {
 	CollectionTokenRepository CollectionTokenRepository
 	GalleryRepository         GalleryRepository
 	GalleryTokenRepository    GalleryTokenRepository
-	ContractRepository        ContractRepository
+	ContractRepository        ContractGalleryRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
 	UserEventRepository       UserEventRepository

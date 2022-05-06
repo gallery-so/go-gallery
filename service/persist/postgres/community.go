@@ -50,7 +50,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS_VALUE,CHAIN FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getAddressByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN FROM addresses WHERE ID = $1;`)
+	getAddressByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS_VALUE,CHAIN FROM addresses WHERE ID = $1;`)
 	checkNoErr(err)
 
 	return &CommunityRepository{

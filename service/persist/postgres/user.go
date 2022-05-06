@@ -41,7 +41,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT 1 FROM users WHERE EXISTS(SELECT 1 FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND USER_ID = users.ID AND DELETED = false);`)
+	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT 1 FROM users WHERE EXISTS(SELECT 1 FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
@@ -50,7 +50,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = (SELECT USER_ID FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false) AND DELETED = false;`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = (SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false) AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
@@ -68,13 +68,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	deleteGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID, ADDRESS, CHAIN) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS,CHAIN) DO NOTHING;`)
+	createAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID, ADDRESS_VALUE, CHAIN) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS_VALUE,CHAIN) DO NOTHING;`)
 	checkNoErr(err)
 
-	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESS, CHAIN FROM addresses WHERE ADDRESS = $1 AND CHAIN = $2;`)
+	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESS_VALUE, CHAIN FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`)
 	checkNoErr(err)
 
-	createWalletStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID, ADDRESS, TYPE) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS) DO NOTHING;`)
+	createWalletStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID, ADDRESS, WALLET_TYPE) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS) DO NOTHING;`)
 	checkNoErr(err)
 
 	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESS FROM wallets WHERE ADDRESS = $1;`)

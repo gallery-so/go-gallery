@@ -36,7 +36,6 @@ type CollectionTokenRepository struct {
 	getNFTsForAddressStmt        *sql.Stmt
 	deleteCollectionStmt         *sql.Stmt
 	getUserAddressesStmt         *sql.Stmt
-	getUnassignedNFTsStmt        *sql.Stmt
 	checkOwnNFTsStmt             *sql.Stmt
 	getAddressByDetailsStmt      *sql.Stmt
 	getUserWalletsStmt           *sql.Stmt
@@ -53,7 +52,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 
 	getByUserIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 		c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
-		n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
+		n.ID,n.OWNER_USER_ID,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 		FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 		JOIN tokens n ON n.ID = nft
 		WHERE c.OWNER_USER_ID = $1 AND c.DELETED = false AND n.DELETED = false ORDER BY ordinality;`)
@@ -63,7 +62,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 
 	getByIDOwnerStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.OWNER_USER_ID,c.NAME,c.VERSION,c.COLLECTORS_NOTE,
 	c.LAYOUT,c.HIDDEN,c.CREATED_AT,c.LAST_UPDATED,
-	n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
+	n.ID,n.OWNER_USER_ID,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
 	FROM collections_v2 c, unnest(c.NFTS) WITH ORDINALITY AS u(nft, ordinality) 
 	JOIN tokens n ON n.ID = nft
 	WHERE c.ID = $1 AND c.DELETED = false AND n.DELETED = false ORDER BY ordinality;`)
@@ -89,7 +88,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	updateNFTsUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
 	checkNoErr(err)
 
-	nftsToRemoveStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_ADDRESS = ANY($1) AND ID <> ALL($2);`)
+	nftsToRemoveStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_USER_ID = $1 AND ID <> ALL($2);`)
 	checkNoErr(err)
 
 	deleteNFTsStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE ID = ANY($1)`)
@@ -98,28 +97,22 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	removeNFTFromCollectionsStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET NFTS = array_remove(NFTS, $1) WHERE OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	getNFTsForAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_ADDRESS = ANY($1);`)
+	getNFTsForAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM tokens WHERE OWNER_USER_ID = $1;`)
 	checkNoErr(err)
 
 	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT a.ID FROM users u, unnest(u.WALLETS) WITH ORDINALITY AS u(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet LEFT JOIN addresses a on a.ID = w.ADDRESS WHERE u.ID = $1;`)
+	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT a.ID FROM users u, unnest(u.ADDRESSES) WITH ORDINALITY AS d(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet LEFT JOIN addresses a on a.ID = w.ADDRESS WHERE u.ID = $1;`)
 	checkNoErr(err)
 
-	getUnassignedNFTsStmt, err := db.PrepareContext(ctx, `SELECT n.ID,n.OWNER_ADDRESS,n.CHAIN,n.NAME,n.DESCRIPTION,n.TOKEN_TYPE,n.TOKEN_URI,n.TOKEN_ID,n.MEDIA,n.TOKEN_METADATA,n.CONTRACT_ADDRESS,n.CREATED_AT 
-	FROM tokens n
-	JOIN collections_v2 c on n.ID <> ALL(c.NFTS)
-	WHERE c.OWNER_USER_ID = $1 AND n.OWNER_ADDRESS = ANY($2);`)
+	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_USER_ID = $1 AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_ADDRESS = ANY($1) AND ID = ANY($2);`)
+	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
-	checkNoErr(err)
-
-	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, getUnassignedNFTsStmt: getUnassignedNFTsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getAddressByDetailsStmt: getAddressByDetailsStmt}
+	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt, getAddressByDetailsStmt: getAddressByDetailsStmt}
 }
 
 // Create creates a new collection in the database
@@ -458,41 +451,6 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 		return persist.ErrCollectionNotFoundByID{ID: pID}
 	}
 	return c.galleryRepo.RefreshCache(pCtx, pUserID)
-}
-
-// GetUnassigned returns all unassigned nfts
-func (c *CollectionTokenRepository) GetUnassigned(pCtx context.Context, pUserID persist.DBID) (persist.CollectionToken, error) {
-	var addresses []persist.EthereumAddress
-	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
-
-	rows, err := c.getUnassignedNFTsStmt.QueryContext(pCtx, pUserID, pq.Array(addresses))
-	if err != nil {
-		return persist.CollectionToken{}, err
-	}
-	defer rows.Close()
-
-	nfts := []persist.TokenInCollection{}
-	for rows.Next() {
-		var nft persist.TokenInCollection
-		err = rows.Scan(&nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
-		if err != nil {
-			return persist.CollectionToken{}, err
-		}
-		nfts = append(nfts, nft)
-	}
-
-	if err := rows.Err(); err != nil {
-		return persist.CollectionToken{}, err
-	}
-
-	return persist.CollectionToken{
-		NFTs: nfts,
-	}, nil
-}
-
-// RefreshUnassigned refreshes the unassigned nfts
-func (c *CollectionTokenRepository) RefreshUnassigned(context.Context, persist.DBID) error {
-	return nil
 }
 
 func ensureTokensOwnedByUser(pCtx context.Context, c *CollectionTokenRepository, pUserID persist.DBID, nfts []persist.DBID) error {
