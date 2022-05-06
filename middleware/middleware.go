@@ -234,7 +234,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 		// Add the cloned hub to the request context so sentrygin will find it
 		c.Request = c.Request.WithContext(sentry.SetHubOnContext(c.Request.Context(), hub))
 
-		// Invoke the sentrygin handler
+		// Invoke the sentrygin handler. We don't call c.Next() here because sentrygin does it for us.
 		handler(c)
 
 		if reportGinErrors {
