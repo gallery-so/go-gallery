@@ -1,15 +1,14 @@
 package server
 
 import (
-	"context"
-	"fmt"
-
 	"cloud.google.com/go/storage"
+	"context"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -54,12 +53,20 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
-	h.AroundOperations(graphql.ScrubbedRequestLogger(schema.Schema()))
-	h.AroundFields(graphql.RemapErrors)
-	h.AroundResponses(graphql.AddErrorsToGin)
+
+	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
+	// It might be worth logging top-level queries and mutations in a single log line, though.
+	enableLogging := viper.GetString("ENV") != "local"
+
+	h.AroundOperations(graphql.RequestReporter(schema.Schema(), enableLogging, true))
+	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))
+	h.AroundFields(graphql.FieldReporter(true))
+
+	// Should happen after FieldReporter, so Sentry trace context is set up prior to error reporting
+	h.AroundFields(graphql.RemapAndReportErrors)
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
-		if hub := sentry.SentryHubFromContext(ctx); hub != nil {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 			hub.Recover(err)
 		}
 
@@ -67,35 +74,16 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 	})
 
 	return func(c *gin.Context) {
-		c.Set(graphql.GraphQLErrorsKey, &graphql.GraphQLErrorContext{})
+		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
+			sentryutil.SetAuthContext(hub.Scope(), c)
 
-		hub := sentry.SentryHubFromContext(c)
-		if hub != nil {
-			sentry.SetSentryAuthContext(c, hub)
+			hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				// Filter the request body because queries may contain sensitive data. Other middleware (e.g. RequestReporter)
+				// can update the request body later with an appropriately scrubbed version of the query.
+				event.Request.Data = "[filtered]"
+				return event
+			})
 		}
-
-		defer func() {
-			if hub != nil {
-				for _, err := range c.Errors {
-					hub.Scope().SetContext(sentry.ErrorSentryContextName, sentry.SentryErrorContext{})
-					hub.CaptureException(err)
-				}
-
-				if gqlErrCtx := graphql.GqlErrorContextFromContext(c); gqlErrCtx != nil {
-					for _, mappedErr := range gqlErrCtx.Errors() {
-						errCtx := sentry.SentryErrorContext{}
-
-						if mappedErr.Model != nil {
-							errCtx.Mapped = true
-							errCtx.MappedTo = fmt.Sprintf("%T", mappedErr.Model)
-						}
-
-						hub.Scope().SetContext(sentry.ErrorSentryContextName, errCtx)
-						hub.CaptureException(mappedErr.Error)
-					}
-				}
-			}
-		}()
 
 		event.AddTo(c, repos)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient)

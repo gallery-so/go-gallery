@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 )
 
 type getMembershipTiersInput struct {
@@ -50,7 +50,7 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 			return
 		}
 		if input.ForceRefresh {
-			logrus.Infof("Force refresh - updating membership tiers")
+			logger.For(c).Infof("Force refresh - updating membership tiers")
 		}
 		allTiers, err := membershipRepository.GetAll(c)
 		if err != nil {
@@ -79,7 +79,7 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 			tiersToUpdate := make([]persist.TokenID, 0, len(allTiers))
 			for _, tier := range allTiers {
 				if time.Since(tier.LastUpdated.Time()) > time.Hour || input.ForceRefresh {
-					logrus.Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
+					logger.For(c).Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
 					tiersToUpdate = append(tiersToUpdate, tier.TokenID)
 				}
 			}
@@ -88,7 +88,7 @@ func getMembershipTiersToken(membershipRepository persist.MembershipRepository, 
 					for _, tierID := range tiersToUpdate {
 						_, err := membership.UpdateMembershipTierToken(tierID, membershipRepository, userRepository, nftRepository, galleryRepository, ethClient)
 						if err != nil {
-							logrus.WithError(err).Errorf("Failed to update membership tier %s", tierID)
+							logger.For(c).WithError(err).Errorf("Failed to update membership tier %s", tierID)
 						}
 					}
 				}()

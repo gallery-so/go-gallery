@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"testing"
 
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 func TestGalleriesGetByUserID_Success(t *testing.T) {
@@ -70,7 +70,7 @@ func TestGalleriesGetByUserID_Success(t *testing.T) {
 
 	a.Len(galleries, 1)
 
-	logrus.Infof("%+v", galleries)
+	logger.For(nil).Infof("%+v", galleries)
 
 	a.Equal(userID, galleries[0].OwnerUserID)
 	a.Len(galleries[0].Collections, 1)

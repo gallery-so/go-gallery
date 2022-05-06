@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -136,7 +136,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 	ids, err := UpdateAssetsForWallet(pCtx, pOwnerWalletAddresses, nftRepo)
 	if err != nil {
 		if e, ok := err.(ErrNoAssetsForWallets); ok {
-			logrus.Debugf("no assets found for wallets %v", e.Wallets)
+			logger.For(pCtx).Debugf("no assets found for wallets %v", e.Wallets)
 		} else {
 			return err
 		}
@@ -164,13 +164,13 @@ func UpdateAssetsForWallet(pCtx context.Context, pOwnerWalletAddresses []persist
 			return nil, fmt.Errorf("failed to fetch assets for wallets %v: %w", pOwnerWalletAddresses, err)
 		}
 	}
-	logrus.Debugf("found %d assets for wallets %v", len(asDBNfts), pOwnerWalletAddresses)
+	logger.For(pCtx).Debugf("found %d assets for wallets %v", len(asDBNfts), pOwnerWalletAddresses)
 
 	ids, err := nftRepo.BulkUpsert(pCtx, asDBNfts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bulk upsert NFTs: %w", err)
 	}
-	logrus.Debugf("bulk upserted %d NFTs", len(ids))
+	logger.For(pCtx).Debugf("bulk upserted %d NFTs", len(ids))
 	return ids, returnErr
 }
 
@@ -240,7 +240,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 
 	dir := "desc"
 
-	logrus.Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
+	logger.For(pCtx).Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
 
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&limit=%d", pWalletAddress, dir, 50)
 	if pCursor != "" {
@@ -284,7 +284,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.Address, 
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
-			logrus.Debugf("response already received asset: %s", it)
+			logger.For(pCtx).Debugf("response already received asset: %s", it)
 			doneReceiving = true
 			continue
 		}
@@ -313,7 +313,7 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 	result := []Asset{}
 
 	if pOffset > 20000 {
-		logrus.Errorf("failed to fetch more assets for wallet %s, contract %s, token %s: too many results", pWalletAddress, pContractAddress, pTokenID)
+		logger.For(pCtx).Errorf("failed to fetch more assets for wallet %s, contract %s, token %s: too many results", pWalletAddress, pContractAddress, pTokenID)
 		return result, nil
 	}
 
@@ -378,7 +378,7 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
-			logrus.Debugf("response already received asset: %s", it)
+			logger.For(pCtx).Debugf("response already received asset: %s", it)
 			doneReceiving = true
 			continue
 		}

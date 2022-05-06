@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"strings"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 )
 
 var errNoTokensToRefresh = errors.New("no tokens to refresh metadata for")
@@ -221,7 +221,7 @@ func refreshMetadataForToken(tokenRepository persist.TokenRepository, ethcl *eth
 		for _, t := range tokens {
 			token, err := refreshMetadata(c, t, ethcl, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
-				logrus.WithError(err).Error("could not refresh all metadata for token")
+				logger.For(c).WithError(err).Error("could not refresh all metadata for token")
 			}
 			update := persist.TokenUpdateMediaInput{
 				TokenURI: token.TokenURI,

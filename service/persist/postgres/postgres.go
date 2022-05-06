@@ -4,12 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/getsentry/sentry-go"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"strings"
+	"time"
 
 	// register postgres driver
 	// _ "github.com/lib/pq"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -27,7 +31,7 @@ func getSqlConnectionString() string {
 func NewClient() *sql.DB {
 	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
-		logrus.WithError(err).Fatal("could not open database connection")
+		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
@@ -43,9 +47,18 @@ func NewClient() *sql.DB {
 // NewPgxClient creates a new postgres client via pgx
 func NewPgxClient() *pgxpool.Pool {
 	ctx := context.Background()
-	db, err := pgxpool.Connect(ctx, getSqlConnectionString())
+
+	config, err := pgxpool.ParseConfig(getSqlConnectionString())
 	if err != nil {
-		logrus.WithError(err).Fatal("could not open database connection")
+		logger.For(nil).WithError(err).Fatal("could not parse pgx connection string")
+		panic(err)
+	}
+
+	config.ConnConfig.Logger = &pgxTracer{}
+
+	db, err := pgxpool.ConnectConfig(ctx, config)
+	if err != nil {
+		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
 	}
 
@@ -58,6 +71,71 @@ func NewPgxClient() *pgxpool.Pool {
 		panic(err)
 	}
 	return db
+}
+
+type pgxTracer struct{}
+
+func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+
+	// Only trace things that have a duration
+	duration, ok := data["time"].(time.Duration)
+	if !ok {
+		return
+	}
+
+	operation := "other"
+	if strings.EqualFold(msg, "query") {
+		operation = "query"
+	} else if strings.EqualFold(msg, "exec") {
+		operation = "exec"
+	}
+
+	description := msg
+
+	sqlStr, ok := data["sql"].(string)
+	if ok {
+		// If a SQL statement was supplied, use that as the default description
+		description = sqlStr
+
+		// If it's a sqlc query, try to parse the query name for an even better description
+		const sqlcPrefix = "-- name: "
+		if strings.HasPrefix(sqlStr, sqlcPrefix) && len(sqlStr) > len(sqlcPrefix) {
+			withoutPrefix := sqlStr[len(sqlcPrefix):]
+			if spaceIndex := strings.Index(withoutPrefix, " "); spaceIndex != -1 {
+				description = withoutPrefix[:spaceIndex]
+			}
+		}
+	}
+
+	span := sentry.StartSpan(ctx, "db."+operation)
+	defer span.Finish()
+
+	span.Description = description
+
+	if span.Data == nil {
+		span.Data = make(map[string]interface{})
+	}
+
+	if sqlStr != "" {
+		span.Data["sql"] = sqlStr
+	}
+
+	if rows, ok := data["rowCount"]; ok {
+		span.Data["rowCount"] = rows
+	}
+
+	if args, ok := data["args"]; ok {
+		span.Data["sql args"] = args
+	}
+
+	span.Data["logMessage"] = msg
+
+	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.
+	// We can use that to update our span so it reflects the correct start time.
+	span.StartTime = time.Now().Add(-duration)
 }
 
 func generateValuesPlaceholders(l, offset int) string {

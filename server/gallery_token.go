@@ -2,13 +2,12 @@ package server
 
 import (
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/sirupsen/logrus"
-
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -53,7 +52,7 @@ func getGalleriesByUserIDToken(galleryRepository persist.GalleryTokenRepository,
 
 		galleries, err := galleryRepository.GetByUserID(c, input.UserID)
 		if len(galleries) == 0 || err != nil {
-			logrus.WithError(err).Errorf("no galleries found with user id: %s - %s", input.UserID, err)
+			logger.For(c).WithError(err).Errorf("no galleries found with user id: %s - %s", input.UserID, err)
 			galleries = []persist.GalleryToken{}
 		}
 
