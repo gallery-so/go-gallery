@@ -17,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -258,10 +257,7 @@ func Tracing() gin.HandlerFunc {
 
 		defer span.Finish()
 
-		loggingCtx := logger.NewContextWithFields(span.Context(), logrus.Fields{
-			"traceId": span.TraceID,
-		})
-
+		loggingCtx := logger.NewContextWithSpan(span.Context(), span)
 		c.Request = c.Request.WithContext(loggingCtx)
 
 		c.Next()
