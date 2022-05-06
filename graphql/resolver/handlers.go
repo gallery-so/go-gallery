@@ -201,7 +201,7 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 		res, err = next(ctx)
 
-		if span != nil {
+		if span != nil && err == nil {
 			// If our result type implements the GraphQL Node pattern, add its ID to our event data
 			if node, ok := res.(interface{ ID() model.GqlID }); ok {
 				addEventDataToSpan(map[string]interface{}{
