@@ -29,14 +29,14 @@ type TokenHolder struct {
 	PreviewNFTs []NullString `json:"preview_nfts"`
 }
 
-// MembershipOwnerList is a slice of MembershipOwners, used to implement scanner/valuer interfaces
-type MembershipOwnerList []TokenHolder
+// TokenHolderList is a slice of MembershipOwners, used to implement scanner/valuer interfaces
+type TokenHolderList []TokenHolder
 
-func (l MembershipOwnerList) Value() (driver.Value, error) {
+func (l TokenHolderList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
 
-func (l *MembershipOwnerList) Scan(value interface{}) error {
+func (l *TokenHolderList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
