@@ -180,7 +180,7 @@ func initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
-		SampleRate:       viper.GetFloat64("SENTRY_SAMPLE_RATE"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)
