@@ -63,6 +63,14 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
@@ -358,6 +366,28 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	}
 
 	return output, nil
+}
+
+func (r *mutationResolver) FollowUser(ctx context.Context, followee persist.DBID) (*bool, error) {
+	err := publicapi.For(ctx).User.FollowUser(ctx, followee)
+
+	var output bool
+	if err == nil {
+		output = true
+	}
+
+	return &output, err
+}
+
+func (r *mutationResolver) UnfollowUser(ctx context.Context, followee persist.DBID) (*bool, error) {
+	err := publicapi.For(ctx).User.UnfollowUser(ctx, followee)
+
+	var output bool
+	if err == nil {
+		output = true
+	}
+
+	return &output, err
 }
 
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {

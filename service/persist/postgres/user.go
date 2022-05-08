@@ -26,6 +26,8 @@ type UserRepository struct {
 	getGalleriesStmt      *sql.Stmt
 	updateCollectionsStmt *sql.Stmt
 	deleteGalleryStmt     *sql.Stmt
+	addFollowerStmt       *sql.Stmt
+	removeFollowerStmt    *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -69,6 +71,12 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	deleteGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
+	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`)
+	checkNoErr(err)
+
+	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true, LAST_UPDATED = NOW() WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
+	checkNoErr(err)
+
 	return &UserRepository{
 		db:                    db,
 		updateInfoStmt:        updateInfoStmt,
@@ -83,6 +91,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		getGalleriesStmt:      getGalleriesStmt,
 		updateCollectionsStmt: updateCollectionsStmt,
 		deleteGalleryStmt:     deleteGalleryStmt,
+		addFollowerStmt:       addFollowerStmt,
+		removeFollowerStmt:    removeFollowerStmt,
 	}
 }
 
@@ -320,4 +330,14 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	}
 
 	return tx.Commit()
+}
+
+func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.addFollowerStmt.ExecContext(pCtx, persist.GenerateID(), follower, followee)
+	return err
+}
+
+func (u *UserRepository) RemoveFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.removeFollowerStmt.ExecContext(pCtx, follower, followee)
+	return err
 }

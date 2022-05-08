@@ -361,12 +361,14 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryUser struct {
-	Dbid                persist.DBID `json:"dbid"`
-	Username            *string      `json:"username"`
-	Bio                 *string      `json:"bio"`
-	Wallets             []*Wallet    `json:"wallets"`
-	Galleries           []*Gallery   `json:"galleries"`
-	IsAuthenticatedUser *bool        `json:"isAuthenticatedUser"`
+	Dbid                persist.DBID   `json:"dbid"`
+	Username            *string        `json:"username"`
+	Bio                 *string        `json:"bio"`
+	Wallets             []*Wallet      `json:"wallets"`
+	Galleries           []*Gallery     `json:"galleries"`
+	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser `json:"followers"`
+	Following           []*GalleryUser `json:"following"`
 }
 
 func (GalleryUser) IsNode()                  {}

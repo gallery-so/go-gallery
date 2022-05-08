@@ -14,10 +14,11 @@ package dataloader
 
 import (
 	"context"
+	"time"
+
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"time"
 )
 
 const defaultMaxBatchOne = 100 // Default for queries that return a single result

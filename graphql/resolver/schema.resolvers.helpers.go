@@ -315,11 +315,16 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            &user.Username.String,
-		Bio:                 &user.Bio.String,
-		Wallets:             wallets,
-		Galleries:           nil, // handled by dedicated resolver
+		Dbid:     user.ID,
+		Username: &user.Username.String,
+		Bio:      &user.Bio.String,
+		Wallets:  wallets,
+
+		// each handeled by dedicated resolver
+		Galleries: nil,
+		Followers: nil,
+		Following: nil,
+
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
 }

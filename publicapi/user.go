@@ -206,6 +206,37 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	return &community, nil
 }
 
+func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"followee": {followee, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.repos.UserRepository.AddFollower(ctx, userID, followee)
+}
+
+func (api UserAPI) UnfollowUser(ctx context.Context, followee persist.DBID) error {
+	if err := validateFields(api.validator, validationMap{
+		"followee": {followee, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.repos.UserRepository.RemoveFollower(ctx, userID, followee)
+}
+
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User

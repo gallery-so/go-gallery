@@ -56,6 +56,8 @@ type GalleryUser implements Node {
     wallets: [Wallet]
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
+    followers: [GalleryUser] @goField(forceResolver: true)
+    following: [GalleryUser] @goField(forceResolver: true)
 }
 
 type Wallet implements Node @goGqlId(fields: ["address"]) {
@@ -628,4 +630,7 @@ type Mutation {
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
+
+    followUser(followee: DBID!): Boolean @authRequired
+    unfollowUser(followee: DBID!): Boolean @authRequired
 }
