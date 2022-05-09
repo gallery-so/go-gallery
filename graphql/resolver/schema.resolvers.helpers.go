@@ -116,6 +116,36 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
+func resolveFollowersByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	followers, err := publicapi.For(ctx).User.GetFollowersById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(followers))
+	for i, user := range followers {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
+func resolveFollowingByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	following, err := publicapi.For(ctx).User.GetFollowingById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(following))
+	for i, user := range following {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
 func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 

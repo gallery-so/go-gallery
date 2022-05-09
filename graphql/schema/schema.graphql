@@ -603,6 +603,26 @@ type CreateUserPayload {
     viewer: Viewer
 }
 
+union FollowUserPayloadOrError =
+    FollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+union UnfollowUserPayloadOrError =
+    UnfollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+type FollowUserPayload {
+    userId: DBID
+}
+
+type UnfollowUserPayload {
+    userId: DBID
+}
+
 type Mutation {
     # User Mutations
     addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
@@ -631,6 +651,6 @@ type Mutation {
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
-    followUser(followee: DBID!): Boolean @authRequired
-    unfollowUser(followee: DBID!): Boolean @authRequired
+    followUser(followee: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(followee: DBID!): UnfollowUserPayloadOrError @authRequired
 }

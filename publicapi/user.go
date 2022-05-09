@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -206,23 +207,72 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	return &community, nil
 }
 
-func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error {
+func (api UserAPI) GetFollowersById(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"followee": {followee, "required"},
+		"userID": {userID, "required"},
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
+	if _, err := api.GetUserById(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	followers, err := api.loaders.FollowersByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return followers, nil
+}
+
+func (api UserAPI) GetFollowingById(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	if _, err := api.GetUserById(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	following, err := api.loaders.FollowingByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return following, nil
+}
+
+func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error {
+	// Validate
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
+	if err := validateFields(api.validator, validationMap{
+		"followee": {followee, fmt.Sprintf("required,ne=%s", userID)},
+	}); err != nil {
+		return err
+	}
+
+	if _, err := api.GetUserById(ctx, followee); err != nil {
+		return err
+	}
+
+	// Send event
+	userData := persist.UserEvent{}
+	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
+
 	return api.repos.UserRepository.AddFollower(ctx, userID, followee)
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, followee persist.DBID) error {
+	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"followee": {followee, "required"},
 	}); err != nil {

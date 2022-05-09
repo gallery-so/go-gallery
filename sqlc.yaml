@@ -35,6 +35,12 @@ overrides:
   - column: "membership.owners"
     go_type: "github.com/mikeydub/go-gallery/service/persist.MembershipOwnerList"
 
+# Follows
+  - column: "follows.followee"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "follows.follower"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
 # Wildcards
 # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"

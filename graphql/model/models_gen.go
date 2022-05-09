@@ -47,6 +47,10 @@ type Error interface {
 	IsError()
 }
 
+type FollowUserPayloadOrError interface {
+	IsFollowUserPayloadOrError()
+}
+
 type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
@@ -81,6 +85,10 @@ type RefreshOpenSeaNftsPayloadOrError interface {
 
 type RemoveUserAddressesPayloadOrError interface {
 	IsRemoveUserAddressesPayloadOrError()
+}
+
+type UnfollowUserPayloadOrError interface {
+	IsUnfollowUserPayloadOrError()
 }
 
 type UpdateCollectionHiddenPayloadOrError interface {
@@ -236,6 +244,8 @@ func (ErrAuthenticationFailed) IsAddUserAddressPayloadOrError() {}
 func (ErrAuthenticationFailed) IsError()                        {}
 func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
+func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()     {}
+func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()   {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -281,6 +291,8 @@ func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
 func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsError()                                  {}
+func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
+func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -342,15 +354,23 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError() {}
-func (ErrUserNotFound) IsError()                 {}
-func (ErrUserNotFound) IsLoginPayloadOrError()   {}
+func (ErrUserNotFound) IsUserByUsernameOrError()      {}
+func (ErrUserNotFound) IsError()                      {}
+func (ErrUserNotFound) IsLoginPayloadOrError()        {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
 type EthereumEoaAuth struct {
 	Address   persist.Address `json:"address"`
 	Nonce     string          `json:"nonce"`
 	Signature string          `json:"signature"`
 }
+
+type FollowUserPayload struct {
+	UserID *persist.DBID `json:"userId"`
+}
+
+func (FollowUserPayload) IsFollowUserPayloadOrError() {}
 
 type Gallery struct {
 	Dbid        persist.DBID  `json:"dbid"`
@@ -525,6 +545,12 @@ type TextMedia struct {
 
 func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
+
+type UnfollowUserPayload struct {
+	UserID *persist.DBID `json:"userId"`
+}
+
+func (UnfollowUserPayload) IsUnfollowUserPayloadOrError() {}
 
 type UnknownMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
