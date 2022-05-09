@@ -264,11 +264,13 @@ func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error 
 		return err
 	}
 
+	err = api.repos.UserRepository.AddFollower(ctx, userID, followee)
+
 	// Send event
 	userData := persist.UserEvent{FolloweeID: followee}
 	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
 
-	return api.repos.UserRepository.AddFollower(ctx, userID, followee)
+	return err
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, followee persist.DBID) error {
