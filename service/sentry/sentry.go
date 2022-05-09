@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"net/http"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
@@ -145,47 +144,4 @@ func SentryHubFromContext(ctx context.Context) *sentry.Hub {
 	}
 
 	return nil
-}
-
-type tracingTransport struct {
-	http.RoundTripper
-
-	continueOnly bool
-}
-
-// NewTracingTransport creates an http transport that will trace requests via Sentry. If continueOnly is true,
-// traces will only be generated if they'd contribute to an existing parent trace (e.g. if a trace is not in progress,
-// no new trace would be started).
-func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool) *tracingTransport {
-	// If roundTripper is already a tracer, grab its underlying RoundTripper instead
-	if existingTracer, ok := roundTripper.(*tracingTransport); ok {
-		return &tracingTransport{RoundTripper: existingTracer.RoundTripper, continueOnly: continueOnly}
-	}
-
-	return &tracingTransport{RoundTripper: roundTripper, continueOnly: continueOnly}
-}
-
-func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.continueOnly {
-		transaction := sentry.TransactionFromContext(req.Context())
-		if transaction == nil {
-			return t.RoundTripper.RoundTrip(req)
-		}
-	}
-
-	span := sentry.StartSpan(req.Context(), "http."+strings.ToLower(req.Method))
-	span.Description = fmt.Sprintf("HTTP %s %s", req.Method, req.URL.String())
-	defer span.Finish()
-
-	// Send sentry-trace header in case the receiving service can continue our trace
-	req.Header.Add("sentry-trace", span.TraceID.String())
-
-	response, err := t.RoundTripper.RoundTrip(req)
-
-	if span.Data == nil {
-		span.Data = make(map[string]interface{})
-	}
-	span.Data["HTTP Status Code"] = response.StatusCode
-
-	return response, err
 }

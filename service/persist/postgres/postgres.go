@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"strings"
 	"time"
 
@@ -54,7 +55,7 @@ func NewPgxClient() *pgxpool.Pool {
 		panic(err)
 	}
 
-	config.ConnConfig.Logger = &pgxTracer{}
+	config.ConnConfig.Logger = &pgxTracer{continueOnly: true}
 
 	db, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
@@ -73,11 +74,20 @@ func NewPgxClient() *pgxpool.Pool {
 	return db
 }
 
-type pgxTracer struct{}
+type pgxTracer struct {
+	continueOnly bool
+}
 
 func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
 	if data == nil {
 		return
+	}
+
+	if l.continueOnly {
+		transaction := sentry.TransactionFromContext(ctx)
+		if transaction == nil {
+			return
+		}
 	}
 
 	// Only trace things that have a duration
@@ -110,28 +120,26 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		}
 	}
 
-	span := sentry.StartSpan(ctx, "db."+operation)
-	defer span.Finish()
+	span, ctx := tracing.StartSpan(ctx, "db."+operation, description)
+	defer tracing.FinishSpan(span)
 
-	span.Description = description
-
-	if span.Data == nil {
-		span.Data = make(map[string]interface{})
+	spanData := map[string]interface{}{
+		"logMessage": msg,
 	}
 
 	if sqlStr != "" {
-		span.Data["sql"] = sqlStr
+		spanData["sql"] = sqlStr
 	}
 
 	if rows, ok := data["rowCount"]; ok {
-		span.Data["rowCount"] = rows
+		spanData["rowCount"] = rows
 	}
 
 	if args, ok := data["args"]; ok {
-		span.Data["sql args"] = args
+		spanData["sql args"] = args
 	}
 
-	span.Data["logMessage"] = msg
+	tracing.AddEventDataToSpan(span, spanData)
 
 	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.
 	// We can use that to update our span so it reflects the correct start time.

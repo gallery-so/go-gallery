@@ -2,11 +2,40 @@ package redis
 
 import (
 	"context"
+	"fmt"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 )
+
+const (
+	GalleriesDB      = 0
+	GalleriesTokenDB = 1
+	CommunitiesDB    = 2
+	RequireNftsDB    = 3
+	TestSuiteDB      = 5
+)
+
+// GetNameForDatabase returns a name for the given database ID, if available.
+// This is useful for adding debug information to Redis calls (like tracing).
+func GetNameForDatabase(databaseId int) string {
+	switch databaseId {
+	case GalleriesDB:
+		return "GalleriesDB"
+	case GalleriesTokenDB:
+		return "GalleriesTokenDB"
+	case CommunitiesDB:
+		return "CommunitiesDB"
+	case RequireNftsDB:
+		return "RequireNftsDB"
+	case TestSuiteDB:
+		return "TestSuiteDB"
+	}
+
+	return fmt.Sprintf("db %d", databaseId)
+}
 
 // Cache represents an abstraction over a redist client
 type Cache struct {
@@ -24,6 +53,7 @@ func NewCache(db int) *Cache {
 		Password: redisPass,
 		DB:       db,
 	})
+	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic(err)
 	}
@@ -31,7 +61,7 @@ func NewCache(db int) *Cache {
 }
 
 // ClearCache deletes the entire cache
-func ClearCache() error {
+func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	redisURL := viper.GetString("REDIS_URL")
@@ -39,8 +69,9 @@ func ClearCache() error {
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
 		Password: redisPass,
-		DB:       0,
+		DB:       db,
 	})
+	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
 	return client.FlushAll(ctx).Err()
 }
 

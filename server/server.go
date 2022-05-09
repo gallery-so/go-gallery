@@ -54,7 +54,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		validate.RegisterCustomValidators(v)
 	}
 
-	if err := redis.ClearCache(); err != nil {
+	if err := redis.ClearCache(redis.GalleriesDB); err != nil {
 		panic(err)
 	}
 	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient())
