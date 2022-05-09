@@ -330,7 +330,7 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 func (c Chain) MarshalGQL(w io.Writer) {
 	switch c {
 	case ChainETH:
-		fmt.Fprint(w, "Ethereum")
+		w.Write([]byte(`"Ethereum"`))
 	}
 }
 

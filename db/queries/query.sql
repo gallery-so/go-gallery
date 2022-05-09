@@ -95,19 +95,28 @@ SELECT * FROM membership WHERE id = $1 AND deleted = false;
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
 
 -- name: GetWalletByID :one
-SELECT * FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false;
+SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
 -- name: GetWalletByIDBatch :batchone
-SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false;
+SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
 -- name: GetWalletByAddress :one
+SELECT * FROM wallets WHERE address = $1 AND deleted = false;
+
+-- name: GetWalletByAddressBatch :batchone
+SELECT * FROM wallets WHERE address = $1 AND deleted = false;
+
+-- name: GetWalletByAddressDetails :one
+SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
+
+-- name: GetWalletByAddressDetailsBatch :batchone
 SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
 
 -- name: GetWalletsByUserID :many
-SELECT w.* FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false;
+SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.address = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
 
 -- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.* FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false;
+SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.address = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
 
 -- name: GetAddressByID :one
 SELECT * FROM addresses WHERE id = $1 AND deleted = false;
@@ -120,6 +129,12 @@ SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = fa
 
 -- name: GetAddressByDetailsBatch :batchone
 SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;
+
+-- name: GetAddressByWalletID :one
+SELECT * FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false;
+
+-- name: GetAddressByWalletIDBatch :batchone
+SELECT * FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false;
 
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;

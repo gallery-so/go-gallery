@@ -313,6 +313,15 @@ func resolveAddressByID(ctx context.Context, addressID persist.DBID) (*model.Add
 	return addressToModelSqlc(ctx, address), nil
 }
 
+func resolveAddressByWalletID(ctx context.Context, addressID persist.DBID) (*model.Address, error) {
+	address, err := publicapi.For(ctx).Address.GetAddressByWalletID(ctx, persist.DBID(addressID))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return addressToModelSqlc(ctx, address), nil
+}
 func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Wallet, error) {
 	addresses, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
 

@@ -61,6 +61,7 @@ type Loaders struct {
 	WalletByAddressDetails   WalletLoaderByAddressDetails
 	AddressByAddressId       AddressLoaderByID
 	AddressByAddressDetails  AddressLoaderByAddressDetails
+	AddressByWalletId        AddressLoaderByID
 	TokenByUserID            TokenLoaderByManyID
 	TokenByID                TokenLoaderByID
 	TokensByCollectionID     TokenLoaderByManyID
@@ -143,7 +144,36 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		wait:     defaultWaitTime,
 		fetch:    loadMembershipByMembershipId(ctx, loaders, q),
 	}
-	// TODO new loaders
+	loaders.WalletByWalletId = WalletLoaderById{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletByWalletId(ctx, loaders, q),
+	}
+	loaders.WalletByAddress = WalletLoaderByAddress{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletByAddress(ctx, loaders, q),
+	}
+	loaders.WalletByUserID = WalletLoaderByUserID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletsByUserId(ctx, loaders, q),
+	}
+	loaders.WalletByAddressDetails = WalletLoaderByAddressDetails{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletByAddressDetails(ctx, loaders, q),
+	}
+	loaders.AddressByAddressId = AddressLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadAddressByAddressId(ctx, loaders, q),
+	}
+	loaders.AddressByWalletId = AddressLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadAddressByWalletId(ctx, loaders, q),
+	}
 
 	return loaders
 }
@@ -516,5 +546,164 @@ func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc
 		})
 
 		return memberships, errors
+	}
+}
+func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Wallet, []error) {
+	return func(walletIds []persist.DBID) ([]sqlc.Wallet, []error) {
+		wallets := make([]sqlc.Wallet, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		b := q.GetWalletByIDBatch(ctx, walletIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+
+			// TODO err for not found by ID
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
+				loaders.WalletByAddress.Prime(wallet.Address, wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadWalletByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Wallet, []error) {
+	return func(walletIds []persist.DBID) ([]sqlc.Wallet, []error) {
+		wallets := make([]sqlc.Wallet, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		b := q.GetWalletByAddressBatch(ctx, walletIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrWalletNotFoundByAddress{Address: walletIds[i]}
+			}
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
+				loaders.WalletByAddress.Prime(wallet.Address, wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Wallet, []error) {
+	return func(userIds []persist.DBID) ([][]sqlc.Wallet, []error) {
+		wallets := make([][]sqlc.Wallet, len(userIds))
+		errors := make([]error, len(userIds))
+
+		b := q.GetWalletsByUserIDBatch(ctx, userIds)
+		defer b.Close()
+
+		b.Query(func(i int, wallet []sqlc.Wallet, err error) {
+
+			// TODO err for not found by user ID
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByUserID.Prime(userIds[i], wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadWalletByAddressDetails(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.AddressDetails) ([]sqlc.Wallet, []error) {
+	return func(details []persist.AddressDetails) ([]sqlc.Wallet, []error) {
+		wallets := make([]sqlc.Wallet, len(details))
+		errors := make([]error, len(details))
+
+		sqlDetails := make([]sqlc.GetWalletByAddressDetailsBatchParams, len(details))
+		for i, detail := range details {
+			sqlDetails[i] = sqlc.GetWalletByAddressDetailsBatchParams{
+				AddressValue: detail.AddressValue,
+				Chain:        detail.Chain,
+			}
+		}
+
+		b := q.GetWalletByAddressDetailsBatch(ctx, sqlDetails)
+		defer b.Close()
+
+		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrWalletNotFoundByAddressDetails{Address: details[i].AddressValue, Chain: details[i].Chain}
+			}
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
+				loaders.WalletByAddress.Prime(wallet.Address, wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadAddressByAddressId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Address, []error) {
+	return func(addressIds []persist.DBID) ([]sqlc.Address, []error) {
+		addresses := make([]sqlc.Address, len(addressIds))
+		errors := make([]error, len(addressIds))
+
+		b := q.GetAddressByIDBatch(ctx, addressIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, address sqlc.Address, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrWalletNotFoundByAddress{Address: addressIds[i]}
+			}
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.AddressByAddressId.Prime(address.ID, address)
+				loaders.AddressByAddressDetails.Prime(persist.AddressDetails{AddressValue: address.AddressValue, Chain: address.Chain}, address)
+			}
+
+			addresses[i], errors[i] = address, err
+		})
+
+		return addresses, errors
+	}
+}
+
+func loadAddressByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Address, []error) {
+	return func(walletIds []persist.DBID) ([]sqlc.Address, []error) {
+		addresses := make([]sqlc.Address, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		b := q.GetAddressByWalletIDBatch(ctx, walletIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, address sqlc.Address, err error) {
+
+			// TODO err for not found by wallet ID
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.AddressByAddressId.Prime(address.ID, address)
+				loaders.AddressByAddressDetails.Prime(persist.AddressDetails{AddressValue: address.AddressValue, Chain: address.Chain}, address)
+			}
+
+			addresses[i], errors[i] = address, err
+		})
+
+		return addresses, errors
 	}
 }

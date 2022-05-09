@@ -8,7 +8,6 @@ package sqlc
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -43,6 +42,25 @@ SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM
 
 func (q *Queries) GetAddressByID(ctx context.Context, id persist.DBID) (Address, error) {
 	row := q.db.QueryRow(ctx, getAddressByID, id)
+	var i Address
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+		&i.Version,
+		&i.AddressValue,
+		&i.Chain,
+	)
+	return i, err
+}
+
+const getAddressByWalletID = `-- name: GetAddressByWalletID :one
+SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false
+`
+
+func (q *Queries) GetAddressByWalletID(ctx context.Context, id persist.DBID) (Address, error) {
+	row := q.db.QueryRow(ctx, getAddressByWalletID, id)
 	var i Address
 	err := row.Scan(
 		&i.ID,
@@ -568,16 +586,35 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getWalletByAddress = `-- name: GetWalletByAddress :one
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE address = $1 AND deleted = false
+`
+
+func (q *Queries) GetWalletByAddress(ctx context.Context, address persist.DBID) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByAddress, address)
+	var i Wallet
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Deleted,
+		&i.Version,
+		&i.Address,
+		&i.WalletType,
+	)
+	return i, err
+}
+
+const getWalletByAddressDetails = `-- name: GetWalletByAddressDetails :one
 SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false
 `
 
-type GetWalletByAddressParams struct {
+type GetWalletByAddressDetailsParams struct {
 	AddressValue persist.AddressValue
 	Chain        persist.Chain
 }
 
-func (q *Queries) GetWalletByAddress(ctx context.Context, arg GetWalletByAddressParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByAddress, arg.AddressValue, arg.Chain)
+func (q *Queries) GetWalletByAddressDetails(ctx context.Context, arg GetWalletByAddressDetailsParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByAddressDetails, arg.AddressValue, arg.Chain)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,
@@ -592,29 +629,12 @@ func (q *Queries) GetWalletByAddress(ctx context.Context, arg GetWalletByAddress
 }
 
 const getWalletByID = `-- name: GetWalletByID :one
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, address, wallet_type, addresses.id, addresses.created_at, addresses.last_updated, addresses.deleted, addresses.version, address_value, chain FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE id = $1 AND deleted = false
 `
 
-type GetWalletByIDRow struct {
-	ID            persist.DBID
-	CreatedAt     time.Time
-	LastUpdated   time.Time
-	Deleted       bool
-	Version       sql.NullInt32
-	Address       persist.DBID
-	WalletType    persist.WalletType
-	ID_2          persist.DBID
-	CreatedAt_2   time.Time
-	LastUpdated_2 time.Time
-	Deleted_2     bool
-	Version_2     sql.NullInt32
-	AddressValue  persist.AddressValue
-	Chain         persist.Chain
-}
-
-func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (GetWalletByIDRow, error) {
+func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, error) {
 	row := q.db.QueryRow(ctx, getWalletByID, id)
-	var i GetWalletByIDRow
+	var i Wallet
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
@@ -623,19 +643,12 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (GetWallet
 		&i.Version,
 		&i.Address,
 		&i.WalletType,
-		&i.ID_2,
-		&i.CreatedAt_2,
-		&i.LastUpdated_2,
-		&i.Deleted_2,
-		&i.Version_2,
-		&i.AddressValue,
-		&i.Chain,
 	)
 	return i, err
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.address = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {

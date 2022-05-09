@@ -439,7 +439,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Address(ctx context.Context, obj *model.Wallet) (*model.Address, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveAddressByWalletID(ctx, obj.Dbid)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {

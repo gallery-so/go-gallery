@@ -53,3 +53,20 @@ func (api AddressApi) GetAddressByDetails(ctx context.Context, address persist.A
 
 	return &a, nil
 }
+
+// GetAddressByWalletID returns the address for a given walletID
+func (api AddressApi) GetAddressByWalletID(ctx context.Context, walletID persist.DBID) (*sqlc.Address, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"walletId": {walletID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	a, err := api.loaders.AddressByWalletId.Load(walletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &a, nil
+}

@@ -114,6 +114,54 @@ func (b *GetAddressByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getAddressByWalletIDBatch = `-- name: GetAddressByWalletIDBatch :batchone
+SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false
+`
+
+type GetAddressByWalletIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetAddressByWalletIDBatch(ctx context.Context, id []persist.DBID) *GetAddressByWalletIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getAddressByWalletIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetAddressByWalletIDBatchBatchResults{br, 0}
+}
+
+func (b *GetAddressByWalletIDBatchBatchResults) QueryRow(f func(int, Address, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Address
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.AddressValue,
+			&i.Chain,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetAddressByWalletIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getCollectionByIdBatch = `-- name: GetCollectionByIdBatch :batchone
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout FROM collections WHERE id = $1 AND deleted = false
 `
@@ -1094,8 +1142,110 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getWalletByAddressBatch = `-- name: GetWalletByAddressBatch :batchone
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE address = $1 AND deleted = false
+`
+
+type GetWalletByAddressBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetWalletByAddressBatch(ctx context.Context, address []persist.DBID) *GetWalletByAddressBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range address {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getWalletByAddressBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetWalletByAddressBatchBatchResults{br, 0}
+}
+
+func (b *GetWalletByAddressBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Wallet
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetWalletByAddressBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getWalletByAddressDetailsBatch = `-- name: GetWalletByAddressDetailsBatch :batchone
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false
+`
+
+type GetWalletByAddressDetailsBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetWalletByAddressDetailsBatchParams struct {
+	AddressValue persist.AddressValue
+	Chain        persist.Chain
+}
+
+func (q *Queries) GetWalletByAddressDetailsBatch(ctx context.Context, arg []GetWalletByAddressDetailsBatchParams) *GetWalletByAddressDetailsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.AddressValue,
+			a.Chain,
+		}
+		batch.Queue(getWalletByAddressDetailsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetWalletByAddressDetailsBatchBatchResults{br, 0}
+}
+
+func (b *GetWalletByAddressDetailsBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Wallet
+		err := row.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Deleted,
+			&i.Version,
+			&i.Address,
+			&i.WalletType,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetWalletByAddressDetailsBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getWalletByIDBatch = `-- name: GetWalletByIDBatch :batchone
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE wallets.id = $1 AND wallets.deleted = false AND addresses.deleted = false
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE id = $1 AND deleted = false
 `
 
 type GetWalletByIDBatchBatchResults struct {
@@ -1143,7 +1293,7 @@ func (b *GetWalletByIDBatchBatchResults) Close() error {
 }
 
 const getWalletsByUserIDBatch = `-- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) INNER JOIN wallets w on w.address = addresses.id WHERE u.id = $1 AND u.deleted = false AND addresses.deleted = false AND w.deleted = false
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.address = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
 `
 
 type GetWalletsByUserIDBatchBatchResults struct {
