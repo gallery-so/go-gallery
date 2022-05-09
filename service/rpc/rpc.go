@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/logger"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"io"
 	"math/big"
 	"net"
@@ -34,7 +34,7 @@ import (
 var keepAliveTimeout = 600 * time.Second
 var client = &http.Client{
 	Timeout: time.Second * 30,
-	Transport: sentryutil.NewTracingTransport(&http.Transport{
+	Transport: tracing.NewTracingTransport(&http.Transport{
 		Dial: (&net.Dialer{
 			KeepAlive: keepAliveTimeout,
 		}).Dial,

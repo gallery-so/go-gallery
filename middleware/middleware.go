@@ -8,6 +8,7 @@ import (
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"net/http"
 	"strings"
 
@@ -247,18 +248,18 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 
 func Tracing() gin.HandlerFunc {
 	// Trace outgoing HTTP requests
-	http.DefaultTransport = sentryutil.NewTracingTransport(http.DefaultTransport, true)
+	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true)
 
 	return func(c *gin.Context) {
-		span := sentry.StartSpan(c.Request.Context(), "gin.server",
-			sentry.TransactionName(fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)),
+		description := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
+		span, ctx := tracing.StartSpan(c.Request.Context(), "gin.server", description,
+			sentry.TransactionName(description),
 			sentry.ContinueFromRequest(c.Request),
 		)
 
-		defer span.Finish()
+		defer tracing.FinishSpan(span)
 
-		loggingCtx := logger.NewContextWithSpan(span.Context(), span)
-		c.Request = c.Request.WithContext(loggingCtx)
+		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
