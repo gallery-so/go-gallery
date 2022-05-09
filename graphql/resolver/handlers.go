@@ -8,11 +8,14 @@ import (
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
+	goredis "github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/tracing"
+
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/segmentio/ksuid"
@@ -23,6 +26,7 @@ import (
 	"github.com/vektah/gqlparser/v2/validator"
 	"sort"
 	"strings"
+	"time"
 )
 
 const scrubText = "<scrubbed>"
@@ -30,16 +34,6 @@ const scrubDirectiveName = "scrub"
 
 const gqlRequestIdContextKey = "graphql.gqlRequestId"
 const maxSentryDataLength = 8 * 1024
-
-func addEventDataToSpan(eventData map[string]interface{}, span *sentry.Span) {
-	if span.Data == nil {
-		span.Data = make(map[string]interface{})
-	}
-
-	for k, v := range eventData {
-		span.Data[k] = v
-	}
-}
 
 func getFieldName(fc *gqlgen.FieldContext) string {
 	if fc == nil {
@@ -88,6 +82,8 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 }
 
 func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+	redisClient := redis.NewCache(redis.RequireNftsDB)
+
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
 
@@ -127,35 +123,41 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			panic(fmt.Errorf("userID is empty, but no auth error occurred"))
 		}
 
-		if viper.GetBool("REQUIRE_NFTS") {
-			span := sentry.StartSpan(ctx, "gql.directive")
-			defer span.Finish()
+		if !viper.GetBool("REQUIRE_NFTS") {
+			return next(ctx)
+		}
 
-			span.Description = "REQUIRE_NFTS"
-
-			spanCtx := logger.NewContextWithSpan(span.Context(), span)
-			user, err := publicapi.For(spanCtx).User.GetUserById(spanCtx, userID)
-
-			if err != nil {
-				return nil, err
+		// If we've verified this recently, use the cached result. The real check is pretty slow (~hundreds of milliseconds).
+		cachedResult, err := redisClient.Get(ctx, userID.String())
+		if err == nil {
+			if len(cachedResult) > 0 && cachedResult[0] == 1 {
+				return next(ctx)
 			}
+		} else if err != goredis.Nil {
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).Warnf("checking REQUIRE_NFTS in cache failed with error: %s", err)
+		}
 
-			has := false
-			for _, addr := range user.Addresses {
-				allowlist := auth.GetAllowlistContracts()
-				for k, v := range allowlist {
-					if found, _ := eth.HasNFTs(gc, k, v, addr, ethClient); found {
-						has = true
-						break
-					}
-				}
-			}
-			if !has {
-				errorMsg := auth.ErrDoesNotOwnRequiredNFT{}.Error()
-				nftErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
+		span, ctx := tracing.StartSpan(ctx, "gql.directive", "REQUIRE_NFTS")
+		defer tracing.FinishSpan(span)
 
-				return makeErrNotAuthorized(errorMsg, nftErr), nil
-			}
+		user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if hasNft, err := auth.HasAllowlistNFT(ctx, user.Addresses, ethClient); !hasNft {
+			errorMsg := err.Error()
+			modelErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
+			return makeErrNotAuthorized(errorMsg, modelErr), nil
+		}
+
+		// Cache the REQUIRE_NFTS result for an hour
+		err = redisClient.Set(ctx, userID.String(), []byte{1}, time.Hour)
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+			logger.For(ctx).Warnf("caching REQUIRE_NFTS result failed with error: %s\n", err)
 		}
 
 		return next(ctx)
@@ -193,9 +195,7 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 					ctx = sentry.SetHubOnContext(ctx, parentHub.Clone())
 				}
 
-				span = sentry.StartSpan(ctx, "gql.resolve")
-				span.Description = getFieldName(fc)
-				ctx = logger.NewContextWithSpan(span.Context(), span)
+				span, ctx = tracing.StartSpan(ctx, "gql.resolve", getFieldName(fc))
 			}
 		}
 
@@ -204,12 +204,12 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 		if span != nil && err == nil {
 			// If our result type implements the GraphQL Node pattern, add its ID to our event data
 			if node, ok := res.(interface{ ID() model.GqlID }); ok {
-				addEventDataToSpan(map[string]interface{}{
+				tracing.AddEventDataToSpan(span, map[string]interface{}{
 					"resolvedNodeId": node.ID(),
-				}, span)
+				})
 			}
 
-			span.Finish()
+			tracing.FinishSpan(span)
 		}
 
 		return res, err
@@ -223,9 +223,7 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 
 		if trace {
 			oc := gqlgen.GetOperationContext(ctx)
-			span = sentry.StartSpan(ctx, "gql.response")
-			span.Description = getOperationName(oc)
-			ctx = logger.NewContextWithSpan(span.Context(), span)
+			span, ctx = tracing.StartSpan(ctx, "gql.response", getOperationName(oc))
 		}
 
 		response := next(ctx)
@@ -265,11 +263,11 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 		if span != nil {
 			responseSizeLimited := limitEventDataSize(len(response.Data), maxSentryDataLength, "response", responseLocatorId, responseData)
 
-			addEventDataToSpan(map[string]interface{}{
+			tracing.AddEventDataToSpan(span, map[string]interface{}{
 				"response": responseSizeLimited,
-			}, span)
+			})
 
-			span.Finish()
+			tracing.FinishSpan(span)
 		}
 
 		return response
@@ -287,9 +285,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 		if trace {
 			operationName := getOperationName(oc)
 			transactionName := fmt.Sprintf("%s %s (%s)", gc.Request.Method, gc.Request.URL.Path, operationName)
-			span = sentry.StartSpan(ctx, "gql.request", sentry.TransactionName(transactionName))
-			span.Description = operationName
-			ctx = logger.NewContextWithSpan(span.Context(), span)
+			span, ctx = tracing.StartSpan(ctx, "gql.request", operationName, sentry.TransactionName(transactionName))
 		}
 
 		userId := auth.GetUserIDFromCtx(gc)
@@ -334,12 +330,12 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 		result := next(ctx)
 
 		if span != nil {
-			addEventDataToSpan(map[string]interface{}{
+			tracing.AddEventDataToSpan(span, map[string]interface{}{
 				"scrubbedVariables": scrubbedVariables,
 				"scrubbedQuery":     scrubbedQuerySizeLimited,
-			}, span)
+			})
 
-			span.Finish()
+			tracing.FinishSpan(span)
 		}
 
 		return result
