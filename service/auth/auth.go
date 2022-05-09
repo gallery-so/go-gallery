@@ -100,8 +100,8 @@ type Authenticator interface {
 }
 
 type AuthResult struct {
-	UserID    persist.DBID
-	Addresses []Wallet
+	UserID  persist.DBID
+	Wallets []Wallet
 }
 
 type ErrAuthenticationFailed struct {
@@ -196,9 +196,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 	if err != nil {
 		return nil, err
 	}
-
-	// All authenticated addresses for the user, including the one they just authenticated with
-	var addresses []persist.Wallet
+	var wallets []Wallet
 
 	if userID != "" {
 		user, err := e.UserRepo.GetByID(pCtx, userID)
@@ -206,10 +204,12 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 			return nil, err
 		}
 
-		addresses = make([]persist.Wallet, len(user.Wallets), len(user.Wallets)+1)
-		copy(addresses, user.Wallets)
+		wallets = make([]Wallet, len(user.Wallets), len(user.Wallets)+1)
+		for i, wallet := range user.Wallets {
+			wallets[i] = Wallet{Address: wallet.Address.AddressValue, Chain: wallet.Address.Chain, WalletType: wallet.WalletType}
+		}
 
-		if !containsAddress(addresses, Wallet{Address: e.Address, Chain: e.Chain, WalletType: e.WalletType}) {
+		if !containsAddress(wallets, Wallet{Address: e.Address, Chain: e.Chain, WalletType: e.WalletType}) {
 			_, err := e.WalletRepo.Insert(pCtx, e.Address, e.Chain, e.WalletType)
 			if err != nil {
 				return nil, err
@@ -218,8 +218,8 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 			if err != nil {
 				return nil, err
 			}
-			addresses = addresses[:cap(addresses)]
-			addresses[cap(addresses)-1] = wallet
+			wallets = wallets[:cap(wallets)]
+			wallets[cap(wallets)-1] = Wallet{Address: wallet.Address.AddressValue, Chain: wallet.Address.Chain, WalletType: wallet.WalletType}
 		}
 	} else {
 		_, err := e.WalletRepo.Insert(pCtx, e.Address, e.Chain, e.WalletType)
@@ -230,12 +230,12 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		if err != nil {
 			return nil, err
 		}
-		addresses = []persist.Wallet{wallet}
+		wallets = []Wallet{{Address: wallet.Address.AddressValue, Chain: wallet.Address.Chain, WalletType: wallet.WalletType}}
 	}
 
 	authResult := AuthResult{
-		Addresses: toAuthWallets(addresses),
-		UserID:    userID,
+		Wallets: wallets,
+		UserID:  userID,
 	}
 
 	return &authResult, nil
@@ -303,17 +303,17 @@ func Logout(pCtx context.Context) {
 func GetAuthNonce(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress, pChain)
+	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
+	if err != nil {
+		return "", false, err
+	}
+	user, err := userRepo.GetByWallet(pCtx, wallet.ID)
 	if err != nil {
 		logrus.WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
 	userExists = user.ID != ""
 
-	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
-	if err != nil {
-		return "", false, err
-	}
 	if !userExists {
 
 		if !pPreAuthed && pChain == persist.ChainETH {
@@ -419,7 +419,7 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.AddressValue, pChai
 
 	nonceValue = nonce.Value.String()
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress, persist.ChainETH)
+	user, err := userRepo.GetByWallet(pCtx, wallet.ID)
 	if err != nil {
 		return nonceValue, userID, err
 	}
@@ -485,9 +485,9 @@ func GetAllowlistContracts() map[persist.EthereumAddress][]persist.TokenID {
 }
 
 // containsAddress checks whether an address exists in a slice
-func containsAddress(a []persist.Wallet, b Wallet) bool {
+func containsAddress(a []Wallet, b Wallet) bool {
 	for _, v := range a {
-		if v.Address.String() == b.Address.String() && v.Address.Chain == b.Chain {
+		if v.Address.String() == b.Address.String() && v.Chain == b.Chain {
 			return true
 		}
 	}

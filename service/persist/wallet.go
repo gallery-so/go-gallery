@@ -49,6 +49,16 @@ func (l *WalletList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
+// Scan implements the Scanner interface for the Wallet type
+func (w *Wallet) Scan(value interface{}) error {
+	if value == nil {
+		*w = Wallet{}
+		return nil
+	}
+	*w = Wallet{ID: DBID(string(value.([]uint8)))}
+	return nil
+}
+
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (wa *WalletType) UnmarshalGQL(v interface{}) error {
 	n, ok := v.(int)

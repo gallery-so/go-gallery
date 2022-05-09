@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
@@ -28,10 +29,18 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 	if viper.GetString("ENV") != "local" {
 		return nil, errors.New("DebugAuthenticator may only be used in a local environment")
 	}
+	wallets := make([]auth.Wallet, len(d.Addresses))
+	for i, address := range d.Addresses {
+		wallets[i] = auth.Wallet{
+			Address:    address,
+			Chain:      d.Chains[i],
+			WalletType: persist.WalletTypeEOA,
+		}
+	}
 
 	authResult := auth.AuthResult{
-		Addresses: d.Addresses,
-		UserID:    d.UserID,
+		UserID:  d.UserID,
+		Wallets: wallets,
 	}
 
 	return &authResult, nil

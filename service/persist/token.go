@@ -313,18 +313,25 @@ func (c *Chain) Scan(src interface{}) error {
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (c *Chain) UnmarshalGQL(v interface{}) error {
-	n, ok := v.(int)
+	n, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("Chain must be an int")
+		return fmt.Errorf("Chain must be an string")
 	}
 
-	*c = Chain(n)
+	switch strings.ToLower(n) {
+	case "ethereum":
+		*c = ChainETH
+
+	}
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
 func (c Chain) MarshalGQL(w io.Writer) {
-	w.Write([]byte{uint8(c)})
+	switch c {
+	case ChainETH:
+		fmt.Fprint(w, "Ethereum")
+	}
 }
 
 // URL turns a token's URI into a URL

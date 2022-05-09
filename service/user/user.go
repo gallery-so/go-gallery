@@ -196,7 +196,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
 	// multiple authenticated addresses available for initial user creation, and we may want to add all of
 	// those addresses to the user's account here.
-	address := authResult.Addresses[0]
+	address := authResult.Wallets[0]
 
 	user := persist.CreateUserInput{
 		Address:    address.Address,
@@ -293,7 +293,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress persis
 		return ErrAddressOwnedByUser{Address: pAddress, Chain: pChain, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Addresses, auth.Wallet{Address: pAddress, Chain: pChain}) {
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pAddress, Chain: pChain}) {
 		return ErrAddressNotOwnedByUser{Address: pAddress, Chain: pChain, UserID: addressUserID}
 	}
 
@@ -317,7 +317,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Addresses, auth.Wallet{Address: pAddress, Chain: pChain}) {
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pAddress, Chain: pChain}) {
 		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
 	}
 
@@ -388,7 +388,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		}
 		break
 	case pInput.Address.String() != "":
-		user, err = userRepo.GetByAddress(pCtx, pInput.Address, pInput.Chain)
+		user, err = userRepo.GetByAddressDetails(pCtx, pInput.Address, pInput.Chain)
 		if err != nil {
 			return GetUserOutput{}, err
 		}

@@ -44,16 +44,16 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT 1 FROM users WHERE EXISTS(SELECT 1 FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, DELETED, VERSION, USERNAME, USERNAME_IDEMPOTENT, ADDRESSES) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES) VALUES ($1, $2) RETURNING ID;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = (SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false) AND DELETED = false;`)
+	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(ADDRESSES) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,ADDRESSES,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -71,13 +71,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	createAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID, ADDRESS_VALUE, CHAIN) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS_VALUE,CHAIN) DO NOTHING;`)
 	checkNoErr(err)
 
-	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESS_VALUE, CHAIN FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`)
+	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`)
 	checkNoErr(err)
 
 	createWalletStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID, ADDRESS, WALLET_TYPE) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS) DO NOTHING;`)
 	checkNoErr(err)
 
-	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ID, ADDRESS FROM wallets WHERE ADDRESS = $1;`)
+	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ID FROM wallets WHERE ADDRESS = $1;`)
 	checkNoErr(err)
 
 	addWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = array_append(ADDRESSES, $1) WHERE ID = $2;`)
@@ -137,35 +137,31 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 }
 
-// ExistsByAddress checks if a user exists with the given address
-// TODO use string and chain to get the user
-func (u *UserRepository) ExistsByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (bool, error) {
-
-	res, err := u.existsByAddressStmt.QueryContext(pCtx, pAddress, pChain)
-	if err != nil {
-		return false, err
-	}
-	defer res.Close()
-	var exists bool
-	for res.Next() {
-		err = res.Scan(&exists)
-		if err != nil {
-			return false, err
-		}
-	}
-
-	if err = res.Err(); err != nil {
-		return false, err
-	}
-
-	return exists, nil
-}
-
 // Create creates a new user
 func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserInput) (persist.DBID, error) {
-	// TODO handle creating wallet
+	var addressID persist.DBID
+	var walletID persist.DBID
 	var id persist.DBID
-	err := u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), false, 0).Scan(&id)
+
+	_, err := u.createAddressStmt.ExecContext(pCtx, persist.GenerateID(), pUser.Address, pUser.Chain)
+	if err != nil {
+		return "", fmt.Errorf("failed to create address: %w", err)
+	}
+	err = u.getAddressStmt.QueryRowContext(pCtx, pUser.Address, pUser.Chain).Scan(&addressID)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = u.createWalletStmt.ExecContext(pCtx, persist.GenerateID(), addressID, pUser.WalletType)
+	if err != nil {
+		return "", fmt.Errorf("failed to create wallet: %w", err)
+	}
+	err = u.getWalletStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
+	if err != nil {
+		return "", err
+	}
+
+	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), []persist.DBID{addressID}).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +173,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
 
 	user := persist.User{}
-	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
@@ -187,15 +183,43 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 	return user, nil
 }
 
-// GetByAddress gets the user with the given address in their list of addresses
+// GetByAddressDetails gets the user with the given address in their list of addresses
 // TODO use string and chain to get the user
-func (u *UserRepository) GetByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.User, error) {
+func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.User, error) {
+	var addressID, walletID persist.DBID
+
+	err := u.getAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addressID)
+	if err != nil {
+		return persist.User{}, err
+	}
+
+	err = u.getWalletStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
+	if err != nil {
+		return persist.User{}, err
+	}
 
 	var user persist.User
-	err := u.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err = u.getByAddressStmt.QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFound{Address: pAddress, Chain: pChain}
+			return persist.User{}, persist.ErrUserNotFound{Address: pAddress, Chain: pChain, WalletID: walletID}
+		}
+		return persist.User{}, err
+	}
+
+	return user, nil
+
+}
+
+// GetByWallet gets the user with the given wallet in their list of addresses
+// TODO use string and chain to get the user
+func (u *UserRepository) GetByWallet(pCtx context.Context, pWallet persist.DBID) (persist.User, error) {
+
+	var user persist.User
+	err := u.getByAddressStmt.QueryRowContext(pCtx, pWallet).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.User{}, persist.ErrUserNotFound{WalletID: pWallet}
 		}
 		return persist.User{}, err
 	}

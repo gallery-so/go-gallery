@@ -35,12 +35,12 @@ type CreateUserInput struct {
 // UserRepository represents the interface for interacting with the persisted state of users
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
-	ExistsByAddress(context.Context, AddressValue, Chain) (bool, error)
 	Create(context.Context, CreateUserInput) (DBID, error)
 	AddWallet(context.Context, DBID, AddressValue, Chain, WalletType) error
 	RemoveWallet(context.Context, DBID, AddressValue, Chain) error
 	GetByID(context.Context, DBID) (User, error)
-	GetByAddress(context.Context, AddressValue, Chain) (User, error)
+	GetByWallet(context.Context, DBID) (User, error)
+	GetByAddressDetails(context.Context, AddressValue, Chain) (User, error)
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
 	MergeUsers(context.Context, DBID, DBID) error

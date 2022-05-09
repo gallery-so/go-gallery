@@ -92,23 +92,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 			if m.Debug.UserID != nil {
 				userID = *m.Debug.UserID
 			}
-			addresses := make([]persist.Address, 0, len(m.Debug.Addresses))
-			for i := range m.Debug.Addresses {
-				address, err := publicapi.For(ctx).Address.GetAddressByDetails(ctx, m.Debug.Addresses[i], m.Debug.Chains[i])
-				if err != nil {
-					return nil, err
-				}
-				addresses = append(addresses, persist.Address{
-					ID:           address.ID,
-					Version:      persist.NullInt64(address.Version.Int32),
-					CreationTime: persist.CreationTime(address.CreatedAt),
-					Deleted:      persist.NullBool(address.Deleted),
-					LastUpdated:  persist.LastUpdatedTime(address.LastUpdated),
-					AddressValue: address.AddressValue,
-					Chain:        address.Chain,
-				})
-			}
-			return debugtools.NewDebugAuthenticator(userID, addresses), nil
+			return debugtools.NewDebugAuthenticator(userID, m.Debug.Addresses, m.Debug.Chains), nil
 		}
 	}
 
