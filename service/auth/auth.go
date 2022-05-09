@@ -136,11 +136,11 @@ func (e ErrSignatureVerificationFailed) Error() string {
 }
 
 type ErrDoesNotOwnRequiredNFT struct {
-	address persist.Address
+	addresses []persist.Address
 }
 
 func (e ErrDoesNotOwnRequiredNFT) Error() string {
-	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
+	return fmt.Sprintf("required tokens not owned by any addresses: %s", e.addresses)
 }
 
 type ErrNonceNotFound struct {
@@ -419,24 +419,9 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	if !userExists {
 
 		if !pPreAuthed {
-
-			req := GetAllowlistContracts()
-			has := false
-			for k, v := range req {
-
-				hasNFT, err := eth.HasNFTs(pCtx, k, v, pAddress, ethClient)
-				if err != nil {
-					return "", false, err
-				}
-				if hasNFT {
-					has = true
-					break
-				}
+			if hasNft, err := HasAllowlistNFT(pCtx, []persist.Address{pAddress}, ethClient); !hasNft {
+				return "", false, err
 			}
-			if !has {
-				return "", false, ErrDoesNotOwnRequiredNFT{pAddress}
-			}
-
 		}
 
 		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
@@ -463,6 +448,22 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	}
 
 	return nonce, userExists, nil
+}
+
+func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient *ethclient.Client) (bool, error) {
+	allowlist := GetAllowlistContracts()
+	for _, addr := range addresses {
+		for k, v := range allowlist {
+			found, err := eth.HasNFTs(ctx, k, v, addr, ethClient)
+			if found {
+				return true, nil
+			} else if err != nil {
+				logger.For(ctx).Warnf("error checking whether address %s owns NFTs with contractAddress: %s and ids: %v: %s\n", addr, k, v, err)
+			}
+		}
+	}
+
+	return false, ErrDoesNotOwnRequiredNFT{addresses: addresses}
 }
 
 // GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
