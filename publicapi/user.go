@@ -265,8 +265,8 @@ func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error 
 	}
 
 	// Send event
-	userData := persist.UserEvent{}
-	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
+	userData := persist.UserEvent{FolloweeID: followee}
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
 
 	return api.repos.UserRepository.AddFollower(ctx, userID, followee)
 }
