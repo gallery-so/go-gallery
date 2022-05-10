@@ -63,6 +63,14 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	return resolveFollowersByUserId(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	return resolveFollowingByUserId(ctx, obj.Dbid)
+}
+
 func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
@@ -358,6 +366,34 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	}
 
 	return output, nil
+}
+
+func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowUser(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.FollowUserPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, err
+}
+
+func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UnfollowUserPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, err
 }
 
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {

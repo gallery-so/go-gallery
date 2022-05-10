@@ -38,6 +38,8 @@ type UserRepository interface {
 	AddAddresses(context.Context, DBID, []Address) error
 	RemoveAddresses(context.Context, DBID, []Address) error
 	MergeUsers(context.Context, DBID, DBID) error
+	AddFollower(pCtx context.Context, follower DBID, followee DBID) error
+	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 }
 
 // ErrUserNotFound is returned when a user is not found

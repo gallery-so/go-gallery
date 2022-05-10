@@ -2,11 +2,12 @@ package cloudtask
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
+
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type UserFeedTask struct {

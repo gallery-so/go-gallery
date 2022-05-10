@@ -116,6 +116,36 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
+func resolveFollowersByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(followers))
+	for i, user := range followers {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
+func resolveFollowingByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(following))
+	for i, user := range following {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
 func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 
@@ -315,11 +345,16 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            &user.Username.String,
-		Bio:                 &user.Bio.String,
-		Wallets:             wallets,
-		Galleries:           nil, // handled by dedicated resolver
+		Dbid:     user.ID,
+		Username: &user.Username.String,
+		Bio:      &user.Bio.String,
+		Wallets:  wallets,
+
+		// each handeled by dedicated resolver
+		Galleries: nil,
+		Followers: nil,
+		Following: nil,
+
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
 }

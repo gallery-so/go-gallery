@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -204,6 +205,88 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	}
 
 	return &community, nil
+}
+
+func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	if _, err := api.GetUserById(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	followers, err := api.loaders.FollowersByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return followers, nil
+}
+
+func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	if _, err := api.GetUserById(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	following, err := api.loaders.FollowingByUserId.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return following, nil
+}
+
+func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
+	// Validate
+	curUserID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
+	}); err != nil {
+		return err
+	}
+
+	if _, err := api.GetUserById(ctx, userID); err != nil {
+		return err
+	}
+
+	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+
+	// Send event
+	userData := persist.UserEvent{FolloweeID: userID}
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
+
+	return err
+}
+
+func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	curUserID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
 }
 
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
