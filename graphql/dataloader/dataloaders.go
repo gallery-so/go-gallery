@@ -126,13 +126,13 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 	}
 
 	loaders.FollowersByUserId = FollowersLoaderById{
-		maxBatch: defaultMaxBatchOne,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadFollowersByUserId(ctx, loaders, q),
 	}
 
 	loaders.FollowingByUserId = FollowingLoaderById{
-		maxBatch: defaultMaxBatchOne,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadFollowingByUserId(ctx, loaders, q),
 	}
@@ -538,6 +538,7 @@ func loadFollowersByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 			if err == nil {
 				for _, user := range followers[i] {
 					loaders.UserByUsername.Prime(user.Username.String, user)
+					loaders.UserByUserId.Prime(user.ID, user)
 				}
 			}
 		})
@@ -562,6 +563,7 @@ func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 			if err == nil {
 				for _, user := range following[i] {
 					loaders.UserByUsername.Prime(user.Username.String, user)
+					loaders.UserByUserId.Prime(user.ID, user)
 				}
 			}
 		})
