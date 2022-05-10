@@ -117,7 +117,7 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 }
 
 func resolveFollowersByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
-	followers, err := publicapi.For(ctx).User.GetFollowersById(ctx, userID)
+	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func resolveFollowersByUserId(ctx context.Context, userID persist.DBID) ([]*mode
 }
 
 func resolveFollowingByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
-	following, err := publicapi.For(ctx).User.GetFollowingById(ctx, userID)
+	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
 
 	if err != nil {
 		return nil, err

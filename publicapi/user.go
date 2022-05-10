@@ -207,7 +207,7 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 	return &community, nil
 }
 
-func (api UserAPI) GetFollowersById(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -227,7 +227,7 @@ func (api UserAPI) GetFollowersById(ctx context.Context, userID persist.DBID) ([
 	return followers, nil
 }
 
-func (api UserAPI) GetFollowingById(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
