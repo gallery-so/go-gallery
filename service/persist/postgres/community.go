@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/lib/pq"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -42,7 +43,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 	getUserByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
-	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT IMAGE_THUMBNAIL_URL FROM nfts WHERE CONTRACT->>'address' = $1 AND DELETED = false AND OWNER_ADDRESS = $2 AND LENGTH(IMAGE_THUMBNAIL_URL) > 0 ORDER BY ID LIMIT 3`)
+	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT IMAGE_THUMBNAIL_URL FROM nfts WHERE CONTRACT->>'address' = $1 AND DELETED = false AND OWNER_ADDRESS = ANY($2) AND LENGTH(IMAGE_THUMBNAIL_URL) > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &CommunityRepository{
@@ -111,8 +112,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		community.Name = contract.ContractName
 	}
 
-	seenUsername := map[string]bool{}
-	community.Owners = make([]persist.TokenHolder, 0, len(addresses))
+	tokenHolders := map[persist.DBID]*persist.TokenHolder{}
 	for _, address := range addresses {
 		var username persist.NullString
 		var userID persist.DBID
@@ -122,28 +122,46 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 			continue
 		}
 
-		// Don't include users who haven't picked a username yet
-		usernameStr := username.String()
-		if usernameStr != "" && !seenUsername[usernameStr] {
-			previewNFTs := make([]persist.NullString, 0, 3)
-			rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pAddress, address)
-			defer rows.Close()
-			if err != nil {
-				logrus.Warnf("error getting preview NFTs of community '%s' by address '%s': %s", pAddress, address, err)
-			} else {
-				for rows.Next() {
-					var imageURL persist.NullString
-					err = rows.Scan(&imageURL)
-					if err != nil {
-						logrus.Warnf("error scanning preview NFT of community '%s' by address '%s': %s", pAddress, address, err)
-						continue
-					}
-					previewNFTs = append(previewNFTs, imageURL)
-				}
-			}
-			community.Owners = append(community.Owners, persist.TokenHolder{Address: address, UserID: userID, Username: username, PreviewNFTs: previewNFTs})
-			seenUsername[usernameStr] = true
+		if username.String() == "" {
+			continue
 		}
+
+		if tokenHolder, ok := tokenHolders[userID]; ok {
+			tokenHolder.Addresses = append(tokenHolder.Addresses, address)
+		} else {
+			tokenHolders[userID] = &persist.TokenHolder{
+				UserID:      userID,
+				Addresses:   []persist.Address{address},
+				Username:    username,
+				PreviewNFTs: nil,
+			}
+		}
+	}
+
+	community.Owners = make([]persist.TokenHolder, 0, len(tokenHolders))
+
+	for _, tokenHolder := range tokenHolders {
+		previewNFTs := make([]persist.NullString, 0, 3)
+
+		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pAddress, pq.Array(tokenHolder.Addresses))
+		defer rows.Close()
+
+		if err != nil {
+			logrus.Warnf("error getting preview NFTs of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+		} else {
+			for rows.Next() {
+				var imageURL persist.NullString
+				err = rows.Scan(&imageURL)
+				if err != nil {
+					logrus.Warnf("error scanning preview NFT of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+					continue
+				}
+				previewNFTs = append(previewNFTs, imageURL)
+			}
+		}
+
+		tokenHolder.PreviewNFTs = previewNFTs
+		community.Owners = append(community.Owners, *tokenHolder)
 	}
 
 	community.LastUpdated = persist.LastUpdatedTime(time.Now())

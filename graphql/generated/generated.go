@@ -330,7 +330,7 @@ type ComplexityRoot struct {
 	}
 
 	TokenHolder struct {
-		Address     func(childComplexity int) int
+		Addresses   func(childComplexity int) int
 		Dbid        func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
@@ -1624,12 +1624,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TextMedia.PreviewURLs(childComplexity), true
 
-	case "TokenHolder.address":
-		if e.complexity.TokenHolder.Address == nil {
+	case "TokenHolder.addresses":
+		if e.complexity.TokenHolder.Addresses == nil {
 			break
 		}
 
-		return e.complexity.TokenHolder.Address(childComplexity), true
+		return e.complexity.TokenHolder.Addresses(childComplexity), true
 
 	case "TokenHolder.dbid":
 		if e.complexity.TokenHolder.Dbid == nil {
@@ -2150,7 +2150,7 @@ type Gallery implements Node {
 
 type TokenHolder {
     dbid: DBID!
-    address: Address
+    addresses: [Address]
     user: GalleryUser @goField(forceResolver: true)
     previewNfts: [String]
 }
@@ -8299,7 +8299,7 @@ func (ec *executionContext) _TokenHolder_dbid(ctx context.Context, field graphql
 	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokenHolder_address(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokenHolder_addresses(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8317,7 +8317,7 @@ func (ec *executionContext) _TokenHolder_address(ctx context.Context, field grap
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
+		return obj.Addresses, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8326,9 +8326,9 @@ func (ec *executionContext) _TokenHolder_address(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.Address)
+	res := resTmp.([]*persist.Address)
 	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+	return ec.marshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TokenHolder_user(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
@@ -14048,9 +14048,9 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "address":
+		case "addresses":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokenHolder_address(ctx, field, obj)
+				return ec._TokenHolder_addresses(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15535,6 +15535,38 @@ func (ec *executionContext) marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑga
 		if e == graphql.Null {
 			return graphql.Null
 		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) ([]*persist.Address, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.Address, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v []*persist.Address) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
 	}
 
 	return ret
