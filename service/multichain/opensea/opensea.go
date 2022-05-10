@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
@@ -33,9 +34,6 @@ var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 type Provider struct {
 	httpClient *http.Client
 	ethClient  *ethclient.Client
-
-	nftRepository  persist.NFTRepository
-	userRepository persist.UserRepository
 }
 
 // TokenID represents a token ID from Opensea. It is separate from persist.TokenID becuase opensea returns token IDs in base 10 format instead of what we want, base 16
@@ -104,15 +102,23 @@ type User struct {
 	Username string `json:"username"`
 }
 
-// Collection is a collection from OpenSea
-type Collection struct {
-	Name string `json:"name"`
-}
-
 // Order is an order from OpenSea representing an NFT's maker and buyer
 type Order struct {
 	Maker Account `json:"maker"`
 	Taker Account `json:"taker"`
+}
+
+// Collection is a collection from OpenSea
+type Collection struct {
+	Name          string                  `json:"name"`
+	PayoutAddress persist.EthereumAddress `json:"payout_address"`
+}
+
+// Contract represents an NFT contract from Opensea
+type Contract struct {
+	Collection Collection              `json:"collection"`
+	Address    persist.EthereumAddress `json:"address"`
+	Symbol     string                  `json:"symbol"`
 }
 
 type errNoSingleNFTForOpenseaID struct {
@@ -122,6 +128,70 @@ type errNoSingleNFTForOpenseaID struct {
 // ErrNoAssetsForWallets is returned when opensea returns an empty array of assets for a wallet address
 type ErrNoAssetsForWallets struct {
 	Wallets []persist.EthereumAddress
+}
+
+// NewProvider creates a new provider for opensea
+func NewProvider(ethClient *ethclient.Client, httpClient *http.Client) *Provider {
+	return &Provider{
+		httpClient: httpClient,
+		ethClient:  ethClient,
+	}
+}
+
+// GetBlockchainInfo returns Ethereum blockchain info
+func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo, error) {
+	return multichain.BlockchainInfo{
+		Chain:   persist.ChainETH,
+		ChainID: 0,
+	}, nil
+}
+
+// GetTokensByWalletAddress returns a list of tokens for a wallet address
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+	assets, err := FetchAssetsForWallet(ctx, persist.EthereumAddress(address.String()), "", 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	return assetsToTokens(ctx, assets, p.ethClient)
+}
+
+// GetTokensByContractAddress returns a list of tokens for a contract address
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(address), "", "", 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	return assetsToTokens(ctx, assets, p.ethClient)
+}
+
+// GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
+	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	return assetsToTokens(ctx, assets, p.ethClient)
+}
+
+// GetContractByAddress returns a contract for a contract address
+func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.AddressValue) (multichain.ChainAgnosticContract, error) {
+	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract), 0)
+	if err != nil {
+		return multichain.ChainAgnosticContract{}, err
+	}
+	return contractToContract(ctx, c, p.ethClient)
+}
+
+// UpdateMediaForWallet updates media for a wallet address
+// bool is whether or not to update all media content, including the tokens that already have media content
+func (p *Provider) UpdateMediaForWallet(context.Context, persist.AddressValue, bool) error {
+	return nil
+}
+
+// ValidateTokensForWallet validates tokens for a wallet address
+// bool is whether or not to update all of the tokens regardless of whether we know they exist already
+func (p *Provider) ValidateTokensForWallet(context.Context, persist.AddressValue, bool) error {
+	return nil
 }
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
@@ -325,24 +395,14 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumA
 }
 
 // FetchAssets fetches assets by its token identifiers
-func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pOffset int, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
 	}
 	result := []Asset{}
 
-	if pOffset > 20000 {
-		logrus.Errorf("failed to fetch more assets for wallet %s, contract %s, token %s: too many results", pWalletAddress, pContractAddress, pTokenID)
-		return result, nil
-	}
-
 	dir := "desc"
-	offset := pOffset
-	if pOffset > 10000 {
-		dir = "asc"
-		offset = pOffset - 10050
-	}
 
 	url := *openseaURL
 	query := url.Query()
@@ -356,8 +416,10 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 		query.Set("owner", string(pWalletAddress))
 	}
 	query.Set("order_direction", dir)
-	query.Set("offset", strconv.Itoa(offset))
 	query.Set("limit", "50")
+	if pCursor != "" {
+		query.Set("cursor", pCursor)
+	}
 
 	url.RawQuery = query.Encode()
 
@@ -378,7 +440,7 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pOffset, retry+1, alreadyReceived)
+				return FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
 			}
 			return nil, fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)
 		}
@@ -395,6 +457,8 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 		return nil, err
 	}
 
+	nextCursor := response.Next
+
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
@@ -403,19 +467,130 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 			continue
 		}
 		result = append(result, asset)
-		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%d|len-%d|dir-%s", asset.ID, pOffset, len(result), dir)
+		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
 	}
 	if doneReceiving {
 		return result, nil
 	}
 	if len(response.Assets) == 50 {
-		next, err := FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pOffset+50, 0, alreadyReceived)
+		next, err := FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, next...)
 	}
 	return result, nil
+}
+
+// FetchContractByAddress fetches a contract by address
+func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress, retry int) (Contract, error) {
+
+	logrus.Debugf("Fetching contract for address %s", pContract)
+
+	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/asset_contract/%s", pContract)
+
+	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
+	if err != nil {
+		return Contract{}, err
+	}
+	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return Contract{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		if resp.StatusCode == 429 {
+			if retry < 3 {
+				time.Sleep(time.Second * 3 * time.Duration(retry+1))
+				return FetchContractByAddress(pCtx, pContract, retry+1)
+			}
+			return Contract{}, fmt.Errorf("opensea api rate limit exceeded")
+		}
+		bs := new(bytes.Buffer)
+		_, err := bs.ReadFrom(resp.Body)
+		if err != nil {
+			return Contract{}, err
+		}
+		return Contract{}, fmt.Errorf("unexpected status code: %d - %s", resp.StatusCode, bs.String())
+	}
+	response := Contract{}
+	err = util.UnmarshallBody(&response, resp.Body)
+	if err != nil {
+		return Contract{}, err
+	}
+
+	return response, nil
+}
+
+func assetsToTokens(ctx context.Context, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, error) {
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]multichain.ChainAgnosticToken, len(openseaNfts))
+	for i, nft := range openseaNfts {
+		var tokenType persist.TokenType
+		switch nft.Contract.ContractSchemaName {
+		case "ERC721", "CRYPTOPUNKS":
+			tokenType = persist.TokenTypeERC721
+		case "ERC1155":
+			tokenType = persist.TokenTypeERC1155
+		default:
+			return nil, fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+		}
+
+		metadata := persist.TokenMetadata{
+			"name":          nft.Name,
+			"description":   nft.Description,
+			"image_url":     nft.ImageOriginalURL,
+			"animation_url": nft.AnimationOriginalURL,
+		}
+
+		med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
+		switch {
+		case nft.AnimationURL != "":
+			med.MediaURL = persist.NullString(nft.AnimationURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.AnimationURL)
+		case nft.ImageURL != "":
+			med.MediaURL = persist.NullString(nft.ImageURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.ImageURL)
+		default:
+			med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+		}
+
+		token := multichain.ChainAgnosticToken{
+			TokenType:       tokenType,
+			Name:            nft.Name,
+			Description:     nft.Description,
+			TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
+			TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
+			OwnerAddress:    persist.AddressValue(nft.Owner.Address.String()),
+			ContractAddress: persist.AddressValue(nft.Contract.ContractAddress.String()),
+			ExternalURL:     nft.ExternalURL,
+			BlockNumber:     persist.BlockNumber(block),
+			TokenMetadata:   metadata,
+			Media:           med,
+		}
+		result[i] = token
+	}
+	return result, nil
+}
+
+func contractToContract(ctx context.Context, openseaContract Contract, ethClient *ethclient.Client) (multichain.ChainAgnosticContract, error) {
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return multichain.ChainAgnosticContract{}, err
+	}
+	return multichain.ChainAgnosticContract{
+		Address:        persist.AddressValue(openseaContract.Address.String()),
+		Symbol:         openseaContract.Symbol,
+		Name:           openseaContract.Collection.Name,
+		CreatorAddress: persist.AddressValue(openseaContract.Collection.PayoutAddress),
+		LatestBlock:    persist.BlockNumber(block),
+	}, nil
 }
 
 func assetsToNFTs(pCtx context.Context, pWalletAddress persist.EthereumAddress, openseaNfts []Asset, nftRepo persist.NFTRepository) ([]persist.NFT, error) {
@@ -468,31 +643,31 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.EthereumAddress
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr string, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.AddressValue, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
 	validBool, err := verifySignature(pSignatureStr,
 		nonce,
-		pAddressStr, pWalletType,
+		pAddressStr.String(), pWalletType,
 		true, d.ethClient)
 
 	if !validBool || err != nil {
 		// eth_sign
 		validBool, err = verifySignature(pSignatureStr,
 			nonce,
-			pAddressStr, pWalletType,
+			pAddressStr.String(), pWalletType,
 			false, d.ethClient)
 		if err != nil || !validBool {
 			nonce = auth.NoncePrepend + pNonce
 			validBool, err = verifySignature(pSignatureStr,
 				nonce,
-				pAddressStr, pWalletType,
+				pAddressStr.String(), pWalletType,
 				true, d.ethClient)
 			if err != nil || !validBool {
 				validBool, err = verifySignature(pSignatureStr,
 					nonce,
-					pAddressStr, pWalletType,
+					pAddressStr.String(), pWalletType,
 					false, d.ethClient)
 			}
 		}

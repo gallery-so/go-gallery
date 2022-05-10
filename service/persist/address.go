@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,12 +33,12 @@ type AddressDetails struct {
 type AddressRepository interface {
 	GetByDetails(context.Context, AddressValue, Chain) (Address, error)
 	GetByID(context.Context, DBID) (Address, error)
-	Insert(context.Context, Address, Chain) error
+	Insert(context.Context, AddressValue, Chain) error
 }
 
 // ErrAddressNotFoundByDetails is an error type for when a wallet is not found by address and chain unique combination
 type ErrAddressNotFoundByDetails struct {
-	Address Address
+	Address AddressValue
 	Chain   Chain
 }
 
@@ -75,4 +76,8 @@ func (n *AddressValue) Scan(value interface{}) error {
 	}
 	*n = AddressValue(value.(string))
 	return nil
+}
+
+func (e ErrAddressNotFoundByDetails) Error() string {
+	return fmt.Sprintf("address not found by details: %s, %d", e.Address, e.Chain)
 }

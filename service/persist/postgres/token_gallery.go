@@ -343,7 +343,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
+				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress.AddressValue, token.TokenID, token.Chain))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, ownership.Address.ID); err != nil {
 					return err
 				}
@@ -355,7 +355,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 	logrus.Infof("Checking 0 quantities for tokens...")
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID))
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress.AddressValue, token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, token.OwnerUserID); err != nil {
 				return err
 			}
@@ -374,7 +374,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	paramsPerRow := 19
+	paramsPerRow := 20
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {

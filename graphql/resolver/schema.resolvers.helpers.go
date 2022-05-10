@@ -219,6 +219,15 @@ func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, err
 	return nftToModel(ctx, *nft), nil
 }
 
+func resolveNftsByUserID(ctx context.Context, userId persist.DBID) ([]*model.Nft, error) {
+	nfts, err := publicapi.For(ctx).Nft.GetNftsByUserID(ctx, userId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nftsToModel(ctx, nfts), nil
+}
 func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (*model.GalleryUser, error) {
 	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
 
@@ -487,6 +496,14 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		CreatorAddress:        nil,                        // handled by dedicated resolver
 		OpenseaCollectionName: &nft.CollectionName.String, // how do we get this?
 	}
+}
+
+func nftsToModel(ctx context.Context, nft []sqlc.Token) []*model.Nft {
+	res := make([]*model.Nft, len(nft))
+	for i, nft := range nft {
+		res[i] = nftToModel(ctx, nft)
+	}
+	return res
 }
 
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {

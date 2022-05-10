@@ -356,6 +356,7 @@ type Query {
   collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
   communityByAddress(communityAddress: AddressValue!, chain: Chain!): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
+  nftsByUserId(userId: DBID!): [Nft]
 }
 
 input CollectionLayoutInput {

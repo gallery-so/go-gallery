@@ -25,8 +25,10 @@ type UserRepository struct {
 	updateCollectionsStmt *sql.Stmt
 	deleteGalleryStmt     *sql.Stmt
 	createAddressStmt     *sql.Stmt
+	getAddressIDStmt      *sql.Stmt
 	getAddressStmt        *sql.Stmt
 	createWalletStmt      *sql.Stmt
+	getWalletIDStmt       *sql.Stmt
 	getWalletStmt         *sql.Stmt
 	addWalletStmt         *sql.Stmt
 	removeWalletStmt      *sql.Stmt
@@ -47,7 +49,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES) VALUES ($1, $2) RETURNING ID;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(ADDRESSES) AND DELETED = false;`)
@@ -71,13 +73,19 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	createAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO addresses (ID, ADDRESS_VALUE, CHAIN) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS_VALUE,CHAIN) DO NOTHING;`)
 	checkNoErr(err)
 
-	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`)
+	getAddressIDStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`)
+	checkNoErr(err)
+
+	getAddressStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS_VALUE,CHAIN FROM addresses WHERE ID = $1;`)
 	checkNoErr(err)
 
 	createWalletStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID, ADDRESS, WALLET_TYPE) VALUES ($1, $2, $3) ON CONFLICT (ADDRESS) DO NOTHING;`)
 	checkNoErr(err)
 
-	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ID FROM wallets WHERE ADDRESS = $1;`)
+	getWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID FROM wallets WHERE ADDRESS = $1;`)
+	checkNoErr(err)
+
+	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS,WALLET_TYPE FROM wallets WHERE ID = $1;`)
 	checkNoErr(err)
 
 	addWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = array_append(ADDRESSES, $1) WHERE ID = $2;`)
@@ -100,8 +108,10 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		updateCollectionsStmt: updateCollectionsStmt,
 		deleteGalleryStmt:     deleteGalleryStmt,
 		createAddressStmt:     createAddressStmt,
+		getAddressIDStmt:      getAddressIDStmt,
 		getAddressStmt:        getAddressStmt,
 		createWalletStmt:      createWalletStmt,
+		getWalletIDStmt:       getWalletIDStmt,
 		getWalletStmt:         getWalletStmt,
 		addWalletStmt:         addWalletStmt,
 		removeWalletStmt:      removeWalletStmt,
@@ -147,7 +157,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	if err != nil {
 		return "", fmt.Errorf("failed to create address: %w", err)
 	}
-	err = u.getAddressStmt.QueryRowContext(pCtx, pUser.Address, pUser.Chain).Scan(&addressID)
+	err = u.getAddressIDStmt.QueryRowContext(pCtx, pUser.Address, pUser.Chain).Scan(&addressID)
 	if err != nil {
 		return "", err
 	}
@@ -156,12 +166,12 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	if err != nil {
 		return "", fmt.Errorf("failed to create wallet: %w", err)
 	}
-	err = u.getWalletStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
+	err = u.getWalletIDStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
 	if err != nil {
 		return "", err
 	}
 
-	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), []persist.DBID{addressID}).Scan(&id)
+	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), []persist.DBID{walletID}).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -173,13 +183,33 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.User, error) {
 
 	user := persist.User{}
-	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	walletIDs := []persist.DBID{}
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
 		}
 		return persist.User{}, err
 	}
+	wallets := make([]persist.Wallet, len(walletIDs))
+
+	for i, walletID := range walletIDs {
+		wallet := persist.Wallet{ID: walletID}
+		var addressID persist.DBID
+		err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&addressID, &wallet.WalletType)
+		if err != nil {
+			return persist.User{}, fmt.Errorf("failed to get wallet: %w", err)
+		}
+		address := persist.Address{ID: addressID}
+		err = u.getAddressStmt.QueryRowContext(pCtx, addressID).Scan(&address.AddressValue, &address.Chain)
+		if err != nil {
+			return persist.User{}, fmt.Errorf("failed to get address: %w", err)
+		}
+		wallet.Address = address
+		wallets[i] = wallet
+	}
+	user.Wallets = wallets
+
 	return user, nil
 }
 
@@ -188,12 +218,12 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.User, error) {
 	var addressID, walletID persist.DBID
 
-	err := u.getAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addressID)
+	err := u.getAddressIDStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addressID)
 	if err != nil {
 		return persist.User{}, err
 	}
 
-	err = u.getWalletStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
+	err = u.getWalletIDStmt.QueryRowContext(pCtx, addressID).Scan(&walletID)
 	if err != nil {
 		return persist.User{}, err
 	}
@@ -249,7 +279,7 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 		return err
 	}
 	var addrID persist.DBID
-	err := u.getAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addrID)
+	err := u.getAddressIDStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addrID)
 	if err != nil {
 		return err
 	}
@@ -259,7 +289,7 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 	}
 
 	var walletID persist.DBID
-	err = u.getWalletStmt.QueryRowContext(pCtx, addrID).Scan(&walletID)
+	err = u.getWalletIDStmt.QueryRowContext(pCtx, addrID).Scan(&walletID)
 	if err != nil {
 		return err
 	}
@@ -274,13 +304,13 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 // RemoveWallet removes an address from user
 func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pAddress persist.AddressValue, pChain persist.Chain) error {
 	var addrID persist.DBID
-	err := u.getAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addrID)
+	err := u.getAddressIDStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&addrID)
 	if err != nil {
 		return err
 	}
 
 	var walletID persist.DBID
-	err = u.getWalletStmt.QueryRowContext(pCtx, addrID).Scan(&walletID)
+	err = u.getWalletIDStmt.QueryRowContext(pCtx, addrID).Scan(&walletID)
 	if err != nil {
 		return err
 	}

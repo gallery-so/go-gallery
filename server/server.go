@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -19,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -62,7 +64,13 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	if err := redis.ClearCache(); err != nil {
 		panic(err)
 	}
-	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient(), multichain.NewMultiChainDataRetriever())
+
+	repos := newRepos(pqClient)
+	ethClient := newEthClient()
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
+	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient))
 }
 
 func newStorageClient() *storage.Client {
@@ -147,6 +155,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		NftEventRepository:        postgres.NewNftEventRepository(db),
 		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
 		WalletRepository:          postgres.NewWalletRepository(db),
+		AddressRepository:         postgres.NewAddressRepository(db),
 	}
 }
 
@@ -192,4 +201,8 @@ func initSentry() {
 	if err != nil {
 		log.Fatalf("failed to start sentry: %s", err)
 	}
+}
+
+func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.AddressRepository, opensea.NewProvider(ethClient, httpClient))
 }

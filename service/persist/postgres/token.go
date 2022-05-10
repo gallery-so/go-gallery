@@ -331,7 +331,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(contractAddr, token.TokenID))
+				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(contractAddr.AddressValue, token.TokenID, token.Chain))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
@@ -347,7 +347,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddress.AddressValue, &contractAddress.Chain); err != nil {
 				return err
 			}
-			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(contractAddress, token.TokenID))
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(contractAddress.AddressValue, token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}

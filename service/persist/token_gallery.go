@@ -35,7 +35,6 @@ type TokenGallery struct {
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	ContractAddress  Address          `json:"contract_address"`
-	CollectionName   NullString       `json:"collection_name"`
 
 	ExternalURL NullString `json:"external_url"`
 
@@ -50,8 +49,9 @@ type AddressAtBlock struct {
 
 // TokenIdentifiers represents a unique identifier for a token
 type TokenIdentifiers struct {
-	TokenID         TokenID `json:"token_id"`
-	ContractAddress Address `json:"contract_address"`
+	TokenID         TokenID      `json:"token_id"`
+	ContractAddress AddressValue `json:"contract_address"`
+	Chain           Chain        `json:"chain"`
 }
 
 // TokenInCollection represents a token within a collection
@@ -122,15 +122,16 @@ type ErrTokenGalleryNotFoundByIdentifiers struct {
 }
 
 // NewTokenIdentifiers creates a new token identifiers
-func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID) TokenIdentifiers {
+func NewTokenIdentifiers(pContractAddress AddressValue, pTokenID TokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{
 		TokenID:         pTokenID,
 		ContractAddress: pContractAddress,
+		Chain:           pChain,
 	}
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%d", t.ContractAddress.AddressValue, t.TokenID, t.ContractAddress.Chain)
+	return fmt.Sprintf("%s+%s+%d", t.ContractAddress, t.TokenID, t.Chain)
 }
 
 // Value implements the driver.Valuer interface
@@ -153,11 +154,9 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 		return err
 	}
 	*t = TokenIdentifiers{
-		TokenID: TokenID(res[1]),
-		ContractAddress: Address{
-			AddressValue: AddressValue(res[0]),
-			Chain:        Chain(chain),
-		},
+		TokenID:         TokenID(res[1]),
+		ContractAddress: AddressValue(res[0]),
+		Chain:           Chain(chain),
 	}
 	return nil
 }

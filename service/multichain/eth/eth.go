@@ -46,8 +46,8 @@ func NewDataRetriever(indexerBaseURL string, httpClient *http.Client, ec *ethcli
 // GetBlockchainInfo retrieves blockchain info for ETH
 func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
 	return multichain.BlockchainInfo{
-		ChainName: persist.ChainETH,
-		ChainID:   0,
+		Chain:   persist.ChainETH,
+		ChainID: 0,
 	}, nil
 }
 

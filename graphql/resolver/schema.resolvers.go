@@ -415,6 +415,10 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, 
 	return resolveGeneralAllowlist(ctx)
 }
 
+func (r *queryResolver) NftsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Nft, error) {
+	return resolveNftsByUserID(ctx, userID)
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)

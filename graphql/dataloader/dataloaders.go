@@ -30,6 +30,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 const defaultMaxBatchOne = 100 // Default for queries that return a single result
@@ -173,6 +174,11 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadAddressByWalletId(ctx, loaders, q),
+	}
+	loaders.TokenByUserID = TokenLoaderByManyID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByUserId(ctx, loaders, q),
 	}
 
 	return loaders
@@ -607,8 +613,8 @@ func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries)
 		b := q.GetWalletsByUserIDBatch(ctx, userIds)
 		defer b.Close()
 
+		logrus.Infof("Loading wallets for user IDs: %v", userIds)
 		b.Query(func(i int, wallet []sqlc.Wallet, err error) {
-
 			// TODO err for not found by user ID
 
 			// Add results to other loaders' caches
@@ -705,5 +711,28 @@ func loadAddressByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		})
 
 		return addresses, errors
+	}
+}
+
+func loadTokensByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(userIds []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(userIds))
+		errors := make([]error, len(userIds))
+
+		b := q.GetTokensByUserIDBatch(ctx, userIds)
+		defer b.Close()
+
+		b.Query(func(i int, token []sqlc.Token, err error) {
+			logrus.Infof("Loading tokens for user IDs: %v - %d", userIds, len(token))
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.TokenByUserID.Prime(userIds[i], token)
+			}
+
+			tokens[i], errors[i] = token, err
+		})
+
+		return tokens, errors
 	}
 }

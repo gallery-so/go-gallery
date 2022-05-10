@@ -301,7 +301,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	mediaType := predictMediaType(pCtx, url)
+	mediaType := PredictMediaType(pCtx, url)
 
 	logrus.Infof("predicting media type for %s: %s", name, mediaType)
 
@@ -392,7 +392,8 @@ outer:
 	}
 }
 
-func predictMediaType(pCtx context.Context, url string) (mediaType persist.MediaType) {
+// PredictMediaType guesses the media type of the given URL.
+func PredictMediaType(pCtx context.Context, url string) (mediaType persist.MediaType) {
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
