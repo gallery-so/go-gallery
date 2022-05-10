@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 const galleryCacheTime = time.Hour * 24 * 3
@@ -211,7 +211,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	if rowsAffected == 0 {
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
-	logrus.Infof("Added %d collections to gallery %s", len(pCollections), pID)
+	logger.For(pCtx).Infof("Added %d collections to gallery %s", len(pCollections), pID)
 	err = g.cacheByUserID(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -227,7 +227,7 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 			var galleries []persist.Gallery
 			err := json.Unmarshal(initial, &galleries)
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to unmarshal cached galleries for user %s - cached: %s", pUserID, string(initial))
+				logger.For(pCtx).WithError(err).Errorf("failed to unmarshal cached galleries for user %s - cached: %s", pUserID, string(initial))
 			} else {
 				return galleries, nil
 			}
@@ -264,22 +264,22 @@ func (g *GalleryRepository) GetByUserID(pCtx context.Context, pUserID persist.DB
 		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
-			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
+			logger.For(pCtx).Debugf("First time seeing collections for gallery %s", gallery.ID)
 			colls = make([]persist.Collection, 0, 10)
 		}
 
 		if lastCollID != collection.ID {
-			logrus.Debugf("Adding collection %s to gallery %s", collection.ID, gallery.ID)
+			logger.For(pCtx).Debugf("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
-				logrus.Debugf("Adding NFT %s to collection %s", nft.ID, collection.ID)
+				logger.For(pCtx).Debugf("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
 			} else {
 				collection.NFTs = []persist.CollectionNFT{}
-				logrus.Debugf("No NFTs found for collection %s", collection.ID)
+				logger.For(pCtx).Debugf("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
 		} else {
-			logrus.Debugf("Already seen: Adding NFT %s to collection at end of current colls len %d", nft.ID, len(colls))
+			logger.For(pCtx).Debugf("Already seen: Adding NFT %s to collection at end of current colls len %d", nft.ID, len(colls))
 			lastColl := colls[len(colls)-1]
 			lastColl.NFTs = append(lastColl.NFTs, nft)
 			colls[len(colls)-1] = lastColl
@@ -376,18 +376,18 @@ func (g *GalleryRepository) GetByID(pCtx context.Context, pID persist.DBID) (per
 
 		colls, ok := collections[gallery.ID]
 		if !ok {
-			logrus.Debugf("First time seeing collections for gallery %s", gallery.ID)
+			logger.For(pCtx).Debugf("First time seeing collections for gallery %s", gallery.ID)
 			colls = make([]persist.Collection, 0, 10)
 		}
 
 		if lastCollID != collection.ID {
-			logrus.Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
+			logger.For(pCtx).Infof("Adding collection %s to gallery %s", collection.ID, gallery.ID)
 			if nft.ID != "" {
-				logrus.Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
+				logger.For(pCtx).Infof("Adding NFT %s to collection %s", nft.ID, collection.ID)
 				collection.NFTs = []persist.CollectionNFT{nft}
 			} else {
 				collection.NFTs = []persist.CollectionNFT{}
-				logrus.Infof("No NFTs found for collection %s", collection.ID)
+				logger.For(pCtx).Infof("No NFTs found for collection %s", collection.ID)
 			}
 			colls = append(colls, collection)
 		} else {

@@ -2,11 +2,11 @@ package cloudtask
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/sirupsen/logrus"
+	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type NftFeedEvent struct {
@@ -21,7 +21,7 @@ func (t NftFeedEvent) Handle(ctx context.Context, event persist.NftEventRecord) 
 
 	saved, err := t.NftEventRepo.Add(ctx, event)
 	if err != nil {
-		logrus.Errorf("failed to add event to token event repo: %s", err)
+		logger.For(ctx).Errorf("failed to add event to token event repo: %s", err)
 
 		if hub != nil {
 			hub.CaptureException(err)
@@ -32,7 +32,7 @@ func (t NftFeedEvent) Handle(ctx context.Context, event persist.NftEventRecord) 
 
 	err = createTaskForFeedbot(ctx, time.Time(saved.CreationTime), saved.ID, saved.Code)
 	if err != nil {
-		logrus.Errorf("failed to create task: %s", err)
+		logger.For(ctx).Errorf("failed to create task: %s", err)
 
 		if hub != nil {
 			hub.CaptureException(err)

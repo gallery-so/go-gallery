@@ -6,9 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/lib/pq"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -118,7 +117,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		var userID persist.DBID
 		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&userID, &username)
 		if err != nil {
-			logrus.Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
+			logger.For(ctx).Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
 			continue
 		}
 
@@ -147,13 +146,13 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		defer rows.Close()
 
 		if err != nil {
-			logrus.Warnf("error getting preview NFTs of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+			logger.For(ctx).Warnf("error getting preview NFTs of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
 		} else {
 			for rows.Next() {
 				var imageURL persist.NullString
 				err = rows.Scan(&imageURL)
 				if err != nil {
-					logrus.Warnf("error scanning preview NFT of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+					logger.For(ctx).Warnf("error scanning preview NFT of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
 					continue
 				}
 				previewNFTs = append(previewNFTs, imageURL)

@@ -171,6 +171,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	FollowUserPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	Gallery struct {
 		Collections func(childComplexity int) int
 		Dbid        func(childComplexity int) int
@@ -181,6 +185,8 @@ type ComplexityRoot struct {
 	GalleryUser struct {
 		Bio                 func(childComplexity int) int
 		Dbid                func(childComplexity int) int
+		Followers           func(childComplexity int) int
+		Following           func(childComplexity int) int
 		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
@@ -253,11 +259,13 @@ type ComplexityRoot struct {
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
+		FollowUser               func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, address persist.Address) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
+		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
@@ -281,6 +289,7 @@ type ComplexityRoot struct {
 		Media                 func(childComplexity int) int
 		Name                  func(childComplexity int) int
 		OpenseaCollectionName func(childComplexity int) int
+		OpenseaID             func(childComplexity int) int
 		Owner                 func(childComplexity int) int
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
@@ -334,6 +343,10 @@ type ComplexityRoot struct {
 		Dbid        func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
+	}
+
+	UnfollowUserPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	UnknownMedia struct {
@@ -408,6 +421,9 @@ type GalleryResolver interface {
 }
 type GalleryUserResolver interface {
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
+
+	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
+	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 }
 type MutationResolver interface {
 	AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
@@ -425,6 +441,8 @@ type MutationResolver interface {
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
+	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
+	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 }
 type NftResolver interface {
 	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
@@ -812,6 +830,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrUserNotFound.Message(childComplexity), true
 
+	case "FollowUserPayload.viewer":
+		if e.complexity.FollowUserPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.FollowUserPayload.Viewer(childComplexity), true
+
 	case "Gallery.collections":
 		if e.complexity.Gallery.Collections == nil {
 			break
@@ -853,6 +878,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Dbid(childComplexity), true
+
+	case "GalleryUser.followers":
+		if e.complexity.GalleryUser.Followers == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Followers(childComplexity), true
+
+	case "GalleryUser.following":
+		if e.complexity.GalleryUser.Following == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Following(childComplexity), true
 
 	case "GalleryUser.galleries":
 		if e.complexity.GalleryUser.Galleries == nil {
@@ -1168,6 +1207,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteCollection(childComplexity, args["collectionId"].(persist.DBID)), true
 
+	case "Mutation.followUser":
+		if e.complexity.Mutation.FollowUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_followUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.FollowUser(childComplexity, args["userId"].(persist.DBID)), true
+
 	case "Mutation.getAuthNonce":
 		if e.complexity.Mutation.GetAuthNonce == nil {
 			break
@@ -1222,6 +1273,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.Address)), true
+
+	case "Mutation.unfollowUser":
+		if e.complexity.Mutation.UnfollowUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unfollowUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnfollowUser(childComplexity, args["userId"].(persist.DBID)), true
 
 	case "Mutation.updateCollectionHidden":
 		if e.complexity.Mutation.UpdateCollectionHidden == nil {
@@ -1392,6 +1455,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Nft.OpenseaCollectionName(childComplexity), true
+
+	case "Nft.openseaId":
+		if e.complexity.Nft.OpenseaID == nil {
+			break
+		}
+
+		return e.complexity.Nft.OpenseaID(childComplexity), true
 
 	case "Nft.owner":
 		if e.complexity.Nft.Owner == nil {
@@ -1651,6 +1721,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokenHolder.User(childComplexity), true
+
+	case "UnfollowUserPayload.viewer":
+		if e.complexity.UnfollowUserPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UnfollowUserPayload.Viewer(childComplexity), true
 
 	case "UnknownMedia.contentRenderURL":
 		if e.complexity.UnknownMedia.ContentRenderURL == nil {
@@ -1942,6 +2019,8 @@ type GalleryUser implements Node {
     wallets: [Wallet]
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
+    followers: [GalleryUser] @goField(forceResolver: true)
+    following: [GalleryUser] @goField(forceResolver: true)
 }
 
 type Wallet implements Node @goGqlId(fields: ["address"]) {
@@ -2110,6 +2189,9 @@ type Nft implements Node {
     # struct and may ultimately end up elsewhere
     creatorAddress: Address
     openseaCollectionName: String
+
+    # temporary field while we're dependent on opensea
+    openseaId: Int
 }
 
 type OwnerAtBlock {
@@ -2479,6 +2561,26 @@ type CreateUserPayload {
     viewer: Viewer
 }
 
+union FollowUserPayloadOrError =
+    FollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+union UnfollowUserPayloadOrError =
+    UnfollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+type FollowUserPayload {
+    viewer: Viewer
+}
+
+type UnfollowUserPayload {
+    viewer: Viewer
+}
+
 type Mutation {
     # User Mutations
     addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
@@ -2506,6 +2608,9 @@ type Mutation {
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
+
+    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 }
 `, BuiltIn: false},
 }
@@ -2599,6 +2704,21 @@ func (ec *executionContext) field_Mutation_deleteCollection_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -2656,6 +2776,21 @@ func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.
 		}
 	}
 	args["addresses"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unfollowUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["userId"] = arg0
 	return args, nil
 }
 
@@ -4550,6 +4685,38 @@ func (ec *executionContext) _ErrUserNotFound_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _FollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.FollowUserPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FollowUserPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4912,6 +5079,70 @@ func (ec *executionContext) _GalleryUser_isAuthenticatedUser(ctx context.Context
 	res := resTmp.(*bool)
 	fc.Result = res
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_followers(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().Followers(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_following(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().Following(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GltfMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.GltfMedia) (ret graphql.Marshaler) {
@@ -6774,6 +7005,124 @@ func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.
 	return ec.marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLogoutPayload(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_followUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_followUser_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().FollowUser(rctx, args["userId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.FollowUserPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.FollowUserPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.FollowUserPayloadOrError)
+	fc.Result = res
+	return ec.marshalOFollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowUserPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_unfollowUser_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UnfollowUser(rctx, args["userId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UnfollowUserPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UnfollowUserPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UnfollowUserPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Nft_id(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -7450,6 +7799,38 @@ func (ec *executionContext) _Nft_openseaCollectionName(ctx context.Context, fiel
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Nft_openseaId(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Nft",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OpenseaID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OwnerAtBlock_owner(ctx context.Context, field graphql.CollectedField, obj *model.OwnerAtBlock) (ret graphql.Marshaler) {
@@ -8393,6 +8774,38 @@ func (ec *executionContext) _TokenHolder_previewNfts(ctx context.Context, field 
 	res := resTmp.([]*string)
 	fc.Result = res
 	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UnfollowUserPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnknownMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
@@ -11198,6 +11611,43 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	}
 }
 
+func (ec *executionContext) _FollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.FollowUserPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.FollowUserPayload:
+		return ec._FollowUserPayload(ctx, sel, &obj)
+	case *model.FollowUserPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FollowUserPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _GalleryUserOrWallet(ctx context.Context, sel ast.SelectionSet, obj model.GalleryUserOrWallet) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -11561,6 +12011,43 @@ func (ec *executionContext) _RemoveUserAddressesPayloadOrError(ctx context.Conte
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UnfollowUserPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UnfollowUserPayload:
+		return ec._UnfollowUserPayload(ctx, sel, &obj)
+	case *model.UnfollowUserPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UnfollowUserPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -12297,7 +12784,7 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserAddressPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserAddressPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -12421,7 +12908,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel a
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -12668,7 +13155,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "Error", "LoginPayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -12688,6 +13175,34 @@ func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var followUserPayloadImplementors = []string{"FollowUserPayload", "FollowUserPayloadOrError"}
+
+func (ec *executionContext) _FollowUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.FollowUserPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, followUserPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FollowUserPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._FollowUserPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12849,6 +13364,40 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "followers":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_followers(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "following":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_following(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13410,6 +13959,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "followUser":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_followUser(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "unfollowUser":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unfollowUser(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13590,6 +14153,13 @@ func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj 
 		case "openseaCollectionName":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Nft_openseaCollectionName(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "openseaId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Nft_openseaId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14075,6 +14645,34 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 		case "previewNfts":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._TokenHolder_previewNfts(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var unfollowUserPayloadImplementors = []string{"UnfollowUserPayload", "UnfollowUserPayloadOrError"}
+
+func (ec *executionContext) _UnfollowUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnfollowUserPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, unfollowUserPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UnfollowUserPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UnfollowUserPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15809,6 +16407,13 @@ func (ec *executionContext) unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydub
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalOFollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.FollowUserPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FollowUserPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v []*model.Gallery) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -15855,6 +16460,47 @@ func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 		return graphql.Null
 	}
 	return ec._Gallery(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryUser) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
@@ -16267,6 +16913,13 @@ func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UnfollowUserPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateCollectionHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionHiddenPayloadOrError) graphql.Marshaler {

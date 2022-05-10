@@ -74,15 +74,16 @@ type CollectionsV2 struct {
 }
 
 type Contract struct {
-	ID          persist.DBID
-	Deleted     bool
-	Version     sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Name        sql.NullString
-	Symbol      sql.NullString
-	Address     sql.NullString
-	LatestBlock sql.NullInt64
+	ID             persist.DBID
+	Deleted        bool
+	Version        sql.NullInt32
+	CreatedAt      time.Time
+	LastUpdated    time.Time
+	Name           sql.NullString
+	Symbol         sql.NullString
+	Address        sql.NullString
+	LatestBlock    sql.NullInt64
+	CreatorAddress persist.Address
 }
 
 type Feature struct {
@@ -98,6 +99,15 @@ type Feature struct {
 	IsEnabled           sql.NullBool
 	AdminOnly           sql.NullBool
 	ForceEnabledUserIds []string
+}
+
+type Follow struct {
+	ID          persist.DBID
+	Follower    persist.DBID
+	Followee    persist.DBID
+	Deleted     sql.NullBool
+	CreatedAt   time.Time
+	LastUpdated time.Time
 }
 
 type Gallery struct {

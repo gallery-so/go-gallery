@@ -125,7 +125,7 @@ func teardown() {
 }
 
 func clearDB() {
-	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups;`
+	dropSQL := `TRUNCATE users, nfts, collections, galleries, tokens, contracts, membership, access, nonces, login_attempts, access, backups, follows;`
 	_, err := db.Exec(dropSQL)
 	if err != nil {
 		panic(err)

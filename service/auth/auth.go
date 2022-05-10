@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"log"
 	"math/rand"
 	"net/http"
@@ -19,7 +20,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -136,11 +136,11 @@ func (e ErrSignatureVerificationFailed) Error() string {
 }
 
 type ErrDoesNotOwnRequiredNFT struct {
-	address persist.Address
+	addresses []persist.Address
 }
 
 func (e ErrDoesNotOwnRequiredNFT) Error() string {
-	return fmt.Sprintf("required tokens not owned by address: %s", e.address)
+	return fmt.Sprintf("required tokens not owned by any addresses: %s", e.addresses)
 }
 
 type ErrNonceNotFound struct {
@@ -394,7 +394,7 @@ func VerifySignature(pSignatureStr string,
 
 		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
 		if err != nil {
-			logrus.WithError(err).Error("IsValidSignature")
+			logger.For(ctx).WithError(err).Error("IsValidSignature")
 			return false, nil
 		}
 
@@ -411,7 +411,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
-		logrus.WithError(err).Error("error retrieving user by address to get login nonce")
+		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
 	userExists = user.ID != ""
@@ -419,24 +419,9 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	if !userExists {
 
 		if !pPreAuthed {
-
-			req := GetAllowlistContracts()
-			has := false
-			for k, v := range req {
-
-				hasNFT, err := eth.HasNFTs(pCtx, k, v, pAddress, ethClient)
-				if err != nil {
-					return "", false, err
-				}
-				if hasNFT {
-					has = true
-					break
-				}
+			if hasNft, err := HasAllowlistNFT(pCtx, []persist.Address{pAddress}, ethClient); !hasNft {
+				return "", false, err
 			}
-			if !has {
-				return "", false, ErrDoesNotOwnRequiredNFT{pAddress}
-			}
-
 		}
 
 		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
@@ -463,6 +448,22 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	}
 
 	return nonce, userExists, nil
+}
+
+func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient *ethclient.Client) (bool, error) {
+	allowlist := GetAllowlistContracts()
+	for _, addr := range addresses {
+		for k, v := range allowlist {
+			found, err := eth.HasNFTs(ctx, k, v, addr, ethClient)
+			if found {
+				return true, nil
+			} else if err != nil {
+				logger.For(ctx).Warnf("error checking whether address %s owns NFTs with contractAddress: %s and ids: %v: %s\n", addr, k, v, err)
+			}
+		}
+	}
+
+	return false, ErrDoesNotOwnRequiredNFT{addresses: addresses}
 }
 
 // GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
@@ -552,7 +553,7 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 	addrs := viper.GetString("CONTRACT_ADDRESSES")
 	spl := strings.Split(addrs, "|")
-	logrus.Info("contract addresses:", spl)
+	logger.For(nil).Info("contract addresses:", spl)
 	res := make(map[persist.Address][]persist.TokenID)
 	for _, addr := range spl {
 		nextSpl := strings.Split(addr, "=")
@@ -563,9 +564,9 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 		tokens := nextSpl[1]
 		tokens = strings.TrimLeft(tokens, "[")
 		tokens = strings.TrimRight(tokens, "]")
-		logrus.Info("token_ids:", tokens)
+		logger.For(nil).Info("token_ids:", tokens)
 		tokenIDs := strings.Split(tokens, ",")
-		logrus.Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
+		logger.For(nil).Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
 		res[persist.Address(addr)] = make([]persist.TokenID, len(tokenIDs))
 		for i, tokenID := range tokenIDs {
 			res[persist.Address(addr)][i] = persist.TokenID(tokenID)

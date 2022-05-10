@@ -76,7 +76,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
-			addError(ctx, err, converted)
 			return converted, true
 		}
 	}
@@ -118,6 +117,36 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	}
 
 	return userToModel(ctx, *user), nil
+}
+
+func resolveFollowersByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(followers))
+	for i, user := range followers {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
+func resolveFollowingByUserId(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(following))
+	for i, user := range following {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
 }
 
 func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
@@ -319,11 +348,16 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            &user.Username.String,
-		Bio:                 &user.Bio.String,
-		Wallets:             wallets,
-		Galleries:           nil, // handled by dedicated resolver
+		Dbid:     user.ID,
+		Username: &user.Username.String,
+		Bio:      &user.Bio.String,
+		Wallets:  wallets,
+
+		// each handeled by dedicated resolver
+		Galleries: nil,
+		Followers: nil,
+		Following: nil,
+
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
 }
@@ -406,6 +440,7 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 
 func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 	chainEthereum := model.ChainEthereum
+	openseaID := int(nft.OpenseaID.Int64)
 
 	return &model.Nft{
 		Dbid:             nft.ID,
@@ -419,6 +454,7 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 		Description:      &nft.Description.String,
 		TokenURI:         nil, // TODO: later
 		TokenID:          &nft.OpenseaTokenID.String,
+		OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later

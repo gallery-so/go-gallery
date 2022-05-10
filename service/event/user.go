@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type UserDispatcher struct {
@@ -18,15 +18,13 @@ func (c UserDispatcher) Handle(eventCode persist.EventCode, handler UserEventHan
 func (c UserDispatcher) Dispatch(ctx context.Context, event persist.UserEventRecord) {
 	currentHub := sentryutil.SentryHubFromContext(ctx)
 
-	go func() {
-		ctx := sentryutil.NewSentryHubContext(ctx, currentHub)
-
+	go func(hubCtx context.Context) {
 		if handlers, ok := c.Handlers[event.Code]; ok {
 			for _, handler := range handlers {
-				handler.Handle(ctx, event)
+				handler.Handle(hubCtx, event)
 			}
 		}
-	}()
+	}(sentryutil.NewSentryHubContext(ctx, currentHub))
 }
 
 type UserEventHandler interface {

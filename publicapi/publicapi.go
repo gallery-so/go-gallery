@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 
 	"cloud.google.com/go/storage"
@@ -34,7 +35,9 @@ type PublicAPI struct {
 }
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
-	loaders := dataloader.NewLoaders(ctx, queries)
+	// Use the request context so dataloaders will add their traces to the request span
+	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries)
+
 	validator := newValidator()
 
 	api := &PublicAPI{
