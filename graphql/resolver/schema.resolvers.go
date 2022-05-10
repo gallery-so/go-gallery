@@ -410,7 +410,12 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 }
 
 func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddressWithRefresh(ctx, contractAddress, *forceRefresh)
+	refresh := false
+	if forceRefresh != nil {
+		refresh = *forceRefresh
+	}
+
+	return resolveCommunityByContractAddress(ctx, contractAddress, refresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address, error) {

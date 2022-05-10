@@ -30,10 +30,13 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByContractAddress,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	},
+
+	OnCommunity: func(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
+		return resolveCommunityByContractAddress(ctx, contractAddress, false)
 	},
 }
 
@@ -274,18 +277,8 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddressWithRefresh(ctx context.Context, contractAddress persist.Address, forceRefresh bool) (*model.Community, error) {
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, forceRefresh bool) (*model.Community, error) {
 	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return communityToModel(ctx, *community), nil
-}
-
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, false)
 
 	if err != nil {
 		return nil, err
