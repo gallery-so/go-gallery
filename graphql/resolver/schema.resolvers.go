@@ -459,7 +459,7 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address
 }
 
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, obj.Dbid)
+	return resolveGalleryUserByUserID(ctx, obj.UserId)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {

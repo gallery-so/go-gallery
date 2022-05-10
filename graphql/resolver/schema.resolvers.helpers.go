@@ -431,10 +431,10 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 	}
 
 	return &model.TokenHolder{
-		Dbid:        tokenHolder.UserID,
-		Addresses:   addresses,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID},
+		Addresses:             addresses,
+		User:                  nil, // handled by dedicated resolver
+		PreviewNfts:           previewNfts,
 	}
 }
 

@@ -340,7 +340,6 @@ type ComplexityRoot struct {
 
 	TokenHolder struct {
 		Addresses   func(childComplexity int) int
-		Dbid        func(childComplexity int) int
 		PreviewNfts func(childComplexity int) int
 		User        func(childComplexity int) int
 	}
@@ -1701,13 +1700,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenHolder.Addresses(childComplexity), true
 
-	case "TokenHolder.dbid":
-		if e.complexity.TokenHolder.Dbid == nil {
-			break
-		}
-
-		return e.complexity.TokenHolder.Dbid(childComplexity), true
-
 	case "TokenHolder.previewNfts":
 		if e.complexity.TokenHolder.PreviewNfts == nil {
 			break
@@ -2230,8 +2222,7 @@ type Gallery implements Node {
     collections: [Collection] @goField(forceResolver: true)
 }
 
-type TokenHolder {
-    dbid: DBID!
+type TokenHolder @goEmbedHelper {
     addresses: [Address]
     user: GalleryUser @goField(forceResolver: true)
     previewNfts: [String]
@@ -8645,41 +8636,6 @@ func (ec *executionContext) _TextMedia_contentRenderURL(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokenHolder_dbid(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "TokenHolder",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _TokenHolder_addresses(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -14608,16 +14564,6 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("TokenHolder")
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokenHolder_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "addresses":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._TokenHolder_addresses(ctx, field, obj)

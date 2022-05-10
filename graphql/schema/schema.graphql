@@ -267,8 +267,7 @@ type Gallery implements Node {
     collections: [Collection] @goField(forceResolver: true)
 }
 
-type TokenHolder {
-    dbid: DBID!
+type TokenHolder @goEmbedHelper {
     addresses: [Address]
     user: GalleryUser @goField(forceResolver: true)
     previewNfts: [String]

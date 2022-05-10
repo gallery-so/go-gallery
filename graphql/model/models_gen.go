@@ -535,7 +535,7 @@ func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
 type TokenHolder struct {
-	Dbid        persist.DBID       `json:"dbid"`
+	HelperTokenHolderData
 	Addresses   []*persist.Address `json:"addresses"`
 	User        *GalleryUser       `json:"user"`
 	PreviewNfts []*string          `json:"previewNfts"`
