@@ -177,7 +177,7 @@ type ComplexityRoot struct {
 	}
 
 	FollowUserPayload struct {
-		UserID func(childComplexity int) int
+		Viewer func(childComplexity int) int
 	}
 
 	Gallery struct {
@@ -271,13 +271,13 @@ type ComplexityRoot struct {
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
-		FollowUser               func(childComplexity int, followee persist.DBID) int
+		FollowUser               func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, address persist.Address) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
-		UnfollowUser             func(childComplexity int, followee persist.DBID) int
+		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
@@ -351,7 +351,7 @@ type ComplexityRoot struct {
 	}
 
 	UnfollowUserPayload struct {
-		UserID func(childComplexity int) int
+		Viewer func(childComplexity int) int
 	}
 
 	UnknownMedia struct {
@@ -449,8 +449,8 @@ type MutationResolver interface {
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
-	FollowUser(ctx context.Context, followee persist.DBID) (model.FollowUserPayloadOrError, error)
-	UnfollowUser(ctx context.Context, followee persist.DBID) (model.UnfollowUserPayloadOrError, error)
+	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
+	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 }
 type NftResolver interface {
 	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
@@ -849,12 +849,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrUserNotFound.Message(childComplexity), true
 
-	case "FollowUserPayload.userId":
-		if e.complexity.FollowUserPayload.UserID == nil {
+	case "FollowUserPayload.viewer":
+		if e.complexity.FollowUserPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.FollowUserPayload.UserID(childComplexity), true
+		return e.complexity.FollowUserPayload.Viewer(childComplexity), true
 
 	case "Gallery.collections":
 		if e.complexity.Gallery.Collections == nil {
@@ -1264,7 +1264,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.FollowUser(childComplexity, args["followee"].(persist.DBID)), true
+		return e.complexity.Mutation.FollowUser(childComplexity, args["userId"].(persist.DBID)), true
 
 	case "Mutation.getAuthNonce":
 		if e.complexity.Mutation.GetAuthNonce == nil {
@@ -1331,7 +1331,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UnfollowUser(childComplexity, args["followee"].(persist.DBID)), true
+		return e.complexity.Mutation.UnfollowUser(childComplexity, args["userId"].(persist.DBID)), true
 
 	case "Mutation.updateCollectionHidden":
 		if e.complexity.Mutation.UpdateCollectionHidden == nil {
@@ -1741,12 +1741,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TextMedia.PreviewURLs(childComplexity), true
 
-	case "UnfollowUserPayload.userId":
-		if e.complexity.UnfollowUserPayload.UserID == nil {
+	case "UnfollowUserPayload.viewer":
+		if e.complexity.UnfollowUserPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.UnfollowUserPayload.UserID(childComplexity), true
+		return e.complexity.UnfollowUserPayload.Viewer(childComplexity), true
 
 	case "UnknownMedia.contentRenderURL":
 		if e.complexity.UnknownMedia.ContentRenderURL == nil {
@@ -2598,11 +2598,11 @@ union UnfollowUserPayloadOrError =
     | ErrInvalidInput
 
 type FollowUserPayload {
-    userId: DBID
+    viewer: Viewer
 }
 
 type UnfollowUserPayload {
-    userId: DBID
+    viewer: Viewer
 }
 
 type Mutation {
@@ -2633,8 +2633,8 @@ type Mutation {
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
-    followUser(followee: DBID!): FollowUserPayloadOrError @authRequired
-    unfollowUser(followee: DBID!): UnfollowUserPayloadOrError @authRequired
+    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 }
 `, BuiltIn: false},
 }
@@ -2732,14 +2732,14 @@ func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, 
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["followee"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("followee"))
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["followee"] = arg0
+	args["userId"] = arg0
 	return args, nil
 }
 
@@ -2807,14 +2807,14 @@ func (ec *executionContext) field_Mutation_unfollowUser_args(ctx context.Context
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["followee"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("followee"))
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["followee"] = arg0
+	args["userId"] = arg0
 	return args, nil
 }
 
@@ -4764,7 +4764,7 @@ func (ec *executionContext) _ErrUserNotFound_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _FollowUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.FollowUserPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _FollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.FollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4782,7 +4782,7 @@ func (ec *executionContext) _FollowUserPayload_userId(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.UserID, nil
+		return obj.Viewer, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4791,9 +4791,9 @@ func (ec *executionContext) _FollowUserPayload_userId(ctx context.Context, field
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.DBID)
+	res := resTmp.(*model.Viewer)
 	fc.Result = res
-	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
@@ -7241,7 +7241,7 @@ func (ec *executionContext) _Mutation_followUser(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().FollowUser(rctx, args["followee"].(persist.DBID))
+			return ec.resolvers.Mutation().FollowUser(rctx, args["userId"].(persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -7300,7 +7300,7 @@ func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field gr
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UnfollowUser(rctx, args["followee"].(persist.DBID))
+			return ec.resolvers.Mutation().UnfollowUser(rctx, args["userId"].(persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -8855,7 +8855,7 @@ func (ec *executionContext) _TextMedia_contentRenderURL(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UnfollowUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8873,7 +8873,7 @@ func (ec *executionContext) _UnfollowUserPayload_userId(ctx context.Context, fie
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.UserID, nil
+		return obj.Viewer, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8882,9 +8882,9 @@ func (ec *executionContext) _UnfollowUserPayload_userId(ctx context.Context, fie
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.DBID)
+	res := resTmp.(*model.Viewer)
 	fc.Result = res
-	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnknownMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
@@ -13310,9 +13310,9 @@ func (ec *executionContext) _FollowUserPayload(ctx context.Context, sel ast.Sele
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("FollowUserPayload")
-		case "userId":
+		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._FollowUserPayload_userId(ctx, field, obj)
+				return ec._FollowUserPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14784,9 +14784,9 @@ func (ec *executionContext) _UnfollowUserPayload(ctx context.Context, sel ast.Se
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("UnfollowUserPayload")
-		case "userId":
+		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UnfollowUserPayload_userId(ctx, field, obj)
+				return ec._UnfollowUserPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

@@ -247,46 +247,46 @@ func (api UserAPI) GetFollowingById(ctx context.Context, userID persist.DBID) ([
 	return following, nil
 }
 
-func (api UserAPI) FollowUser(ctx context.Context, followee persist.DBID) error {
+func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
-	userID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
 	if err := validateFields(api.validator, validationMap{
-		"followee": {followee, fmt.Sprintf("required,ne=%s", userID)},
+		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
 	}); err != nil {
 		return err
 	}
 
-	if _, err := api.GetUserById(ctx, followee); err != nil {
+	if _, err := api.GetUserById(ctx, userID); err != nil {
 		return err
 	}
 
-	err = api.repos.UserRepository.AddFollower(ctx, userID, followee)
+	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
 
 	// Send event
-	userData := persist.UserEvent{FolloweeID: followee}
+	userData := persist.UserEvent{FolloweeID: userID}
 	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
 
 	return err
 }
 
-func (api UserAPI) UnfollowUser(ctx context.Context, followee persist.DBID) error {
+func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"followee": {followee, "required"},
+		"userID": {userID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	return api.repos.UserRepository.RemoveFollower(ctx, userID, followee)
+	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
 }
 
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {

@@ -367,7 +367,7 @@ type EthereumEoaAuth struct {
 }
 
 type FollowUserPayload struct {
-	UserID *persist.DBID `json:"userId"`
+	Viewer *Viewer `json:"viewer"`
 }
 
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
@@ -547,7 +547,7 @@ func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
 type UnfollowUserPayload struct {
-	UserID *persist.DBID `json:"userId"`
+	Viewer *Viewer `json:"viewer"`
 }
 
 func (UnfollowUserPayload) IsUnfollowUserPayloadOrError() {}

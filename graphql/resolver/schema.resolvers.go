@@ -368,29 +368,29 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	return output, nil
 }
 
-func (r *mutationResolver) FollowUser(ctx context.Context, followee persist.DBID) (model.FollowUserPayloadOrError, error) {
-	err := publicapi.For(ctx).User.FollowUser(ctx, followee)
+func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowUser(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.FollowUserPayload{
-		UserID: &followee,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, err
 }
 
-func (r *mutationResolver) UnfollowUser(ctx context.Context, followee persist.DBID) (model.UnfollowUserPayloadOrError, error) {
-	err := publicapi.For(ctx).User.UnfollowUser(ctx, followee)
+func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.UnfollowUserPayload{
-		UserID: &followee,
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, err

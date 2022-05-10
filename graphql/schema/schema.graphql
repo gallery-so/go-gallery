@@ -616,11 +616,11 @@ union UnfollowUserPayloadOrError =
     | ErrInvalidInput
 
 type FollowUserPayload {
-    userId: DBID
+    viewer: Viewer
 }
 
 type UnfollowUserPayload {
-    userId: DBID
+    viewer: Viewer
 }
 
 type Mutation {
@@ -651,6 +651,6 @@ type Mutation {
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
-    followUser(followee: DBID!): FollowUserPayloadOrError @authRequired
-    unfollowUser(followee: DBID!): UnfollowUserPayloadOrError @authRequired
+    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 }
