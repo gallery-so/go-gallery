@@ -437,10 +437,8 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 	lastUpdated := community.LastUpdated.Time()
 
 	owners := make([]*model.TokenHolder, len(community.Owners))
-	for _, owner := range community.Owners {
-		if owner.UserID != "" {
-			owners = append(owners, tokenHolderToModel(ctx, owner))
-		}
+	for i, owner := range community.Owners {
+		owners[i] = tokenHolderToModel(ctx, owner)
 	}
 
 	return &model.Community{
