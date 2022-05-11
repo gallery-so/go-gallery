@@ -247,4 +247,24 @@ CREATE TABLE IF NOT EXISTS collection_events (
     DATA JSONB
 );
 
+CREATE TABLE IF NOT EXISTS follows (
+    ID varchar(255) PRIMARY KEY,
+    FOLLOWER varchar(255) NOT NULL REFERENCES users (ID),
+    FOLLOWEE varchar(255) NOT NULL REFERENCES users (ID),
+    DELETED bool NOT NULL DEFAULT false,
+    UNIQUE (FOLLOWER, FOLLOWEE)
+);
+
+CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows (FOLLOWER);
+
+CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (FOLLOWEE);
+
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_created_at ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, CREATED_AT);
+
+CREATE INDEX IF NOT EXISTS nfts_owner_address_idx ON nfts(owner_address);
+
+CREATE INDEX IF NOT EXISTS user_id_event_code_last_updated ON user_events (USER_ID, EVENT_CODE, LAST_UPDATED DESC);
+
+CREATE INDEX IF NOT EXISTS user_id_nft_id_event_code_last_updated ON nft_events (USER_ID, NFT_ID, EVENT_CODE, LAST_UPDATED DESC);
+
+CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_last_updated ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, LAST_UPDATED DESC);
