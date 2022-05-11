@@ -191,7 +191,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	return &membership, nil
 }
 
-func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*persist.Community, error) {
+func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, forceRefresh bool) (*persist.Community, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required,eth_addr"},
@@ -199,7 +199,7 @@ func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAd
 		return nil, err
 	}
 
-	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress)
+	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress, forceRefresh)
 	if err != nil {
 		return nil, err
 	}

@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/opensea"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/opensea"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )

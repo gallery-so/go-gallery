@@ -10,6 +10,7 @@ import (
 
 type getCommunityInput struct {
 	ContractAddress persist.Address `form:"contract_address" binding:"required"`
+	ForceRefresh    bool            `form:"force_refresh"`
 }
 
 type getCommunityOutput struct {
@@ -24,7 +25,7 @@ func getCommunity(communityRepo persist.CommunityRepository) gin.HandlerFunc {
 			return
 		}
 
-		community, err := communityRepo.GetByAddress(c, input.ContractAddress)
+		community, err := communityRepo.GetByAddress(c, input.ContractAddress, input.ForceRefresh)
 		if err != nil {
 			if _, ok := err.(persist.ErrCommunityNotFound); ok {
 				util.ErrResponse(c, http.StatusNotFound, err)

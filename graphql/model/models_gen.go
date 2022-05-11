@@ -186,22 +186,17 @@ func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type Community struct {
-	LastUpdated     *time.Time        `json:"lastUpdated"`
-	ContractAddress *persist.Address  `json:"contractAddress"`
-	CreatorAddress  *persist.Address  `json:"creatorAddress"`
-	Name            *string           `json:"name"`
-	Description     *string           `json:"description"`
-	PreviewImage    *string           `json:"previewImage"`
-	Owners          []*CommunityOwner `json:"owners"`
+	LastUpdated     *time.Time       `json:"lastUpdated"`
+	ContractAddress *persist.Address `json:"contractAddress"`
+	CreatorAddress  *persist.Address `json:"creatorAddress"`
+	Name            *string          `json:"name"`
+	Description     *string          `json:"description"`
+	PreviewImage    *string          `json:"previewImage"`
+	Owners          []*TokenHolder   `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
-
-type CommunityOwner struct {
-	Address  *persist.Address `json:"address"`
-	Username *string          `json:"username"`
-}
 
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
@@ -468,19 +463,12 @@ type LogoutPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-type MembershipOwner struct {
-	Dbid        persist.DBID     `json:"dbid"`
-	Address     *persist.Address `json:"address"`
-	User        *GalleryUser     `json:"user"`
-	PreviewNfts []*string        `json:"previewNfts"`
-}
-
 type MembershipTier struct {
-	Dbid     persist.DBID       `json:"dbid"`
-	Name     *string            `json:"name"`
-	AssetURL *string            `json:"assetUrl"`
-	TokenID  *string            `json:"tokenId"`
-	Owners   []*MembershipOwner `json:"owners"`
+	Dbid     persist.DBID   `json:"dbid"`
+	Name     *string        `json:"name"`
+	AssetURL *string        `json:"assetUrl"`
+	TokenID  *string        `json:"tokenId"`
+	Owners   []*TokenHolder `json:"owners"`
 }
 
 func (MembershipTier) IsNode() {}
@@ -545,6 +533,13 @@ type TextMedia struct {
 
 func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
+
+type TokenHolder struct {
+	HelperTokenHolderData
+	Addresses   []*persist.Address `json:"addresses"`
+	User        *GalleryUser       `json:"user"`
+	PreviewNfts []*string          `json:"previewNfts"`
+}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer `json:"viewer"`

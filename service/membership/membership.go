@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -180,6 +179,45 @@ func OpenseaFetchMembershipCards(contractAddress persist.Address, tokenID persis
 	return result, nil
 }
 
+func filterTokenHolders(holdersChannel chan persist.TokenHolder, numHolders int, tokenID persist.TokenID) []persist.TokenHolder {
+	receivedAddresses := map[persist.Address]bool{}
+	tokenHolderByUserId := map[persist.DBID]*persist.TokenHolder{}
+
+	for i := 0; i < numHolders; i++ {
+		owner := <-holdersChannel
+		for _, address := range owner.Addresses {
+			if address == "" || receivedAddresses[address] {
+				logger.For(nil).Debugf("Skipping duplicate or empty address for ID %s: %s", tokenID, address)
+				continue
+			}
+
+			if owner.UserID == "" || owner.Username == "" {
+				logger.For(nil).Debugf("Skipping empty userID or username for ID %s: userID=%s, username=%s", tokenID, owner.UserID, owner.Username)
+				continue
+			}
+
+			if existingUser, ok := tokenHolderByUserId[owner.UserID]; ok {
+				existingUser.Addresses = append(existingUser.Addresses, address)
+				continue
+			}
+
+			tokenHolderByUserId[owner.UserID] = &persist.TokenHolder{
+				UserID:      owner.UserID,
+				Addresses:   []persist.Address{address},
+				Username:    owner.Username,
+				PreviewNFTs: owner.PreviewNFTs,
+			}
+		}
+	}
+
+	filtered := make([]persist.TokenHolder, 0, len(tokenHolderByUserId))
+	for _, tokenHolder := range tokenHolderByUserId {
+		filtered = append(filtered, *tokenHolder)
+	}
+
+	return filtered
+}
+
 func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
@@ -188,34 +226,16 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwner(ctx, owner.Address, pTokenID, ethClient, userRepository, galleryRepository)
+			owner := fillMembershipOwner(ctx, owner.Addresses, pTokenID, ethClient, userRepository, galleryRepository)
 			ownersChan <- owner
 		})
 	}
-	receivedOwners := map[persist.Address]bool{}
-	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
-	for i := 0; i < len(tier.Owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address == "" {
-			logger.For(ctx).Debugf("Skipping duplicate or empty owner for ID %s: %s", pTokenID, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logger.For(ctx).Debugf("Skipping duplicate username for ID %s: %s", pTokenID, owner.Username)
-			continue
-		}
-		newOwners = append(newOwners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
-	tier.Owners = newOwners
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tier.Owners), pTokenID)
 	wp.StopWait()
 	logger.For(ctx).Debugf("Done receiving owners for token %s", pTokenID)
 
@@ -236,34 +256,16 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwnerToken(ctx, owner.Address, pTokenID, ethClient, userRepository, galleryRepository)
+			owner := fillMembershipOwnerToken(ctx, owner.Addresses, pTokenID, ethClient, userRepository, galleryRepository)
 			ownersChan <- owner
 		})
 	}
-	receivedOwners := map[persist.Address]bool{}
-	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
-	for i := 0; i < len(tier.Owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address == "" {
-			logger.For(ctx).Debugf("Skipping duplicate or empty owner for ID %s: %s", pTokenID, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logger.For(ctx).Debugf("Skipping duplicate username for ID %s: %s", pTokenID, owner.Username)
-			continue
-		}
-		newOwners = append(newOwners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
-	tier.Owners = newOwners
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tier.Owners), pTokenID)
 	wp.StopWait()
 	logger.For(ctx).Debugf("Done receiving owners for token %s", pTokenID)
 
@@ -287,9 +289,8 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 	tier.AssetURL = persist.NullString(metadata.Image)
 
 	logger.For(ctx).Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
-	tier.Owners = make([]persist.MembershipOwner, 0, len(owners))
 
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for i, o := range owners {
 		addr := o
@@ -298,39 +299,23 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 			if addr.String() != persist.ZeroAddress.String() {
 				logger.For(ctx).Debug("Event is to real address")
 				// does to have the NFT?
-				membershipOwner := fillMembershipOwner(ctx, addr, id, ethClient, userRepository, galleryRepository)
+				membershipOwner := fillMembershipOwner(ctx, []persist.Address{addr}, id, ethClient, userRepository, galleryRepository)
 				if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
-					logger.For(ctx).Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
+					logger.For(ctx).Debugf("Adding membership owner %s for ID %s", addr, id)
 					ownersChan <- membershipOwner
 				} else {
-					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s", membershipOwner.Address, id)
-					ownersChan <- persist.MembershipOwner{}
+					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s", addr, id)
+					ownersChan <- persist.TokenHolder{}
 				}
 				return
 			}
 			logger.For(ctx).Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
-			ownersChan <- persist.MembershipOwner{}
+			ownersChan <- persist.TokenHolder{}
 		})
 
 	}
-	receivedOwners := map[persist.Address]bool{}
-	receivedUsers := map[string]bool{}
-	for i := 0; i < len(owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address == "" {
-			logger.For(ctx).Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logger.For(ctx).Debugf("Skipping duplicate username for ID %s: %s", id, owner.Username)
-			continue
-		}
-		tier.Owners = append(tier.Owners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
+
+	tier.Owners = filterTokenHolders(ownersChan, len(owners), id)
 	wp.StopWait()
 	logger.For(ctx).Debugf("Done receiving owners for token %s", id)
 
@@ -343,38 +328,47 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 	return tier, nil
 }
 
-func fillMembershipOwner(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{Address: pAddress}
+func fillMembershipOwner(ctx context.Context, pAddresses []persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{Addresses: pAddresses}
 
-	glryUser, err := userRepository.GetByAddress(ctx, pAddress)
-	if err != nil || glryUser.Username == "" {
-		logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", pAddress)
-		return membershipOwner
-	}
-	membershipOwner.Username = glryUser.Username
-	membershipOwner.UserID = glryUser.ID
-
-	galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-	if err == nil && len(galleries) > 0 {
-		gallery := galleries[0]
-		if gallery.Collections != nil && len(gallery.Collections) > 0 {
-			membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
+	for _, address := range pAddresses {
+		glryUser, err := userRepository.GetByAddress(ctx, address)
+		if err != nil || glryUser.Username == "" {
+			logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", address)
+			continue
 		}
+
+		membershipOwner.Username = glryUser.Username
+		membershipOwner.UserID = glryUser.ID
+
+		galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+		if err == nil && len(galleries) > 0 {
+			gallery := galleries[0]
+			if gallery.Collections != nil && len(gallery.Collections) > 0 {
+				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
+			}
+		}
+
+		return membershipOwner
 	}
 
 	return membershipOwner
 }
 
-func fillMembershipOwnerToken(ctx context.Context, pAddress persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{Address: pAddress}
+func fillMembershipOwnerToken(ctx context.Context, pAddresses []persist.Address, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{Addresses: pAddresses}
 
-	hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, pAddress, ethClient)
-	if hasNFT {
-		glryUser, err := userRepository.GetByAddress(ctx, pAddress)
-		if err != nil || glryUser.Username == "" {
-			logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", pAddress)
-			return membershipOwner
+	for _, address := range pAddresses {
+		if hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, address, ethClient); !hasNFT {
+			continue
 		}
+
+		glryUser, err := userRepository.GetByAddress(ctx, address)
+		if err != nil || glryUser.Username == "" {
+			logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", address)
+			continue
+		}
+
 		membershipOwner.Username = glryUser.Username
 		membershipOwner.UserID = glryUser.ID
 
@@ -385,7 +379,10 @@ func fillMembershipOwnerToken(ctx context.Context, pAddress persist.Address, id 
 				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
 			}
 		}
+
+		return membershipOwner
 	}
+
 	return membershipOwner
 }
 
@@ -408,28 +405,22 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 
 	logger.For(ctx).Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 
-	tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
-
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			membershipOwner := fillMembershipOwnerToken(ctx, token.OwnerAddress, id, ethClient, userRepository, galleryRepository)
+			membershipOwner := fillMembershipOwnerToken(ctx, []persist.Address{token.OwnerAddress}, id, ethClient, userRepository, galleryRepository)
 			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
 				ownersChan <- membershipOwner
 			} else {
-				ownersChan <- persist.MembershipOwner{}
+				ownersChan <- persist.TokenHolder{}
 			}
 		})
 
 	}
-	for i := 0; i < len(tokens); i++ {
-		owner := <-ownersChan
-		if owner.Address != "" {
-			tier.Owners = append(tier.Owners, <-ownersChan)
-		}
-	}
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tokens), id)
 	wp.StopWait()
 
 	err = membershipRepository.UpsertByTokenID(ctx, id, tier)

@@ -20,6 +20,10 @@ type HelperCollectionNftData struct {
 	CollectionId persist.DBID
 }
 
+type HelperTokenHolderData struct {
+	UserId persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

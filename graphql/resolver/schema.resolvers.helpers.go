@@ -30,10 +30,13 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByContractAddress,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	},
+
+	OnCommunity: func(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
+		return resolveCommunityByContractAddress(ctx, contractAddress, false)
 	},
 }
 
@@ -303,8 +306,8 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress)
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, forceRefresh bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
 
 	if err != nil {
 		return nil, err
@@ -382,10 +385,10 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 }
 
 func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -399,10 +402,10 @@ func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *mod
 }
 
 func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -415,17 +418,23 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 	}
 }
 
-func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
-	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
-	for i, nft := range membershipOwner.PreviewNFTs {
+func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *model.TokenHolder {
+	previewNfts := make([]*string, len(tokenHolder.PreviewNFTs))
+	for i, nft := range tokenHolder.PreviewNFTs {
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	return &model.MembershipOwner{
-		Dbid:        membershipOwner.UserID,
-		Address:     &membershipOwner.Address,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
+	addresses := make([]*persist.Address, len(tokenHolder.Addresses))
+	for i, address := range tokenHolder.Addresses {
+		address := address
+		addresses[i] = &address
+	}
+
+	return &model.TokenHolder{
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID},
+		Addresses:             addresses,
+		User:                  nil, // handled by dedicated resolver
+		PreviewNfts:           previewNfts,
 	}
 }
 
@@ -463,12 +472,9 @@ func nftToModel(ctx context.Context, nft sqlc.Nft) *model.Nft {
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {
 	lastUpdated := community.LastUpdated.Time()
 
-	owners := make([]*model.CommunityOwner, len(community.Owners))
-	for i, _ := range community.Owners {
-		owners[i] = &model.CommunityOwner{
-			Address:  &community.Owners[i].Address,
-			Username: util.StringToPointer(community.Owners[i].Username.String()),
-		}
+	owners := make([]*model.TokenHolder, len(community.Owners))
+	for i, owner := range community.Owners {
+		owners[i] = tokenHolderToModel(ctx, owner)
 	}
 
 	return &model.Community{
