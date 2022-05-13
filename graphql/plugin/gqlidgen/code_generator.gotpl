@@ -50,7 +50,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
     {{- end }}
     }
 
-    return nil, ErrInvalidIDFormat{typeName}
+    return nil, ErrInvalidIDType{typeName}
 }
 
 func (n *NodeFetcher) ValidateHandlers() {

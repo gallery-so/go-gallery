@@ -115,7 +115,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		return n.OnWallet(ctx, persist.Address(ids[0]))
 	}
 
-	return nil, ErrInvalidIDFormat{typeName}
+	return nil, ErrInvalidIDType{typeName}
 }
 
 func (n *NodeFetcher) ValidateHandlers() {

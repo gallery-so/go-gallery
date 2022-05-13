@@ -26,6 +26,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.15.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/hamba/avro v1.6.6 // indirect
+	github.com/imgix/imgix-go/v2 v2.0.3
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/go-ipfs-files v0.1.1 // indirect
 	github.com/jackc/pgconn v1.11.0

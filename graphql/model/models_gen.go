@@ -430,6 +430,7 @@ type ImageURLSet struct {
 	Small  *string `json:"small"`
 	Medium *string `json:"medium"`
 	Large  *string `json:"large"`
+	SrcSet *string `json:"srcSet"`
 }
 
 type InvalidMedia struct {
@@ -510,6 +511,7 @@ type PreviewURLSet struct {
 	Small  *string `json:"small"`
 	Medium *string `json:"medium"`
 	Large  *string `json:"large"`
+	SrcSet *string `json:"srcSet"`
 }
 
 type RefreshOpenSeaNftsPayload struct {

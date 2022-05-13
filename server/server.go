@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 
 	"cloud.google.com/go/storage"
@@ -110,12 +111,23 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
+	if viper.GetString("ENV") == "local" {
+		viper.SetConfigFile("_internal/app-local-backend.yaml")
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+		}
+	}
+
 	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
 		panic("ADMIN_PASS must be set")
 	}
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
+	}
+
+	if viper.GetString("IMGIX_SECRET") == "" {
+		panic("IMGIX_SECRET must be set")
 	}
 }
 
