@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 
 	"cloud.google.com/go/storage"
@@ -112,7 +113,13 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") == "local" {
-		viper.SetConfigFile("_internal/app-local-backend.yaml")
+		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+		path, err := util.FindFile("_internal/app-local-backend.yaml", 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
 		if err := viper.ReadInConfig(); err != nil {
 			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
 		}
