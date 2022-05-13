@@ -24,11 +24,11 @@ func Init() {
 	http.Handle("/", router)
 }
 
-func coreInit() (*gin.Engine, *Indexer) {
+func coreInit() (*gin.Engine, *indexer) {
 
 	setDefaults()
 
-	tokenRepo, contractRepo, userRepo, collRepo := newRepos()
+	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -44,8 +44,8 @@ func coreInit() (*gin.Engine, *Indexer) {
 	arweaveClient := rpc.NewArweaveClient()
 	tq := task.NewQueue()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash, foundationMintedEventHash, foundationTransferEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetInt("CHAIN")), events)
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events)
 
 	router := gin.Default()
 
@@ -57,13 +57,13 @@ func coreInit() (*gin.Engine, *Indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
-	viper.SetDefault("CHAIN", "ETH")
+	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
@@ -77,8 +77,7 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
+func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 	pgClient := postgres.NewClient()
-	galleryRepo := postgres.NewGalleryTokenRepository(pgClient, nil)
-	return postgres.NewTokenRepository(pgClient, galleryRepo), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, galleryRepo)
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
 }

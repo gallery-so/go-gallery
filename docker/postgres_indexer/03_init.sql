@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS tokens (
     NAME varchar,
     DESCRIPTION varchar,
     CONTRACT_ADDRESS varchar(255),
-    COLLECTORS_NOTE varchar,
     MEDIA jsonb,
     CHAIN int,
     OWNER_ADDRESS varchar(255),
@@ -44,7 +43,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     SYMBOL varchar,
     ADDRESS varchar(255),
     CREATOR_ADDRESS varchar(255),
-    LAST_UPDATED_BLOCK varchar(255)
+    LATEST_BLOCK bigint
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS address_idx ON contracts (ADDRESS);

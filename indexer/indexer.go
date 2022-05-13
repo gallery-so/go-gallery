@@ -31,7 +31,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5000000
+// var defaultStartingBlock persist.BlockNumber = 5000000
+var defaultStartingBlock persist.BlockNumber = 13768584
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -53,10 +54,10 @@ const (
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
-	// foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
-	foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
-	//foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
-	foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
+	// // foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
+	// foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
+	// //foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
+	// foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
 )
 
 type tokenMetadata struct {
@@ -100,17 +101,15 @@ type tokenMedia struct {
 	media persist.Media
 }
 
-// Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
+// indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
-type Indexer struct {
+type indexer struct {
 	ethClient     *ethclient.Client
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
 	storageClient *storage.Client
 	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
-	collRepo      persist.CollectionTokenRepository
-	userRepo      persist.UserRepository
 	contractDBMu  *sync.Mutex
 	tokenDBMu     *sync.Mutex
 
@@ -126,14 +125,14 @@ type Indexer struct {
 	uniqueMetadatas uniqueMetadatas
 }
 
-// NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository, pChain persist.Chain, pEvents []eventHash) *Indexer {
+// newIndexer sets up an indexer for retrieving the specified events that will process tokens
+func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash) *indexer {
 	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
 	}
 
-	return &Indexer{
+	return &indexer{
 
 		ethClient:     ethClient,
 		ipfsClient:    ipfsClient,
@@ -141,8 +140,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		storageClient: storageClient,
 		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
-		collRepo:      collRepo,
-		userRepo:      userRepo,
 		contractDBMu:  &sync.Mutex{},
 		tokenDBMu:     &sync.Mutex{},
 
@@ -157,7 +154,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 // INITIALIZATION FUNCS ---------------------------------------------------------
 
 // Start begins indexing events from the blockchain
-func (i *Indexer) Start() {
+func (i *indexer) Start() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
@@ -198,7 +195,7 @@ func (i *Indexer) Start() {
 	i.startNewBlocksPipeline(lastSyncedBlock, topics)
 }
 
-func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	startTime := time.Now()
 	i.isListening = false
 	uris := make(chan tokenURI)
@@ -215,7 +212,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	}
 	logrus.Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
-func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	i.isListening = true
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
@@ -230,7 +227,7 @@ func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]c
 	i.processNewTokens(uris, metadatas, owners, previousOwners, balances, medias)
 }
 
-func (i *Indexer) listenForNewBlocks() {
+func (i *indexer) listenForNewBlocks() {
 	for {
 		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
 		if err != nil {
@@ -244,7 +241,7 @@ func (i *Indexer) listenForNewBlocks() {
 
 // LOGS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
 	defer close(transfersChan)
 
 	curBlock := startingBlock.BigInt()
@@ -271,7 +268,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		}
 	}
 	if len(logsTo) == 0 {
-		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -353,40 +350,40 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			})
 
 			logrus.Debugf("Processed transfer event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
+		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
 
-			if len(pLog.Topics) < 4 {
-				continue
-			}
+		// 	if len(pLog.Topics) < 4 {
+		// 		continue
+		// 	}
 
-			result = append(result, rpc.Transfer{
-				From:            persist.ZeroAddress,
-				To:              persist.EthereumAddress(pLog.Topics[1].Hex()),
-				TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
-				Amount:          1,
-				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
-				TokenType:       persist.TokenTypeERC721,
-			})
+		// 	result = append(result, rpc.Transfer{
+		// 		From:            persist.ZeroAddress,
+		// 		To:              persist.EthereumAddress(pLog.Topics[1].Hex()),
+		// 		TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
+		// 		Amount:          1,
+		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
+		// 		TokenType:       persist.TokenTypeERC721,
+		// 	})
 
-			logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
+		// 	logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
+		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
 
-			if len(pLog.Topics) < 4 {
-				continue
-			}
+		// 	if len(pLog.Topics) < 4 {
+		// 		continue
+		// 	}
 
-			result = append(result, rpc.Transfer{
-				From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
-				To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
-				TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
-				Amount:          1,
-				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
-				TokenType:       persist.TokenTypeERC721,
-			})
+		// 	result = append(result, rpc.Transfer{
+		// 		From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
+		// 		To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
+		// 		TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
+		// 		Amount:          1,
+		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
+		// 		TokenType:       persist.TokenTypeERC721,
+		// 	})
 
-			logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
+		// 	logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
@@ -461,7 +458,7 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 	return result
 }
 
-func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
+func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfers)
 
@@ -487,7 +484,7 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
 	defer close(owners)
 	defer close(previousOwners)
@@ -512,7 +509,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 	logrus.Info("Closing field channels...")
 }
 
-func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia) {
+func (i *indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia) {
 	defer close(uris)
 	defer close(metadatas)
 	defer close(owners)
@@ -539,7 +536,7 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 	logrus.Info("Closing field channels...")
 }
 
-func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields bool) {
+func processTransfers(i *indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields bool) {
 
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
@@ -564,7 +561,7 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 }
 
-func findFields(i *Indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields bool) {
+func findFields(i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields bool) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
@@ -658,7 +655,7 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.EthereumTokenIden
 	wg.Wait()
 }
 
-func findOptionalFields(i *Indexer, key persist.EthereumTokenIdentifiers, to, from persist.EthereumAddress, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
+func findOptionalFields(i *indexer, key persist.EthereumTokenIdentifiers, to, from persist.EthereumAddress, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -751,7 +748,7 @@ func getMetadata(contractAddress persist.EthereumAddress, uriReplaced persist.To
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
+func (i *indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(4)
@@ -772,7 +769,7 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock
 	createTokens(i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
 }
 
-func (i *Indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, medias <-chan tokenMedia) {
+func (i *indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, medias <-chan tokenMedia) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(6)
@@ -797,7 +794,7 @@ func (i *Indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenM
 
 }
 
-func createTokens(i *Indexer, ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata, urisMap map[persist.EthereumTokenIdentifiers]tokenURI, mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
+func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata, urisMap map[persist.EthereumTokenIdentifiers]tokenURI, mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
 	tokens := i.fieldMapsToTokens(ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap)
 	if tokens == nil || len(tokens) == 0 {
 		logrus.Info("No tokens to process")
@@ -903,7 +900,7 @@ func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners ma
 	}
 }
 
-func (i *Indexer) fieldMapsToTokens(owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata, uris map[persist.EthereumTokenIdentifiers]tokenURI, medias map[persist.EthereumTokenIdentifiers]tokenMedia) []persist.Token {
+func (i *indexer) fieldMapsToTokens(owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata, uris map[persist.EthereumTokenIdentifiers]tokenURI, medias map[persist.EthereumTokenIdentifiers]tokenMedia) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)

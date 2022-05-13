@@ -33,7 +33,7 @@ services:
         - PGDATABASE=${PGDATABASE}
         - PGTESTUSER=${PGTESTUSER}
     ports:
-      - "5433:5433"
+      - "5433:5432"
     environment:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres

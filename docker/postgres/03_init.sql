@@ -107,7 +107,8 @@ CREATE TABLE IF NOT EXISTS tokens (
     COLLECTORS_NOTE varchar,
     MEDIA jsonb,
     CHAIN int,
-    OWNER_ADDRESS varchar(255),
+    OWNER_USER_ID varchar(255),
+    OWNER_ADDRESSES varchar(255) [],
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,
@@ -118,11 +119,11 @@ CREATE TABLE IF NOT EXISTS tokens (
     BLOCK_NUMBER bigint
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_owner_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_USER_ID);
 
 CREATE INDEX IF NOT EXISTS token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
 
-CREATE INDEX IF NOT EXISTS owner_address_idx ON tokens (OWNER_ADDRESS);
+CREATE INDEX IF NOT EXISTS owner_user_id_idx ON tokens (OWNER_USER_ID);
 
 CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
 
@@ -252,3 +253,27 @@ CREATE TABLE IF NOT EXISTS collection_events (
 );
 
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_created_at ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, CREATED_AT);
+
+
+CREATE TABLE IF NOT EXISTS addresses (
+    ID varchar(255) PRIMARY KEY,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    ADDRESS_VALUE varchar(255),
+    CHAIN int
+);
+
+CREATE TABLE IF NOT EXISTS wallets (
+    ID varchar(255) PRIMARY KEY,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    DELETED boolean NOT NULL DEFAULT false,
+    VERSION int,
+    ADDRESS varchar(255),
+    WALLET_TYPE int
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS address_value_chain_idx on addresses (ADDRESS_VALUE, CHAIN);
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS);

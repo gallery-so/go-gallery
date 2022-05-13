@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	// register postgres driver

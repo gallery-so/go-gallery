@@ -14,7 +14,6 @@ import (
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
 	db                                      *sql.DB
-	galleryRepo                             *GalleryTokenRepository
 	createStmt                              *sql.Stmt
 	getByWalletStmt                         *sql.Stmt
 	getByWalletPaginateStmt                 *sql.Stmt
@@ -33,15 +32,14 @@ type TokenRepository struct {
 	upsertStmt                              *sql.Stmt
 	deleteBalanceZeroStmt                   *sql.Stmt
 	deleteStmt                              *sql.Stmt
-	getAddressByDetailsStmt                 *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
-func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenRepository {
+func NewTokenRepository(db *sql.DB) *TokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,VERSION,MEDIA,TOKEN_METADATA,TOKEN_TYPE,TOKEN_ID,CHAIN,NAME,DESCRIPTION,EXTERNAL_URL,BLOCK_NUMBER,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,CONTRACT_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,VERSION,MEDIA,TOKEN_METADATA,TOKEN_TYPE,TOKEN_ID,CHAIN,NAME,DESCRIPTION,EXTERNAL_URL,BLOCK_NUMBER,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,CONTRACT_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByWalletStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE OWNER_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC;`)
@@ -86,7 +84,7 @@ func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenR
 	countTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens;`)
 	checkNoErr(err)
 
-	upsertStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET MEDIA = $3,TOKEN_TYPE = $4,CHAIN = $5,NAME = $6,DESCRIPTION = $7,TOKEN_URI = $9,QUANTITY = $10,OWNER_ADDRESS = $11,OWNERSHIP_HISTORY = $12,TOKEN_METADATA = $13,EXTERNAL_URL = $15,BLOCK_NUMBER = $16,VERSION = $17,CREATED_AT = $18,LAST_UPDATED = $19;`)
+	upsertStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
 	deleteBalanceZeroStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE QUANTITY = '0';`)
@@ -95,12 +93,8 @@ func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenR
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
-	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS,CHAIN FROM addresses WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
-	checkNoErr(err)
-
 	return &TokenRepository{
 		db:                                      db,
-		galleryRepo:                             galleryRepo,
 		createStmt:                              createStmt,
 		getByWalletStmt:                         getByWalletStmt,
 		getByWalletPaginateStmt:                 getByWalletPaginateStmt,
@@ -119,7 +113,6 @@ func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenR
 		deleteStmt:                              deleteStmt,
 		getByTokenIDStmt:                        getByTokenIDStmt,
 		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
-		getAddressByDetailsStmt:                 getAddressByDetailsStmt,
 	}
 
 }
@@ -127,9 +120,9 @@ func NewTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenR
 // CreateBulk creates many tokens in the database
 func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Token) ([]persist.DBID, error) {
 	insertSQL := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION) VALUES `
-	vals := make([]interface{}, 0, len(pTokens)*16)
+	vals := make([]interface{}, 0, len(pTokens)*15)
 	for i, token := range pTokens {
-		insertSQL += generateValuesPlaceholders(16, i*16) + ","
+		insertSQL += generateValuesPlaceholders(15, i*15) + ","
 		vals = append(vals, token.ID, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version)
 	}
 	insertSQL = insertSQL[:len(insertSQL)-1]
@@ -325,13 +318,9 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		if token.TokenType != persist.TokenTypeERC721 {
 			continue
 		}
-		var contractAddr persist.Address
-		if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddr.AddressValue, &contractAddr.Chain); err != nil {
-			return err
-		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(contractAddr.AddressValue, token.TokenID, token.Chain))
+				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(persist.AddressValue(token.ContractAddress.String()), token.TokenID, token.Chain))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
@@ -343,11 +332,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	logrus.Infof("Checking 0 quantities for tokens...")
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			var contractAddress persist.Address
-			if err := t.getAddressByDetailsStmt.QueryRowContext(pCtx, token.ContractAddress, token.Chain).Scan(&contractAddress.AddressValue, &contractAddress.Chain); err != nil {
-				return err
-			}
-			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(contractAddress.AddressValue, token.TokenID, token.Chain))
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.AddressValue(token.ContractAddress.String()), token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}
@@ -366,7 +351,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	paramsPerRow := 19
+	paramsPerRow := 18
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {

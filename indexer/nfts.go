@@ -159,18 +159,19 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 
 }
 
-func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ValidateUsersNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		output, err := ValidateNFTs(c, input, userRepository, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-		}
-		c.JSON(http.StatusOK, output)
+		// TODO do we need to validate at the indexer level? probably multichain level.
+		// output, err := ValidateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
+		// if err != nil {
+		// 	util.ErrResponse(c, http.StatusInternalServerError, err)
+		// }
+		// c.JSON(http.StatusOK, output)
 
 	}
 }
