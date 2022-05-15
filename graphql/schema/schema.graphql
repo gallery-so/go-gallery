@@ -645,6 +645,6 @@ type Mutation {
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
-    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
-    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+    followUser(username: String!): FollowUserPayloadOrError @authRequired
+    unfollowUser(username: String!): UnfollowUserPayloadOrError @authRequired
 }

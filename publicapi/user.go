@@ -247,36 +247,42 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 	return following, nil
 }
 
-func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
-	// Validate
+func (api UserAPI) FollowUser(ctx context.Context, username string) error {
 	curUserID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
+	curUser, err := api.GetUserById(ctx, curUserID)
+	if err != nil {
+		return err
+	}
+
+	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
+		"username": {username, fmt.Sprintf("required,ne=%s", curUser.UsernameIdempotent.String)},
 	}); err != nil {
 		return err
 	}
 
-	if _, err := api.GetUserById(ctx, userID); err != nil {
+	followee, err := api.GetUserByUsername(ctx, username)
+	if err != nil {
 		return err
 	}
 
-	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+	err = api.repos.UserRepository.AddFollower(ctx, curUserID, followee.ID)
 
 	// Send event
-	userData := persist.UserEvent{FolloweeID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
+	userData := persist.UserEvent{Username: curUser.UsernameIdempotent.String, FolloweeName: username}
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
 
 	return err
 }
 
-func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
+func (api UserAPI) UnfollowUser(ctx context.Context, username string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"userID": {userID, "required"},
+		"username": {username, "required"},
 	}); err != nil {
 		return err
 	}
@@ -286,7 +292,12 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 		return err
 	}
 
-	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
+	followee, err := api.GetUserByUsername(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, followee.ID)
 }
 
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {

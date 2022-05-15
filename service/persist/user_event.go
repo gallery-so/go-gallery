@@ -18,9 +18,9 @@ type UserEventRecord struct {
 }
 
 type UserEvent struct {
-	Username   string     `json:"username"`
-	Bio        NullString `json:"bio"`
-	FolloweeID DBID       `json:"followee_id"`
+	Username     string     `json:"username"`
+	Bio          NullString `json:"bio"`
+	FolloweeName string     `json:"followee_name"`
 }
 
 func (u UserEvent) Value() (driver.Value, error) {

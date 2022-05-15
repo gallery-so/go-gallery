@@ -259,13 +259,13 @@ type ComplexityRoot struct {
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
-		FollowUser               func(childComplexity int, userID persist.DBID) int
+		FollowUser               func(childComplexity int, username string) int
 		GetAuthNonce             func(childComplexity int, address persist.Address) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
 		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
 		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
-		UnfollowUser             func(childComplexity int, userID persist.DBID) int
+		UnfollowUser             func(childComplexity int, username string) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
@@ -440,8 +440,8 @@ type MutationResolver interface {
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
-	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
-	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
+	FollowUser(ctx context.Context, username string) (model.FollowUserPayloadOrError, error)
+	UnfollowUser(ctx context.Context, username string) (model.UnfollowUserPayloadOrError, error)
 }
 type NftResolver interface {
 	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
@@ -1216,7 +1216,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.FollowUser(childComplexity, args["userId"].(persist.DBID)), true
+		return e.complexity.Mutation.FollowUser(childComplexity, args["username"].(string)), true
 
 	case "Mutation.getAuthNonce":
 		if e.complexity.Mutation.GetAuthNonce == nil {
@@ -1283,7 +1283,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UnfollowUser(childComplexity, args["userId"].(persist.DBID)), true
+		return e.complexity.Mutation.UnfollowUser(childComplexity, args["username"].(string)), true
 
 	case "Mutation.updateCollectionHidden":
 		if e.complexity.Mutation.UpdateCollectionHidden == nil {
@@ -2600,8 +2600,8 @@ type Mutation {
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
-    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
-    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+    followUser(username: String!): FollowUserPayloadOrError @authRequired
+    unfollowUser(username: String!): UnfollowUserPayloadOrError @authRequired
 }
 `, BuiltIn: false},
 }
@@ -2698,15 +2698,15 @@ func (ec *executionContext) field_Mutation_deleteCollection_args(ctx context.Con
 func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["username"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userId"] = arg0
+	args["username"] = arg0
 	return args, nil
 }
 
@@ -2773,15 +2773,15 @@ func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.
 func (ec *executionContext) field_Mutation_unfollowUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["username"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userId"] = arg0
+	args["username"] = arg0
 	return args, nil
 }
 
@@ -7022,7 +7022,7 @@ func (ec *executionContext) _Mutation_followUser(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().FollowUser(rctx, args["userId"].(persist.DBID))
+			return ec.resolvers.Mutation().FollowUser(rctx, args["username"].(string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -7081,7 +7081,7 @@ func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field gr
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UnfollowUser(rctx, args["userId"].(persist.DBID))
+			return ec.resolvers.Mutation().UnfollowUser(rctx, args["username"].(string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
