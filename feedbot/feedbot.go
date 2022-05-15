@@ -8,7 +8,9 @@ import (
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/shurcooL/graphql"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -28,7 +30,16 @@ func coreInit(pqClient *sql.DB) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 		log.SetLevel(log.DebugLevel)
 	}
-	return handlersInit(router, postgres.NewUserRepository(pqClient), postgres.NewUserEventRepository(pqClient), postgres.NewNftEventRepository(pqClient), postgres.NewCollectionEventRepository(pqClient))
+
+	gql := graphql.NewClient(viper.GetString("GALLERY_API"), nil)
+
+	repos := persist.Repositories{
+		UserEventRepository:       postgres.NewUserEventRepository(pqClient),
+		NftEventRepository:        postgres.NewNftEventRepository(pqClient),
+		CollectionEventRepository: postgres.NewCollectionEventRepository(pqClient),
+	}
+
+	return handlersInit(router, repos, gql)
 }
 
 func setDefaults() {
@@ -44,6 +55,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("PORT", 4123)
 	viper.SetDefault("GALLERY_HOST", "http://localhost:3000")
+	viper.SetDefault("GALLERY_API", "http://localhost:4000/glry/graphql/query")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.AutomaticEnv()

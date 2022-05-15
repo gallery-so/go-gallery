@@ -40,4 +40,5 @@ type CollectionEventRepository interface {
 	Get(context.Context, DBID) (CollectionEventRecord, error)
 	GetEventsSince(context.Context, CollectionEventRecord, time.Time) ([]CollectionEventRecord, error)
 	GetEventBefore(context.Context, CollectionEventRecord) (*CollectionEventRecord, error)
+	MarkSent(context.Context, DBID) error
 }
