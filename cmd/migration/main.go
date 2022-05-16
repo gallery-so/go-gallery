@@ -3,26 +3,19 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/everFinance/goar"
-	"github.com/gammazero/workerpool"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/lib/pq"
-	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	progressbar "github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	ens "github.com/wealdtech/go-ens/v3"
 )
 
 var bigZero = big.NewInt(0)
@@ -36,25 +29,52 @@ func run() {
 
 	pgClient := postgres.NewClient()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*12)
-	defer cancel()
+	logrus.Info("Full migration...")
 
-	galleryRepo := postgres.NewGalleryRepository(pgClient, nil)
-	tokenRepo := postgres.NewTokenGalleryRepository(pgClient, nil)
-	nftRepo := postgres.NewNFTRepository(pgClient, galleryRepo)
-	userRepo := postgres.NewUserRepository(pgClient)
-	collectionRepo := postgres.NewCollectionRepository(pgClient, galleryRepo)
-	backupRepo := postgres.NewBackupRepository(pgClient)
+	// Users migration
+	logrus.Info("Copying users to temp table...")
+	if err := copyUsersToTempTable(pgClient); err != nil {
+		panic(err)
+	}
+	logrus.Info("Copying users to temp table... Done")
 
-	ethClient := rpc.NewEthClient()
-	ipfsClient := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
+	logrus.Info("Clearing addresses column in users table...")
+	if err := clearAddressesColumn(pgClient); err != nil {
+		panic(err)
+	}
+	logrus.Info("Clearing addresses column in users table... Done")
 
-	userIDs := getAllUsers(ctx, pgClient)
+	logrus.Info("Getting all users wallets...")
+	idsToAddresses, err := getAllUsersWallets(pgClient)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Info("Getting all users wallets... Done")
+	logrus.Infof("Found %d users", len(idsToAddresses))
 
-	usersToNewCollections := getNewCollections(ctx, pgClient, userIDs, nftRepo, userRepo, collectionRepo, tokenRepo, galleryRepo, backupRepo, ethClient, ipfsClient, arweaveClient)
+	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+		panic(err)
+	}
+	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
-	updateCollections(ctx, pgClient, usersToNewCollections)
+	// NFTs migration
+
+	logrus.Info("Getting all NFTs...")
+	allNFTs, err := getAllNFTs(pgClient)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Info("Getting all NFTs... Done")
+	logrus.Infof("Found %d NFTs", len(allNFTs))
+
+	logrus.Info("Migrating NFTs...")
+	if err := migrateNFTs(pgClient, rpc.NewEthClient(), allNFTs); err != nil {
+		panic(err)
+	}
+	logrus.Info("Migrating NFTs... Done")
+
+	logrus.Info("Full migration... Done")
 }
 
 func setDefaults() {
@@ -70,394 +90,286 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func updateCollections(ctx context.Context, pgClient *sql.DB, usersToNewCollections map[persist.DBID]map[persist.DBID][]persist.DBID) {
-	for userID, newCollections := range usersToNewCollections {
-		logrus.Infof("Updating %d collections for user %s", len(newCollections), userID)
-		for coll, nfts := range newCollections {
-			logrus.Infof("Updating collection %s with %d nfts for user %s", coll, len(nfts), userID)
-			_, err := pgClient.ExecContext(ctx, `UPDATE collections_v2 SET NFTS = $2 WHERE ID = $1`, coll, pq.Array(nfts))
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-}
-
-type userIDCollsTuple struct {
-	userID         persist.DBID
-	newCollsToNFTs map[persist.DBID][]persist.DBID
-}
-
-func getNewCollections(ctx context.Context, pgClient *sql.DB, userIDs map[persist.DBID][]persist.Wallet, nftRepo *postgres.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, tokenRepo *postgres.TokenGalleryRepository, galleryRepo *postgres.GalleryRepository, backupRepo *postgres.BackupRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) map[persist.DBID]map[persist.DBID][]persist.DBID {
-	usersToNewCollections := map[persist.DBID]map[persist.DBID][]persist.DBID{}
-	receivedColls := make(chan userIDCollsTuple)
-
-	wp := workerpool.New(10)
-	go func() {
-		for u, addrs := range userIDs {
-			userID := u
-			addresses := addrs
-			for i, addr := range addresses {
-				if strings.ContainsAny(addr.String(), ".eth") {
-					resolved, err := ens.Resolve(ethClient, addr.String())
-					if err != nil {
-						logrus.Errorf("Error resolving ens address %s: %s", addr.String(), err)
-						continue
-					}
-					addresses[i] = persist.Wallet{
-						Address: persist.NullString(strings.ToLower(resolved.Hex())),
-						Chain:   persist.ChainETH,
-					}
-				}
-			}
-			wp.Submit(func() {
-				c, cancel := context.WithTimeout(ctx, time.Minute*30)
-				defer cancel()
-				logrus.Infof("Processing user %s with addresses %v", userID, addresses)
-				res, err := pgClient.QueryContext(c, `SELECT ID, NFTS FROM collections WHERE OWNER_USER_ID = $1 AND DELETED = false;`, userID)
-				if err != nil {
-					panic(err)
-				}
-				collsToNFTs := map[persist.DBID][]persist.DBID{}
-				for res.Next() {
-					var nftIDs []persist.DBID
-					var collID persist.DBID
-					if err = res.Scan(&collID, pq.Array(&nftIDs)); err != nil {
-						panic(err)
-					}
-					collsToNFTs[collID] = nftIDs
-				}
-				if err := res.Err(); err != nil {
-					panic(err)
-				}
-				newCollsToNFTs := map[persist.DBID][]persist.DBID{}
-				for coll, nftIDs := range collsToNFTs {
-					newCollsToNFTs[coll] = make([]persist.DBID, 0, 10)
-					logrus.Infof("Processing collection %s with %d nfts for user %s", coll, len(nftIDs), userID)
-					for _, nftID := range nftIDs {
-						fullNFT, err := nftRepo.GetByID(c, nftID)
-						if err != nil {
-							logrus.Errorf("Error getting nft %s: %s", nftID, err)
-							continue
-						}
-						if strings.ContainsAny(fullNFT.OwnerAddress.String(), ".eth") {
-							addr, err := ens.Resolve(ethClient, fullNFT.OwnerAddress.String())
-							if err != nil {
-								logrus.Errorf("Error resolving ens address %s: %s", fullNFT.OwnerAddress.String(), err)
-								continue
-							}
-							fullNFT.OwnerAddress = persist.EthereumAddress(strings.ToLower(addr.Hex()))
-						}
-
-						if fullNFT.Contract.ContractAddress == "" {
-							logrus.Infof("NFT %s has no contract address", nftID)
-							assets, err := opensea.FetchAssets(c, fullNFT.OwnerAddress, "", opensea.TokenID(fullNFT.OpenseaTokenID.String()), 0, 0, nil)
-							if err != nil {
-								logrus.Errorf("Error fetching contract address for NFT %s: %d assets found - err %s", nftID, len(assets), err)
-							} else {
-								matchingAsset, err := findMatchingAsset(assets, fullNFT)
-								if err != nil {
-									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
-									if err != nil {
-										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
-									} else {
-										fullNFT, err = nftRepo.GetByID(c, nftID)
-										if err != nil {
-											logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
-										} else {
-											if fullNFT.Contract.ContractAddress == "" {
-												logrus.Errorf("NFT %s still has no contract address", nftID)
-
-											}
-										}
-									}
-								}
-								logrus.Infof("Found contract address %s for NFT %s", matchingAsset.Contract.ContractAddress, nftID)
-								fullNFT.Contract = matchingAsset.Contract
-
-							}
-						}
-
-						if fullNFT.OpenseaTokenID == "" {
-							assets, err := opensea.FetchAssets(c, fullNFT.OwnerAddress, fullNFT.Contract.ContractAddress, "", 0, 0, nil)
-							if err != nil {
-								logrus.Errorf("Error fetching token ID for NFT %s: %d assets found - err %s", nftID, len(assets), err)
-							} else {
-								matchingAsset, err := findMatchingAsset(assets, fullNFT)
-								if err != nil {
-									logrus.Errorf("Error finding matching asset for NFT %s: %s", nftID, err)
-									err = opensea.UpdateAssetsForAcc(c, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
-									if err != nil {
-										logrus.Errorf("Error updating assets for user %s: %s", userID, err)
-									} else {
-										fullNFT, err = nftRepo.GetByID(c, nftID)
-										if err != nil {
-											logrus.Errorf("Error fetching NFT %s after updating assets: %s", nftID, err)
-										} else {
-											if fullNFT.OpenseaTokenID == "" {
-												logrus.Errorf("NFT %s still has no token ID", nftID)
-											}
-										}
-									}
-								}
-								logrus.Infof("Found token ID %s for NFT %s", matchingAsset.TokenID.ToBase16(), nftID)
-								fullNFT.OpenseaTokenID = persist.TokenID(matchingAsset.TokenID.ToBase16())
-							}
-						}
-
-						var tokenEquivelents []persist.TokenGallery
-						if fullNFT.OpenseaTokenID == "" && fullNFT.Contract.ContractAddress != "" {
-							logrus.Warnf("NFT %s has no token ID and has a contract address", nftID)
-							tokenEquivelents, err = tokenRepo.GetByContract(c, fullNFT.Contract.ContractAddress, -1, -1)
-							if err != nil {
-								if len(tokenEquivelents) == 0 {
-									tokenEquivelents, err = tokenRepo.GetByWallet(c, fullNFT.OwnerAddress, -1, -1)
-								}
-							}
-							if err == nil {
-								tokenEquivelents = findMatchingTokens(tokenEquivelents, fullNFT)
-							}
-						} else if fullNFT.OpenseaTokenID != "" && fullNFT.Contract.ContractAddress == "" {
-							tokenEquivelents, err = tokenRepo.GetByTokenID(c, fullNFT.OpenseaTokenID, -1, -1)
-							if err != nil {
-								asBase10, ok := big.NewInt(0).SetString(fullNFT.OpenseaTokenID.String(), 10)
-								if ok {
-									tokenEquivelents, err = tokenRepo.GetByTokenID(c, persist.TokenID(asBase10.Text(16)), -1, -1)
-								}
-								if len(tokenEquivelents) == 0 {
-									tokenEquivelents, err = tokenRepo.GetByWallet(c, fullNFT.OwnerAddress, -1, -1)
-								}
-							}
-							if err == nil {
-								tokenEquivelents = findMatchingTokens(tokenEquivelents, fullNFT)
-							}
-						} else if fullNFT.OpenseaTokenID != "" && fullNFT.Contract.ContractAddress != "" {
-							tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
-							if err != nil {
-								asBase10, ok := big.NewInt(0).SetString(fullNFT.OpenseaTokenID.String(), 10)
-								if ok {
-									tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, persist.TokenID(asBase10.Text(16)), fullNFT.Contract.ContractAddress, -1, -1)
-								}
-								if len(tokenEquivelents) == 0 {
-									tokens, err := tokenRepo.GetByWallet(c, fullNFT.OwnerAddress, -1, -1)
-									if err == nil {
-										tokenEquivelents = findMatchingTokens(tokens, fullNFT)
-									}
-								}
-							}
-						} else {
-							logrus.Errorf("NFT %s has no token ID and no contract address", nftID)
-							continue
-						}
-
-						if err != nil {
-							logrus.Warnf("Token equivalent not found for %s-%s in collection %s. Making token...", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
-							tokenEquivelents, err = nftToTokens(c, fullNFT, addresses, ethClient, ipfsClient, arweaveClient)
-							if err != nil {
-								logrus.Errorf("Error making token for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
-								continue
-							}
-							if len(tokenEquivelents) == 0 {
-								logrus.Errorf("No token equivalent found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
-								continue
-							}
-							logrus.Warnf("Upserting token equivalent for %s-%s in collection %s: %+v", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, tokenEquivelents)
-							err = tokenRepo.BulkUpsert(c, tokenEquivelents)
-							if err != nil {
-								logrus.Errorf("Error upserting token equivalents for %s-%s in collection %s: %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll, err)
-								continue
-							}
-							tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, -1, -1)
-							if err != nil {
-								asBase10, _ := big.NewInt(0).SetString(fullNFT.OpenseaTokenID.String(), 10)
-								tokenEquivelents, err = tokenRepo.GetByTokenIdentifiers(c, persist.TokenID(asBase10.Text(16)), fullNFT.Contract.ContractAddress, -1, -1)
-								if err != nil {
-									if len(tokenEquivelents) == 0 {
-										tokens, err := tokenRepo.GetByWallet(c, fullNFT.OwnerAddress, -1, -1)
-										if err == nil {
-											tokenEquivelents = findMatchingTokens(tokens, fullNFT)
-										}
-									}
-								}
-							}
-						}
-
-						if len(tokenEquivelents) == 0 {
-							logrus.Errorf("No token equivalent found for %s-%s in collection %s", fullNFT.OpenseaTokenID, fullNFT.Contract.ContractAddress, coll)
-							continue
-						}
-
-						for _, token := range tokenEquivelents {
-							if containsEthAddress(token.OwnerAddress, addresses) {
-								logrus.Infof("token %s-%s is owned by %s", token.ContractAddress, token.TokenID, token.OwnerAddress)
-								newCollsToNFTs[coll] = append(newCollsToNFTs[coll], token.ID)
-							}
-						}
-					}
-				}
-				receivedColls <- userIDCollsTuple{userID, newCollsToNFTs}
-			})
-		}
-	}()
-	for i := 0; i < len(userIDs); i++ {
-		select {
-		case tuple := <-receivedColls:
-			if tuple.newCollsToNFTs != nil && tuple.userID != "" {
-				usersToNewCollections[tuple.userID] = tuple.newCollsToNFTs
-			}
-		case <-ctx.Done():
-			panic("context cancelled")
-		}
-	}
-	return usersToNewCollections
-}
-
-func getAllUsers(ctx context.Context, pgClient *sql.DB) map[persist.DBID][]persist.EthereumAddress {
-	c, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-
-	res, err := pgClient.QueryContext(c, `SELECT ID,ADDRESSES FROM users WHERE DELETED = false ORDER BY CREATED_AT DESC;`)
+func copyUsersToTempTable(pg *sql.DB) error {
+	_, err := pg.Exec(`
+		DROP TABLE IF EXISTS temp_users;
+		CREATE TABLE temp_users AS
+			SELECT * FROM users;
+	`)
 	if err != nil {
-		panic(err)
+		return err
 	}
-
-	result := map[persist.DBID][]persist.EthereumAddress{}
-	for res.Next() {
-		var id persist.DBID
-		var addresses []persist.EthereumAddress
-		if err = res.Scan(&id, pq.Array(&addresses)); err != nil {
-			panic(err)
-		}
-		if _, ok := result[id]; !ok {
-			result[id] = make([]persist.EthereumAddress, 0, 3)
-		}
-		result[id] = append(result[id], addresses...)
-	}
-	return result
+	return nil
 }
 
-func nftToTokens(ctx context.Context, nft persist.NFT, addresses []persist.EthereumAddress, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]persist.TokenGallery, error) {
+func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.AddressValue, error) {
 
+	rows, err := pg.Query(`SELECT ID,ADDRESSES FROM temp_users;`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	idToAddress := make(map[persist.DBID][]persist.AddressValue)
+	for rows.Next() {
+		var id persist.DBID
+		var addresses []persist.AddressValue
+		err := rows.Scan(&id, pq.Array(&addresses))
+		if err != nil {
+			return nil, err
+		}
+		idToAddress[id] = addresses
+	}
+	return idToAddress, nil
+}
+
+func clearAddressesColumn(pg *sql.DB) error {
+	_, err := pg.Exec(`UPDATE users SET ADDRESSES = $1;`, []persist.DBID{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]persist.AddressValue) error {
+	for id, addresses := range idsToAddresses {
+		tx, err := pg.Begin()
+		if err != nil {
+			return err
+		}
+		run := func() error {
+			defer tx.Rollback()
+			userWallets := make([]persist.DBID, len(addresses))
+			for i, address := range addresses {
+				var addressID persist.DBID
+				err = tx.QueryRow(`INSERT INTO addresses (ID,VERSION,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,$3,$4) RETURNING ID;`, persist.GenerateID(), 0, address, persist.ChainETH).Scan(&addressID)
+				if err != nil {
+					return err
+				}
+				var walletID persist.DBID
+				err = tx.QueryRow(`INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE) VALUES ($1,$2,$3,$4) RETURNING ID;`, persist.GenerateID(), 0, addressID, persist.WalletTypeEOA).Scan(&walletID)
+				if err != nil {
+					return err
+				}
+
+				err = tx.Commit()
+				if err != nil {
+					return err
+				}
+
+				userWallets[i] = walletID
+			}
+			_, err = tx.Exec(`UPDATE users SET ADDRESSES = $1 WHERE ID = $2;`, userWallets, id)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+		if err := run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getAllNFTs(pg *sql.DB) ([]persist.NFT, error) {
+	rows, err := pg.Query(`SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts;`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	nfts := make([]persist.NFT, 0, 1_000_000)
+	for rows.Next() {
+		var nft persist.NFT
+		err := rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
+		if err != nil {
+			return nil, err
+		}
+		nfts = append(nfts, nft)
+	}
+	return nfts, nil
+}
+
+func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts []persist.NFT) error {
+	bar := progressbar.Default(int64(len(nfts)), "Converting To Tokens")
+	defer bar.Finish()
+	chunks := splitNFTs(3000, nfts)
+	for _, chunk := range chunks {
+
+		asTokens, err := nftsToTokens(pg, ethClient, chunk)
+		if err != nil {
+			return err
+		}
+		err = upsertTokens(pg, asTokens)
+		if err != nil {
+			return err
+		}
+		bar.Add(len(chunk))
+	}
+	return nil
+}
+
+// a function that will split an array of NFTs into chunks of size n
+func splitNFTs(n int, nfts []persist.NFT) [][]persist.NFT {
+	var chunks [][]persist.NFT
+	for i := 0; i < len(nfts); i += n {
+		end := i + n
+		if end > len(nfts) {
+			end = len(nfts)
+		}
+		chunks = append(chunks, nfts[i:end])
+	}
+	return chunks
+}
+
+func nftsToTokens(pg *sql.DB, ethClient *ethclient.Client, nfts []persist.NFT) ([]persist.TokenGallery, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
-	allTokens := make([]persist.TokenGallery, 0, 5)
-	asURI := persist.TokenURI(nft.ImageURL)
-	media := persist.Media{}
+	tokens := make([]persist.TokenGallery, len(nfts))
+	for i, nft := range nfts {
 
-	bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient, arweaveClient)
-	if err == nil {
-		mediaType := persist.SniffMediaType(bs)
-		if mediaType != persist.MediaTypeUnknown {
-			media.MediaURL = persist.NullString(nft.ImageURL)
-			media.ThumbnailURL = persist.NullString(nft.ImagePreviewURL)
-			media.MediaType = mediaType
+		var tokenType persist.TokenType
+		switch nft.Contract.ContractSchemaName {
+		case "ERC721", "CRYPTOPUNKS":
+			tokenType = persist.TokenTypeERC721
+		case "ERC1155":
+			tokenType = persist.TokenTypeERC1155
+		default:
+			return nil, fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
 		}
-	}
 
-	uri := persist.TokenURI(nft.TokenMetadataURL.String()).ReplaceID(nft.OpenseaTokenID)
-	metadata, _ := rpc.GetMetadataFromURI(ctx, uri, ipfsClient, arweaveClient)
-	t := persist.TokenGallery{
-		CollectorsNote:  nft.CollectorsNote,
-		TokenMetadata:   metadata,
-		Media:           media,
-		TokenURI:        uri,
-		Chain:           persist.ChainETH,
-		TokenID:         nft.OpenseaTokenID,
-		OwnerAddress:    nft.OwnerAddress,
-		ContractAddress: nft.Contract.ContractAddress,
-		BlockNumber:     persist.BlockNumber(block),
-		ExternalURL:     nft.ExternalURL,
-		Description:     nft.Description,
-		Name:            nft.Name,
-		Quantity:        "1",
-	}
-	switch nft.Contract.ContractSchemaName {
-	case "ERC1155":
-		t.TokenType = persist.TokenTypeERC1155
-		ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.AddressValue(), ethClient)
-		if err != nil {
-			return nil, fmt.Errorf("error getting ERC1155 contract: %s", err)
+		metadata := persist.TokenMetadata{
+			"name":          nft.Name,
+			"description":   nft.Description,
+			"image_url":     nft.ImageOriginalURL,
+			"animation_url": nft.AnimationOriginalURL,
 		}
-		for _, addr := range addresses {
-			new := t
-			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, addr.Address(), t.TokenID.BigInt())
-			if err != nil {
-				return nil, fmt.Errorf("error getting balance of %s for %s-%s: %s", addr.Address(), t.ContractAddress, t.TokenID, err)
-			}
-			if bal.Cmp(bigZero) > 0 {
-				new.OwnerAddress = addr
-				new.Quantity = persist.HexString(bal.Text(16))
 
-				allTokens = append(allTokens, new)
-			}
-		}
-	default:
-		t.TokenType = persist.TokenTypeERC721
-		t.OwnershipHistory = []persist.AddressAtBlock{
-			{
-				Address: persist.ZeroAddress,
-				Block:   persist.BlockNumber(block - 1),
-			},
-		}
-		allTokens = append(allTokens, t)
-	}
-
-	return allTokens, nil
-}
-
-func containsEthAddress(addr persist.EthereumAddress, addrs []persist.EthereumAddress) bool {
-	for _, a := range addrs {
-		if addr.String() == a.String() {
-			return true
-		}
-	}
-	return false
-}
-
-var errNoMatchingAsset = errors.New("no matching asset")
-
-func findMatchingAsset(assets []opensea.Asset, pNFT persist.NFT) (opensea.Asset, error) {
-	logrus.Infof("finding matching asset for %s-%s using %d assets", pNFT.Contract.ContractAddress, pNFT.OpenseaTokenID, len(assets))
-	for _, a := range assets {
+		med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
 		switch {
-		case a.ID == int(pNFT.OpenseaID.Int64()):
-			return a, nil
-		case a.TokenID.ToBase16() == pNFT.OpenseaTokenID.String() && a.Contract.ContractAddress.String() == pNFT.Contract.ContractAddress.String():
-			return a, nil
-		case a.Name == pNFT.Name.String() && a.Description == pNFT.Description.String():
-			return a, nil
-		case a.TokenMetadataURL == pNFT.TokenMetadataURL.String():
-			return a, nil
+		case nft.AnimationURL != "":
+			med.MediaURL = persist.NullString(nft.AnimationURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.AnimationURL.String())
+		case nft.ImageURL != "":
+			med.MediaURL = persist.NullString(nft.ImageURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.ImageURL.String())
+		default:
+			med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
 		}
+
+		var ownerAddressID persist.DBID
+		err := pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1;`, nft.OwnerAddress).Scan(&ownerAddressID)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		var walletWithAddressID persist.DBID
+		err = pg.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, nft.OwnerAddress).Scan(&walletWithAddressID)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		var ownerUserID persist.DBID
+		err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(ADDRESSES);`, walletWithAddressID).Scan(&ownerUserID)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		var contractAddressID persist.DBID
+		err = pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1;`, nft.Contract.ContractAddress).Scan(&contractAddressID)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		token := persist.TokenGallery{
+			TokenType:       tokenType,
+			Name:            nft.Name,
+			Description:     nft.Description,
+			Version:         0,
+			CollectorsNote:  nft.CollectorsNote,
+			Chain:           persist.ChainETH,
+			OwnerAddresses:  []persist.Address{{ID: ownerAddressID}},
+			TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
+			TokenID:         nft.OpenseaTokenID,
+			OwnerUserID:     ownerUserID,
+			ContractAddress: persist.Address{ID: contractAddressID},
+			ExternalURL:     nft.ExternalURL,
+			BlockNumber:     persist.BlockNumber(block),
+			TokenMetadata:   metadata,
+			Media:           med,
+		}
+		tokens[i] = token
 	}
-	return opensea.Asset{}, errNoMatchingAsset
+	return tokens, nil
 }
-func findMatchingTokens(tokens []persist.TokenGallery, pNFT persist.NFT) []persist.TokenGallery {
-	result := make([]persist.TokenGallery, 0, 10)
-	logrus.Infof("finding matching asset for %s-%s using %d assets", pNFT.Contract.ContractAddress, pNFT.OpenseaTokenID, len(tokens))
-	for _, t := range tokens {
-		if t.OwnerAddress.String() != pNFT.OwnerAddress.String() {
-			continue
+
+func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	paramsPerRow := 20
+	rowsPerQuery := 65535 / paramsPerRow
+
+	if len(tokens) > rowsPerQuery {
+		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(tokens), len(tokens)/rowsPerQuery)
+		next := tokens[rowsPerQuery:]
+		current := tokens[:rowsPerQuery]
+		if err := upsertTokens(pg, next); err != nil {
+			return err
 		}
-		switch {
-		case t.TokenID.String() == pNFT.OpenseaTokenID.String() && t.ContractAddress.String() == pNFT.Contract.ContractAddress.String():
-			result = append(result, t)
-		case t.Name.String() == pNFT.Name.String():
-			result = append(result, t)
-		case t.TokenURI.String() == pNFT.TokenMetadataURL.String():
-			result = append(result, t)
-		case t.Media.MediaURL == pNFT.ImageURL, t.Media.MediaURL == pNFT.ImagePreviewURL, t.Media.MediaURL == pNFT.ImageOriginalURL, t.Media.MediaURL == pNFT.ImageThumbnailURL, t.Media.ThumbnailURL == pNFT.ImageThumbnailURL, t.Media.MediaURL == pNFT.ImageURL:
-			result = append(result, t)
-		case t.Media.MediaURL == pNFT.AnimationURL, t.Media.MediaURL == pNFT.AnimationOriginalURL:
-			result = append(result, t)
-		case t.ExternalURL == pNFT.ExternalURL:
-			result = append(result, t)
-		case t.Description.String() == pNFT.Description.String():
-			result = append(result, t)
+		tokens = current
+	}
+
+	tokens = dedupTokens(tokens)
+
+	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNER_ADDRESSES,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
+	vals := make([]interface{}, 0, len(tokens)*paramsPerRow)
+	for i, token := range tokens {
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnerAddresses, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+	}
+
+	sqlStr = sqlStr[:len(sqlStr)-1]
+
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_USER_ID) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNER_ADDRESSES = EXCLUDED.OWNER_ADDRESSES,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
+
+	_, err := pg.ExecContext(ctx, sqlStr, vals...)
+	if err != nil {
+		return fmt.Errorf("failed to upsert tokens: %w", err)
+	}
+
+	return nil
+
+}
+
+func dedupTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
+	seen := map[string]persist.TokenGallery{}
+	for _, token := range pTokens {
+		key := token.ContractAddress.String() + "-" + token.TokenID.String() + "-" + token.OwnerUserID.String()
+		if seenToken, ok := seen[key]; ok {
+			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
+				continue
+			}
+			seen[key] = token
 		}
+		seen[key] = token
+	}
+	result := make([]persist.TokenGallery, 0, len(seen))
+	for _, v := range seen {
+		result = append(result, v)
 	}
 	return result
+}
+func generateValuesPlaceholders(l, offset int) string {
+	values := "("
+	for i := 0; i < l; i++ {
+		values += fmt.Sprintf("$%d,", i+1+offset)
+	}
+	return values[0:len(values)-1] + ")"
 }

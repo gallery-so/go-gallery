@@ -9,6 +9,8 @@ import (
 	"github.com/lib/pq"
 )
 
+var errWalletValueNoID = fmt.Errorf("wallet value has no ID")
+
 // Wallet represents an address on any chain
 type Wallet struct {
 	ID           DBID            `json:"id"`
@@ -57,6 +59,14 @@ func (w *Wallet) Scan(value interface{}) error {
 	}
 	*w = Wallet{ID: DBID(string(value.([]uint8)))}
 	return nil
+}
+
+// Value implements the database/sql driver Valuer interface for the Wallet type
+func (w Wallet) Value() (driver.Value, error) {
+	if w.ID == "" {
+		return nil, errWalletValueNoID
+	}
+	return w.ID.Value()
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface

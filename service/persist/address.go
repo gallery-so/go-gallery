@@ -3,11 +3,14 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
+
+var errAddressValueNoID = errors.New("address value has no ID")
 
 // Address represents an address on any chain
 type Address struct {
@@ -54,6 +57,14 @@ func (a Address) ToHexAddress() common.Address {
 	default:
 		return common.Address{}
 	}
+}
+
+// Value implements the database/sql driver Valuer interface for the Address type
+func (a Address) Value() (driver.Value, error) {
+	if a.ID == "" {
+		return "", errAddressValueNoID
+	}
+	return a.ID.Value()
 }
 
 func (n AddressValue) String() string {
