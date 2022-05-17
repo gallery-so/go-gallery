@@ -412,7 +412,7 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (mo
 	return resolveGalleryUserByUsername(ctx, username)
 }
 
-func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.UserByUsernameOrError, error) {
+func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error) {
 	return resolveGalleryUserByUserID(ctx, id)
 }
 

@@ -115,6 +115,10 @@ type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
 
+type UserByIDOrError interface {
+	IsUserByIDOrError()
+}
+
 type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
@@ -275,6 +279,7 @@ type ErrInvalidInput struct {
 }
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
+func (ErrInvalidInput) IsUserByIDOrError()                        {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
@@ -350,6 +355,7 @@ type ErrUserNotFound struct {
 }
 
 func (ErrUserNotFound) IsUserByUsernameOrError()      {}
+func (ErrUserNotFound) IsUserByIDOrError()            {}
 func (ErrUserNotFound) IsError()                      {}
 func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
@@ -389,6 +395,7 @@ type GalleryUser struct {
 func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsUserByUsernameOrError() {}
+func (GalleryUser) IsUserByIDOrError()       {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

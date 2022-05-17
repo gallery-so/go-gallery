@@ -308,6 +308,8 @@ type Viewer {
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -330,7 +332,7 @@ type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
-    userById(id: DBID!): UserByUsernameOrError
+    userById(id: DBID!): UserByIdOrError
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
     nftById(id: DBID!): NftByIdOrError
