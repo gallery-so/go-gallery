@@ -133,6 +133,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UserByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UserByIDOrError)
+		return obj, ok
+	},
+
 	"UserByUsernameOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByUsernameOrError)
 		return obj, ok

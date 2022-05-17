@@ -64,11 +64,11 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 }
 
 func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
-	return resolveFollowersByUserId(ctx, obj.Dbid)
+	return resolveFollowersByUserID(ctx, obj.Dbid)
 }
 
 func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
-	return resolveFollowingByUserId(ctx, obj.Dbid)
+	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
@@ -410,6 +410,10 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error) {
 	return resolveGalleryUserByUsername(ctx, username)
+}
+
+func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error) {
+	return resolveGalleryUserByUserID(ctx, id)
 }
 
 func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error) {
