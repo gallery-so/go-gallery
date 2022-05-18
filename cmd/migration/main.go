@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gammazero/workerpool"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -63,18 +64,17 @@ func run() {
 	nftsChan := make(chan persist.NFT)
 
 	go func() {
-		logrus.Info("Migrating NFTs...")
-		if err := migrateNFTs(pgClient, rpc.NewEthClient(), nftsChan); err != nil {
+		logrus.Info("Getting all NFTs...")
+		if err := getAllNFTs(pgClient, nftsChan); err != nil {
 			panic(err)
 		}
-		logrus.Info("Migrating NFTs... Done")
+		logrus.Info("Getting all NFTs... Done")
 	}()
-	logrus.Info("Getting all NFTs...")
-	err := getAllNFTs(pgClient, nftsChan)
-	if err != nil {
+	logrus.Info("Migrating NFTs...")
+	if err := migrateNFTs(pgClient, rpc.NewEthClient(), nftsChan); err != nil {
 		panic(err)
 	}
-	logrus.Info("Getting all NFTs... Done")
+	logrus.Info("Migrating NFTs... Done")
 
 	logrus.Info("Full migration... Done")
 }
@@ -200,30 +200,63 @@ func getAllNFTs(pg *sql.DB, nftsChan chan<- persist.NFT) error {
 	return nil
 }
 
-func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts chan persist.NFT) error {
+func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NFT) error {
 	ctx := context.Background()
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return err
 	}
-	tokens := make([]persist.TokenGallery, 1000)
+
+	toUpsertChan := make(chan persist.TokenGallery)
+	errChan := make(chan error)
+	go func() {
+		defer close(toUpsertChan)
+		wp := workerpool.New(1000)
+		for nft := range nfts {
+			n := nft
+			wp.Submit(func() {
+				toUpsert, err := nftToToken(ctx, pg, n, block)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				toUpsertChan <- toUpsert
+			})
+		}
+		wp.StopWait()
+	}()
+
+	perUpsert := 2000
+
+	tokens := make([]persist.TokenGallery, perUpsert)
 	i := 0
-	for nft := range nfts {
-		toUpsert, err := nftToToken(ctx, pg, nft, block)
-		if err != nil {
+	j := 0
+	bar := progressbar.Default(int64(perUpsert), fmt.Sprintf("Upserting NFTs %d", j))
+
+	for {
+		select {
+		case toUpsert, ok := <-toUpsertChan:
+			if i == perUpsert || !ok {
+				err = upsertTokens(pg, tokens)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return nil
+				}
+				tokens = make([]persist.TokenGallery, perUpsert)
+				i = 0
+				bar.Finish()
+				j++
+				bar = progressbar.Default(int64(perUpsert), fmt.Sprintf("Upserting NFTs %d", j))
+			}
+			tokens[i] = toUpsert
+			bar.Add(1)
+			i++
+		case err := <-errChan:
 			return err
 		}
-		if i == 1000 {
-			err = upsertTokens(pg, tokens)
-			if err != nil {
-				return err
-			}
-			tokens = make([]persist.TokenGallery, 1000)
-			i = 0
-		}
-		tokens[i] = toUpsert
 	}
-	return nil
 }
 
 // a function that will split an array of NFTs into chunks of size n
@@ -279,7 +312,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	switch nft.Contract.ContractSchemaName {
 	case "ERC1155":
 		tokenType = persist.TokenTypeERC1155
-		quantity = "0x1"
+		quantity = "1"
 	default:
 		tokenType = persist.TokenTypeERC721
 	}
@@ -305,8 +338,15 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	var ownerAddressID persist.DBID
-	err := pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1;`, nft.OwnerAddress).Scan(&ownerAddressID)
-	if err != nil && err != sql.ErrNoRows {
+	err := pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = 0;`, nft.OwnerAddress).Scan(&ownerAddressID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			ownerAddressID = persist.GenerateID()
+			_, err = pg.Exec(`INSERT INTO addresses (ID,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,0);`, ownerAddressID, nft.OwnerAddress)
+			if err != nil {
+				return persist.TokenGallery{}, err
+			}
+		}
 		return persist.TokenGallery{}, err
 	}
 
@@ -323,8 +363,15 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	var contractAddressID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1;`, nft.Contract.ContractAddress).Scan(&contractAddressID)
-	if err != nil && err != sql.ErrNoRows {
+	err = pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = 0;`, nft.Contract.ContractAddress).Scan(&contractAddressID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			contractAddressID = persist.GenerateID()
+			_, err = pg.Exec(`INSERT INTO addresses (ID,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,0);`, contractAddressID, nft.Contract.ContractAddress)
+			if err != nil {
+				return persist.TokenGallery{}, err
+			}
+		}
 		return persist.TokenGallery{}, err
 	}
 
