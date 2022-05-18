@@ -13,7 +13,6 @@ type WalletRepository struct {
 	db *sql.DB
 
 	getByAddressDetailStmt  *sql.Stmt
-	getByUserIDStmt         *sql.Stmt
 	insertStmt              *sql.Stmt
 	insertAddressStmt       *sql.Stmt
 	getByAddressStmt        *sql.Stmt
@@ -34,15 +33,19 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ID = $1 AND DELETED = false);`)
 	checkNoErr(err)
 
-	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
+	getByAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE FROM wallets WHERE ADDRESS = (SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
+	checkNoErr(err)
+
+	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
 	return &WalletRepository{
-		db:                     db,
-		getByAddressDetailStmt: getAddressByDetailsStmt,
-		getByAddressStmt:       getByAddressStmt,
-		insertStmt:             insertStmt,
-		insertAddressStmt:      insertAddressStmt,
+		db:                      db,
+		getByAddressDetailStmt:  getByAddressByDetailsStmt,
+		getByAddressStmt:        getByAddressStmt,
+		insertStmt:              insertStmt,
+		insertAddressStmt:       insertAddressStmt,
+		getAddressByDetailsStmt: getAddressByDetailsStmt,
 	}
 }
 
@@ -81,6 +84,17 @@ func (w *WalletRepository) Insert(ctx context.Context, addr persist.AddressValue
 	if err != nil {
 		return "", err
 	}
+	var addressID persist.DBID
+	err = w.getAddressByDetailsStmt.QueryRowContext(ctx, addr, chain).Scan(&addressID)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = w.insertStmt.ExecContext(ctx, persist.GenerateID(), 0, addressID, walletType)
+	if err != nil {
+		return "", err
+	}
+
 	wa, err := w.GetByAddressDetails(ctx, addr, chain)
 	if err != nil {
 		return "", err

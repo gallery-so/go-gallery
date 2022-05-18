@@ -62,9 +62,9 @@ func (a Address) ToHexAddress() common.Address {
 // Value implements the database/sql driver Valuer interface for the Address type
 func (a Address) Value() (driver.Value, error) {
 	if a.ID == "" {
-		return "", errAddressValueNoID
+		return "", nil
 	}
-	return a.ID.Value()
+	return a.ID.String(), nil
 }
 
 func (n AddressValue) String() string {
@@ -85,7 +85,7 @@ func (n *AddressValue) Scan(value interface{}) error {
 		*n = AddressValue("")
 		return nil
 	}
-	*n = AddressValue(value.(string))
+	*n = AddressValue(value.([]uint8))
 	return nil
 }
 

@@ -64,9 +64,9 @@ func (w *Wallet) Scan(value interface{}) error {
 // Value implements the database/sql driver Valuer interface for the Wallet type
 func (w Wallet) Value() (driver.Value, error) {
 	if w.ID == "" {
-		return nil, errWalletValueNoID
+		return "", nil
 	}
-	return w.ID.Value()
+	return w.ID.String(), nil
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
