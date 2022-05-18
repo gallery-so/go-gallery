@@ -76,6 +76,8 @@ type Address implements Node {
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
+union GalleryUserOrAddress = GalleryUser | Address
+
 union MediaSubtype =
     ImageMedia
   | VideoMedia
@@ -241,7 +243,7 @@ type Nft implements Node {
 
 type OwnerAtBlock {
   # TODO: will need to store addresses to make this resolver work
-  owner: GalleryUserOrWallet @goField(forceResolver: true)
+  owner: GalleryUserOrAddress @goField(forceResolver: true)
   blockNumber: String # source is uint64
 }
 
@@ -356,7 +358,6 @@ type Query {
   collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
   communityByAddress(communityAddress: AddressValue!, chain: Chain!): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
-  nftsByUserId(userId: DBID!): [Nft]
 }
 
 input CollectionLayoutInput {

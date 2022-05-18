@@ -47,6 +47,10 @@ type Error interface {
 	IsError()
 }
 
+type GalleryUserOrAddress interface {
+	IsGalleryUserOrAddress()
+}
+
 type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
@@ -127,7 +131,8 @@ type Address struct {
 	Chain   *persist.Chain        `json:"chain"`
 }
 
-func (Address) IsNode() {}
+func (Address) IsNode()                 {}
+func (Address) IsGalleryUserOrAddress() {}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -383,6 +388,7 @@ type GalleryUser struct {
 
 func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
+func (GalleryUser) IsGalleryUserOrAddress()  {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 
 type GltfMedia struct {
@@ -503,8 +509,8 @@ func (Nft) IsNode()           {}
 func (Nft) IsNftByIDOrError() {}
 
 type OwnerAtBlock struct {
-	Owner       GalleryUserOrWallet `json:"owner"`
-	BlockNumber *string             `json:"blockNumber"`
+	Owner       GalleryUserOrAddress `json:"owner"`
+	BlockNumber *string              `json:"blockNumber"`
 }
 
 type PreviewURLSet struct {

@@ -358,7 +358,7 @@ func (r *nftResolver) CreatorAddress(ctx context.Context, obj *model.Nft) (*mode
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error) {
+func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -413,10 +413,6 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 	return resolveGeneralAllowlist(ctx)
-}
-
-func (r *queryResolver) NftsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Nft, error) {
-	return resolveNftsByUserID(ctx, userID)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {

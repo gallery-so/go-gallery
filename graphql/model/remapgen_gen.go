@@ -48,6 +48,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GalleryUserOrAddress": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GalleryUserOrAddress)
+		return obj, ok
+	},
+
 	"GalleryUserOrWallet": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GalleryUserOrWallet)
 		return obj, ok
