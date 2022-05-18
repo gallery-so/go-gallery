@@ -206,15 +206,22 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts chan persist.NFT)
 	if err != nil {
 		return err
 	}
-	tokenRepo := postgres.NewTokenGalleryRepository(pg, nil)
+	tokens := make([]persist.TokenGallery, 1000)
+	i := 0
 	for nft := range nfts {
 		toUpsert, err := nftToToken(ctx, pg, nft, block)
 		if err != nil {
 			return err
 		}
-		if err := tokenRepo.Upsert(ctx, toUpsert); err != nil {
-			return err
+		if i == 1000 {
+			err = upsertTokens(pg, tokens)
+			if err != nil {
+				return err
+			}
+			tokens = make([]persist.TokenGallery, 1000)
+			i = 0
 		}
+		tokens[i] = toUpsert
 	}
 	return nil
 }
@@ -268,9 +275,11 @@ func nftsToTokens(pg *sql.DB, ethClient *ethclient.Client, nfts []persist.NFT) (
 
 func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) (persist.TokenGallery, error) {
 	var tokenType persist.TokenType
+	var quantity persist.HexString
 	switch nft.Contract.ContractSchemaName {
 	case "ERC1155":
 		tokenType = persist.TokenTypeERC1155
+		quantity = "0x1"
 	default:
 		tokenType = persist.TokenTypeERC721
 	}
@@ -320,21 +329,23 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	token := persist.TokenGallery{
-		TokenType:       tokenType,
-		Name:            nft.Name,
-		Description:     nft.Description,
-		Version:         0,
-		CollectorsNote:  nft.CollectorsNote,
-		Chain:           persist.ChainETH,
-		OwnerAddresses:  []persist.Address{{ID: ownerAddressID}},
-		TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-		TokenID:         nft.OpenseaTokenID,
-		OwnerUserID:     ownerUserID,
-		ContractAddress: persist.Address{ID: contractAddressID},
-		ExternalURL:     nft.ExternalURL,
-		BlockNumber:     persist.BlockNumber(block),
-		TokenMetadata:   metadata,
-		Media:           med,
+		TokenType:        tokenType,
+		Name:             nft.Name,
+		Description:      nft.Description,
+		Version:          0,
+		Quantity:         quantity,
+		OwnershipHistory: []persist.AddressAtBlock{},
+		CollectorsNote:   nft.CollectorsNote,
+		Chain:            persist.ChainETH,
+		OwnerAddresses:   []persist.Address{{ID: ownerAddressID}},
+		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
+		TokenID:          nft.OpenseaTokenID,
+		OwnerUserID:      ownerUserID,
+		ContractAddress:  persist.Address{ID: contractAddressID},
+		ExternalURL:      nft.ExternalURL,
+		BlockNumber:      persist.BlockNumber(block),
+		TokenMetadata:    metadata,
+		Media:            med,
 	}
 	return token, nil
 }
