@@ -45,6 +45,10 @@ func (r *collectionResolver) Nfts(ctx context.Context, obj *model.Collection) ([
 	return output, nil
 }
 
+func (r *followUserPayloadResolver) User(ctx context.Context, obj *model.FollowUserPayload) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
+}
+
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
@@ -373,6 +377,9 @@ func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) 
 
 	output := &model.FollowUserPayload{
 		Viewer: resolveViewer(ctx),
+		User: &model.GalleryUser{
+			Dbid: userID, // remaining fields handled by dedicated resolver
+		},
 	}
 
 	return output, err
@@ -387,6 +394,9 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 
 	output := &model.UnfollowUserPayload{
 		Viewer: resolveViewer(ctx),
+		User: &model.GalleryUser{
+			Dbid: userID, // remaining fields handled by dedicated resolver
+		},
 	}
 
 	return output, err
@@ -466,6 +476,10 @@ func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) 
 	return resolveGalleryUserByUserID(ctx, obj.UserId)
 }
 
+func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
+}
+
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
@@ -507,6 +521,11 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
+// FollowUserPayload returns generated.FollowUserPayloadResolver implementation.
+func (r *Resolver) FollowUserPayload() generated.FollowUserPayloadResolver {
+	return &followUserPayloadResolver{r}
+}
+
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
 
@@ -528,6 +547,11 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
 
+// UnfollowUserPayload returns generated.UnfollowUserPayloadResolver implementation.
+func (r *Resolver) UnfollowUserPayload() generated.UnfollowUserPayloadResolver {
+	return &unfollowUserPayloadResolver{r}
+}
+
 // Viewer returns generated.ViewerResolver implementation.
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
 
@@ -535,6 +559,7 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
 type collectionResolver struct{ *Resolver }
+type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
@@ -542,5 +567,6 @@ type nftResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
+type unfollowUserPayloadResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
