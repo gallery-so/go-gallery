@@ -368,7 +368,8 @@ type EthereumEoaAuth struct {
 }
 
 type FollowUserPayload struct {
-	Viewer *Viewer `json:"viewer"`
+	Viewer *Viewer      `json:"viewer"`
+	User   *GalleryUser `json:"user"`
 }
 
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
@@ -549,7 +550,8 @@ type TokenHolder struct {
 }
 
 type UnfollowUserPayload struct {
-	Viewer *Viewer `json:"viewer"`
+	Viewer *Viewer      `json:"viewer"`
+	User   *GalleryUser `json:"user"`
 }
 
 func (UnfollowUserPayload) IsUnfollowUserPayloadOrError() {}

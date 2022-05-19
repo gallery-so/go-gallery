@@ -614,10 +614,12 @@ union UnfollowUserPayloadOrError =
 
 type FollowUserPayload {
     viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
 }
 
 type UnfollowUserPayload {
     viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
 }
 
 type Mutation {

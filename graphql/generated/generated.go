@@ -39,6 +39,7 @@ type Config struct {
 
 type ResolverRoot interface {
 	Collection() CollectionResolver
+	FollowUserPayload() FollowUserPayloadResolver
 	Gallery() GalleryResolver
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
@@ -46,6 +47,7 @@ type ResolverRoot interface {
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
 	TokenHolder() TokenHolderResolver
+	UnfollowUserPayload() UnfollowUserPayloadResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 }
@@ -172,6 +174,7 @@ type ComplexityRoot struct {
 	}
 
 	FollowUserPayload struct {
+		User   func(childComplexity int) int
 		Viewer func(childComplexity int) int
 	}
 
@@ -346,6 +349,7 @@ type ComplexityRoot struct {
 	}
 
 	UnfollowUserPayload struct {
+		User   func(childComplexity int) int
 		Viewer func(childComplexity int) int
 	}
 
@@ -415,6 +419,9 @@ type CollectionResolver interface {
 
 	Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error)
 }
+type FollowUserPayloadResolver interface {
+	User(ctx context.Context, obj *model.FollowUserPayload) (*model.GalleryUser, error)
+}
 type GalleryResolver interface {
 	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
@@ -464,6 +471,9 @@ type QueryResolver interface {
 }
 type TokenHolderResolver interface {
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
+}
+type UnfollowUserPayloadResolver interface {
+	User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
@@ -830,6 +840,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrUserNotFound.Message(childComplexity), true
+
+	case "FollowUserPayload.user":
+		if e.complexity.FollowUserPayload.User == nil {
+			break
+		}
+
+		return e.complexity.FollowUserPayload.User(childComplexity), true
 
 	case "FollowUserPayload.viewer":
 		if e.complexity.FollowUserPayload.Viewer == nil {
@@ -1728,6 +1745,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenHolder.User(childComplexity), true
 
+	case "UnfollowUserPayload.user":
+		if e.complexity.UnfollowUserPayload.User == nil {
+			break
+		}
+
+		return e.complexity.UnfollowUserPayload.User(childComplexity), true
+
 	case "UnfollowUserPayload.viewer":
 		if e.complexity.UnfollowUserPayload.Viewer == nil {
 			break
@@ -2583,10 +2607,12 @@ union UnfollowUserPayloadOrError =
 
 type FollowUserPayload {
     viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
 }
 
 type UnfollowUserPayload {
     viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
 }
 
 type Mutation {
@@ -4738,6 +4764,38 @@ func (ec *executionContext) _FollowUserPayload_viewer(ctx context.Context, field
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FollowUserPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.FollowUserPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FollowUserPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FollowUserPayload().User(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
@@ -8833,6 +8891,38 @@ func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, fie
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UnfollowUserPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UnfollowUserPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.UnfollowUserPayload().User(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnknownMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
@@ -13260,6 +13350,23 @@ func (ec *executionContext) _FollowUserPayload(ctx context.Context, sel ast.Sele
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FollowUserPayload_user(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -14744,6 +14851,23 @@ func (ec *executionContext) _UnfollowUserPayload(ctx context.Context, sel ast.Se
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._UnfollowUserPayload_user(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
