@@ -26,7 +26,7 @@ func (FeedCriteria) EventIsValid(q Query) bool {
 }
 
 func (FeedCriteria) EventNoMoreRecentEvents(q Query) bool {
-	return q.EventsSince > 0
+	return q.EventsSince == 0
 }
 
 func (FeedCriteria) IsUserCreatedEvent(q Query) bool {
