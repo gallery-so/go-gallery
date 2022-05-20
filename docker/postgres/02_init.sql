@@ -254,17 +254,6 @@ CREATE TABLE IF NOT EXISTS collection_events (
 
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_created_at ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, CREATED_AT);
 
-
-CREATE TABLE IF NOT EXISTS addresses (
-    ID varchar(255) PRIMARY KEY,
-    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    DELETED boolean NOT NULL DEFAULT false,
-    VERSION int,
-    ADDRESS_VALUE varchar(255),
-    CHAIN int
-);
-
 CREATE TABLE IF NOT EXISTS wallets (
     ID varchar(255) PRIMARY KEY,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -272,8 +261,8 @@ CREATE TABLE IF NOT EXISTS wallets (
     DELETED boolean NOT NULL DEFAULT false,
     VERSION int,
     ADDRESS varchar(255),
-    WALLET_TYPE int
+    WALLET_TYPE int,
+    CHAIN int,
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS address_value_chain_idx on addresses (ADDRESS_VALUE, CHAIN);
 CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS);

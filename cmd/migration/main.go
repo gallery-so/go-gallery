@@ -33,31 +33,31 @@ func run() {
 	logrus.Info("Full migration...")
 
 	// Users migration
-	// logrus.Info("Copying users to temp table...")
-	// if err := copyUsersToTempTable(pgClient); err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Copying users to temp table... Done")
+	logrus.Info("Copying users to temp table...")
+	if err := copyUsersToTempTable(pgClient); err != nil {
+		panic(err)
+	}
+	logrus.Info("Copying users to temp table... Done")
 
-	// logrus.Info("Clearing addresses column in users table...")
-	// if err := clearAddressesColumn(pgClient); err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Clearing addresses column in users table... Done")
+	logrus.Info("Clearing addresses column in users table...")
+	if err := clearAddressesColumn(pgClient); err != nil {
+		panic(err)
+	}
+	logrus.Info("Clearing addresses column in users table... Done")
 
-	// logrus.Info("Getting all users wallets...")
-	// idsToAddresses, err := getAllUsersWallets(pgClient)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Getting all users wallets... Done")
-	// logrus.Infof("Found %d users", len(idsToAddresses))
+	logrus.Info("Getting all users wallets...")
+	idsToAddresses, err := getAllUsersWallets(pgClient)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Info("Getting all users wallets... Done")
+	logrus.Infof("Found %d users", len(idsToAddresses))
 
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users...")
-	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
+	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+		panic(err)
+	}
+	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	// NFTs migration
 
@@ -142,21 +142,8 @@ func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]pers
 			defer tx.Rollback()
 			userWallets := make([]persist.DBID, len(addresses))
 			for i, address := range addresses {
-				var addressID persist.DBID
-				_, err = tx.Exec(`INSERT INTO addresses (ID,VERSION,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,$3,$4) ON CONFLICT (ADDRESS_VALUE,CHAIN) DO NOTHING;`, persist.GenerateID(), 0, address, persist.ChainETH)
-				if err != nil {
-					return err
-				}
-				err = tx.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2;`, address, persist.ChainETH).Scan(&addressID)
-				if err != nil {
-					return err
-				}
-				var walletID persist.DBID
-				_, err = tx.Exec(`INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE) VALUES ($1,$2,$3,$4) ON CONFLICT (ADDRESS) DO NOTHING;`, persist.GenerateID(), 0, addressID, persist.WalletTypeEOA)
-				if err != nil {
-					return err
-				}
-				err = tx.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, addressID).Scan(&walletID)
+				walletID := persist.GenerateID()
+				_, err = tx.Exec(`INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE,CHAIN) VALUES ($1,$2,$3,$4,0) ON CONFLICT (ADDRESS) DO NOTHING;`, walletID, 0, address, persist.WalletTypeEOA)
 				if err != nil {
 					return err
 				}
@@ -214,14 +201,16 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		wp := workerpool.New(1000)
 		for nft := range nfts {
 			n := nft
-			wp.Submit(func() {
+			f := func() {
 				toUpsert, err := nftToToken(ctx, pg, n, block)
 				if err != nil {
 					errChan <- err
 					return
 				}
 				toUpsertChan <- toUpsert
-			})
+			}
+
+			wp.Submit(f)
 		}
 		wp.StopWait()
 	}()
@@ -231,7 +220,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	tokens := make([]persist.TokenGallery, perUpsert)
 	i := 0
 	j := 0
-	bar := progressbar.Default(int64(perUpsert), fmt.Sprintf("Upserting NFTs %d", j))
+	bar := progressbar.Default(int64(perUpsert), "Prepping Upsert")
 
 	for {
 		select {
@@ -246,9 +235,9 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 				}
 				tokens = make([]persist.TokenGallery, perUpsert)
 				i = 0
-				bar.Finish()
 				j++
-				bar = progressbar.Default(int64(perUpsert), fmt.Sprintf("Upserting NFTs %d", j))
+				bar = progressbar.Default(int64(perUpsert), fmt.Sprintf("Prepping Upsert"))
+				logrus.Infof("Upserted NFTs %d", j)
 			}
 			tokens[i] = toUpsert
 			bar.Add(1)
@@ -337,45 +326,20 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
 	}
 
-	var ownerAddressID persist.DBID
-	err := pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = 0;`, nft.OwnerAddress).Scan(&ownerAddressID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			ownerAddressID = persist.GenerateID()
-			_, err = pg.Exec(`INSERT INTO addresses (ID,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,0);`, ownerAddressID, nft.OwnerAddress)
-			if err != nil {
-				return persist.TokenGallery{}, err
-			}
-		}
-		return persist.TokenGallery{}, err
-	}
-
-	var walletWithAddressID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, nft.OwnerAddress).Scan(&walletWithAddressID)
+	var walletID persist.DBID
+	err := pg.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, nft.OwnerAddress).Scan(&walletID)
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
 
 	var ownerUserID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(ADDRESSES);`, walletWithAddressID).Scan(&ownerUserID)
+	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(ADDRESSES);`, walletID).Scan(&ownerUserID)
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
 
-	var contractAddressID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = 0;`, nft.Contract.ContractAddress).Scan(&contractAddressID)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			contractAddressID = persist.GenerateID()
-			_, err = pg.Exec(`INSERT INTO addresses (ID,ADDRESS_VALUE,CHAIN) VALUES ($1,$2,0);`, contractAddressID, nft.Contract.ContractAddress)
-			if err != nil {
-				return persist.TokenGallery{}, err
-			}
-		}
-		return persist.TokenGallery{}, err
-	}
-
 	token := persist.TokenGallery{
+		ID:               nft.ID,
 		TokenType:        tokenType,
 		Name:             nft.Name,
 		Description:      nft.Description,
@@ -384,15 +348,15 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
-		OwnerAddresses:   []persist.Address{{ID: ownerAddressID}},
-		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
-		TokenID:          nft.OpenseaTokenID,
-		OwnerUserID:      ownerUserID,
-		ContractAddress:  persist.Address{ID: contractAddressID},
-		ExternalURL:      nft.ExternalURL,
-		BlockNumber:      persist.BlockNumber(block),
-		TokenMetadata:    metadata,
-		Media:            med,
+		// OwnerAddresses:   []persist.DBID{walletID},
+		TokenURI:    persist.TokenURI(nft.TokenMetadataURL),
+		TokenID:     nft.OpenseaTokenID,
+		OwnerUserID: ownerUserID,
+		// ContractAddress:  persist.AddressValue(nft.Contract.ContractAddress),
+		ExternalURL:   nft.ExternalURL,
+		BlockNumber:   persist.BlockNumber(block),
+		TokenMetadata: metadata,
+		Media:         med,
 	}
 	return token, nil
 }
@@ -418,7 +382,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 	vals := make([]interface{}, 0, len(tokens)*paramsPerRow)
 	for i, token := range tokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnerAddresses, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnerAddresses, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
@@ -433,7 +397,6 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 	return nil
 
 }
-
 func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
 	seen := map[string]persist.TokenGallery{}
 	for _, token := range pTokens {

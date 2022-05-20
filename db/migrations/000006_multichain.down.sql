@@ -5,4 +5,4 @@ DROP INDEX IF EXISTS owner_address_idx;
 DROP INDEX IF EXISTS contract_address_idx;
 DROP INDEX IF EXISTS block_number_idx;
 DROP TABLE IF EXISTS wallets;
-DROP TABLE IF EXISTS addresses;
+ALTER TABLE tokens DROP COLUMN IF EXISTS chain;
