@@ -77,8 +77,8 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
-		// Rules are currently mutually exclusive, but in the future it might be that
-		// that a query could match more than one rule.
+		// Rules are currently mutually exclusive, but in the future it could be that
+		// that a query matches more than one rule.
 		if err := matches[1].Handle(ctx, query); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

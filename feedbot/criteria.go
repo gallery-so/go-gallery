@@ -17,7 +17,7 @@ func (FeedCriteria) EventIsValid(q Query) bool {
 	case persist.UserEventCode:
 		return q.UserID != ""
 	case persist.NftEventCode:
-		return q.NftCollectorsNote != ""
+		return q.NftID != ""
 	case persist.CollectionEventCode:
 		return q.CollectionID != ""
 	default:
