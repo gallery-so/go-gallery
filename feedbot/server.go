@@ -19,7 +19,7 @@ type UserQueryForQuery struct {
 		User struct {
 			Username string
 		} `graphql:"...on GalleryUser"`
-	} `graphql:"userById(id: $id}"`
+	} `graphql:"userById(id: $id)"`
 }
 
 type NftQueryForQuery struct {
@@ -79,7 +79,7 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 
 		// Rules are currently mutually exclusive, but in the future it could be that
 		// that a query matches more than one rule.
-		if err := matches[1].Handle(ctx, query); err != nil {
+		if err := matches[0].Handle(ctx, query); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -135,17 +135,15 @@ func fromUserEvent(ctx context.Context, repos persist.Repositories, gql *graphql
 		return Query{}, err
 	}
 
-	var (
-		userQuery     UserQueryForQuery
-		followedQuery UserQueryForQuery
-	)
+	var userQuery UserQueryForQuery
+	var followedQuery UserQueryForQuery
 
-	if err := gql.Query(ctx, userQuery, map[string]interface{}{"id": event.UserID}); err != nil {
+	if err := gql.Query(ctx, &userQuery, map[string]interface{}{"id": event.UserID}); err != nil {
 		logger.For(ctx).Errorf("failed to fetch additional user context: %v", err)
 	}
 
 	if event.Data.FollowedUserID != "" {
-		if err := gql.Query(ctx, followedQuery, map[string]interface{}{"id": event.Data.FollowedUserID}); err != nil {
+		if err := gql.Query(ctx, &followedQuery, map[string]interface{}{"id": event.Data.FollowedUserID}); err != nil {
 			logger.For(ctx).Errorf("failed to fetch additional followee context: %v", err)
 		}
 	}
@@ -180,7 +178,7 @@ func fromNftEvent(ctx context.Context, repos persist.Repositories, gql *graphql.
 
 	var q NftQueryForQuery
 
-	if err := gql.Query(ctx, q, map[string]interface{}{"id": event.NftID}); err == nil {
+	if err := gql.Query(ctx, &q, map[string]interface{}{"id": event.NftID}); err == nil {
 		logger.For(ctx).Errorf("failed to fetch additional nft context: %v", err)
 	}
 
@@ -216,7 +214,7 @@ func fromCollectionEvent(ctx context.Context, repos persist.Repositories, gql *g
 
 	var q CollectionQueryForQuery
 
-	if err := gql.Query(ctx, q, map[string]interface{}{"id": event.CollectionID}); err != nil {
+	if err := gql.Query(ctx, &q, map[string]interface{}{"id": event.CollectionID}); err != nil {
 		logger.For(ctx).Errorf("failed to fetch additional nft context: %v", err)
 	}
 
