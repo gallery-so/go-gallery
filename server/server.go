@@ -155,7 +155,6 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		NftEventRepository:        postgres.NewNftEventRepository(db),
 		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
 		WalletRepository:          postgres.NewWalletRepository(db),
-		AddressRepository:         postgres.NewAddressRepository(db),
 	}
 }
 
@@ -204,5 +203,5 @@ func initSentry() {
 }
 
 func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, repos.AddressRepository, opensea.NewProvider(ethClient, httpClient))
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, opensea.NewProvider(ethClient, httpClient))
 }

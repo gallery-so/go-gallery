@@ -12,68 +12,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const getAddressByDetails = `-- name: GetAddressByDetails :one
-SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false
-`
-
-type GetAddressByDetailsParams struct {
-	AddressValue persist.AddressValue
-	Chain        persist.Chain
-}
-
-func (q *Queries) GetAddressByDetails(ctx context.Context, arg GetAddressByDetailsParams) (Address, error) {
-	row := q.db.QueryRow(ctx, getAddressByDetails, arg.AddressValue, arg.Chain)
-	var i Address
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-		&i.Version,
-		&i.AddressValue,
-		&i.Chain,
-	)
-	return i, err
-}
-
-const getAddressByID = `-- name: GetAddressByID :one
-SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE id = $1 AND deleted = false
-`
-
-func (q *Queries) GetAddressByID(ctx context.Context, id persist.DBID) (Address, error) {
-	row := q.db.QueryRow(ctx, getAddressByID, id)
-	var i Address
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-		&i.Version,
-		&i.AddressValue,
-		&i.Chain,
-	)
-	return i, err
-}
-
-const getAddressByWalletID = `-- name: GetAddressByWalletID :one
-SELECT id, created_at, last_updated, deleted, version, address_value, chain FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false
-`
-
-func (q *Queries) GetAddressByWalletID(ctx context.Context, id persist.DBID) (Address, error) {
-	row := q.db.QueryRow(ctx, getAddressByWalletID, id)
-	var i Address
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-		&i.Version,
-		&i.AddressValue,
-		&i.Chain,
-	)
-	return i, err
-}
-
 const getCollectionById = `-- name: GetCollectionById :one
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout FROM collections WHERE id = $1 AND deleted = false
 `
@@ -136,40 +74,17 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 	return items, nil
 }
 
-const getContractByAddress = `-- name: GetContractByAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND deleted = false
-`
-
-func (q *Queries) GetContractByAddress(ctx context.Context, address sql.NullString) (Contract, error) {
-	row := q.db.QueryRow(ctx, getContractByAddress, address)
-	var i Contract
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Name,
-		&i.Symbol,
-		&i.Address,
-		&i.LatestBlock,
-		&i.CreatorAddress,
-		&i.Chain,
-	)
-	return i, err
-}
-
 const getContractByDetails = `-- name: GetContractByDetails :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByDetailsParams struct {
-	AddressValue persist.AddressValue
-	Chain        persist.Chain
+	Address sql.NullString
+	Chain   sql.NullInt32
 }
 
 func (q *Queries) GetContractByDetails(ctx context.Context, arg GetContractByDetailsParams) (Contract, error) {
-	row := q.db.QueryRow(ctx, getContractByDetails, arg.AddressValue, arg.Chain)
+	row := q.db.QueryRow(ctx, getContractByDetails, arg.Address, arg.Chain)
 	var i Contract
 	err := row.Scan(
 		&i.ID,
@@ -395,7 +310,7 @@ const getNftsByOwnerAddress = `-- name: GetNftsByOwnerAddress :many
 SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE owner_address = $1 AND deleted = false
 `
 
-func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.DBID) ([]Nft, error) {
+func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.Address) ([]Nft, error) {
 	rows, err := q.db.Query(ctx, getNftsByOwnerAddress, ownerAddress)
 	if err != nil {
 		return nil, err
@@ -442,7 +357,7 @@ func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persis
 }
 
 const getTokenByID = `-- name: GetTokenByID :one
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, error) {
@@ -470,13 +385,12 @@ func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, err
 		&i.BlockNumber,
 		&i.OwnerUserID,
 		&i.OwnerAddresses,
-		&i.CollectionName,
 	)
 	return i, err
 }
 
 const getTokensByUserID = `-- name: GetTokensByUserID :many
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses, collection_name FROM tokens WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
@@ -510,7 +424,6 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 			&i.BlockNumber,
 			&i.OwnerUserID,
 			&i.OwnerAddresses,
-			&i.CollectionName,
 		); err != nil {
 			return nil, err
 		}
@@ -585,36 +498,17 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
-const getWalletByAddress = `-- name: GetWalletByAddress :one
-SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE address = $1 AND deleted = false
-`
-
-func (q *Queries) GetWalletByAddress(ctx context.Context, address persist.DBID) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByAddress, address)
-	var i Wallet
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.LastUpdated,
-		&i.Deleted,
-		&i.Version,
-		&i.Address,
-		&i.WalletType,
-	)
-	return i, err
-}
-
 const getWalletByAddressDetails = `-- name: GetWalletByAddressDetails :one
-SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false
+SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetWalletByAddressDetailsParams struct {
-	AddressValue persist.AddressValue
-	Chain        persist.Chain
+	Address persist.Address
+	Chain   sql.NullInt32
 }
 
 func (q *Queries) GetWalletByAddressDetails(ctx context.Context, arg GetWalletByAddressDetailsParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByAddressDetails, arg.AddressValue, arg.Chain)
+	row := q.db.QueryRow(ctx, getWalletByAddressDetails, arg.Address, arg.Chain)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,
@@ -624,12 +518,13 @@ func (q *Queries) GetWalletByAddressDetails(ctx context.Context, arg GetWalletBy
 		&i.Version,
 		&i.Address,
 		&i.WalletType,
+		&i.Chain,
 	)
 	return i, err
 }
 
 const getWalletByID = `-- name: GetWalletByID :one
-SELECT id, created_at, last_updated, deleted, version, address, wallet_type FROM wallets WHERE id = $1 AND deleted = false
+SELECT id, created_at, last_updated, deleted, version, address, wallet_type, chain FROM wallets WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, error) {
@@ -643,12 +538,13 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, e
 		&i.Version,
 		&i.Address,
 		&i.WalletType,
+		&i.Chain,
 	)
 	return i, err
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {
@@ -668,6 +564,7 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 			&i.Version,
 			&i.Address,
 			&i.WalletType,
+			&i.Chain,
 		); err != nil {
 			return nil, err
 		}

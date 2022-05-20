@@ -88,7 +88,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.DBID) (
 	return &user, nil
 }
 
-func (api UserAPI) AddUserAddress(ctx context.Context, address persist.AddressValue, chain persist.Chain, authenticator auth.Authenticator) error {
+func (api UserAPI) AddUserAddress(ctx context.Context, address persist.Address, chain persist.Chain, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address":       {address, "required,eth_addr"},
@@ -111,7 +111,7 @@ func (api UserAPI) AddUserAddress(ctx context.Context, address persist.AddressVa
 	return nil
 }
 
-func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue, chains []persist.Chain) error {
+func (api UserAPI) RemoveUserAddresses(ctx context.Context, addresses []persist.Address, chains []persist.Chain) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"addresses": {addresses, "required,unique,dive,required,eth_addr"},
@@ -190,7 +190,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	return &membership, nil
 }
 
-func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.AddressValue, chain persist.Chain) (*persist.Community, error) {
+func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain) (*persist.Community, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required,eth_addr"},

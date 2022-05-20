@@ -24,16 +24,6 @@ type Access struct {
 	IsAdmin             sql.NullBool
 }
 
-type Address struct {
-	ID           persist.DBID
-	CreatedAt    time.Time
-	LastUpdated  time.Time
-	Deleted      bool
-	Version      sql.NullInt32
-	AddressValue persist.AddressValue
-	Chain        persist.Chain
-}
-
 type Backup struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -93,7 +83,7 @@ type Contract struct {
 	Symbol         sql.NullString
 	Address        sql.NullString
 	LatestBlock    sql.NullInt64
-	CreatorAddress persist.DBID
+	CreatorAddress persist.Address
 	Chain          sql.NullInt32
 }
 
@@ -159,9 +149,9 @@ type Nft struct {
 	Description          sql.NullString
 	CollectorsNote       sql.NullString
 	ExternalUrl          sql.NullString
-	CreatorAddress       persist.DBID
+	CreatorAddress       persist.Address
 	CreatorName          sql.NullString
-	OwnerAddress         persist.DBID
+	OwnerAddress         persist.Address
 	MultipleOwners       sql.NullBool
 	Contract             persist.NFTContract
 	OpenseaID            sql.NullInt64
@@ -210,7 +200,7 @@ type Token struct {
 	ContractAddress  sql.NullString
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
-	Chain            sql.NullString
+	Chain            sql.NullInt32
 	TokenUri         sql.NullString
 	TokenType        sql.NullString
 	TokenID          sql.NullString
@@ -221,7 +211,6 @@ type Token struct {
 	BlockNumber      sql.NullInt64
 	OwnerUserID      persist.DBID
 	OwnerAddresses   []string
-	CollectionName   sql.NullString
 }
 
 type User struct {
@@ -252,6 +241,7 @@ type Wallet struct {
 	LastUpdated time.Time
 	Deleted     bool
 	Version     sql.NullInt32
-	Address     persist.DBID
+	Address     persist.Address
 	WalletType  persist.WalletType
+	Chain       sql.NullInt32
 }

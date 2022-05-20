@@ -12,7 +12,7 @@ import (
 
 type DebugAuthenticator struct {
 	UserID    persist.DBID
-	Addresses []persist.AddressValue
+	Addresses []persist.Address
 	Chains    []persist.Chain
 }
 
@@ -20,7 +20,7 @@ func (d DebugAuthenticator) GetDescription() string {
 	return fmt.Sprintf("DebugAuthenticator(userId: %s, addresses: %v)", d.UserID, d.Addresses)
 }
 
-func NewDebugAuthenticator(userID persist.DBID, addresses []persist.AddressValue, chains []persist.Chain) auth.Authenticator {
+func NewDebugAuthenticator(userID persist.DBID, addresses []persist.Address, chains []persist.Chain) auth.Authenticator {
 	return DebugAuthenticator{
 		UserID:    userID,
 		Addresses: addresses,

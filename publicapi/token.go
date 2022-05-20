@@ -81,7 +81,7 @@ func (api TokenAPI) GetNftsByUserID(ctx context.Context, userID persist.DBID) ([
 	return nfts, nil
 }
 
-func (api TokenAPI) RefreshTokens(ctx context.Context, addresses []*persist.AddressValue) error {
+func (api TokenAPI) RefreshTokens(ctx context.Context, addresses []*persist.Address) error {
 	// No validation to do here -- addresses is an optional comma-separated list of addresses
 
 	userID, err := getAuthenticatedUser(ctx)

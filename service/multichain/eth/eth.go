@@ -52,7 +52,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens?address=%s&limit=-1", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=-1", d.indexerBaseURL, contractAddress), nil)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
-func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.AddressValue) (multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/contracts/get?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
@@ -173,7 +173,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 }
 
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
-func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.AddressValue, all bool) error {
+func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 
 	input := indexer.UpdateMediaInput{
 		OwnerAddress: persist.EthereumAddress(wallet.String()),
@@ -210,7 +210,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 }
 
 // ValidateTokensForWallet validates tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.AddressValue, all bool) error {
+func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	input := indexer.ValidateUsersNFTsInput{Wallet: persist.EthereumAddress(wallet.String()), All: all}
 
 	asJSON, err := json.Marshal(input)
@@ -245,7 +245,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.AddressValue, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
@@ -284,7 +284,7 @@ func (d *Provider) VerifySignature(pCtx context.Context,
 
 func verifySignature(pSignatureStr string,
 	pData string,
-	pAddress persist.AddressValue, pWalletType persist.WalletType,
+	pAddress persist.Address, pWalletType persist.WalletType,
 	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
 
 	// eth_sign:
@@ -365,8 +365,8 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 	for i, token := range tokens {
 		res[i] = multichain.ChainAgnosticToken{
 			TokenID:          token.TokenID,
-			ContractAddress:  persist.AddressValue(token.ContractAddress.String()),
-			OwnerAddress:     persist.AddressValue(token.OwnerAddress.String()),
+			ContractAddress:  persist.Address(token.ContractAddress.String()),
+			OwnerAddress:     persist.Address(token.OwnerAddress.String()),
 			TokenURI:         token.TokenURI,
 			Media:            token.Media,
 			TokenType:        token.TokenType,
@@ -384,10 +384,10 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 
 func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
-		Address:        persist.AddressValue(contract.Address.String()),
+		Address:        persist.Address(contract.Address.String()),
 		Name:           contract.Name.String(),
 		Symbol:         contract.Symbol.String(),
-		CreatorAddress: persist.AddressValue(contract.CreatorAddress.String()),
+		CreatorAddress: persist.Address(contract.CreatorAddress.String()),
 	}
 }
 
@@ -395,7 +395,7 @@ func ethereumAddressAtBlockToChainAgnostic(addrs []persist.EthereumAddressAtBloc
 	res := make([]multichain.ChainAgnosticAddressAtBlock, len(addrs))
 	for i, addr := range addrs {
 		res[i] = multichain.ChainAgnosticAddressAtBlock{
-			Address: persist.AddressValue(addr.Address.String()),
+			Address: persist.Address(addr.Address.String()),
 			Block:   addr.Block,
 		}
 	}

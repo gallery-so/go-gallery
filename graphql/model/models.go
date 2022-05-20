@@ -16,17 +16,13 @@ func (r *CollectionNft) GetGqlIDField_CollectionID() string {
 	return r.CollectionId.String()
 }
 
-func (r *Community) GetGqlIDField_ContractAddressID() string {
-	return r.ContractAddressID.String()
+func (r *Community) GetGqlIDField_Chain() string {
+	return fmt.Sprint(r.Chain)
 }
 
 type HelperCollectionNftData struct {
 	NftId        persist.DBID
 	CollectionId persist.DBID
-}
-
-type HelperCommunityData struct {
-	ContractAddressID persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

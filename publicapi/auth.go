@@ -22,7 +22,7 @@ type AuthAPI struct {
 	multiChainProvier *multichain.Provider
 }
 
-func (api AuthAPI) NewNonceAuthenticator(address persist.AddressValue, chain persist.Chain, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
+func (api AuthAPI) NewNonceAuthenticator(address persist.Address, chain persist.Chain, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
 	authenticator := auth.NonceAuthenticator{
 		Address:            address,
 		Chain:              chain,
@@ -38,7 +38,7 @@ func (api AuthAPI) NewNonceAuthenticator(address persist.AddressValue, chain per
 	return authenticator
 }
 
-func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.AddressValue, chain persist.Chain) (nonce string, userExists bool, err error) {
+func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.Address, chain persist.Chain) (nonce string, userExists bool, err error) {
 	gc := util.GinContextFromContext(ctx)
 	authed := auth.GetUserAuthedFromCtx(gc)
 

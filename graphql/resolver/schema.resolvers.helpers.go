@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -29,8 +30,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByID,
-	OnAddress:        resolveAddressByID,
+	OnCommunity:      resolveCommunityByContractAddressGqlID,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
@@ -270,7 +270,7 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.AddressValue, chain persist.Chain) (*model.Community, error) {
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain) (*model.Community, error) {
 	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain)
 
 	if err != nil {
@@ -280,14 +280,13 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community), nil
 }
 
-func resolveCommunityByID(ctx context.Context, communityAddressID string) (*model.Community, error) {
-	address, err := publicapi.For(ctx).Address.GetAddressById(ctx, persist.DBID(communityAddressID))
-
+func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress persist.Address, chain string) (*model.Community, error) {
+	parsed, err := strconv.Atoi(chain)
 	if err != nil {
 		return nil, err
 	}
 
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, address.AddressValue, address.Chain)
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, persist.Chain(parsed))
 
 	if err != nil {
 		return nil, err
@@ -312,25 +311,6 @@ func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 	return output, nil
 }
 
-func resolveAddressByID(ctx context.Context, addressID persist.DBID) (*model.Address, error) {
-	address, err := publicapi.For(ctx).Address.GetAddressById(ctx, persist.DBID(addressID))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return addressToModelSqlc(ctx, address), nil
-}
-
-func resolveAddressByWalletID(ctx context.Context, addressID persist.DBID) (*model.Address, error) {
-	address, err := publicapi.For(ctx).Address.GetAddressByWalletID(ctx, persist.DBID(addressID))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return addressToModelSqlc(ctx, address), nil
-}
 func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Wallet, error) {
 	addresses, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
 
@@ -392,7 +372,8 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 	return &model.Wallet{
 		Dbid:       wallet.ID,
 		WalletType: &wallet.WalletType,
-		Address:    addressToModelPersist(ctx, wallet.Address),
+		Address:    &wallet.Address,
+		Chain:      &wallet.Chain,
 		Nfts:       nil, // handled by dedicated resolver
 	}
 }
@@ -493,8 +474,8 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		BlockNumber:      nil, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
-		CreatorAddress:        nil,                        // handled by dedicated resolver
-		OpenseaCollectionName: &nft.CollectionName.String, // how do we get this?
+		CreatorAddress:        nil, // handled by dedicated resolver
+		OpenseaCollectionName: nil, // TODO: later
 	}
 }
 
@@ -519,8 +500,8 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 
 	return &model.Community{
 		LastUpdated:     &lastUpdated,
-		ContractAddress: addressToModelPersist(ctx, community.ContractAddress),
-		CreatorAddress:  addressToModelPersist(ctx, community.CreatorAddress),
+		ContractAddress: &community.ContractAddress,
+		CreatorAddress:  &community.CreatorAddress,
 		Name:            util.StringToPointer(community.Name.String()),
 		Description:     util.StringToPointer(community.Description.String()),
 		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
@@ -528,33 +509,15 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 	}
 }
 
-func addressToModelPersist(ctx context.Context, address persist.Address) *model.Address {
-	return &model.Address{
-		Dbid:    address.ID,
-		Address: &address.AddressValue,
-		Chain:   &address.Chain,
-	}
-}
-
-func addressToModelSqlc(ctx context.Context, address *sqlc.Address) *model.Address {
-	return &model.Address{
-		Dbid:    address.ID,
-		Address: &address.AddressValue,
-		Chain:   &address.Chain,
-	}
-}
 func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
-	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByDetails(ctx, persist.AddressValue(address.String()), persist.ChainETH)
-	dbAddr, _ := publicapi.For(ctx).Address.GetAddressByDetails(ctx, persist.AddressValue(address.String()), persist.ChainETH)
+	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByDetails(ctx, persist.Address(address.String()), persist.ChainETH)
+	chain := persist.Chain(dbWallet.Chain.Int32)
 	return &model.Wallet{
 		Dbid:       dbWallet.ID,
 		WalletType: &dbWallet.WalletType,
-		Address: &model.Address{
-			Dbid:    dbAddr.ID,
-			Address: &dbAddr.AddressValue,
-			Chain:   &dbAddr.Chain,
-		},
-		Nfts: nil, // handled by dedicated resolver
+		Address:    &dbWallet.Address,
+		Chain:      &chain,
+		Nfts:       nil, // handled by dedicated resolver
 	}
 }
 

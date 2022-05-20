@@ -31,7 +31,7 @@ func NewContractGalleryRepository(db *sql.DB) *ContractGalleryRepository {
 }
 
 // GetByAddress returns the contract with the given address
-func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.ContractGallery, error) {
+func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain) (persist.ContractGallery, error) {
 	contract := persist.ContractGallery{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
 	if err != nil {
@@ -42,7 +42,7 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 }
 
 // UpsertByAddress upserts the contract with the given address
-func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.AddressValue, pChain persist.Chain, pContract persist.ContractGallery) error {
+func (c *ContractGalleryRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pContract persist.ContractGallery) error {
 	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.CreatorAddress, pContract.Chain)
 	if err != nil {
 		return err

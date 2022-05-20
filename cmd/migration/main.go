@@ -102,7 +102,7 @@ func copyUsersToTempTable(pg *sql.DB) error {
 	return nil
 }
 
-func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.AddressValue, error) {
+func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) {
 
 	rows, err := pg.Query(`SELECT ID,ADDRESSES FROM temp_users;`)
 	if err != nil {
@@ -110,10 +110,10 @@ func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.AddressValue, er
 	}
 	defer rows.Close()
 
-	idToAddress := make(map[persist.DBID][]persist.AddressValue)
+	idToAddress := make(map[persist.DBID][]persist.Address)
 	for rows.Next() {
 		var id persist.DBID
-		var addresses []persist.AddressValue
+		var addresses []persist.Address
 		err := rows.Scan(&id, pq.Array(&addresses))
 		if err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func clearAddressesColumn(pg *sql.DB) error {
 	return nil
 }
 
-func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]persist.AddressValue) error {
+func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]persist.Address) error {
 	bar := progressbar.Default(int64(len(idsToAddresses)), "Creating Wallets")
 	for id, addresses := range idsToAddresses {
 		tx, err := pg.Begin()
@@ -348,15 +348,15 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
-		// OwnerAddresses:   []persist.DBID{walletID},
-		TokenURI:    persist.TokenURI(nft.TokenMetadataURL),
-		TokenID:     nft.OpenseaTokenID,
-		OwnerUserID: ownerUserID,
-		// ContractAddress:  persist.AddressValue(nft.Contract.ContractAddress),
-		ExternalURL:   nft.ExternalURL,
-		BlockNumber:   persist.BlockNumber(block),
-		TokenMetadata: metadata,
-		Media:         med,
+		OwnerAddresses:   []persist.Wallet{{ID: walletID}},
+		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
+		TokenID:          nft.OpenseaTokenID,
+		OwnerUserID:      ownerUserID,
+		ContractAddress:  persist.Address(nft.Contract.ContractAddress),
+		ExternalURL:      nft.ExternalURL,
+		BlockNumber:      persist.BlockNumber(block),
+		TokenMetadata:    metadata,
+		Media:            med,
 	}
 	return token, nil
 }

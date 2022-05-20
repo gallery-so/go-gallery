@@ -10,10 +10,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-func (r *Address) ID() GqlID {
-	return GqlID(fmt.Sprintf("Address:%s", r.Dbid))
-}
-
 func (r *Collection) ID() GqlID {
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
@@ -40,9 +36,9 @@ func (r *Community) ID() GqlID {
 	// (b) the field exists but is not a string type
 	//-----------------------------------------------------------------------------------------------
 	// Please create binding methods on the Community type with the following signatures:
-	// func (r *Community) GetGqlIDField_ContractAddressID() string
+	// func (r *Community) GetGqlIDField_Chain() string
 	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("Community:%s", r.GetGqlIDField_ContractAddressID()))
+	return GqlID(fmt.Sprintf("Community:%s:%s", *r.ContractAddress, r.GetGqlIDField_Chain()))
 }
 
 func (r *Gallery) ID() GqlID {
@@ -66,10 +62,9 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnAddress        func(ctx context.Context, dbid persist.DBID) (*Address, error)
 	OnCollection     func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionNft  func(ctx context.Context, nftId string, collectionId string) (*CollectionNft, error)
-	OnCommunity      func(ctx context.Context, contractAddressId string) (*Community, error)
+	OnCommunity      func(ctx context.Context, contractAddress persist.Address, chain string) (*Community, error)
 	OnGallery        func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
@@ -87,11 +82,6 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 	ids := parts[1:]
 
 	switch typeName {
-	case "Address":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Address' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnAddress(ctx, persist.DBID(ids[0]))
 	case "Collection":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -103,10 +93,10 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		}
 		return n.OnCollectionNft(ctx, string(ids[0]), string(ids[1]))
 	case "Community":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		if len(ids) != 2 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCommunity(ctx, string(ids[0]))
+		return n.OnCommunity(ctx, persist.Address(ids[0]), string(ids[1]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -139,8 +129,6 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 
 func (n *NodeFetcher) ValidateHandlers() {
 	switch {
-	case n.OnAddress == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnAddress")
 	case n.OnCollection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
 	case n.OnCollectionNft == nil:

@@ -32,7 +32,6 @@ type PublicAPI struct {
 	Gallery    *GalleryAPI
 	User       *UserAPI
 	Nft        *TokenAPI
-	Address    *AddressApi
 	Wallet     *WalletAPI
 	Misc       *MiscAPI
 }
@@ -51,7 +50,6 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
 		Nft:        &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
-		Address:    &AddressApi{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Wallet:     &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:       &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 	}
