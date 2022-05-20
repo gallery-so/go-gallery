@@ -17,9 +17,9 @@ import (
 type UserQueryForQuery struct {
 	UserOrError struct {
 		User struct {
-			Name string
+			Username string
 		} `graphql:"...on GalleryUser"`
-	} `grappql:"userById(id: $id}"`
+	} `graphql:"userById(id: $id}"`
 }
 
 type NftQueryForQuery struct {
@@ -155,9 +155,9 @@ func fromUserEvent(ctx context.Context, repos persist.Repositories, gql *graphql
 		EventCode:        msg.EventCode,
 		EventsSince:      len(eventsSince),
 		UserID:           event.UserID,
-		Username:         userQuery.UserOrError.User.Name,
+		Username:         userQuery.UserOrError.User.Username,
 		FollowedUserID:   event.Data.FollowedUserID,
-		FollowedUsername: followedQuery.UserOrError.User.Name,
+		FollowedUsername: followedQuery.UserOrError.User.Username,
 		LastUserEvent:    lastEvent,
 	}, nil
 }

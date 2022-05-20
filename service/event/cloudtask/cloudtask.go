@@ -46,10 +46,10 @@ func createTaskForService(ctx context.Context, queuePath string, scheduleOn time
 			ScheduleTime: timestamppb.New(scheduleOn),
 			MessageType: &taskspb.Task_AppEngineHttpRequest{
 				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-					HttpMethod:       taskspb.HttpMethod_POST,
-					AppEngineRouting: &taskspb.AppEngineRouting{Service: service},
-					RelativeUri:      uri,
-					Headers:          headers,
+					HttpMethod: taskspb.HttpMethod_POST,
+					// XXX: AppEngineRouting: &taskspb.AppEngineRouting{Service: service},
+					RelativeUri: uri,
+					Headers:     headers,
 				},
 			},
 		},
