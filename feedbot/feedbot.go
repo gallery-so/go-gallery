@@ -8,6 +8,7 @@ import (
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/shurcooL/graphql"
@@ -17,7 +18,10 @@ import (
 
 func Init() {
 	setDefaults()
+
 	initSentry()
+	initLogger()
+
 	router := coreInit(postgres.NewClient())
 	http.Handle("/", router)
 }
@@ -69,6 +73,23 @@ func setDefaults() {
 	}
 }
 
+func initLogger() {
+	logger.SetLoggerOptions(func(logger *log.Logger) {
+		logger.SetReportCaller(true)
+
+		if viper.GetString("ENV") != "production" {
+			logger.SetLevel(log.DebugLevel)
+		}
+
+		if viper.GetString("ENV") == "local" {
+			logger.SetFormatter(&log.TextFormatter{DisableQuote: true})
+		} else {
+			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
+			logger.SetFormatter(&log.JSONFormatter{})
+		}
+	})
+}
+
 func initSentry() {
 	if viper.GetString("ENV") == "local" {
 		log.Info("skipping sentry init")
@@ -89,7 +110,7 @@ func initSentry() {
 			scrubbed := map[string]string{}
 			for k, v := range event.Request.Headers {
 				if k == "Authorization" {
-					scrubbed[k] = "[Filtered]"
+					scrubbed[k] = "[filtered]"
 				} else {
 					scrubbed[k] = v
 				}

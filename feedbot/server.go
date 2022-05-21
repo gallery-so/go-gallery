@@ -71,16 +71,18 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
-		matches := rules.matchOn(query)
-		if len(matches) == 0 {
-			c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event(%s) matched no rules", msg.ID)})
+		logger.For(ctx).Debugf("handling event %s", query)
+
+		handled, err := rules.Handle(ctx, query)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		// Rules are currently mutually exclusive, but in the future it could be that
-		// that a query matches more than one rule.
-		if err := matches[0].Handle(ctx, query); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
+		logger.For(c).Debugf("event handled: %v", handled)
+
+		if !handled {
+			c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event(%s) matched no rules", msg.ID)})
 			return
 		}
 

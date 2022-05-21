@@ -2,10 +2,14 @@ package feedbot
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -32,29 +36,48 @@ type Query struct {
 	LastCollectionEvent      *persist.CollectionEventRecord
 }
 
+func (q Query) String() string {
+	b, _ := json.MarshalIndent(q, "", "\t")
+	return string(b)
+}
+
 type FeedPoster interface {
 	handleQuery(context.Context, Query) error
 }
 
 type FeedPost struct {
+	name   string
 	rule   []func(Query) bool
 	poster FeedPoster
 }
 
 func (f *FeedPost) Matches(q Query) bool {
 	for _, criterion := range f.rule {
-		if !criterion(q) {
+		eval := criterion(q)
+
+		if log := logger.For(nil); log.Level <= logrus.DebugLevel {
+			parts := strings.Split(util.FuncName(criterion), ".")
+			log.Debugf("%s:%s evaluated to: %v", f.name, parts[len(parts)-1], eval)
+		}
+
+		if !eval {
 			return false
 		}
 	}
 	return true
 }
 
-func (f *FeedPost) Handle(ctx context.Context, q Query) error {
+func (f *FeedPost) Handle(ctx context.Context, q Query) (bool, error) {
 	if !f.Matches(q) {
-		return errors.New("unable to handle query")
+		return false, nil
 	}
-	return f.poster.handleQuery(ctx, q)
+
+	err := f.poster.handleQuery(ctx, q)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 type FeedRules struct {
@@ -72,7 +95,7 @@ func newFeedRules() *FeedRules {
 		posts: []*FeedPost{
 			newUserCreatedPost(criteria, base),
 			newUserFollowedPost(criteria, base),
-			newNftCollectorsNotePost(criteria, base),
+			newNftCollectorsNoteAddedPost(criteria, base),
 			newCollectionCreatedPost(criteria, base),
 			newCollectionCollectorsNoteAddedPost(criteria, base),
 			newCollectionTokensAddedPost(criteria, base),
@@ -80,14 +103,18 @@ func newFeedRules() *FeedRules {
 	}
 }
 
-func (p *FeedRules) matchOn(q Query) []*FeedPost {
-	matches := make([]*FeedPost, 0)
+func (p *FeedRules) Handle(ctx context.Context, q Query) (bool, error) {
+	logger.For(ctx).Debugf("handling query %s", q)
 	for _, post := range p.posts {
-		if post.Matches(q) {
-			matches = append(matches, post)
+		handled, err := post.Handle(ctx, q)
+		if err != nil {
+			return false, err
+		}
+		if handled {
+			return true, nil
 		}
 	}
-	return matches
+	return false, nil
 }
 
 func userURL(username string) string {
@@ -104,6 +131,7 @@ func nftURL(username, collectionID, nftID string) string {
 
 func newUserCreatedPost(critiera FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "UserCreated",
 		rule: append(
 			baseRule,
 			critiera.IsUserCreatedEvent,
@@ -119,6 +147,7 @@ func newUserCreatedPost(critiera FeedCriteria, baseRule []func(Query) bool) *Fee
 
 func newUserFollowedPost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "UserFollowed",
 		rule: append(
 			baseRule,
 			criteria.IsUserFollowedEvent,
@@ -132,8 +161,9 @@ func newUserFollowedPost(criteria FeedCriteria, baseRule []func(Query) bool) *Fe
 	}
 }
 
-func newNftCollectorsNotePost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
+func newNftCollectorsNoteAddedPost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "NftCollectorsNoteAdded",
 		rule: append(
 			baseRule,
 			criteria.IsNftCollectorsNoteAddedEvent,
@@ -156,6 +186,7 @@ func newNftCollectorsNotePost(criteria FeedCriteria, baseRule []func(Query) bool
 
 func newCollectionCreatedPost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "CollectionCreated",
 		rule: append(
 			baseRule,
 			criteria.IsCollectionCreatedEvent,
@@ -177,6 +208,7 @@ func newCollectionCreatedPost(criteria FeedCriteria, baseRule []func(Query) bool
 
 func newCollectionCollectorsNoteAddedPost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "CollectionCollectorsNoteAdded",
 		rule: append(
 			baseRule,
 			criteria.IsCollectionCollectorsNoteAddedEvent,
@@ -198,6 +230,7 @@ func newCollectionCollectorsNoteAddedPost(criteria FeedCriteria, baseRule []func
 
 func newCollectionTokensAddedPost(criteria FeedCriteria, baseRule []func(Query) bool) *FeedPost {
 	return &FeedPost{
+		name: "CollectionTokensAdded",
 		rule: append(
 			baseRule,
 			criteria.IsCollectionTokensAddedEvent,
