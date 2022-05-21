@@ -50,7 +50,7 @@ func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("AGENT_NAME", "DiscordBot (github.com/gallery-so, 0.0.1)")
 	viper.SetDefault("DISCORD_API", "https://discord.com/api/v9")
-	viper.SetDefault("CHANNEL_ID", "936895075076685845") // #gallery-feed-test channel
+	viper.SetDefault("CHANNEL_ID", "977428719402627092")
 	viper.SetDefault("BOT_TOKEN", "")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)

@@ -104,7 +104,6 @@ func newFeedRules() *FeedRules {
 }
 
 func (p *FeedRules) Handle(ctx context.Context, q Query) (bool, error) {
-	logger.For(ctx).Debugf("handling query %s", q)
 	for _, post := range p.posts {
 		handled, err := post.Handle(ctx, q)
 		if err != nil {

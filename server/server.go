@@ -104,8 +104,7 @@ func setDefaults() {
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 	viper.SetDefault("GCLOUD_FEED_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
-	// XXX: viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 10) // Set low for debugging
-	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 1) // Set low for debugging
+	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 1)
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("SENTRY_DSN", "")
 
