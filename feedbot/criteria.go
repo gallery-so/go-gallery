@@ -60,9 +60,37 @@ func newCriteria() Criteria {
 			name: "IsCollectionTokensAddedEvent",
 			eval: isCollectionTokensAddedEvent,
 		},
+		UserHasUsername: Criterion{
+			name: "UserHasUsername",
+			eval: userHasUsername,
+		},
 		UserNoEventsBefore: Criterion{
 			name: "UserNoEventsBefore",
 			eval: userNoEventsBefore,
+		},
+		FollowedUserHasUsername: Criterion{
+			name: "FollowedUserHasUsername",
+			eval: followedUserHasUsername,
+		},
+		NftHasCollectorsNote: Criterion{
+			name: "NftHasCollectorsNote",
+			eval: nftHasCollectorsNote,
+		},
+		NftBelongsToCollection: Criterion{
+			name: "NftBelongsToCollection",
+			eval: nftBelongsToCollection,
+		},
+		CollectionHasNfts: Criterion{
+			name: "CollectionHasNfts",
+			eval: collectionHasNfts,
+		},
+		CollectionHasCollectorsNote: Criterion{
+			name: "CollectionHasCollectorsNote",
+			eval: collectionHasCollectorsNote,
+		},
+		CollectionHasNewTokensAdded: Criterion{
+			name: "CollectionHasNewTokensAdded",
+			eval: collectionHasNewTokensAdded,
 		},
 	}
 }

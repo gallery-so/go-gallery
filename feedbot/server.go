@@ -71,7 +71,7 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 
 		feed := newFeed()
 
-		logger.For(ctx).Debugf("handling event %s", query)
+		logger.For(ctx).Debugf("handling event(%s)", msg.ID)
 		handled, err := feed.Handle(ctx, query)
 
 		if err != nil {
@@ -79,7 +79,7 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
-		logger.For(c).Debugf("event handled: %v", handled)
+		logger.For(c).Debugf("event(%s) handled: %v", msg.ID, handled)
 
 		if !handled {
 			c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event(%s) matched no rules", msg.ID)})

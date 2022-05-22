@@ -65,7 +65,7 @@ type Feed struct {
 }
 
 func newFeed() *Feed {
-	criteria := Criteria{}
+	criteria := newCriteria()
 	base := []Criterion{
 		criteria.EventIsValid,
 		criteria.EventNoMoreRecentEvents,
@@ -88,22 +88,22 @@ func newFeed() *Feed {
 	}
 }
 
-func (f *Feed) matchPost(q Query, post *Post) bool {
+func (f *Feed) postMatches(post *Post, q Query) bool {
 	for _, c := range post.rule {
 
 		key := fmt.Sprintf("%s:%s", q.EventID, c.name)
-		eval, ok := f.cache[key]
+		matching, ok := f.cache[key]
 
 		if !ok {
-			matching := c.eval(q)
+			matching = c.eval(q)
 			f.mu.Lock()
 			f.cache[key] = matching
 			f.mu.Unlock()
 		}
 
-		logger.For(nil).Debugf("%s evaluated query as: %s", post.name, eval)
+		logger.For(nil).Debugf("%s:%s evaluated query as: %v", post.name, c.name, matching)
 
-		if !eval {
+		if !matching {
 			return false
 		}
 	}
@@ -111,6 +111,8 @@ func (f *Feed) matchPost(q Query, post *Post) bool {
 }
 
 func (f *Feed) Handle(ctx context.Context, q Query) (bool, error) {
+	logger.For(ctx).Debugf("handling query: %s", q)
+
 	var posts []*Post
 
 	switch persist.CategoryFromEventCode(q.EventCode) {
@@ -123,7 +125,7 @@ func (f *Feed) Handle(ctx context.Context, q Query) (bool, error) {
 	}
 
 	for _, p := range posts {
-		if f.matchPost(q, p) {
+		if f.postMatches(p, q) {
 			handled, err := p.Handle(ctx, q)
 
 			if err != nil {
