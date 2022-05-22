@@ -13,11 +13,11 @@ import (
 )
 
 type DiscordPoster struct {
-	renderFromQuery func(Query) string
+	renderQuery func(Query) string
 }
 
-func (d *DiscordPoster) handleQuery(ctx context.Context, q Query) error {
-	content := d.renderFromQuery(q)
+func (d *DiscordPoster) withQuery(ctx context.Context, q Query) error {
+	content := d.renderQuery(q)
 
 	message, err := json.Marshal(map[string]interface{}{
 		"content": content,

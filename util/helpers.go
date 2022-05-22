@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
-	"runtime"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -153,17 +151,4 @@ func FindFile(f string, searchDepth int) (string, error) {
 	}
 
 	return "", errors.New("could not find file in path")
-}
-
-// FuncName provides the name of the object if of type Func and an empty string otherwise
-func FuncName(fn interface{}) string {
-	if fn == nil {
-		return ""
-	}
-
-	if reflect.TypeOf(fn).Kind() != reflect.Func {
-		return ""
-	}
-
-	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }

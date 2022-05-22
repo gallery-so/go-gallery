@@ -2,9 +2,72 @@ package feedbot
 
 import "github.com/mikeydub/go-gallery/service/persist"
 
-type FeedCriteria struct{}
+type Criteria struct {
+	EventIsValid                         Criterion
+	EventNoMoreRecentEvents              Criterion
+	IsUserCreatedEvent                   Criterion
+	IsUserFollowedEvent                  Criterion
+	IsNftCollectorsNoteAddedEvent        Criterion
+	IsCollectionCreatedEvent             Criterion
+	IsCollectionCollectorsNoteAddedEvent Criterion
+	IsCollectionTokensAddedEvent         Criterion
+	UserHasUsername                      Criterion
+	UserNoEventsBefore                   Criterion
+	FollowedUserHasUsername              Criterion
+	NftHasCollectorsNote                 Criterion
+	NftBelongsToCollection               Criterion
+	CollectionHasNfts                    Criterion
+	CollectionHasCollectorsNote          Criterion
+	CollectionHasNewTokensAdded          Criterion
+}
 
-func (FeedCriteria) EventIsValid(q Query) bool {
+type Criterion struct {
+	name string
+	eval func(q Query) bool
+}
+
+func newCriteria() Criteria {
+	return Criteria{
+		EventIsValid: Criterion{
+			name: "EventIsValid",
+			eval: eventIsValid,
+		},
+		EventNoMoreRecentEvents: Criterion{
+			name: "EventNoMoreRecentEvents",
+			eval: eventNoMoreRecentEvents,
+		},
+		IsUserCreatedEvent: Criterion{
+			name: "IsUserCreatedEvent",
+			eval: isUserCreatedEvent,
+		},
+		IsUserFollowedEvent: Criterion{
+			name: "IsUserFollowedEvent",
+			eval: isUserFollowedEvent,
+		},
+		IsNftCollectorsNoteAddedEvent: Criterion{
+			name: "IsNftCollectorsNoteAddedEvent",
+			eval: isNftCollectorsNoteAddedEvent,
+		},
+		IsCollectionCreatedEvent: Criterion{
+			name: "IsCollectionCreatedEvent",
+			eval: isCollectionCreatedEvent,
+		},
+		IsCollectionCollectorsNoteAddedEvent: Criterion{
+			name: "IsCollectionCollectorsNoteAddedEvent",
+			eval: isCollectionCollectorsNoteAddedEvent,
+		},
+		IsCollectionTokensAddedEvent: Criterion{
+			name: "IsCollectionTokensAddedEvent",
+			eval: isCollectionTokensAddedEvent,
+		},
+		UserNoEventsBefore: Criterion{
+			name: "UserNoEventsBefore",
+			eval: userNoEventsBefore,
+		},
+	}
+}
+
+func eventIsValid(q Query) bool {
 	if q.EventID == "" {
 		return false
 	}
@@ -25,47 +88,47 @@ func (FeedCriteria) EventIsValid(q Query) bool {
 	}
 }
 
-func (FeedCriteria) EventNoMoreRecentEvents(q Query) bool {
+func eventNoMoreRecentEvents(q Query) bool {
 	return q.EventsSince == 0
 }
 
-func (FeedCriteria) IsUserCreatedEvent(q Query) bool {
+func isUserCreatedEvent(q Query) bool {
 	return q.EventCode == persist.UserCreatedEvent
 }
 
-func (FeedCriteria) IsUserFollowedEvent(q Query) bool {
+func isUserFollowedEvent(q Query) bool {
 	return q.EventCode == persist.UserFollowedEvent
 }
 
-func (FeedCriteria) IsNftCollectorsNoteAddedEvent(q Query) bool {
+func isNftCollectorsNoteAddedEvent(q Query) bool {
 	return q.EventCode == persist.NftCollectorsNoteAddedEvent
 }
 
-func (FeedCriteria) IsCollectionCreatedEvent(q Query) bool {
+func isCollectionCreatedEvent(q Query) bool {
 	return q.EventCode == persist.CollectionCreatedEvent
 }
 
-func (FeedCriteria) IsCollectionCollectorsNoteAddedEvent(q Query) bool {
+func isCollectionCollectorsNoteAddedEvent(q Query) bool {
 	return q.EventCode == persist.CollectionCollectorsNoteAdded
 }
 
-func (FeedCriteria) IsCollectionTokensAddedEvent(q Query) bool {
+func isCollectionTokensAddedEvent(q Query) bool {
 	return q.EventCode == persist.CollectionTokensAdded
 }
 
-func (FeedCriteria) UserHasUsername(q Query) bool {
+func userHasUsername(q Query) bool {
 	return q.Username != ""
 }
 
-func (FeedCriteria) UserNoEventsBefore(q Query) bool {
+func userNoEventsBefore(q Query) bool {
 	return q.LastUserEvent == nil
 }
 
-func (FeedCriteria) FollowedUserHasUsername(q Query) bool {
+func followedUserHasUsername(q Query) bool {
 	return q.FollowedUsername != ""
 }
 
-func (FeedCriteria) NftHasCollectorsNote(q Query) bool {
+func nftHasCollectorsNote(q Query) bool {
 	if q.NftCollectorsNote == "" {
 		return false
 	}
@@ -77,15 +140,15 @@ func (FeedCriteria) NftHasCollectorsNote(q Query) bool {
 	return true
 }
 
-func (FeedCriteria) NftBelongsToCollection(q Query) bool {
+func nftBelongsToCollection(q Query) bool {
 	return q.NftID != "" && q.CollectionID != ""
 }
 
-func (FeedCriteria) CollectionHasNfts(q Query) bool {
+func collectionHasNfts(q Query) bool {
 	return len(q.CollectionNfts) > 0
 }
 
-func (FeedCriteria) CollectionHasCollectorsNote(q Query) bool {
+func collectionHasCollectorsNote(q Query) bool {
 	if q.CollectionCollectorsNote == "" {
 		return false
 	}
@@ -97,7 +160,7 @@ func (FeedCriteria) CollectionHasCollectorsNote(q Query) bool {
 	return true
 }
 
-func (FeedCriteria) CollectionHasNewTokensAdded(q Query) bool {
+func collectionHasNewTokensAdded(q Query) bool {
 	if q.LastCollectionEvent == nil {
 		return true
 	}

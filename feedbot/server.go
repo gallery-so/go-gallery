@@ -53,8 +53,6 @@ type CollectionQueryForQuery struct {
 }
 
 func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerFunc {
-	rules := newFeedRules()
-
 	return func(c *gin.Context) {
 		msg := cloudtask.EventMessage{}
 		if err := c.ShouldBindJSON(&msg); err != nil {
@@ -71,9 +69,11 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
-		logger.For(ctx).Debugf("handling event %s", query)
+		feed := newFeed()
 
-		handled, err := rules.Handle(ctx, query)
+		logger.For(ctx).Debugf("handling event %s", query)
+		handled, err := feed.Handle(ctx, query)
+
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
