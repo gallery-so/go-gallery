@@ -14,11 +14,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/segmentio/ksuid"
 	"github.com/sirupsen/logrus"
@@ -143,13 +142,17 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		span, ctx := tracing.StartSpan(ctx, "gql.directive", "REQUIRE_NFTS")
 		defer tracing.FinishSpan(span)
 
-		user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
-
+		wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
 
-		if hasNft, err := auth.HasAllowlistNFT(ctx, user.Addresses, ethClient); !hasNft {
+		addresses := make([]persist.AddressDetails, len(wallets))
+		for i, w := range wallets {
+			addresses[i] = persist.AddressDetails{AddressValue: w.Address, Chain: persist.Chain(w.Chain.Int32)}
+		}
+
+		if hasNft, err := auth.HasAllowlistNFT(ctx, addresses, ethClient); !hasNft {
 			errorMsg := err.Error()
 			modelErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
 			return makeErrNotAuthorized(errorMsg, modelErr), nil

@@ -26,7 +26,8 @@ type HelperCollectionNftData struct {
 }
 
 type HelperTokenHolderData struct {
-	UserId persist.DBID
+	UserId    persist.DBID
+	WalletIds []persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

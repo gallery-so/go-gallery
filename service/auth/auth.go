@@ -129,7 +129,7 @@ func (e ErrSignatureVerificationFailed) Error() string {
 }
 
 type ErrDoesNotOwnRequiredNFT struct {
-	addresses []persist.Address
+	addresses []persist.AddressDetails
 }
 
 func (e ErrDoesNotOwnRequiredNFT) Error() string {
@@ -317,7 +317,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist
 	if !userExists {
 
 		if !pPreAuthed {
-			if hasNft, err := HasAllowlistNFT(pCtx, []persist.Address{pAddress}, ethClient); !hasNft {
+			if hasNft, err := HasAllowlistNFT(pCtx, []persist.AddressDetails{{pAddress, pChain}}, ethClient); !hasNft {
 				return "", false, err
 			}
 		}
@@ -354,11 +354,14 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist
 	return nonce, userExists, nil
 }
 
-func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient *ethclient.Client) (bool, error) {
+func HasAllowlistNFT(ctx context.Context, addresses []persist.AddressDetails, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
+		if addr.Chain != persist.ChainETH {
+			continue
+		}
 		for k, v := range allowlist {
-			found, err := eth.HasNFTs(ctx, k, v, addr, ethClient)
+			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.AddressValue), ethClient)
 			if found {
 				return true, nil
 			} else if err != nil {

@@ -453,17 +453,29 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.Address, chain persist.Chain, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	refresh := false
 	if forceRefresh != nil {
 		refresh = *forceRefresh
 	}
 
-	return resolveCommunityByContractAddress(ctx, contractAddress, chain, refresh)
+	return resolveCommunityByContractAddress(ctx, communityAddress, chain, refresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 	return resolveGeneralAllowlist(ctx)
+}
+
+func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
+	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
+	for _, id := range obj.WalletIds {
+		wallet, err := resolveWalletByWalletID(ctx, id)
+		if err == nil {
+			wallets = append(wallets, wallet)
+		}
+	}
+
+	return wallets, nil
 }
 
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {

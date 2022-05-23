@@ -13,6 +13,7 @@ type WalletRepository struct {
 	db *sql.DB
 
 	insertStmt              *sql.Stmt
+	getByIDStmt             *sql.Stmt
 	getByAddressDetailsStmt *sql.Stmt
 }
 
@@ -24,14 +25,32 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 	insertStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID,VERSION,ADDRESS,CHAIN,WALLET_TYPE) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (ADDRESS,CHAIN) DO NOTHING;`)
 	checkNoErr(err)
 
-	getByAddressDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELTED = FALSE;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ID = $1 AND DELETED = FALSE;`)
+	checkNoErr(err)
+
+	getByAddressDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = FALSE;`)
 	checkNoErr(err)
 
 	return &WalletRepository{
 		db:                      db,
+		getByIDStmt:             getByIDStmt,
 		getByAddressDetailsStmt: getByAddressDetailsStmt,
 		insertStmt:              insertStmt,
 	}
+}
+
+// GetByID returns a wallet by its ID
+func (w *WalletRepository) GetByID(ctx context.Context, ID persist.DBID) (persist.Wallet, error) {
+	var wallet persist.Wallet
+	err := w.getByIDStmt.QueryRowContext(ctx, ID).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address, &wallet.WalletType, &wallet.Chain)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return wallet, persist.ErrWalletNotFoundByID{WalletID: ID}
+		}
+		return wallet, err
+	}
+	return wallet, nil
+
 }
 
 // GetByAddressDetails returns a wallet by address and chain

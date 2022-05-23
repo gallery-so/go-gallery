@@ -47,6 +47,7 @@ const (
 
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
+	GetByID(context.Context, DBID) (Wallet, error)
 	GetByAddressDetails(context.Context, Address, Chain) (Wallet, error)
 	Insert(context.Context, Address, Chain, WalletType) (DBID, error)
 }
@@ -116,6 +117,10 @@ func (n *Address) Scan(value interface{}) error {
 	return nil
 }
 
+type ErrWalletNotFoundByID struct {
+	WalletID DBID
+}
+
 // ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination
 type ErrWalletNotFoundByAddressDetails struct {
 	Address Address
@@ -125,6 +130,10 @@ type ErrWalletNotFoundByAddressDetails struct {
 // ErrWalletNotFoundByAddress is an error type for when a wallet is not found by address's ID
 type ErrWalletNotFoundByAddress struct {
 	Address DBID
+}
+
+func (e ErrWalletNotFoundByID) Error() string {
+	return fmt.Sprintf("wallet not found by id: %s", e.WalletID)
 }
 
 func (e ErrWalletNotFoundByAddressDetails) Error() string {

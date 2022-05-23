@@ -24,8 +24,7 @@ type MembershipTier struct {
 // TokenHolder represents a user who owns a membership card
 type TokenHolder struct {
 	UserID      DBID         `json:"user_id"`
-	Addresses   []Address    `json:"addresses"`
-	Username    NullString   `json:"username"`
+	WalletIDs   []DBID       `json:"wallet_ids"`
 	PreviewNFTs []NullString `json:"preview_nfts"`
 }
 

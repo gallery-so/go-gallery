@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"

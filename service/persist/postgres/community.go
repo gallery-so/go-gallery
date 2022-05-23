@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"time"
-
 	"github.com/sirupsen/logrus"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -27,7 +26,7 @@ type CommunityRepository struct {
 	getWalletByDetailsStmt  *sql.Stmt
 	getAddressByDetailsStmt *sql.Stmt
 	getAddressByIDStmt      *sql.Stmt
-	getPreviewNFTsStmt   *sql.Stmt
+	getPreviewNFTsStmt      *sql.Stmt
 }
 
 // NewCommunityRepository returns a new CommunityRepository
@@ -66,7 +65,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 		getWalletByDetailsStmt:  getWalletByDetailsStmt,
 		getAddressByDetailsStmt: getAddressByDetailsStmt,
 		getAddressByIDStmt:      getAddressByIDStmt,
-		getPreviewNFTsStmt:   getPreviewNFTsStmt,
+		getPreviewNFTsStmt:      getPreviewNFTsStmt,
 	}
 }
 
@@ -135,6 +134,13 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 
 	tokenHolders := map[persist.DBID]*persist.TokenHolder{}
 	for _, address := range addresses {
+		wallet := persist.Wallet{}
+		err = c.getWalletByDetailsStmt.QueryRowContext(ctx, address).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address, &wallet.Chain, &wallet.WalletType)
+		if err != nil {
+			logrus.Warnf("error getting wallet of member of community '%s' by address '%s': %s", pAddress, address, err)
+			continue
+		}
+
 		var username persist.NullString
 		var userID persist.DBID
 		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&userID, &username)
@@ -148,12 +154,11 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 		}
 
 		if tokenHolder, ok := tokenHolders[userID]; ok {
-			tokenHolder.Addresses = append(tokenHolder.Addresses, address)
+			tokenHolder.WalletIDs = append(tokenHolder.WalletIDs, wallet.ID)
 		} else {
 			tokenHolders[userID] = &persist.TokenHolder{
 				UserID:      userID,
-				Addresses:   []persist.Address{address},
-				Username:    username,
+				WalletIDs:   []persist.DBID{wallet.ID},
 				PreviewNFTs: nil,
 			}
 		}
@@ -164,17 +169,17 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pAddress persist
 	for _, tokenHolder := range tokenHolders {
 		previewNFTs := make([]persist.NullString, 0, 3)
 
-		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pAddress, pq.Array(tokenHolder.Addresses))
+		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pAddress, pq.Array(tokenHolder.WalletIDs))
 		defer rows.Close()
 
 		if err != nil {
-			logger.For(ctx).Warnf("error getting preview NFTs of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+			logger.For(ctx).Warnf("error getting preview NFTs of community '%s' by addresses '%s': %s", pAddress, tokenHolder.WalletIDs, err)
 		} else {
 			for rows.Next() {
 				var imageURL persist.NullString
 				err = rows.Scan(&imageURL)
 				if err != nil {
-					logger.For(ctx).Warnf("error scanning preview NFT of community '%s' by addresses '%s': %s", pAddress, tokenHolder.Addresses, err)
+					logger.For(ctx).Warnf("error scanning preview NFT of community '%s' by addresses '%s': %s", pAddress, tokenHolder.WalletIDs, err)
 					continue
 				}
 				previewNFTs = append(previewNFTs, imageURL)

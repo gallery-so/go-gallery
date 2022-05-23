@@ -15,13 +15,11 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -274,6 +272,15 @@ func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (*model.Gal
 	return resolveGalleryUserByUserID(ctx, nft.OwnerUserID)
 }
 
+func resolveWalletByWalletID(ctx context.Context, walletID persist.DBID) (*model.Wallet, error) {
+	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return walletToModelSqlc(ctx, *wallet), nil
+}
+
 func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.Wallet, error) {
 
 	wallet := model.Wallet{
@@ -322,7 +329,7 @@ func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress
 		return nil, err
 	}
 
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, persist.Chain(parsed))
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, persist.Chain(parsed), false)
 
 	if err != nil {
 		return nil, err
@@ -483,38 +490,33 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
 
-	addresses := make([]*persist.Address, len(tokenHolder.Addresses))
-	for i, address := range tokenHolder.Addresses {
-		address := address
-		addresses[i] = &address
-	}
-
 	return &model.TokenHolder{
-		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID},
-		Addresses:             addresses,
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
 		User:                  nil, // handled by dedicated resolver
+		Wallets:               nil, // handled by dedicated resolver
 		PreviewNfts:           previewNfts,
 	}
 }
 
 func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 	chainEthereum := persist.ChainETH
-	openseaID := int(nft.OpenseaID.Int64)
+	//openseaID := int(nft.OpenseaID.Int64)
 
 	return &model.Nft{
-		Dbid:             nft.ID,
-		CreationTime:     &nft.CreatedAt,
-		LastUpdated:      &nft.LastUpdated,
-		CollectorsNote:   &nft.CollectorsNote.String,
-		Media:            getMediaForToken(nft),
-		TokenType:        nil,            // TODO: later
-		Chain:            &chainEthereum, // Everything's Ethereum right now
-		Name:             &nft.Name.String,
-		Description:      &nft.Description.String,
-		OwnerAddresses:   nil, // handled by dedicated resolver
-		TokenURI:         nil, // TODO: later
-		TokenID:          &nft.TokenID.String,
-		OpenseaID:        &openseaID,
+		Dbid:           nft.ID,
+		CreationTime:   &nft.CreatedAt,
+		LastUpdated:    &nft.LastUpdated,
+		CollectorsNote: &nft.CollectorsNote.String,
+		Media:          getMediaForToken(nft),
+		TokenType:      nil,            // TODO: later
+		Chain:          &chainEthereum, // Everything's Ethereum right now
+		Name:           &nft.Name.String,
+		Description:    &nft.Description.String,
+		OwnerAddresses: nil, // handled by dedicated resolver
+		TokenURI:       nil, // TODO: later
+		TokenID:        &nft.TokenID.String,
+		// TODO-EZRA: Does the frontend have something that can replace this?
+		//OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later

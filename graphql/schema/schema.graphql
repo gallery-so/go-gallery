@@ -284,7 +284,7 @@ type Gallery implements Node {
 }
 
 type TokenHolder @goEmbedHelper {
-    addresses: [Address]
+    wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
     previewNfts: [String]
 }

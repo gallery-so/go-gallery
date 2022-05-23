@@ -47,6 +47,10 @@ type Error interface {
 	IsError()
 }
 
+type FollowUserPayloadOrError interface {
+	IsFollowUserPayloadOrError()
+}
+
 type GalleryUserOrAddress interface {
 	IsGalleryUserOrAddress()
 }
@@ -197,23 +201,18 @@ func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type Community struct {
-	LastUpdated     *time.Time        `json:"lastUpdated"`
-	ContractAddress *persist.Address  `json:"contractAddress"`
-	CreatorAddress  *persist.Address  `json:"creatorAddress"`
-	Chain           *persist.Chain    `json:"chain"`
-	Name            *string           `json:"name"`
-	Description     *string           `json:"description"`
-	PreviewImage    *string           `json:"previewImage"`
-	Owners          []*CommunityOwner `json:"owners"`
+	LastUpdated     *time.Time       `json:"lastUpdated"`
+	ContractAddress *persist.Address `json:"contractAddress"`
+	CreatorAddress  *persist.Address `json:"creatorAddress"`
+	Chain           *persist.Chain   `json:"chain"`
+	Name            *string          `json:"name"`
+	Description     *string          `json:"description"`
+	PreviewImage    *string          `json:"previewImage"`
+	Owners          []*TokenHolder   `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
-
-type CommunityOwner struct {
-	Address  *Wallet `json:"address"`
-	Username *string `json:"username"`
-}
 
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
@@ -382,6 +381,13 @@ func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
+type FollowUserPayload struct {
+	Viewer *Viewer      `json:"viewer"`
+	User   *GalleryUser `json:"user"`
+}
+
+func (FollowUserPayload) IsFollowUserPayloadOrError() {}
+
 type Gallery struct {
 	Dbid        persist.DBID  `json:"dbid"`
 	Owner       *GalleryUser  `json:"owner"`
@@ -480,13 +486,6 @@ type LogoutPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-type MembershipOwner struct {
-	Dbid        persist.DBID             `json:"dbid"`
-	Address     *persist.EthereumAddress `json:"address"`
-	User        *GalleryUser             `json:"user"`
-	PreviewNfts []*string                `json:"previewNfts"`
-}
-
 type MembershipTier struct {
 	Dbid     persist.DBID   `json:"dbid"`
 	Name     *string        `json:"name"`
@@ -519,6 +518,7 @@ type Nft struct {
 	BlockNumber           *string            `json:"blockNumber"`
 	CreatorAddress        *persist.Address   `json:"creatorAddress"`
 	OpenseaCollectionName *string            `json:"openseaCollectionName"`
+	OpenseaID             *int               `json:"openseaId"`
 }
 
 func (Nft) IsNode()           {}
@@ -560,9 +560,9 @@ func (TextMedia) IsMedia()        {}
 
 type TokenHolder struct {
 	HelperTokenHolderData
-	Addresses   []*persist.Address `json:"addresses"`
-	User        *GalleryUser       `json:"user"`
-	PreviewNfts []*string          `json:"previewNfts"`
+	Wallets     []*Wallet    `json:"wallets"`
+	User        *GalleryUser `json:"user"`
+	PreviewNfts []*string    `json:"previewNfts"`
 }
 
 type UnfollowUserPayload struct {
