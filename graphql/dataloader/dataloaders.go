@@ -16,6 +16,8 @@
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByAddressDetails github.com/mikeydub/go-gallery/service/persist.AddressDetails github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden FollowersLoaderById github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden FollowingLoaderById github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
 
 package dataloader
 
@@ -61,6 +63,8 @@ type Loaders struct {
 	TokensByCollectionID     TokenLoaderByManyID
 	ContractByContractId     ContractLoaderByID
 	ContractByAddressDetails ContractLoaderByAddressDetails
+	FollowersByUserId        FollowersLoaderById
+	FollowingByUserId        FollowingLoaderById
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -158,6 +162,18 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadTokensByUserId(ctx, loaders, q),
 	}
 
+	loaders.FollowersByUserId = FollowersLoaderById{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadFollowersByUserId(ctx, loaders, q),
+	}
+
+	loaders.FollowingByUserId = FollowingLoaderById{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadFollowingByUserId(ctx, loaders, q),
+	}
+
 	return loaders
 }
 
@@ -169,6 +185,7 @@ func (l *Loaders) ClearAllCaches() {
 	l.ClearCollectionCaches()
 	l.ClearNftCaches()
 	l.ClearMembershipCaches()
+	l.ClearFollowCaches()
 }
 
 func (l *Loaders) ClearUserCaches() {
@@ -227,6 +244,16 @@ func (l *Loaders) ClearMembershipCaches() {
 	l.MembershipByMembershipId.mu.Lock()
 	l.MembershipByMembershipId.cache = nil
 	l.MembershipByMembershipId.mu.Unlock()
+}
+
+func (l *Loaders) ClearFollowCaches() {
+	l.FollowersByUserId.mu.Lock()
+	l.FollowersByUserId.cache = nil
+	l.FollowersByUserId.mu.Unlock()
+
+	l.FollowingByUserId.mu.Lock()
+	l.FollowingByUserId.cache = nil
+	l.FollowingByUserId.mu.Unlock()
 }
 
 func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
@@ -634,5 +661,55 @@ func loadTokensByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 		})
 
 		return tokens, errors
+	}
+}
+
+func loadFollowersByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.User, []error) {
+	return func(userIds []persist.DBID) ([][]sqlc.User, []error) {
+		followers := make([][]sqlc.User, len(userIds))
+		errors := make([]error, len(followers))
+
+		b := q.GetFollowersByUserIdBatch(ctx, userIds)
+		defer b.Close()
+
+		b.Query(func(i int, u []sqlc.User, err error) {
+			followers[i] = u
+			errors[i] = err
+
+			// Add results to other loaders' caches
+			if err == nil {
+				for _, user := range followers[i] {
+					loaders.UserByUsername.Prime(user.Username.String, user)
+					loaders.UserByUserId.Prime(user.ID, user)
+				}
+			}
+		})
+
+		return followers, errors
+	}
+}
+
+func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.User, []error) {
+	return func(userIds []persist.DBID) ([][]sqlc.User, []error) {
+		following := make([][]sqlc.User, len(userIds))
+		errors := make([]error, len(following))
+
+		b := q.GetFollowingByUserIdBatch(ctx, userIds)
+		defer b.Close()
+
+		b.Query(func(i int, u []sqlc.User, err error) {
+			following[i] = u
+			errors[i] = err
+
+			// Add results to other loaders' caches
+			if err == nil {
+				for _, user := range following[i] {
+					loaders.UserByUsername.Prime(user.Username.String, user)
+					loaders.UserByUserId.Prime(user.ID, user)
+				}
+			}
+		})
+
+		return following, errors
 	}
 }

@@ -237,6 +237,126 @@ func (b *GetContractByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.addresses, u.bio FROM follows f
+    INNER JOIN users u ON f.follower = u.id
+    WHERE f.followee = $1 AND f.deleted = false
+`
+
+type GetFollowersByUserIdBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetFollowersByUserIdBatch(ctx context.Context, followee []persist.DBID) *GetFollowersByUserIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range followee {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getFollowersByUserIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetFollowersByUserIdBatchBatchResults{br, 0}
+}
+
+func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []User
+		for rows.Next() {
+			var i User
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.LastUpdated,
+				&i.CreatedAt,
+				&i.Username,
+				&i.UsernameIdempotent,
+				&i.Addresses,
+				&i.Bio,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.addresses, u.bio FROM follows f
+    INNER JOIN users u ON f.followee = u.id
+    WHERE f.follower = $1 AND f.deleted = false
+`
+
+type GetFollowingByUserIdBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetFollowingByUserIdBatch(ctx context.Context, follower []persist.DBID) *GetFollowingByUserIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range follower {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getFollowingByUserIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetFollowingByUserIdBatchBatchResults{br, 0}
+}
+
+func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []User
+		for rows.Next() {
+			var i User
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.LastUpdated,
+				&i.CreatedAt,
+				&i.Username,
+				&i.UsernameIdempotent,
+				&i.Addresses,
+				&i.Bio,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetFollowingByUserIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getGalleriesByUserIdBatch = `-- name: GetGalleriesByUserIdBatch :batchmany
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `

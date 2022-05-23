@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 
 	"cloud.google.com/go/storage"
@@ -12,7 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -79,12 +79,12 @@ func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress 
 	case persist.URITypeArweave, persist.URITypeIPFS:
 		md, err := rpc.GetMetadataFromURI(ctx, asURI, ipfsClient, arweaveClient)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to get metadata from URI")
+			logger.For(ctx).WithError(err).Error("Failed to get metadata from URI")
 			return response.Metadata, nil
 		}
 		med, err := media.MakePreviewsForMetadata(ctx, md, contractAddress.String(), tid, asURI, persist.ChainETH, ipfsClient, arweaveClient, stg)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to make previews")
+			logger.For(ctx).WithError(err).Error("Failed to make previews")
 			return response.Metadata, nil
 		}
 		response.Metadata.Image = med.MediaURL.String()

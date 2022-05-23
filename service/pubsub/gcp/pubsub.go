@@ -2,11 +2,11 @@ package gcp
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/pubsub/pstest"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -69,7 +69,7 @@ func (g *PubSub) Subscribe(pCtx context.Context, topicName string, handler func(
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
 		err := handler(ctx, msg.Data)
 		if err != nil {
-			logrus.WithError(err).Error("error handling sub message")
+			logger.For(ctx).WithError(err).Error("error handling sub message")
 			msg.Nack()
 			return
 		}

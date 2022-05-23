@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // CollectionRepository is the repository for interacting with collections in a postgres database
@@ -450,33 +450,16 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 	defer tx.Rollback()
 
 	deleteManyStmt := tx.StmtContext(pCtx, c.deleteNFTsStmt)
-	deleteStmt := tx.StmtContext(pCtx, c.deleteNFTStmt)
 	removeFromCollStmt := tx.StmtContext(pCtx, c.removeNFTFromCollectionsStmt)
-	updateOwnerStmt := tx.StmtContext(pCtx, c.updateOwnerAddressStmt)
 
 	nftsToRemoveIDs := make([]persist.DBID, 0, len(removing))
 
 	for removeID, removeOpenseaID := range removing {
 		remove := true
-		for id, openseaID := range newOpenseaIDs {
+		for _, openseaID := range newOpenseaIDs {
 			if removeOpenseaID == openseaID {
 				remove = false
-
-				var newAddress persist.NullString
-				err := c.getOwnerAddressStmt.QueryRowContext(pCtx, id).Scan(&newAddress)
-				if err != nil {
-					return err
-				}
-
-				_, err = deleteStmt.ExecContext(pCtx, id)
-				if err != nil {
-					return err
-				}
-
-				_, err = updateOwnerStmt.ExecContext(pCtx, newAddress, removeID)
-				if err != nil {
-					return err
-				}
+				break
 			}
 		}
 		if remove {
@@ -490,7 +473,7 @@ func (c *CollectionRepository) ClaimNFTs(pCtx context.Context, pUserID persist.D
 	}
 
 	for _, nft := range nftsToRemoveIDs {
-		logrus.Infof("removing nft %s from collections for %s because no longer owns NFT", nft, pUserID)
+		logger.For(pCtx).Infof("removing nft %s from collections for %s because no longer owns NFT", nft, pUserID)
 		_, err := removeFromCollStmt.ExecContext(pCtx, nft, pUserID)
 		if err != nil {
 			return err
@@ -556,7 +539,7 @@ func (c *CollectionRepository) RemoveNFTsOfOldAddresses(pCtx context.Context, pU
 	for _, coll := range colls {
 		for _, nft := range coll.NFTs {
 			if !containsWallet(addresses, nft.OwnerAddress) {
-				logrus.Infof("removing nft %s from collections for %s because NFT is of old address", nft.ID, pUserID)
+				logger.For(pCtx).Infof("removing nft %s from collections for %s because NFT is of old address", nft.ID, pUserID)
 				_, err := c.removeNFTFromCollectionsStmt.ExecContext(pCtx, nft.ID, pUserID)
 				if err != nil {
 					return err

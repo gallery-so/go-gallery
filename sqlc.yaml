@@ -32,15 +32,21 @@ overrides:
 
   # Membership
   - column: "membership.owners"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.MembershipOwnerList"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.TokenHolderList"
   # Wallet
   - column: "wallets.address"
     go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
   - column: "wallets.wallet_type"
     go_type: "github.com/mikeydub/go-gallery/service/persist.WalletType"
 
-  # Wildcards
-  # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+# Follows
+  - column: "follows.followee"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "follows.follower"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+# Wildcards
+# Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "*.owner_user_id"

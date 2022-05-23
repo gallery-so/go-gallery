@@ -10,33 +10,33 @@ import (
 
 // MembershipTier represents the membership tier of a user
 type MembershipTier struct {
-	Version      NullInt32         `json:"version"` // schema version for this model
-	ID           DBID              `json:"id" binding:"required"`
-	CreationTime CreationTime      `json:"created_at"`
-	Deleted      NullBool          `json:"-"`
-	LastUpdated  LastUpdatedTime   `json:"last_updated"`
-	Name         NullString        `json:"name"`
-	TokenID      TokenID           `json:"token_id"`
-	AssetURL     NullString        `json:"asset_url"`
-	Owners       []MembershipOwner `json:"owners"`
+	Version      NullInt32       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
+	Name         NullString      `json:"name"`
+	TokenID      TokenID         `json:"token_id"`
+	AssetURL     NullString      `json:"asset_url"`
+	Owners       []TokenHolder   `json:"owners"`
 }
 
-// MembershipOwner represents a user who owns a membership card
-type MembershipOwner struct {
-	UserID      DBID            `json:"user_id"`
-	Address     EthereumAddress `json:"address"`
-	Username    NullString      `json:"username"`
-	PreviewNFTs []NullString    `json:"preview_nfts"`
+// TokenHolder represents a user who owns a membership card
+type TokenHolder struct {
+	UserID      DBID         `json:"user_id"`
+	Addresses   []Address    `json:"addresses"`
+	Username    NullString   `json:"username"`
+	PreviewNFTs []NullString `json:"preview_nfts"`
 }
 
-// MembershipOwnerList is a slice of MembershipOwners, used to implement scanner/valuer interfaces
-type MembershipOwnerList []MembershipOwner
+// TokenHolderList is a slice of MembershipOwners, used to implement scanner/valuer interfaces
+type TokenHolderList []TokenHolder
 
-func (l MembershipOwnerList) Value() (driver.Value, error) {
+func (l TokenHolderList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
 
-func (l *MembershipOwnerList) Scan(value interface{}) error {
+func (l *TokenHolderList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
@@ -48,14 +48,14 @@ type MembershipRepository interface {
 }
 
 // Value implements the database/sql/driver Valuer interface for the membership owner type
-func (o MembershipOwner) Value() (driver.Value, error) {
+func (o TokenHolder) Value() (driver.Value, error) {
 	return json.Marshal(o)
 }
 
 // Scan implements the database/sql Scanner interface for the membership owner type
-func (o *MembershipOwner) Scan(src interface{}) error {
+func (o *TokenHolder) Scan(src interface{}) error {
 	if src == nil {
-		*o = MembershipOwner{}
+		*o = TokenHolder{}
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), o)

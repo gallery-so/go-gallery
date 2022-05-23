@@ -92,7 +92,7 @@ func TestGetCommunity_Success(t *testing.T) {
 	a.NoError(err)
 	a.Len(newNFTs, 1)
 
-	comm, err := communityRepo.GetByAddress(context.Background(), nfts[0].Contract.ContractAddress)
+	comm, err := communityRepo.GetByAddress(context.Background(), nfts[0].Contract.ContractAddress, true)
 	a.NoError(err)
 
 	a.Equal(nfts[0].Contract.ContractName, comm.Name)

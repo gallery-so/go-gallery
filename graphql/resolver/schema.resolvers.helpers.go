@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
+
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -35,6 +38,10 @@ var nodeFetcher = model.NodeFetcher{
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
 	},
+
+	//OnCommunity: func(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
+	//	return resolveCommunityByContractAddress(ctx, contractAddress, false)
+	//},
 }
 
 func init() {
@@ -73,7 +80,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
-			addError(ctx, err, converted)
 			return converted, true
 		}
 	}
@@ -116,6 +122,36 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	}
 
 	return userToModel(ctx, *user), nil
+}
+
+func resolveFollowersByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(followers))
+	for i, user := range followers {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
+func resolveFollowingByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(following))
+	for i, user := range following {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
 }
 
 func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
@@ -270,8 +306,8 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain)
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain, forceRefresh bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain, forceRefresh)
 
 	if err != nil {
 		return nil, err
@@ -359,11 +395,16 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            &user.Username.String,
-		Bio:                 &user.Bio.String,
-		Wallets:             wallets,
-		Galleries:           nil, // handled by dedicated resolver
+		Dbid:     user.ID,
+		Username: &user.Username.String,
+		Bio:      &user.Bio.String,
+		Wallets:  wallets,
+
+		// each handeled by dedicated resolver
+		Galleries: nil,
+		Followers: nil,
+		Following: nil,
+
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
 }
@@ -403,10 +444,10 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 }
 
 func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -420,10 +461,10 @@ func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *mod
 }
 
 func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -436,21 +477,29 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 	}
 }
 
-func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
-	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
-	for i, nft := range membershipOwner.PreviewNFTs {
+func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *model.TokenHolder {
+	previewNfts := make([]*string, len(tokenHolder.PreviewNFTs))
+	for i, nft := range tokenHolder.PreviewNFTs {
 		previewNfts[i] = util.StringToPointer(nft.String())
 	}
-	return &model.MembershipOwner{
-		Dbid:        membershipOwner.UserID,
-		Address:     &membershipOwner.Address,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
+
+	addresses := make([]*persist.Address, len(tokenHolder.Addresses))
+	for i, address := range tokenHolder.Addresses {
+		address := address
+		addresses[i] = &address
+	}
+
+	return &model.TokenHolder{
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID},
+		Addresses:             addresses,
+		User:                  nil, // handled by dedicated resolver
+		PreviewNfts:           previewNfts,
 	}
 }
 
 func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 	chainEthereum := persist.ChainETH
+	openseaID := int(nft.OpenseaID.Int64)
 
 	return &model.Nft{
 		Dbid:             nft.ID,
@@ -465,6 +514,7 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		OwnerAddresses:   nil, // handled by dedicated resolver
 		TokenURI:         nil, // TODO: later
 		TokenID:          &nft.TokenID.String,
+		OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
@@ -490,12 +540,9 @@ func nftsToModel(ctx context.Context, nft []sqlc.Token) []*model.Nft {
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {
 	lastUpdated := community.LastUpdated.Time()
 
-	owners := make([]*model.CommunityOwner, len(community.Owners))
-	for i := range community.Owners {
-		owners[i] = &model.CommunityOwner{
-			Address:  walletToModelPersist(ctx, community.Owners[i].Wallet),
-			Username: util.StringToPointer(community.Owners[i].Username.String()),
-		}
+	owners := make([]*model.TokenHolder, len(community.Owners))
+	for i, owner := range community.Owners {
+		owners[i] = tokenHolderToModel(ctx, owner)
 	}
 
 	return &model.Community{

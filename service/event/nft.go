@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type NftDispatcher struct {
@@ -18,15 +18,13 @@ func (c NftDispatcher) Handle(eventCode persist.EventCode, handler NftEventHandl
 func (c NftDispatcher) Dispatch(ctx context.Context, event persist.NftEventRecord) {
 	currentHub := sentryutil.SentryHubFromContext(ctx)
 
-	go func() {
-		ctx := sentryutil.NewSentryHubContext(ctx, currentHub)
-
+	go func(hubCtx context.Context) {
 		if handlers, ok := c.Handlers[event.Code]; ok {
 			for _, handler := range handlers {
-				handler.Handle(ctx, event)
+				handler.Handle(hubCtx, event)
 			}
 		}
-	}()
+	}(sentryutil.NewSentryHubContext(ctx, currentHub))
 }
 
 type NftEventHandler interface {

@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
@@ -246,7 +246,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 			var galleries []persist.GalleryToken
 			err := json.Unmarshal(initial, &galleries)
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to unmarshal galleries cache for userID %s - cached: %s", pUserID, string(initial))
+				logger.For(pCtx).WithError(err).Errorf("failed to unmarshal galleries cache for userID %s - cached: %s", pUserID, string(initial))
 			} else {
 				return galleries, nil
 			}

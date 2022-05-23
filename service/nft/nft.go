@@ -3,6 +3,10 @@ package nft
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/mikeydub/go-gallery/service/opensea"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )

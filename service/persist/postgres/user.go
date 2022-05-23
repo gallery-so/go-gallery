@@ -29,6 +29,8 @@ type UserRepository struct {
 	getWalletStmt         *sql.Stmt
 	addWalletStmt         *sql.Stmt
 	removeWalletStmt      *sql.Stmt
+	addFollowerStmt       *sql.Stmt
+	removeFollowerStmt    *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -82,6 +84,12 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	removeWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = array_remove(ADDRESSES, $1) WHERE ID = $2;`)
 	checkNoErr(err)
 
+	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false`)
+	checkNoErr(err)
+
+	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
+	checkNoErr(err)
+
 	return &UserRepository{
 		db:                  db,
 		updateInfoStmt:      updateInfoStmt,
@@ -100,6 +108,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		getWalletStmt:         getWalletStmt,
 		addWalletStmt:         addWalletStmt,
 		removeWalletStmt:      removeWalletStmt,
+		addFollowerStmt:       addFollowerStmt,
+		removeFollowerStmt:    removeFollowerStmt,
 	}
 }
 
@@ -356,4 +366,14 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	}
 
 	return tx.Commit()
+}
+
+func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.addFollowerStmt.ExecContext(pCtx, persist.GenerateID(), follower, followee)
+	return err
+}
+
+func (u *UserRepository) RemoveFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.removeFollowerStmt.ExecContext(pCtx, follower, followee)
+	return err
 }

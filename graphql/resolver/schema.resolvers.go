@@ -45,6 +45,10 @@ func (r *collectionResolver) Nfts(ctx context.Context, obj *model.Collection) ([
 	return output, nil
 }
 
+func (r *followUserPayloadResolver) User(ctx context.Context, obj *model.FollowUserPayload) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
+}
+
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
@@ -67,8 +71,12 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
-func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.MembershipOwner) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, obj.Dbid)
+func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	return resolveFollowersByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
+	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
 func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
@@ -342,6 +350,40 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	return output, nil
 }
 
+func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowUser(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.FollowUserPayload{
+		Viewer: resolveViewer(ctx),
+		User: &model.GalleryUser{
+			Dbid: userID, // remaining fields handled by dedicated resolver
+		},
+	}
+
+	return output, err
+}
+
+func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UnfollowUserPayload{
+		Viewer: resolveViewer(ctx),
+		User: &model.GalleryUser{
+			Dbid: userID, // remaining fields handled by dedicated resolver
+		},
+	}
+
+	return output, err
+}
+
 func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (*model.GalleryUser, error) {
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
@@ -372,6 +414,10 @@ func (r *queryResolver) Viewer(ctx context.Context) (model.ViewerOrError, error)
 
 func (r *queryResolver) UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error) {
 	return resolveGalleryUserByUsername(ctx, username)
+}
+
+func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error) {
+	return resolveGalleryUserByUserID(ctx, id)
 }
 
 func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error) {
@@ -407,12 +453,25 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.Address, chain persist.Chain) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddress(ctx, communityAddress, chain)
+func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+	refresh := false
+	if forceRefresh != nil {
+		refresh = *forceRefresh
+	}
+
+	return resolveCommunityByContractAddress(ctx, contractAddress, chain, refresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 	return resolveGeneralAllowlist(ctx)
+}
+
+func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.UserId)
+}
+
+func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
@@ -445,16 +504,16 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
+// FollowUserPayload returns generated.FollowUserPayloadResolver implementation.
+func (r *Resolver) FollowUserPayload() generated.FollowUserPayloadResolver {
+	return &followUserPayloadResolver{r}
+}
+
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
 
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
-
-// MembershipOwner returns generated.MembershipOwnerResolver implementation.
-func (r *Resolver) MembershipOwner() generated.MembershipOwnerResolver {
-	return &membershipOwnerResolver{r}
-}
 
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
@@ -468,6 +527,14 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// TokenHolder returns generated.TokenHolderResolver implementation.
+func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
+
+// UnfollowUserPayload returns generated.UnfollowUserPayloadResolver implementation.
+func (r *Resolver) UnfollowUserPayload() generated.UnfollowUserPayloadResolver {
+	return &unfollowUserPayloadResolver{r}
+}
+
 // Viewer returns generated.ViewerResolver implementation.
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
 
@@ -475,12 +542,14 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
 type collectionResolver struct{ *Resolver }
+type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
-type membershipOwnerResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type nftResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type tokenHolderResolver struct{ *Resolver }
+type unfollowUserPayloadResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }

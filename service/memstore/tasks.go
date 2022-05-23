@@ -2,11 +2,11 @@ package memstore
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"sync"
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/sirupsen/logrus"
 )
 
 // update represents a key and value pair
@@ -66,7 +66,7 @@ func (uq *UpdateQueue) start() {
 				defer cancel()
 				err := uq.cache.Set(ctx, update.key, update.val, update.ttl)
 				if err != nil {
-					logrus.WithError(err).Error("memstore: failed to update key")
+					logger.For(ctx).WithError(err).Error("memstore: failed to update key")
 				}
 				uq.poolFinished <- update.key
 			})

@@ -9,8 +9,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -27,7 +27,7 @@ func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.EthereumA
 	// Nothing to validate
 
 	bucket := viper.GetString("SNAPSHOT_BUCKET")
-	logrus.Infof("Proxying snapshot from bucket %s", bucket)
+	logger.For(ctx).Infof("Proxying snapshot from bucket %s", bucket)
 
 	obj := api.storageClient.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
 

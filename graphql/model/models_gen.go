@@ -87,6 +87,10 @@ type RemoveUserAddressesPayloadOrError interface {
 	IsRemoveUserAddressesPayloadOrError()
 }
 
+type UnfollowUserPayloadOrError interface {
+	IsUnfollowUserPayloadOrError()
+}
+
 type UpdateCollectionHiddenPayloadOrError interface {
 	IsUpdateCollectionHiddenPayloadOrError()
 }
@@ -109,6 +113,10 @@ type UpdateNftInfoPayloadOrError interface {
 
 type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
+}
+
+type UserByIDOrError interface {
+	IsUserByIDOrError()
 }
 
 type UserByUsernameOrError interface {
@@ -256,6 +264,8 @@ func (ErrAuthenticationFailed) IsAddUserAddressPayloadOrError() {}
 func (ErrAuthenticationFailed) IsError()                        {}
 func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
 func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
+func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()     {}
+func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()   {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -290,6 +300,7 @@ type ErrInvalidInput struct {
 }
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
+func (ErrInvalidInput) IsUserByIDOrError()                        {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
@@ -301,6 +312,8 @@ func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
 func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsError()                                  {}
+func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
+func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -362,9 +375,12 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError() {}
-func (ErrUserNotFound) IsError()                 {}
-func (ErrUserNotFound) IsLoginPayloadOrError()   {}
+func (ErrUserNotFound) IsUserByUsernameOrError()      {}
+func (ErrUserNotFound) IsUserByIDOrError()            {}
+func (ErrUserNotFound) IsError()                      {}
+func (ErrUserNotFound) IsLoginPayloadOrError()        {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
 type Gallery struct {
 	Dbid        persist.DBID  `json:"dbid"`
@@ -375,18 +391,21 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryUser struct {
-	Dbid                persist.DBID `json:"dbid"`
-	Username            *string      `json:"username"`
-	Bio                 *string      `json:"bio"`
-	Wallets             []*Wallet    `json:"wallets"`
-	Galleries           []*Gallery   `json:"galleries"`
-	IsAuthenticatedUser *bool        `json:"isAuthenticatedUser"`
+	Dbid                persist.DBID   `json:"dbid"`
+	Username            *string        `json:"username"`
+	Bio                 *string        `json:"bio"`
+	Wallets             []*Wallet      `json:"wallets"`
+	Galleries           []*Gallery     `json:"galleries"`
+	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser `json:"followers"`
+	Following           []*GalleryUser `json:"following"`
 }
 
 func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsGalleryUserOrAddress()  {}
 func (GalleryUser) IsUserByUsernameOrError() {}
+func (GalleryUser) IsUserByIDOrError()       {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -469,11 +488,11 @@ type MembershipOwner struct {
 }
 
 type MembershipTier struct {
-	Dbid     persist.DBID       `json:"dbid"`
-	Name     *string            `json:"name"`
-	AssetURL *string            `json:"assetUrl"`
-	TokenID  *string            `json:"tokenId"`
-	Owners   []*MembershipOwner `json:"owners"`
+	Dbid     persist.DBID   `json:"dbid"`
+	Name     *string        `json:"name"`
+	AssetURL *string        `json:"assetUrl"`
+	TokenID  *string        `json:"tokenId"`
+	Owners   []*TokenHolder `json:"owners"`
 }
 
 func (MembershipTier) IsNode() {}
@@ -538,6 +557,20 @@ type TextMedia struct {
 
 func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
+
+type TokenHolder struct {
+	HelperTokenHolderData
+	Addresses   []*persist.Address `json:"addresses"`
+	User        *GalleryUser       `json:"user"`
+	PreviewNfts []*string          `json:"previewNfts"`
+}
+
+type UnfollowUserPayload struct {
+	Viewer *Viewer      `json:"viewer"`
+	User   *GalleryUser `json:"user"`
+}
+
+func (UnfollowUserPayload) IsUnfollowUserPayloadOrError() {}
 
 type UnknownMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

@@ -16,14 +16,7 @@ type Community struct {
 	Description     NullString `json:"description"`
 	PreviewImage    NullString `json:"preview_image"`
 
-	Owners []CommunityOwner `json:"owners"`
-}
-
-// CommunityOwner represents a user in a community
-type CommunityOwner struct {
-	// TODO change json to wallet
-	Wallet   Wallet     `json:"address"`
-	Username NullString `json:"username"`
+	Owners []TokenHolder `json:"owners"`
 }
 
 // ErrCommunityNotFound is returned when a community is not found
@@ -34,7 +27,7 @@ type ErrCommunityNotFound struct {
 
 // CommunityRepository represents a repository for interacting with persisted communities
 type CommunityRepository interface {
-	GetByAddress(context.Context, Address, Chain) (Community, error)
+	GetByAddress(context.Context, Address, Chain, bool) (Community, error)
 }
 
 func (e ErrCommunityNotFound) Error() string {

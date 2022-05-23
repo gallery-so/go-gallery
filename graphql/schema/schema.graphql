@@ -50,13 +50,15 @@ interface Error {
 }
 
 type GalleryUser implements Node {
-  id: ID!
-  dbid: DBID!
-  username: String
-  bio: String
+    id: ID!
+    dbid: DBID!
+    username: String
+    bio: String
   wallets: [Wallet] @goField(forceResolver: true)
-  galleries: [Gallery] @goField(forceResolver: true)
-  isAuthenticatedUser: Boolean
+    galleries: [Gallery] @goField(forceResolver: true)
+    isAuthenticatedUser: Boolean
+    followers: [GalleryUser] @goField(forceResolver: true)
+    following: [GalleryUser] @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -238,6 +240,9 @@ type Nft implements Node {
   # struct and may ultimately end up elsewhere
   creatorAddress: Address @goField(forceResolver: true)
   openseaCollectionName: String
+
+    # temporary field while we're dependent on opensea
+    openseaId: Int
 }
 
 type OwnerAtBlock {
@@ -278,29 +283,22 @@ type Gallery implements Node {
   collections: [Collection] @goField(forceResolver: true)
 }
 
-type MembershipOwner {
-  dbid: DBID!
-  address: EthereumAddress
-  user: GalleryUser @goField(forceResolver: true)
-  previewNfts: [String]
+type TokenHolder @goEmbedHelper {
+    addresses: [Address]
+    user: GalleryUser @goField(forceResolver: true)
+    previewNfts: [String]
 }
 
 type MembershipTier implements Node {
-  id: ID!
-  dbid: DBID!
-  name: String
-  assetUrl: String
-  tokenId: String
-  owners: [MembershipOwner]
+    id: ID!
+    dbid: DBID!
+    name: String
+    assetUrl: String
+    tokenId: String
+    owners: [TokenHolder]
 }
 
-type CommunityOwner {
-    address: Wallet 
-    username: String
-}
-
-type Community implements Node
-  @goGqlId(fields: ["contractAddress", "chain"]) {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
   id: ID!
 
   lastUpdated: Time
@@ -312,7 +310,7 @@ type Community implements Node
   description: String
   previewImage: String
 
-  owners: [CommunityOwner]
+    owners: [TokenHolder]
 }
 
 # We have this extra type in case we need to stick authed data
@@ -326,6 +324,8 @@ type Viewer {
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
+union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
@@ -352,11 +352,12 @@ type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
   userByUsername(username: String!): UserByUsernameOrError
-  membershipTiers(forceRefresh: Boolean): [MembershipTier]
-  collectionById(id: DBID!): CollectionByIdOrError
-  nftById(id: DBID!): NftByIdOrError
-  collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(communityAddress: Address!, chain: Chain!): CommunityByAddressOrError
+    userById(id: DBID!): UserByIdOrError
+    membershipTiers(forceRefresh: Boolean): [MembershipTier]
+    collectionById(id: DBID!): CollectionByIdOrError
+    nftById(id: DBID!): NftByIdOrError
+    collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
+  communityByAddress(communityAddress: Address!, chain: Chain!, forceRefresh: Boolean): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
 }
 
@@ -621,6 +622,28 @@ type CreateUserPayload {
    viewer: Viewer
 }
 
+union FollowUserPayloadOrError =
+    FollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+union UnfollowUserPayloadOrError =
+    UnfollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+type FollowUserPayload {
+    viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
+}
+
+type UnfollowUserPayload {
+    viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
+}
+
 type Mutation {
   # User Mutations
   addUserAddress(
@@ -666,7 +689,10 @@ type Mutation {
     chain: Chain!
   ): GetAuthNoncePayloadOrError
 
-  createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
-  login(authMechanism: AuthMechanism!): LoginPayloadOrError
-  logout: LogoutPayload
+    createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+    login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    logout: LogoutPayload
+
+    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 }
