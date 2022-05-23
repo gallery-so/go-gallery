@@ -15,7 +15,6 @@ import (
 type UserRepository struct {
 	db                    *sql.DB
 	updateInfoStmt        *sql.Stmt
-	existsByAddressStmt   *sql.Stmt
 	createStmt            *sql.Stmt
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
@@ -40,9 +39,6 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	defer cancel()
 
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
-	checkNoErr(err)
-
-	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT 1 FROM users WHERE EXISTS(SELECT 1 FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES) VALUES ($1, $2) RETURNING ID;`)
@@ -91,14 +87,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	checkNoErr(err)
 
 	return &UserRepository{
-		db:                  db,
-		updateInfoStmt:      updateInfoStmt,
-		existsByAddressStmt: existsByAddressStmt,
-		createStmt:          createStmt,
-		getByIDStmt:         getByIDStmt,
-		getByAddressStmt:    getByAddressStmt,
-		getByUsernameStmt:   getByUsernameStmt,
-		deleteStmt:          deleteStmt,
+		db:                db,
+		updateInfoStmt:    updateInfoStmt,
+		createStmt:        createStmt,
+		getByIDStmt:       getByIDStmt,
+		getByAddressStmt:  getByAddressStmt,
+		getByUsernameStmt: getByUsernameStmt,
+		deleteStmt:        deleteStmt,
 
 		getGalleriesStmt:      getGalleriesStmt,
 		updateCollectionsStmt: updateCollectionsStmt,
