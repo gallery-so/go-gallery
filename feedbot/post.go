@@ -23,8 +23,10 @@ type Query struct {
 	CollectionID      persist.DBID
 	CollectionName    string
 	CollectionNfts    []struct {
-		Id   string
-		Name string
+		Nft struct {
+			Dbid persist.DBID
+			Name string
+		}
 	}
 	CollectionCollectorsNote string
 	FollowedUserID           persist.DBID
@@ -90,27 +92,24 @@ func newFeed() *Feed {
 
 func (f *Feed) postMatches(post *Post, q Query) bool {
 	for _, c := range post.rule {
-
 		key := fmt.Sprintf("%s:%s", q.EventID, c.name)
-		matching, ok := f.cache[key]
 
-		if !ok {
-			matching = c.eval(q)
+		if _, ok := f.cache[key]; !ok {
 			f.mu.Lock()
-			f.cache[key] = matching
+			f.cache[key] = c.eval(q)
 			f.mu.Unlock()
 		}
 
-		logger.For(nil).Debugf("%s:%s evaluated query as: %v", post.name, c.name, matching)
+		logger.For(nil).Debugf("%s:%s evaluated query as: %v", post.name, c.name, f.cache[key])
 
-		if !matching {
+		if !f.cache[key] {
 			return false
 		}
 	}
 	return true
 }
 
-func (f *Feed) Handle(ctx context.Context, q Query) (bool, error) {
+func (f *Feed) SearchFor(ctx context.Context, q Query) (bool, error) {
 	logger.For(ctx).Debugf("handling query: %s", q)
 
 	var posts []*Post
@@ -218,7 +217,7 @@ func newCollectionCreatedPost(criteria Criteria, baseRule []Criterion) *Post {
 			renderQuery: func(q Query) string {
 				var message string
 				if q.CollectionName != "" {
-					message = fmt.Sprintf("**%s** created a collection, *%s*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
+					message = fmt.Sprintf("**%s** created a collection titled '*%s'*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
 				} else {
 					message = fmt.Sprintf("**%s** created a collection: %s", q.Username, collectionURL(q.Username, q.CollectionID.String()))
 				}
@@ -240,7 +239,7 @@ func newCollectionCollectorsNoteAddedPost(criteria Criteria, baseRule []Criterio
 			renderQuery: func(q Query) string {
 				var message string
 				if q.CollectionName != "" {
-					message = fmt.Sprintf("**%s** added a collector's note to *%s*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
+					message = fmt.Sprintf("**%s** added a collector's note to their collection, *%s*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
 				} else {
 					message = fmt.Sprintf("**%s** added a collector's note to their collection: %s", q.Username, collectionURL(q.Username, q.CollectionID.String()))
 				}
@@ -264,40 +263,52 @@ func newCollectionTokensAddedPost(criteria Criteria, baseRule []Criterion) *Post
 				var tokensAdded int
 				var tokenName string
 
-				for _, nft := range q.CollectionNfts {
-					contains := false
-					for _, otherId := range q.LastCollectionEvent.Data.NFTs {
-						if nft.Id == otherId.String() {
-							contains = true
-							break
+				if q.LastCollectionEvent != nil {
+					for _, nft := range q.CollectionNfts {
+						contains := false
+						for _, otherId := range q.LastCollectionEvent.Data.NFTs {
+							if nft.Nft.Dbid == otherId {
+								contains = true
+								break
+							}
+						}
+						if !contains {
+							tokensAdded++
+							if tokenName == "" && nft.Nft.Name != "" {
+								tokenName = nft.Nft.Name
+							}
 						}
 					}
-					if !contains {
-						tokensAdded++
-						if tokenName == "" && nft.Name != "" {
-							tokenName = nft.Name
+				} else {
+					tokensAdded = len(q.CollectionNfts)
+
+					for _, nft := range q.CollectionNfts {
+						if nft.Nft.Name != "" {
+							tokenName = nft.Nft.Name
+							break
 						}
 					}
 				}
 
 				url := collectionURL(q.Username, q.CollectionID.String())
 				var message string
+
 				if q.CollectionName != "" && tokenName != "" {
-					message := fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
+					message = fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
 					if tokensAdded == 1 {
-						message += fmt.Sprintf("to *%s*: %s", q.CollectionName, url)
+						message += fmt.Sprintf("to their collection, *%s*: %s", q.CollectionName, url)
 					} else {
-						message += fmt.Sprintf("and %v other NFT(s) to their collection: %s", tokensAdded-1, url)
+						message += fmt.Sprintf("and %v other NFT(s) to their collection, *%s*: %s", tokensAdded-1, q.CollectionName, url)
 					}
 				} else if q.CollectionName == "" && tokenName != "" {
-					message := fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
+					message = fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
 					if tokensAdded == 1 {
 						message += fmt.Sprintf("to their collection: %s", url)
 					} else {
 						message += fmt.Sprintf("and %v other NFT(s) to their collection: %s", tokensAdded-1, url)
 					}
 				} else if q.CollectionName != "" && tokenName == "" {
-					message = fmt.Sprintf("**%s** added %v NFT(s) to *%s*: %s", q.Username, tokensAdded, q.CollectionName, url)
+					message = fmt.Sprintf("**%s** added %v NFT(s) to their collection, *%s*: %s", q.Username, tokensAdded, q.CollectionName, url)
 				} else {
 					message = fmt.Sprintf("**%s** added %v NFT(s) to their collection: %s", q.Username, tokensAdded, url)
 				}

@@ -197,7 +197,7 @@ func collectionHasNewTokensAdded(q Query) bool {
 	for _, nft := range q.CollectionNfts {
 		contains := false
 		for _, otherId := range q.LastCollectionEvent.Data.NFTs {
-			if nft.Id == otherId.String() {
+			if nft.Nft.Dbid == otherId {
 				contains = true
 				break
 			}

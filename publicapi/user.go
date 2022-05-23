@@ -268,7 +268,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 
 	// Send event
 	userData := persist.UserEvent{FollowedUserID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
 
 	return err
 }

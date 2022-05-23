@@ -45,10 +45,12 @@ type CollectionQueryForQuery struct {
 				}
 			}
 			Nfts []struct {
-				Id   string
-				Name string
+				Nft struct {
+					Dbid persist.DBID
+					Name string
+				}
 			}
-		} `graphql:":...on Collection"`
+		} `graphql:"...on Collection"`
 	} `graphql:"collectionById(id: $id)"`
 }
 
@@ -72,7 +74,7 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 		feed := newFeed()
 
 		logger.For(ctx).Debugf("handling event(%s)", msg.ID)
-		handled, err := feed.Handle(ctx, query)
+		handled, err := feed.SearchFor(ctx, query)
 
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
