@@ -20,6 +20,7 @@ type CommunityTokenRepository struct {
 
 	getInfoStmt             *sql.Stmt
 	getUserByAddressStmt    *sql.Stmt
+	getUserByWalletIDStmt   *sql.Stmt
 	getContractStmt         *sql.Stmt
 	getWalletByDetailsStmt  *sql.Stmt
 	getAddressByDetailsStmt *sql.Stmt
@@ -45,6 +46,9 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getUserByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
+	getUserByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE WALLETS @> ARRAY[$1]:: varchar[] AND DELETED = false`)
+	checkNoErr(err)
+
 	getContractStmt, err := db.PrepareContext(ctx, `SELECT NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
 	checkNoErr(err)
 
@@ -57,7 +61,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getAddressByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN FROM addresses WHERE ID = $1;`)
 	checkNoErr(err)
 
-	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM nfts WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNER_ADDRESS = ANY($2) AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
+	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNER_ADDRESSES && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &CommunityTokenRepository{
@@ -65,6 +69,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 		db:                      db,
 		getInfoStmt:             getInfoStmt,
 		getUserByAddressStmt:    getUserByAddressStmt,
+		getUserByWalletIDStmt:   getUserByWalletIDStmt,
 		getContractStmt:         getContractStmt,
 		getWalletByDetailsStmt:  getWalletByDetailsStmt,
 		getAddressByDetailsStmt: getAddressByDetailsStmt,
@@ -157,9 +162,9 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 
 		var username persist.NullString
 		var userID persist.DBID
-		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&userID, &username)
+		err := c.getUserByWalletIDStmt.QueryRowContext(ctx, wallet.ID).Scan(&userID, &username)
 		if err != nil {
-			logrus.Warnf("error getting member of community '%s' by address '%s': %s", pAddress, address, err)
+			logrus.Warnf("error getting member of community '%s' by wallet ID '%s': %s", pAddress, address, err)
 			continue
 		}
 
