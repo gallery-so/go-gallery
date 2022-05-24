@@ -35,9 +35,8 @@ type CollectionTokenRepository struct {
 	removeNFTFromCollectionsStmt *sql.Stmt
 	getNFTsForAddressStmt        *sql.Stmt
 	deleteCollectionStmt         *sql.Stmt
-	getUserAddressesStmt         *sql.Stmt
-	checkOwnNFTsStmt             *sql.Stmt
 	getUserWalletsStmt           *sql.Stmt
+	checkOwnNFTsStmt             *sql.Stmt
 }
 
 // NewCollectionTokenRepository creates a new CollectionTokenRepository
@@ -102,13 +101,13 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT a.ID FROM users u, unnest(u.ADDRESSES) WITH ORDINALITY AS d(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet LEFT JOIN addresses a on a.ID = w.ADDRESS WHERE u.ID = $1;`)
+	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT w.ID FROM users u, unnest(u.ADDRESSES) WITH ORDINALITY AS d(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet WHERE u.ID = $1;`)
 	checkNoErr(err)
 
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_USER_ID = $1 AND ID = ANY($2);`)
 	checkNoErr(err)
 
-	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserAddressesStmt: getUserAddressesStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
+	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserWalletsStmt: getUserWalletsStmt, checkOwnNFTsStmt: checkOwnNFTsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
 }
 
 // Create creates a new collection in the database
@@ -415,7 +414,7 @@ func (c *CollectionTokenRepository) RemoveNFTsOfOldAddresses(pCtx context.Contex
 	}
 
 	var walletIDs []persist.DBID
-	if err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&walletIDs)); err != nil {
+	if err := c.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&walletIDs)); err != nil {
 		return err
 	}
 
@@ -451,7 +450,7 @@ func (c *CollectionTokenRepository) Delete(pCtx context.Context, pID persist.DBI
 
 func ensureTokensOwnedByUser(pCtx context.Context, c *CollectionTokenRepository, pUserID persist.DBID, nfts []persist.DBID) error {
 	var addresses []persist.EthereumAddress
-	err := c.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
+	err := c.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return err
 	}

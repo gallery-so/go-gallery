@@ -30,6 +30,10 @@ overrides:
   - column: "nfts.contract"
     go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
 
+  # Tokens
+  - column: "tokens.owner_addresses"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+
   # Membership
   - column: "membership.owners"
     go_type: "github.com/mikeydub/go-gallery/service/persist.TokenHolderList"

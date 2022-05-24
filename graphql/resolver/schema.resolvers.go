@@ -510,7 +510,7 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveNftsByWalletID(ctx, obj.Dbid)
 }
 
 // Collection returns generated.CollectionResolver implementation.

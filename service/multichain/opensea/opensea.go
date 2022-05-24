@@ -152,7 +152,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	if err != nil {
 		return nil, err
 	}
-	return assetsToTokens(ctx, assets, p.ethClient)
+	return assetsToTokens(ctx, address, assets, p.ethClient)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
@@ -161,7 +161,8 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	if err != nil {
 		return nil, err
 	}
-	return assetsToTokens(ctx, assets, p.ethClient)
+	// TODO: Fill in this address or change something else
+	return assetsToTokens(ctx, "", assets, p.ethClient)
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
@@ -170,7 +171,8 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.T
 	if err != nil {
 		return nil, err
 	}
-	return assetsToTokens(ctx, assets, p.ethClient)
+	// TODO: Fill in this address or change something else
+	return assetsToTokens(ctx, "", assets, p.ethClient)
 }
 
 // GetContractByAddress returns a contract for a contract address
@@ -524,7 +526,7 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return response, nil
 }
 
-func assetsToTokens(ctx context.Context, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, error) {
+func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, err
@@ -567,7 +569,7 @@ func assetsToTokens(ctx context.Context, openseaNfts []Asset, ethClient *ethclie
 			Description:     nft.Description,
 			TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
 			TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-			OwnerAddress:    persist.Address(nft.Owner.Address.String()),
+			OwnerAddress:    address,
 			ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
 			ExternalURL:     nft.ExternalURL,
 			BlockNumber:     persist.BlockNumber(block),

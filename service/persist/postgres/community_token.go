@@ -21,6 +21,7 @@ type CommunityTokenRepository struct {
 
 	getInfoStmt            *sql.Stmt
 	getUserByAddressStmt   *sql.Stmt
+	getUserByWalletIDStmt  *sql.Stmt
 	getContractStmt        *sql.Stmt
 	getWalletByDetailsStmt *sql.Stmt
 	getPreviewNFTsStmt     *sql.Stmt
@@ -61,6 +62,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 		db:                     db,
 		getInfoStmt:            getInfoStmt,
 		getUserByAddressStmt:   getUserByAddressStmt,
+		getUserByWalletIDStmt:  getUserByWalletIDStmt,
 		getContractStmt:        getContractStmt,
 		getWalletByDetailsStmt: getWalletByDetailsStmt,
 		getPreviewNFTsStmt:     getPreviewNFTsStmt,

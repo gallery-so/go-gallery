@@ -265,7 +265,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     CHAIN int
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS, CHAIN);
 
 CREATE TABLE IF NOT EXISTS follows (
     ID varchar(255) PRIMARY KEY,

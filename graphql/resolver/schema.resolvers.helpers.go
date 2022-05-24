@@ -253,6 +253,16 @@ func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, err
 	return nftToModel(ctx, *nft), nil
 }
 
+func resolveNftsByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Nft, error) {
+	tokens, err := publicapi.For(ctx).Nft.GetTokensByWalletID(ctx, walletID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nftsToModel(ctx, tokens), nil
+}
+
 func resolveNftsByUserID(ctx context.Context, userId persist.DBID) ([]*model.Nft, error) {
 	nfts, err := publicapi.For(ctx).Nft.GetNftsByUserID(ctx, userId)
 
@@ -427,10 +437,12 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 }
 
 func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
+	chain := persist.Chain(wallet.Chain.Int32)
 	return &model.Wallet{
 		Dbid:       wallet.ID,
 		WalletType: &wallet.WalletType,
-		Address:    nil, // handled by dedicated resolver
+		Address:    &wallet.Address,
+		Chain:      &chain,
 		Nfts:       nil, // handled by dedicated resolver
 	}
 }

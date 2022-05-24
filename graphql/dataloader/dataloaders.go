@@ -65,6 +65,7 @@ type Loaders struct {
 	ContractByAddressDetails ContractLoaderByAddressDetails
 	FollowersByUserId        FollowersLoaderById
 	FollowingByUserId        FollowingLoaderById
+	TokensByWalletId         TokenLoaderByManyID
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -172,6 +173,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadFollowingByUserId(ctx, loaders, q),
+	}
+
+	loaders.TokensByWalletId = TokenLoaderByManyID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadNftsByWalletId(ctx, loaders, q),
 	}
 
 	return loaders
@@ -711,5 +718,34 @@ func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		})
 
 		return following, errors
+	}
+}
+
+func loadNftsByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(walletIds []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		convertedIds := make([]interface{}, len(walletIds))
+		for i, id := range walletIds {
+			convertedIds[i] = id
+		}
+
+		b := q.GetNftsByWalletIdBatch(ctx, convertedIds)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i] = t
+			errors[i] = err
+
+			// Add results to the NftByNftId loader's cache
+			if errors[i] == nil {
+				//for _, nft := range tokens[i] {
+				//loaders.NftByNftId.Prime(nft.ID, nft)
+				//}
+			}
+		})
+
+		return tokens, errors
 	}
 }

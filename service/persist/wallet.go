@@ -113,7 +113,7 @@ func (n *Address) Scan(value interface{}) error {
 		*n = Address("")
 		return nil
 	}
-	*n = Address(value.([]uint8))
+	*n = Address(value.(string))
 	return nil
 }
 

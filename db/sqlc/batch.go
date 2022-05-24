@@ -776,6 +776,76 @@ func (b *GetNftsByOwnerAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getNftsByWalletIdBatch = `-- name: GetNftsByWalletIdBatch :batchmany
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE $1 = ANY(owner_addresses) AND deleted = false
+`
+
+type GetNftsByWalletIdBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetNftsByWalletIdBatch(ctx context.Context, dollar_1 []interface{}) *GetNftsByWalletIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range dollar_1 {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getNftsByWalletIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetNftsByWalletIdBatchBatchResults{br, 0}
+}
+
+func (b *GetNftsByWalletIdBatchBatchResults) Query(f func(int, []Token, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Token
+		for rows.Next() {
+			var i Token
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.Name,
+				&i.Description,
+				&i.ContractAddress,
+				&i.CollectorsNote,
+				&i.Media,
+				&i.Chain,
+				&i.TokenUri,
+				&i.TokenType,
+				&i.TokenID,
+				&i.Quantity,
+				&i.OwnershipHistory,
+				&i.TokenMetadata,
+				&i.ExternalUrl,
+				&i.BlockNumber,
+				&i.OwnerUserID,
+				&i.OwnerAddresses,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetNftsByWalletIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getTokenByIDBatch = `-- name: GetTokenByIDBatch :batchone
 SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
 `

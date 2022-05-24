@@ -134,3 +134,6 @@ SELECT u.* FROM follows f
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false;
+
+-- name: GetNftsByWalletIdBatch :batchmany
+SELECT * FROM tokens WHERE $1 = ANY(owner_addresses) AND deleted = false;
