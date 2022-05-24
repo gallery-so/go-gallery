@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/lib/pq"
 	"time"
+
+	"github.com/lib/pq"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -18,14 +19,11 @@ type CommunityTokenRepository struct {
 	cache memstore.Cache
 	db    *sql.DB
 
-	getInfoStmt             *sql.Stmt
-	getUserByAddressStmt    *sql.Stmt
-	getUserByWalletIDStmt   *sql.Stmt
-	getContractStmt         *sql.Stmt
-	getWalletByDetailsStmt  *sql.Stmt
-	getAddressByDetailsStmt *sql.Stmt
-	getAddressByIDStmt      *sql.Stmt
-	getPreviewNFTsStmt      *sql.Stmt
+	getInfoStmt            *sql.Stmt
+	getUserByAddressStmt   *sql.Stmt
+	getContractStmt        *sql.Stmt
+	getWalletByDetailsStmt *sql.Stmt
+	getPreviewNFTsStmt     *sql.Stmt
 }
 
 // NewCommunityTokenRepository returns a new CommunityRepository
@@ -55,26 +53,17 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getWalletByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN,WALLET_TYPE FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS_VALUE,CHAIN FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false;`)
-	checkNoErr(err)
-
-	getAddressByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN FROM addresses WHERE ID = $1;`)
-	checkNoErr(err)
-
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNER_ADDRESSES && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &CommunityTokenRepository{
-		cache:                   cache,
-		db:                      db,
-		getInfoStmt:             getInfoStmt,
-		getUserByAddressStmt:    getUserByAddressStmt,
-		getUserByWalletIDStmt:   getUserByWalletIDStmt,
-		getContractStmt:         getContractStmt,
-		getWalletByDetailsStmt:  getWalletByDetailsStmt,
-		getAddressByDetailsStmt: getAddressByDetailsStmt,
-		getAddressByIDStmt:      getAddressByIDStmt,
-		getPreviewNFTsStmt:      getPreviewNFTsStmt,
+		cache:                  cache,
+		db:                     db,
+		getInfoStmt:            getInfoStmt,
+		getUserByAddressStmt:   getUserByAddressStmt,
+		getContractStmt:        getContractStmt,
+		getWalletByDetailsStmt: getWalletByDetailsStmt,
+		getPreviewNFTsStmt:     getPreviewNFTsStmt,
 	}
 }
 
