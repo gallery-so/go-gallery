@@ -11,19 +11,17 @@ import (
 )
 
 type DebugAuthenticator struct {
-	UserID    persist.DBID
-	Addresses []persist.Address
-	Chains    []persist.Chain
+	UserID         persist.DBID
+	ChainAddresses []persist.ChainAddress
 }
 
 func (d DebugAuthenticator) GetDescription() string {
-	return fmt.Sprintf("DebugAuthenticator(userId: %s, addresses: %v)", d.UserID, d.Addresses)
+	return fmt.Sprintf("DebugAuthenticator(userId: %s, addresses: %v)", d.UserID, d.ChainAddresses)
 }
 
-func NewDebugAuthenticator(userID persist.DBID, addresses []persist.Address, chains []persist.Chain) auth.Authenticator {
+func NewDebugAuthenticator(userID persist.DBID, chainAddresses []persist.ChainAddress) auth.Authenticator {
 	return DebugAuthenticator{
-		UserID:    userID,
-		Addresses: addresses,
-		Chains:    chains,
+		UserID:         userID,
+		ChainAddresses: chainAddresses,
 	}
 }

@@ -30,12 +30,16 @@ type WalletType int
 
 type WalletList []Wallet
 
-// AddressValue represents the value of an address
+// Address represents the value of an address
 type Address string
 
-type AddressDetails struct {
-	AddressValue Address `json:"address"`
-	Chain        Chain   `json:"chain"`
+type ChainAddress struct {
+	Address Address `json:"address"`
+	Chain   Chain   `json:"chain"`
+}
+
+func (c ChainAddress) String() string {
+	return fmt.Sprintf("%d:%s", c.Chain, c.Address)
 }
 
 const (
@@ -48,8 +52,8 @@ const (
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
 	GetByID(context.Context, DBID) (Wallet, error)
-	GetByAddressDetails(context.Context, Address, Chain) (Wallet, error)
-	Insert(context.Context, Address, Chain, WalletType) (DBID, error)
+	GetByChainAddress(context.Context, ChainAddress) (Wallet, error)
+	Insert(context.Context, ChainAddress, WalletType) (DBID, error)
 }
 
 func (l WalletList) Value() (driver.Value, error) {
@@ -121,10 +125,9 @@ type ErrWalletNotFoundByID struct {
 	WalletID DBID
 }
 
-// ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination
-type ErrWalletNotFoundByAddressDetails struct {
-	Address Address
-	Chain   Chain
+// ErrWalletNotFoundByChainAddress is an error type for when a wallet is not found by address and chain unique combination
+type ErrWalletNotFoundByChainAddress struct {
+	ChainAddress ChainAddress
 }
 
 // ErrWalletNotFoundByAddress is an error type for when a wallet is not found by address's ID
@@ -136,8 +139,8 @@ func (e ErrWalletNotFoundByID) Error() string {
 	return fmt.Sprintf("wallet not found by id: %s", e.WalletID)
 }
 
-func (e ErrWalletNotFoundByAddressDetails) Error() string {
-	return fmt.Sprintf("wallet not found by address details: %s | chain: %s", e.Address, e.Chain)
+func (e ErrWalletNotFoundByChainAddress) Error() string {
+	return fmt.Sprintf("wallet not found by chain address: %s | chain: %d", e.ChainAddress.Address, e.ChainAddress.Chain)
 }
 
 func (e ErrWalletNotFoundByAddress) Error() string {

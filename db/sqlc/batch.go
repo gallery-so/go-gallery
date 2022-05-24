@@ -127,34 +127,34 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getContractByDetailsBatch = `-- name: GetContractByDetailsBatch :batchone
+const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
 select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetContractByDetailsBatchBatchResults struct {
+type GetContractByChainAddressBatchBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-type GetContractByDetailsBatchParams struct {
+type GetContractByChainAddressBatchParams struct {
 	Address sql.NullString
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetContractByDetailsBatch(ctx context.Context, arg []GetContractByDetailsBatchParams) *GetContractByDetailsBatchBatchResults {
+func (q *Queries) GetContractByChainAddressBatch(ctx context.Context, arg []GetContractByChainAddressBatchParams) *GetContractByChainAddressBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Address,
 			a.Chain,
 		}
-		batch.Queue(getContractByDetailsBatch, vals...)
+		batch.Queue(getContractByChainAddressBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetContractByDetailsBatchBatchResults{br, 0}
+	return &GetContractByChainAddressBatchBatchResults{br, 0}
 }
 
-func (b *GetContractByDetailsBatchBatchResults) QueryRow(f func(int, Contract, error)) {
+func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contract, error)) {
 	for {
 		row := b.br.QueryRow()
 		var i Contract
@@ -181,7 +181,7 @@ func (b *GetContractByDetailsBatchBatchResults) QueryRow(f func(int, Contract, e
 	}
 }
 
-func (b *GetContractByDetailsBatchBatchResults) Close() error {
+func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -1128,34 +1128,34 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getWalletByAddressDetailsBatch = `-- name: GetWalletByAddressDetailsBatch :batchone
+const getWalletByChainAddressBatch = `-- name: GetWalletByChainAddressBatch :batchone
 SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetWalletByAddressDetailsBatchBatchResults struct {
+type GetWalletByChainAddressBatchBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-type GetWalletByAddressDetailsBatchParams struct {
+type GetWalletByChainAddressBatchParams struct {
 	Address persist.Address
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetWalletByAddressDetailsBatch(ctx context.Context, arg []GetWalletByAddressDetailsBatchParams) *GetWalletByAddressDetailsBatchBatchResults {
+func (q *Queries) GetWalletByChainAddressBatch(ctx context.Context, arg []GetWalletByChainAddressBatchParams) *GetWalletByChainAddressBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Address,
 			a.Chain,
 		}
-		batch.Queue(getWalletByAddressDetailsBatch, vals...)
+		batch.Queue(getWalletByChainAddressBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetWalletByAddressDetailsBatchBatchResults{br, 0}
+	return &GetWalletByChainAddressBatchBatchResults{br, 0}
 }
 
-func (b *GetWalletByAddressDetailsBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
+func (b *GetWalletByChainAddressBatchBatchResults) QueryRow(f func(int, Wallet, error)) {
 	for {
 		row := b.br.QueryRow()
 		var i Wallet
@@ -1179,7 +1179,7 @@ func (b *GetWalletByAddressDetailsBatchBatchResults) QueryRow(f func(int, Wallet
 	}
 }
 
-func (b *GetWalletByAddressDetailsBatchBatchResults) Close() error {
+func (b *GetWalletByChainAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 

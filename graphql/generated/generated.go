@@ -62,11 +62,6 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
-	AddressDetails struct {
-		Address func(childComplexity int) int
-		Chain   func(childComplexity int) int
-	}
-
 	AudioMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
@@ -77,6 +72,11 @@ type ComplexityRoot struct {
 	AuthNonce struct {
 		Nonce      func(childComplexity int) int
 		UserExists func(childComplexity int) int
+	}
+
+	ChainAddress struct {
+		Address func(childComplexity int) int
+		Chain   func(childComplexity int) int
 	}
 
 	Collection struct {
@@ -264,16 +264,16 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserAddress           func(childComplexity int, address persist.Address, chain persist.Chain, authMechanism model.AuthMechanism) int
+		AddUserAddress           func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		FollowUser               func(childComplexity int, userID persist.DBID) int
-		GetAuthNonce             func(childComplexity int, address persist.Address, chain persist.Chain) int
+		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
-		RefreshTokens            func(childComplexity int, addresses []*persist.Address, chains []*persist.Chain) int
-		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address, chains []persist.Chain) int
+		RefreshTokens            func(childComplexity int) int
+		RemoveUserAddresses      func(childComplexity int, chainAddresses []*persist.ChainAddress) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
@@ -323,7 +323,7 @@ type ComplexityRoot struct {
 	Query struct {
 		CollectionByID     func(childComplexity int, id persist.DBID) int
 		CollectionNftByID  func(childComplexity int, nftID persist.DBID, collectionID persist.DBID) int
-		CommunityByAddress func(childComplexity int, communityAddress persist.Address, chain persist.Chain, forceRefresh *bool) int
+		CommunityByAddress func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		GeneralAllowlist   func(childComplexity int) int
 		MembershipTiers    func(childComplexity int, forceRefresh *bool) int
 		NftByID            func(childComplexity int, id persist.DBID) int
@@ -443,8 +443,8 @@ type GalleryUserResolver interface {
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 }
 type MutationResolver interface {
-	AddUserAddress(ctx context.Context, address persist.Address, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
-	RemoveUserAddresses(ctx context.Context, addresses []persist.Address, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error)
+	AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
+	RemoveUserAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.RemoveUserAddressesPayloadOrError, error)
 	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
@@ -452,8 +452,8 @@ type MutationResolver interface {
 	UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error)
 	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
 	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
-	RefreshTokens(ctx context.Context, addresses []*persist.Address, chains []*persist.Chain) (model.RefreshTokensPayloadOrError, error)
-	GetAuthNonce(ctx context.Context, address persist.Address, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error)
+	RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error)
+	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
@@ -480,7 +480,7 @@ type QueryResolver interface {
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
 	NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error)
 	CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error)
-	CommunityByAddress(ctx context.Context, communityAddress persist.Address, chain persist.Chain, forceRefresh *bool) (model.CommunityByAddressOrError, error)
+	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error)
 }
 type TokenHolderResolver interface {
@@ -519,20 +519,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AddUserAddressPayload.Viewer(childComplexity), true
-
-	case "AddressDetails.address":
-		if e.complexity.AddressDetails.Address == nil {
-			break
-		}
-
-		return e.complexity.AddressDetails.Address(childComplexity), true
-
-	case "AddressDetails.chain":
-		if e.complexity.AddressDetails.Chain == nil {
-			break
-		}
-
-		return e.complexity.AddressDetails.Chain(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -575,6 +561,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
+
+	case "ChainAddress.address":
+		if e.complexity.ChainAddress.Address == nil {
+			break
+		}
+
+		return e.complexity.ChainAddress.Address(childComplexity), true
+
+	case "ChainAddress.chain":
+		if e.complexity.ChainAddress.Chain == nil {
+			break
+		}
+
+		return e.complexity.ChainAddress.Chain(childComplexity), true
 
 	case "Collection.collectorsNote":
 		if e.complexity.Collection.CollectorsNote == nil {
@@ -1223,7 +1223,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddUserAddress(childComplexity, args["address"].(persist.Address), args["chain"].(persist.Chain), args["authMechanism"].(model.AuthMechanism)), true
+		return e.complexity.Mutation.AddUserAddress(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
@@ -1283,7 +1283,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["address"].(persist.Address), args["chain"].(persist.Chain)), true
+		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -1309,12 +1309,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_refreshTokens_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.RefreshTokens(childComplexity, args["addresses"].([]*persist.Address), args["chains"].([]*persist.Chain)), true
+		return e.complexity.Mutation.RefreshTokens(childComplexity), true
 
 	case "Mutation.removeUserAddresses":
 		if e.complexity.Mutation.RemoveUserAddresses == nil {
@@ -1326,7 +1321,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.Address), args["chains"].([]persist.Chain)), true
+		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["chainAddresses"].([]*persist.ChainAddress)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -1637,7 +1632,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.Address), args["chain"].(persist.Chain), args["forceRefresh"].(*bool)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
 	case "Query.generalAllowlist":
 		if e.complexity.Query.GeneralAllowlist == nil {
@@ -2083,7 +2078,6 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
-scalar EthereumAddress
 scalar DBID
 
 interface Node {
@@ -2099,7 +2093,7 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
-  wallets: [Wallet] @goField(forceResolver: true)
+    wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
@@ -2115,14 +2109,19 @@ type Wallet implements Node {
   nfts: [Nft] @goField(forceResolver: true)
 }
 
-type AddressDetails {
+type ChainAddress {
   address: Address
   chain: Chain
 }
 
+input ChainAddressInput {
+    address: Address!
+    chain: Chain!
+}
+
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-union GalleryUserOrAddress = GalleryUser | AddressDetails
+union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
@@ -2402,7 +2401,7 @@ type Query {
     collectionById(id: DBID!): CollectionByIdOrError
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(communityAddress: Address!, chain: Chain!, forceRefresh: Boolean): CommunityByAddressOrError
+  communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
 }
 
@@ -2619,8 +2618,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-  address: Address!
-  chain: Chain!
+  chainAddress: ChainAddressInput!
   nonce: String!
   signature: String! @scrub
 }
@@ -2629,8 +2627,7 @@ input EoaAuth {
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
-    chains: [Chain!]!
+    chainAddresses:[ChainAddressInput!]!
 }
 
 input GnosisSafeAuth {
@@ -2691,17 +2688,9 @@ type UnfollowUserPayload {
 
 type Mutation {
   # User Mutations
-  addUserAddress(
-    address: Address!
-    chain: Chain!
-    authMechanism: AuthMechanism!
-  ): AddUserAddressPayloadOrError @authRequired
-  removeUserAddresses(
-    addresses: [Address!]!
-    chains: [Chain!]!
-  ): RemoveUserAddressesPayloadOrError @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
-    @authRequired
+  addUserAddress(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
+  removeUserAddresses(chainAddresses: [ChainAddressInput!]!): RemoveUserAddressesPayloadOrError @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
@@ -2722,17 +2711,11 @@ type Mutation {
   ): UpdateCollectionNftsPayloadOrError @authRequired
 
   # Nft Mutations
-  updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError
-    @authRequired
+  updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
 
-  # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshTokens(addresses: [Address]!, chains: [Chain]!): RefreshTokensPayloadOrError
-    @authRequired
+  refreshTokens: RefreshTokensPayloadOrError @authRequired
 
-  getAuthNonce(
-    address: Address!
-    chain: Chain!
-  ): GetAuthNoncePayloadOrError
+  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
@@ -2767,33 +2750,24 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 func (ec *executionContext) field_Mutation_addUserAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
-	var arg1 persist.Chain
-	if tmp, ok := rawArgs["chain"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-		arg1, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chain"] = arg1
-	var arg2 model.AuthMechanism
+	args["chainAddress"] = arg0
+	var arg1 model.AuthMechanism
 	if tmp, ok := rawArgs["authMechanism"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
-		arg2, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
+		arg1, err = ec.unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["authMechanism"] = arg2
+	args["authMechanism"] = arg1
 	return args, nil
 }
 
@@ -2860,24 +2834,15 @@ func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
-	var arg1 persist.Chain
-	if tmp, ok := rawArgs["chain"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-		arg1, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chain"] = arg1
+	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -2896,51 +2861,18 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_refreshTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 []*persist.Address
-	if tmp, ok := rawArgs["addresses"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalNAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["addresses"] = arg0
-	var arg1 []*persist.Chain
-	if tmp, ok := rawArgs["chains"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
-		arg1, err = ec.unmarshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chains"] = arg1
-	return args, nil
-}
-
 func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []persist.Address
-	if tmp, ok := rawArgs["addresses"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, tmp)
+	var arg0 []*persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddresses"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
+		arg0, err = ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["addresses"] = arg0
-	var arg1 []persist.Chain
-	if tmp, ok := rawArgs["chains"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
-		arg1, err = ec.unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chains"] = arg1
+	args["chainAddresses"] = arg0
 	return args, nil
 }
 
@@ -3091,33 +3023,24 @@ func (ec *executionContext) field_Query_collectionNftById_args(ctx context.Conte
 func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
+	var arg0 persist.ChainAddress
 	if tmp, ok := rawArgs["communityAddress"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityAddress"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["communityAddress"] = arg0
-	var arg1 persist.Chain
-	if tmp, ok := rawArgs["chain"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-		arg1, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["chain"] = arg1
-	var arg2 *bool
+	var arg1 *bool
 	if tmp, ok := rawArgs["forceRefresh"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceRefresh"))
-		arg2, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["forceRefresh"] = arg2
+	args["forceRefresh"] = arg1
 	return args, nil
 }
 
@@ -3264,70 +3187,6 @@ func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, f
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _AddressDetails_address(ctx context.Context, field graphql.CollectedField, obj *model.AddressDetails) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "AddressDetails",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Address)
-	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _AddressDetails_chain(ctx context.Context, field graphql.CollectedField, obj *model.AddressDetails) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "AddressDetails",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Chain, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Chain)
-	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _AudioMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
@@ -3520,6 +3379,70 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	res := resTmp.(*bool)
 	fc.Result = res
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainAddress_address(ctx context.Context, field graphql.CollectedField, obj *model.ChainAddress) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainAddress",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Address, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainAddress_chain(ctx context.Context, field graphql.CollectedField, obj *model.ChainAddress) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainAddress",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Collection_id(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
@@ -6535,7 +6458,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.Address), args["chain"].(persist.Chain), args["authMechanism"].(model.AuthMechanism))
+			return ec.resolvers.Mutation().AddUserAddress(rctx, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6594,7 +6517,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.Address), args["chains"].([]persist.Chain))
+			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["chainAddresses"].([]*persist.ChainAddress))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -7056,17 +6979,10 @@ func (ec *executionContext) _Mutation_refreshTokens(ctx context.Context, field g
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_refreshTokens_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RefreshTokens(rctx, args["addresses"].([]*persist.Address), args["chains"].([]*persist.Chain))
+			return ec.resolvers.Mutation().RefreshTokens(rctx)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -7124,7 +7040,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["address"].(persist.Address), args["chain"].(persist.Chain))
+		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["chainAddress"].(persist.ChainAddress))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8650,7 +8566,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.Address), args["chain"].(persist.Chain), args["forceRefresh"].(*bool))
+		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -11236,6 +11152,37 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context, obj interface{}) (persist.ChainAddress, error) {
+	var it persist.ChainAddress
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "address":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			it.Address, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "chain":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+			it.Chain, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Context, obj interface{}) (model.CollectionLayoutInput, error) {
 	var it model.CollectionLayoutInput
 	asMap := map[string]interface{}{}
@@ -11361,12 +11308,12 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/service/persist.DBID`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
-		case "addresses":
+		case "chainAddresses":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
 			directive0 := func(ctx context.Context) (interface{}, error) {
-				return ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, v)
+				return ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
 				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
@@ -11383,42 +11330,12 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 			if err != nil {
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
-			if data, ok := tmp.([]persist.Address); ok {
-				it.Addresses = data
+			if data, ok := tmp.([]*persist.ChainAddress); ok {
+				it.ChainAddresses = data
 			} else if tmp == nil {
-				it.Addresses = nil
+				it.ChainAddresses = nil
 			} else {
-				err := fmt.Errorf(`unexpected type %T from directive, should be []github.com/mikeydub/go-gallery/service/persist.Address`, tmp)
-				return it, graphql.ErrorOnPath(ctx, err)
-			}
-		case "chains":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
-			directive0 := func(ctx context.Context) (interface{}, error) {
-				return ec.unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
-			}
-			directive1 := func(ctx context.Context) (interface{}, error) {
-				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
-				if err != nil {
-					return nil, err
-				}
-				if ec.directives.RestrictEnvironment == nil {
-					return nil, errors.New("directive restrictEnvironment is not implemented")
-				}
-				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
-			}
-
-			tmp, err := directive1(ctx)
-			if err != nil {
-				return it, graphql.ErrorOnPath(ctx, err)
-			}
-			if data, ok := tmp.([]persist.Chain); ok {
-				it.Chains = data
-			} else if tmp == nil {
-				it.Chains = nil
-			} else {
-				err := fmt.Errorf(`unexpected type %T from directive, should be []github.com/mikeydub/go-gallery/service/persist.Chain`, tmp)
+				err := fmt.Errorf(`unexpected type %T from directive, should be []*github.com/mikeydub/go-gallery/service/persist.ChainAddress`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
@@ -11436,19 +11353,11 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 
 	for k, v := range asMap {
 		switch k {
-		case "address":
+		case "chainAddress":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			it.Address, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "chain":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-			it.Chain, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			it.ChainAddress, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -12107,13 +12016,13 @@ func (ec *executionContext) _GalleryUserOrAddress(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._GalleryUser(ctx, sel, obj)
-	case model.AddressDetails:
-		return ec._AddressDetails(ctx, sel, &obj)
-	case *model.AddressDetails:
+	case model.ChainAddress:
+		return ec._ChainAddress(ctx, sel, &obj)
+	case *model.ChainAddress:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._AddressDetails(ctx, sel, obj)
+		return ec._ChainAddress(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12833,41 +12742,6 @@ func (ec *executionContext) _AddUserAddressPayload(ctx context.Context, sel ast.
 	return out
 }
 
-var addressDetailsImplementors = []string{"AddressDetails", "GalleryUserOrAddress"}
-
-func (ec *executionContext) _AddressDetails(ctx context.Context, sel ast.SelectionSet, obj *model.AddressDetails) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, addressDetailsImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("AddressDetails")
-		case "address":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AddressDetails_address(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "chain":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AddressDetails_chain(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var audioMediaImplementors = []string{"AudioMedia", "MediaSubtype", "Media"}
 
 func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSet, obj *model.AudioMedia) graphql.Marshaler {
@@ -12937,6 +12811,41 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 		case "userExists":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._AuthNonce_userExists(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var chainAddressImplementors = []string{"ChainAddress", "GalleryUserOrAddress"}
+
+func (ec *executionContext) _ChainAddress(ctx context.Context, sel ast.SelectionSet, obj *model.ChainAddress) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainAddressImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainAddress")
+		case "address":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainAddress_address(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainAddress_chain(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -16241,64 +16150,6 @@ func (ec *executionContext) marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
-func (ec *executionContext) unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, v interface{}) ([]persist.Address, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]persist.Address, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Address) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) unmarshalNAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) ([]*persist.Address, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]*persist.Address, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v []*persist.Address) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
-	}
-
-	return ret
-}
-
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -16339,16 +16190,21 @@ func (ec *executionContext) marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgallery
 	return v
 }
 
-func (ec *executionContext) unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, v interface{}) ([]persist.Chain, error) {
+func (ec *executionContext) unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (persist.ChainAddress, error) {
+	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, v interface{}) ([]*persist.ChainAddress, error) {
 	var vSlice []interface{}
 	if v != nil {
 		vSlice = graphql.CoerceList(v)
 	}
 	var err error
-	res := make([]persist.Chain, len(vSlice))
+	res := make([]*persist.ChainAddress, len(vSlice))
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		res[i], err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}
@@ -16356,103 +16212,9 @@ func (ec *executionContext) unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑga
 	return res, nil
 }
 
-func (ec *executionContext) marshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Chain) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) unmarshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) ([]*persist.Chain, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]*persist.Chain, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v []*persist.Chain) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
+func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (*persist.ChainAddress, error) {
+	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {

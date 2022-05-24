@@ -97,9 +97,8 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 	return tokens, nil
 }
 
-func (api TokenAPI) RefreshTokens(ctx context.Context, addresses []*persist.Address) error {
-	// No validation to do here -- addresses is an optional comma-separated list of addresses
-
+func (api TokenAPI) RefreshTokens(ctx context.Context) error {
+	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err

@@ -96,17 +96,17 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 			if m.Debug.UserID != nil {
 				userID = *m.Debug.UserID
 			}
-			return debugtools.NewDebugAuthenticator(userID, m.Debug.Addresses, m.Debug.Chains), nil
+			return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(m.Debug.ChainAddresses)), nil
 		}
 	}
 
-	if m.Eoa != nil {
-		return authApi.NewNonceAuthenticator(m.Eoa.Address, m.Eoa.Chain, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
+	if m.Eoa != nil && m.Eoa.ChainAddress != nil {
+		return authApi.NewNonceAuthenticator(*m.Eoa.ChainAddress, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return authApi.NewNonceAuthenticator(m.Eoa.Address, persist.ChainETH, m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
+		return authApi.NewNonceAuthenticator(persist.ChainAddress{Address: m.GnosisSafe.Address, Chain: persist.ChainETH}, m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -323,8 +323,8 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain, forceRefresh bool) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain, forceRefresh)
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
 
 	if err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress
 		return nil, err
 	}
 
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, persist.Chain(parsed), false)
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, persist.ChainAddress{Address: contractAddress, Chain: persist.Chain(parsed)}, false)
 
 	if err != nil {
 		return nil, err
@@ -571,7 +571,7 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 }
 
 func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
-	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByDetails(ctx, persist.Address(address.String()), persist.ChainETH)
+	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.ChainAddress{Address: persist.Address(address), Chain: persist.ChainETH})
 	chain := persist.Chain(dbWallet.Chain.Int32)
 	return &model.Wallet{
 		Dbid:       dbWallet.ID,
@@ -739,4 +739,16 @@ func getInvalidMedia(media persist.Media) model.InvalidMedia {
 		MediaType:        nil,
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
+}
+
+func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
+	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
+
+	for _, address := range chainAddresses {
+		if address != nil {
+			addresses = append(addresses, *address)
+		}
+	}
+
+	return addresses
 }

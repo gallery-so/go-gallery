@@ -79,7 +79,7 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
@@ -87,7 +87,7 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 		return nil, err
 	}
 
-	err = api.User.AddUserAddress(ctx, address, chain, authenticator)
+	err = api.User.AddUserAddress(ctx, chainAddress, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -99,10 +99,11 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.RemoveUserAddressesPayloadOrError, error) {
 	api := publicapi.For(ctx)
+	addresses := chainAddressPointersToChainAddresses(chainAddresses)
 
-	err := api.User.RemoveUserAddresses(ctx, addresses, chains)
+	err := api.User.RemoveUserAddresses(ctx, addresses)
 	if err != nil {
 		return nil, err
 	}
@@ -270,10 +271,10 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshTokens(ctx context.Context, addresses []*persist.Address, chains []*persist.Chain) (model.RefreshTokensPayloadOrError, error) {
+func (r *mutationResolver) RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Nft.RefreshTokens(ctx, addresses)
+	err := api.Nft.RefreshTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +286,8 @@ func (r *mutationResolver) RefreshTokens(ctx context.Context, addresses []*persi
 	return output, nil
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error) {
-	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, address, chain)
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
+	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -453,13 +454,13 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.Address, chain persist.Chain, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	refresh := false
 	if forceRefresh != nil {
 		refresh = *forceRefresh
 	}
 
-	return resolveCommunityByContractAddress(ctx, communityAddress, chain, refresh)
+	return resolveCommunityByContractAddress(ctx, communityAddress, refresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {

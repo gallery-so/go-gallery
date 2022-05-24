@@ -137,13 +137,6 @@ type AddUserAddressPayload struct {
 
 func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
 
-type AddressDetails struct {
-	Address *persist.Address `json:"address"`
-	Chain   *persist.Chain   `json:"chain"`
-}
-
-func (AddressDetails) IsGalleryUserOrAddress() {}
-
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
 	MediaURL         *string        `json:"mediaURL"`
@@ -166,6 +159,13 @@ type AuthNonce struct {
 }
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
+
+type ChainAddress struct {
+	Address *persist.Address `json:"address"`
+	Chain   *persist.Chain   `json:"chain"`
+}
+
+func (ChainAddress) IsGalleryUserOrAddress() {}
 
 type Collection struct {
 	Dbid           persist.DBID      `json:"dbid"`
@@ -237,9 +237,8 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
-	UserID    *persist.DBID     `json:"userId"`
-	Addresses []persist.Address `json:"addresses"`
-	Chains    []persist.Chain   `json:"chains"`
+	UserID         *persist.DBID           `json:"userId"`
+	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
 }
 
 type DeleteCollectionPayload struct {
@@ -249,10 +248,9 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type EoaAuth struct {
-	Address   persist.Address `json:"address"`
-	Chain     persist.Chain   `json:"chain"`
-	Nonce     string          `json:"nonce"`
-	Signature string          `json:"signature"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Nonce        string                `json:"nonce"`
+	Signature    string                `json:"signature"`
 }
 
 type ErrAuthenticationFailed struct {

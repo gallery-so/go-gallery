@@ -74,17 +74,17 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 	return items, nil
 }
 
-const getContractByDetails = `-- name: GetContractByDetails :one
+const getContractByChainAddress = `-- name: GetContractByChainAddress :one
 select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetContractByDetailsParams struct {
+type GetContractByChainAddressParams struct {
 	Address sql.NullString
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetContractByDetails(ctx context.Context, arg GetContractByDetailsParams) (Contract, error) {
-	row := q.db.QueryRow(ctx, getContractByDetails, arg.Address, arg.Chain)
+func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContractByChainAddressParams) (Contract, error) {
+	row := q.db.QueryRow(ctx, getContractByChainAddress, arg.Address, arg.Chain)
 	var i Contract
 	err := row.Scan(
 		&i.ID,
@@ -498,17 +498,17 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
-const getWalletByAddressDetails = `-- name: GetWalletByAddressDetails :one
+const getWalletByChainAddress = `-- name: GetWalletByChainAddress :one
 SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetWalletByAddressDetailsParams struct {
+type GetWalletByChainAddressParams struct {
 	Address persist.Address
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetWalletByAddressDetails(ctx context.Context, arg GetWalletByAddressDetailsParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByAddressDetails, arg.Address, arg.Chain)
+func (q *Queries) GetWalletByChainAddress(ctx context.Context, arg GetWalletByChainAddressParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByChainAddress, arg.Address, arg.Chain)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,

@@ -17,7 +17,7 @@ type UserRepository struct {
 	updateInfoStmt        *sql.Stmt
 	createStmt            *sql.Stmt
 	getByIDStmt           *sql.Stmt
-	getByAddressStmt      *sql.Stmt
+	getByWalletIDStmt     *sql.Stmt
 	getByUsernameStmt     *sql.Stmt
 	deleteStmt            *sql.Stmt
 	getGalleriesStmt      *sql.Stmt
@@ -47,7 +47,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(ADDRESSES) AND DELETED = false;`)
+	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(ADDRESSES) AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
@@ -91,7 +91,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		updateInfoStmt:    updateInfoStmt,
 		createStmt:        createStmt,
 		getByIDStmt:       getByIDStmt,
-		getByAddressStmt:  getByAddressStmt,
+		getByWalletIDStmt: getByWalletIDStmt,
 		getByUsernameStmt: getByUsernameStmt,
 		deleteStmt:        deleteStmt,
 
@@ -186,21 +186,21 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 	return user, nil
 }
 
-// GetByAddressDetails gets the user with the given address in their list of addresses
+// GetByChainAddress gets the user with the given address in their list of addresses
 // TODO use string and chain to get the user
-func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress persist.Address, pChain persist.Chain) (persist.User, error) {
+func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.User, error) {
 	var walletID persist.DBID
 
-	err := u.getWalletIDStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&walletID)
+	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address, pChainAddress.Chain).Scan(&walletID)
 	if err != nil {
 		return persist.User{}, err
 	}
 
 	var user persist.User
-	err = u.getByAddressStmt.QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err = u.getByWalletIDStmt.QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFound{Address: pAddress, Chain: pChain, WalletID: walletID}
+			return persist.User{}, persist.ErrUserNotFound{ChainAddress: pChainAddress, WalletID: walletID}
 		}
 		return persist.User{}, err
 	}
@@ -214,7 +214,7 @@ func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress pers
 func (u *UserRepository) GetByWallet(pCtx context.Context, pWallet persist.DBID) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByAddressStmt.QueryRowContext(pCtx, pWallet).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWallet).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{WalletID: pWallet}

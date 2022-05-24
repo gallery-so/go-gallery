@@ -21,13 +21,12 @@ type Community struct {
 
 // ErrCommunityNotFound is returned when a community is not found
 type ErrCommunityNotFound struct {
-	CommunityAddress Address
-	Chain            Chain
+	CommunityAddress ChainAddress
 }
 
 // CommunityRepository represents a repository for interacting with persisted communities
 type CommunityRepository interface {
-	GetByAddress(context.Context, Address, Chain, bool) (Community, error)
+	GetByAddress(context.Context, ChainAddress, bool) (Community, error)
 }
 
 func (e ErrCommunityNotFound) Error() string {

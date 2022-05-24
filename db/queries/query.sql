@@ -100,10 +100,10 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByAddressDetails :one
+-- name: GetWalletByChainAddress :one
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
--- name: GetWalletByAddressDetailsBatch :batchone
+-- name: GetWalletByChainAddressBatch :batchone
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
@@ -118,10 +118,10 @@ select * FROM contracts WHERE id = $1 AND deleted = false;
 -- name: GetContractByIDBatch :batchone
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByDetails :one
+-- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
--- name: GetContractByDetailsBatch :batchone
+-- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
 

@@ -38,7 +38,6 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
-scalar EthereumAddress
 scalar DBID
 
 interface Node {
@@ -54,7 +53,7 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
-  wallets: [Wallet] @goField(forceResolver: true)
+    wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
@@ -70,14 +69,19 @@ type Wallet implements Node {
   nfts: [Nft] @goField(forceResolver: true)
 }
 
-type AddressDetails {
+type ChainAddress {
   address: Address
   chain: Chain
 }
 
+input ChainAddressInput {
+    address: Address!
+    chain: Chain!
+}
+
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-union GalleryUserOrAddress = GalleryUser | AddressDetails
+union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
@@ -357,7 +361,7 @@ type Query {
     collectionById(id: DBID!): CollectionByIdOrError
     nftById(id: DBID!): NftByIdOrError
     collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(communityAddress: Address!, chain: Chain!, forceRefresh: Boolean): CommunityByAddressOrError
+  communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
 }
 
@@ -574,8 +578,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-  address: Address!
-  chain: Chain!
+  chainAddress: ChainAddressInput!
   nonce: String!
   signature: String! @scrub
 }
@@ -584,8 +587,7 @@ input EoaAuth {
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
-    chains: [Chain!]!
+    chainAddresses:[ChainAddressInput!]!
 }
 
 input GnosisSafeAuth {
@@ -646,17 +648,9 @@ type UnfollowUserPayload {
 
 type Mutation {
   # User Mutations
-  addUserAddress(
-    address: Address!
-    chain: Chain!
-    authMechanism: AuthMechanism!
-  ): AddUserAddressPayloadOrError @authRequired
-  removeUserAddresses(
-    addresses: [Address!]!
-    chains: [Chain!]!
-  ): RemoveUserAddressesPayloadOrError @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
-    @authRequired
+  addUserAddress(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
+  removeUserAddresses(chainAddresses: [ChainAddressInput!]!): RemoveUserAddressesPayloadOrError @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
@@ -677,17 +671,11 @@ type Mutation {
   ): UpdateCollectionNftsPayloadOrError @authRequired
 
   # Nft Mutations
-  updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError
-    @authRequired
+  updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
 
-  # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshTokens(addresses: [Address]!, chains: [Chain]!): RefreshTokensPayloadOrError
-    @authRequired
+  refreshTokens: RefreshTokensPayloadOrError @authRequired
 
-  getAuthNonce(
-    address: Address!
-    chain: Chain!
-  ): GetAuthNoncePayloadOrError
+  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
