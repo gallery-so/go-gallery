@@ -61,8 +61,6 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Media, error) {
 
-	pCtx, cancel := context.WithTimeout(pCtx, time.Minute*5)
-	defer cancel()
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
 	logrus.Infof("Making previews for %s", name)
@@ -73,7 +71,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	videoAsURI := persist.TokenURI(vURL)
 	logrus.Infof("asURI for %s: %s", name, imgAsURI)
 
-	res, err := mediaSVG(pCtx, videoAsURI, ipfsClient, arweaveClient)
+	res, err := preHandleSVG(pCtx, videoAsURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return res, err
 	}
@@ -82,7 +80,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		return res, nil
 	}
 
-	res, err = mediaSVG(pCtx, imgAsURI, ipfsClient, arweaveClient)
+	res, err = preHandleSVG(pCtx, imgAsURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return res, err
 	}
@@ -157,7 +155,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	return res, nil
 }
 
-func mediaSVG(pCtx context.Context, uri persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.Media, error) {
+func preHandleSVG(pCtx context.Context, uri persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.Media, error) {
 	res := persist.Media{}
 	switch uri.Type() {
 	case persist.URITypeBase64SVG:
