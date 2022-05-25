@@ -41,7 +41,6 @@ func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress p
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"chainAddress.Address": {chainAddress.Address(), "required"},
-		"chainAddress.Chain":   {chainAddress.Chain(), "required"},
 	}); err != nil {
 		return nil, err
 	}
