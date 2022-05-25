@@ -5,11 +5,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/lib/pq"
 	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/lib/pq"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/mikeydub/go-gallery/util"
@@ -344,6 +345,19 @@ func (c *Chain) Scan(src interface{}) error {
 		return nil
 	}
 	*c = Chain(src.(string))
+	return nil
+}
+
+// UnmarshalJSON will unmarshall the JSON data into the TokenMetadata struct
+func (c *Chain) UnmarshalJSON(data []byte) error {
+	var s int
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case 0:
+		*c = ChainETH
+	}
 	return nil
 }
 
