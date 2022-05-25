@@ -351,8 +351,14 @@ func (c *Chain) Scan(src interface{}) error {
 // UnmarshalJSON will unmarshall the JSON data into the TokenMetadata struct
 func (c *Chain) UnmarshalJSON(data []byte) error {
 	var s int
+	var asString string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return err
+		err = json.Unmarshal(data, &asString)
+		if err != nil {
+			return err
+		}
+		*c = Chain(asString)
+		return nil
 	}
 	switch s {
 	case 0:
