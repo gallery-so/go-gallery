@@ -298,7 +298,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 			if addr.String() != persist.ZeroAddress.String() {
 				logger.For(ctx).Debug("Event is to real address")
 				// does to have the NFT?
-				wallet, err := walletRepository.GetByChainAddress(ctx, persist.ChainAddress{Address: persist.Address(addr), Chain: persist.ChainETH})
+				wallet, err := walletRepository.GetByChainAddress(ctx, persist.NewChainAddress(persist.Address(addr), persist.ChainETH))
 				if err != nil {
 					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s: no wallet found for address", addr, id)
 					ownersChan <- persist.TokenHolder{}

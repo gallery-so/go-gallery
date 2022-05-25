@@ -191,7 +191,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.User, error) {
 	var walletID persist.DBID
 
-	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address, pChainAddress.Chain).Scan(&walletID)
+	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain()).Scan(&walletID)
 	if err != nil {
 		return persist.User{}, err
 	}

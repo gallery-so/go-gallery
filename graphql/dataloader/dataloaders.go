@@ -580,7 +580,7 @@ func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
-				loaders.WalletByChainAddress.Prime(persist.ChainAddress{Address: wallet.Address, Chain: persist.Chain(wallet.Chain.Int32)}, wallet)
+				loaders.WalletByChainAddress.Prime(persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)), wallet)
 			}
 
 			wallets[i], errors[i] = wallet, err
@@ -622,8 +622,8 @@ func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Que
 		sqlChainAddress := make([]sqlc.GetWalletByChainAddressBatchParams, len(chainAddresses))
 		for i, chainAddress := range chainAddresses {
 			sqlChainAddress[i] = sqlc.GetWalletByChainAddressBatchParams{
-				Address: chainAddress.Address,
-				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain), Valid: true},
+				Address: chainAddress.Address(),
+				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
 			}
 		}
 
@@ -638,7 +638,6 @@ func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Que
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
-				loaders.WalletByChainAddress.Prime(persist.ChainAddress{Address: wallet.Address, Chain: persist.Chain(wallet.Chain.Int32)}, wallet)
 			}
 
 			wallets[i], errors[i] = wallet, err

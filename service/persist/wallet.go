@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -33,13 +34,86 @@ type WalletList []Wallet
 // Address represents the value of an address
 type Address string
 
+//type ChainAddress struct {
+//	Address Address `json:"address"`
+//	Chain   Chain   `json:"chain"`
+//}
+//
+//func (c ChainAddress) String() string {
+//	return fmt.Sprintf("%d:%s", c.Chain, c.Address)
+//}
+
 type ChainAddress struct {
-	Address Address `json:"address"`
-	Chain   Chain   `json:"chain"`
+	addressSet bool
+	chainSet   bool
+	address    Address
+	chain      Chain
+}
+
+func NewChainAddress(address Address, chain Chain) ChainAddress {
+	ca := ChainAddress{
+		addressSet: true,
+		chainSet:   true,
+		address:    address,
+		chain:      chain,
+	}
+
+	ca.updateCasing()
+	return ca
+}
+
+func (c *ChainAddress) Address() Address {
+	return c.address
+}
+
+func (c *ChainAddress) Chain() Chain {
+	return c.chain
+}
+
+func (c *ChainAddress) updateCasing() {
+	switch c.chain {
+	// TODO: Add an IsCaseSensitive to the Chain type?
+	case ChainETH:
+		c.address = Address(strings.ToLower(c.address.String()))
+	}
+}
+
+// GQLSetAddressFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainAddress) GQLSetAddressFromResolver(address Address) error {
+	if c.addressSet {
+		return errors.New("ChainAddress.address may only be set once")
+	}
+
+	c.address = address
+	c.addressSet = true
+
+	if c.chainSet {
+		c.updateCasing()
+	}
+
+	return nil
+}
+
+// GQLSetChainFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
+	if c.chainSet {
+		return errors.New("ChainAddress.chain may only be set once")
+	}
+
+	c.chain = chain
+	c.chainSet = true
+
+	if c.addressSet {
+		c.updateCasing()
+	}
+
+	return nil
 }
 
 func (c ChainAddress) String() string {
-	return fmt.Sprintf("%d:%s", c.Chain, c.Address)
+	return fmt.Sprintf("%d:%s", c.chain, c.address)
 }
 
 const (
@@ -140,7 +214,7 @@ func (e ErrWalletNotFoundByID) Error() string {
 }
 
 func (e ErrWalletNotFoundByChainAddress) Error() string {
-	return fmt.Sprintf("wallet not found by chain address: %s | chain: %d", e.ChainAddress.Address, e.ChainAddress.Chain)
+	return fmt.Sprintf("wallet not found by chain address: %s | chain: %d", e.ChainAddress.Address(), e.ChainAddress.Chain())
 }
 
 func (e ErrWalletNotFoundByAddress) Error() string {

@@ -92,8 +92,8 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.DBID) (
 func (api UserAPI) AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"chainAddress.Address": {chainAddress.Address, "required"},
-		"chainAddress.Chain":   {chainAddress.Chain, "required"},
+		"chainAddress.Address": {chainAddress.Address(), "required"},
+		"chainAddress.Chain":   {chainAddress.Chain(), "required"},
 		"authenticator":        {authenticator, "required"},
 	}); err != nil {
 		return err
@@ -195,8 +195,8 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*persist.Community, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"contractAddress.Address": {contractAddress.Address, "required"},
-		"contractAddress.Chain":   {contractAddress.Chain, "required"},
+		"contractAddress.Address": {contractAddress.Address(), "required"},
+		"contractAddress.Chain":   {contractAddress.Chain(), "required"},
 	}); err != nil {
 		return nil, err
 	}

@@ -32,8 +32,8 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 	wallets := make([]auth.Wallet, len(d.ChainAddresses))
 	for i, chainAddress := range d.ChainAddresses {
 		wallets[i] = auth.Wallet{
-			Address:    chainAddress.Address,
-			Chain:      chainAddress.Chain,
+			Address:    chainAddress.Address(),
+			Chain:      chainAddress.Chain(),
 			WalletType: persist.WalletTypeEOA,
 		}
 	}

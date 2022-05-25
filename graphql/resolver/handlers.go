@@ -149,7 +149,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 
 		addresses := make([]persist.ChainAddress, len(wallets))
 		for i, w := range wallets {
-			addresses[i] = persist.ChainAddress{Address: w.Address, Chain: persist.Chain(w.Chain.Int32)}
+			addresses[i] = persist.NewChainAddress(w.Address, persist.Chain(w.Chain.Int32))
 		}
 
 		if hasNft, err := auth.HasAllowlistNFT(ctx, addresses, ethClient); !hasNft {

@@ -75,8 +75,8 @@ type ChainAddress {
 }
 
 input ChainAddressInput {
-    address: Address!
-    chain: Chain!
+    address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet

@@ -92,7 +92,7 @@ type MergeUsersInput struct {
 func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, multichainProvider *multichain.Provider) (CreateUserOutput, error) {
 
 	output := &CreateUserOutput{}
-	chainAddress := persist.ChainAddress{Address: pInput.Address, Chain: pInput.Chain}
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
@@ -239,7 +239,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pChainA
 		return errUserCannotRemoveAllAddresses
 	}
 	for _, chainAddress := range pChainAddresses {
-		if err := userRepo.RemoveWallet(pCtx, pUserID, chainAddress.Address, chainAddress.Chain); err != nil {
+		if err := userRepo.RemoveWallet(pCtx, pUserID, chainAddress.Address(), chainAddress.Chain()); err != nil {
 			return err
 		}
 	}
@@ -262,7 +262,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address, Chain: pChainAddress.Chain}) {
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
 		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
@@ -286,7 +286,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAdd
 		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address, Chain: pChainAddress.Chain}) {
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
 		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
@@ -313,7 +313,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAdd
 	}()
 
 	// TODO add address to user waterfalls to wallet and address table
-	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress.Address, pChainAddress.Chain, pWalletType); err != nil {
+	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress.Address(), pChainAddress.Chain(), pWalletType); err != nil {
 		return err
 	}
 
@@ -343,7 +343,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 
 	var user persist.User
 	var err error
-	chainAddress := persist.ChainAddress{Address: pInput.Address, Chain: pInput.Chain}
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 	switch {
 	case pInput.UserID != "":
 		user, err = userRepo.GetByID(pCtx, pInput.UserID)
@@ -416,7 +416,7 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 
 // MergeUsers merges two users together
 func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
-	chainAddress := persist.ChainAddress{Address: pInput.Address, Chain: pInput.Chain}
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
 		return auth.ErrNonceNotFound{ChainAddress: chainAddress}

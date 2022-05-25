@@ -160,11 +160,11 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 
 // VerifySignature verifies a signature for a wallet address
 func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainAddress, pWalletType persist.WalletType) (bool, error) {
-	provider, ok := d.Chains[pChainAddress.Chain]
+	provider, ok := d.Chains[pChainAddress.Chain()]
 	if !ok {
-		return false, ErrChainNotFound{Chain: pChainAddress.Chain}
+		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
-	return provider.VerifySignature(ctx, pChainAddress.Address, pWalletType, pNonce, pSig)
+	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
 }
 
 func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.TokenGallery, error) {

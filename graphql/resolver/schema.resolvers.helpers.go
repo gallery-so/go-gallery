@@ -106,7 +106,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return authApi.NewNonceAuthenticator(persist.ChainAddress{Address: m.GnosisSafe.Address, Chain: persist.ChainETH}, m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
+		return authApi.NewNonceAuthenticator(persist.NewChainAddress(m.GnosisSafe.Address, persist.ChainETH), m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -339,7 +339,7 @@ func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress
 		return nil, err
 	}
 
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, persist.ChainAddress{Address: contractAddress, Chain: persist.Chain(parsed)}, false)
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, persist.NewChainAddress(contractAddress, persist.Chain(parsed)), false)
 
 	if err != nil {
 		return nil, err
@@ -571,7 +571,7 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 }
 
 func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
-	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.ChainAddress{Address: persist.Address(address), Chain: persist.ChainETH})
+	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.NewChainAddress(persist.Address(address), persist.ChainETH))
 	chain := persist.Chain(dbWallet.Chain.Int32)
 	return &model.Wallet{
 		Dbid:       dbWallet.ID,

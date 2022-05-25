@@ -207,7 +207,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 			wallets[i] = Wallet{Address: wallet.Address, Chain: wallet.Chain, WalletType: wallet.WalletType}
 		}
 
-		if !containsAddress(wallets, Wallet{Address: e.ChainAddress.Address, Chain: e.ChainAddress.Chain, WalletType: e.WalletType}) {
+		if !containsAddress(wallets, Wallet{Address: e.ChainAddress.Address(), Chain: e.ChainAddress.Chain(), WalletType: e.WalletType}) {
 			_, err := e.WalletRepo.Insert(pCtx, e.ChainAddress, e.WalletType)
 			if err != nil {
 				return nil, err
@@ -295,9 +295,9 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 		dbNonce, err := nonceRepo.Get(pCtx, wallet.ID)
 		if err != nil || dbNonce.ID == "" {
 			create := persist.CreateNonceInput{
-				Address: pChainAddress.Address,
+				Address: pChainAddress.Address(),
 				Value:   GenerateNonce(),
-				Chain:   pChainAddress.Chain,
+				Chain:   pChainAddress.Chain(),
 			}
 
 			err = nonceRepo.Create(pCtx, create)
@@ -327,11 +327,11 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 func HasAllowlistNFT(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
-		if addr.Chain != persist.ChainETH {
+		if addr.Chain() != persist.ChainETH {
 			continue
 		}
 		for k, v := range allowlist {
-			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.Address), ethClient)
+			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.Address()), ethClient)
 			if found {
 				return true, nil
 			} else if err != nil {
@@ -348,8 +348,8 @@ func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUser
 
 	newNonce := persist.CreateNonceInput{
 		Value:   GenerateNonce(),
-		Address: pChainAddress.Address,
-		Chain:   pChainAddress.Chain,
+		Address: pChainAddress.Address(),
+		Chain:   pChainAddress.Chain(),
 	}
 
 	err := nonceRepo.Create(pCtx, newNonce)

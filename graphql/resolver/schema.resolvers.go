@@ -514,6 +514,14 @@ func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.
 	return resolveNftsByWalletID(ctx, obj.Dbid)
 }
 
+func (r *chainAddressInputResolver) Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error {
+	return obj.GQLSetAddressFromResolver(data)
+}
+
+func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error {
+	return obj.GQLSetChainFromResolver(data)
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -554,6 +562,11 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 // Wallet returns generated.WalletResolver implementation.
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
+// ChainAddressInput returns generated.ChainAddressInputResolver implementation.
+func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
+	return &chainAddressInputResolver{r}
+}
+
 type collectionResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
@@ -566,3 +579,4 @@ type tokenHolderResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
+type chainAddressInputResolver struct{ *Resolver }

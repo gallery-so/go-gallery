@@ -50,6 +50,7 @@ type ResolverRoot interface {
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
+	ChainAddressInput() ChainAddressInputResolver
 }
 
 type DirectiveRoot struct {
@@ -496,6 +497,11 @@ type ViewerResolver interface {
 }
 type WalletResolver interface {
 	Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error)
+}
+
+type ChainAddressInputResolver interface {
+	Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error
+	Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error
 }
 
 type executableSchema struct {
@@ -2115,8 +2121,8 @@ type ChainAddress {
 }
 
 input ChainAddressInput {
-    address: Address!
-    chain: Chain!
+    address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -11165,16 +11171,22 @@ func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context,
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			it.Address, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			data, err := ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
 			if err != nil {
+				return it, err
+			}
+			if err = ec.resolvers.ChainAddressInput().Address(ctx, &it, data); err != nil {
 				return it, err
 			}
 		case "chain":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
-			it.Chain, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
+			data, err := ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
 			if err != nil {
+				return it, err
+			}
+			if err = ec.resolvers.ChainAddressInput().Chain(ctx, &it, data); err != nil {
 				return it, err
 			}
 		}

@@ -74,7 +74,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	var community persist.Community
 
 	if !forceRefresh {
-		bs, err := c.cache.Get(ctx, pCommunityAddress.Address.String())
+		bs, err := c.cache.Get(ctx, pCommunityAddress.Address().String())
 		if err == nil && len(bs) > 0 {
 			err = json.Unmarshal(bs, &community)
 			if err != nil {
@@ -85,14 +85,14 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	}
 
 	community = persist.Community{
-		ContractAddress: pCommunityAddress.Address,
+		ContractAddress: pCommunityAddress.Address(),
 	}
 
 	hasDescription := true
 
 	addresses := make([]persist.Address, 0, 20)
 
-	rows, err := c.getInfoStmt.QueryContext(ctx, pCommunityAddress.Address)
+	rows, err := c.getInfoStmt.QueryContext(ctx, pCommunityAddress.Address())
 	if err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community info: %w", err)
 	}
@@ -137,7 +137,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 		community.Description = ""
 	}
 
-	err = c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address).Scan(&community.Name, &community.CreatorAddress)
+	err = c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&community.Name, &community.CreatorAddress)
 	if err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
 	}
@@ -179,7 +179,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	for _, tokenHolder := range tokenHolders {
 		previewNFTs := make([]persist.NullString, 0, 3)
 
-		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pCommunityAddress.Address, pq.Array(tokenHolder.WalletIDs))
+		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pCommunityAddress.Address(), pq.Array(tokenHolder.WalletIDs))
 		defer rows.Close()
 
 		if err != nil {
@@ -206,7 +206,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	if err != nil {
 		return persist.Community{}, err
 	}
-	err = c.cache.Set(ctx, pCommunityAddress.Address.String(), bs, staleCommunityTime)
+	err = c.cache.Set(ctx, pCommunityAddress.Address().String(), bs, staleCommunityTime)
 	if err != nil {
 		return persist.Community{}, err
 	}
