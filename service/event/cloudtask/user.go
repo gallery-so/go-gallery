@@ -17,9 +17,6 @@ type UserFeedTask struct {
 func (u UserFeedTask) Handle(ctx context.Context, event persist.UserEventRecord) {
 	hub := sentryutil.SentryHubFromContext(ctx)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	saved, err := u.UserEventRepo.Add(ctx, event)
 	if err != nil {
 		logger.For(ctx).Errorf("failed to add event to user event repo: %s", err)
