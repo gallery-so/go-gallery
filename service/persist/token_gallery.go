@@ -31,7 +31,7 @@ type TokenGallery struct {
 	TokenID          TokenID   `json:"token_id"`
 	Quantity         HexString `json:"quantity"`
 	OwnerUserID      DBID
-	OwnerAddresses   []Address        `json:"owner_addresses"`
+	OwnerAddresses   []Wallet         `json:"owner_addresses"`
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	ContractAddress  Address          `json:"contract_address"`
@@ -49,9 +49,9 @@ type AddressAtBlock struct {
 
 // TokenIdentifiers represents a unique identifier for a token
 type TokenIdentifiers struct {
-	TokenID         TokenID      `json:"token_id"`
-	ContractAddress AddressValue `json:"contract_address"`
-	Chain           Chain        `json:"chain"`
+	TokenID         TokenID `json:"token_id"`
+	ContractAddress Address `json:"contract_address"`
+	Chain           Chain   `json:"chain"`
 }
 
 // TokenInCollection represents a token within a collection
@@ -97,32 +97,32 @@ type TokenGalleryRepository interface {
 	CreateBulk(context.Context, []TokenGallery) ([]DBID, error)
 	Create(context.Context, TokenGallery) (DBID, error)
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
-	GetByContract(context.Context, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
-	GetByTokenIdentifiers(context.Context, TokenID, AddressValue, Chain, int64, int64) ([]TokenGallery, error)
+	GetByContract(context.Context, Address, Chain, int64, int64) ([]TokenGallery, error)
+	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	GetByID(context.Context, DBID) (TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
 	Upsert(context.Context, TokenGallery) error
 	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, AddressValue, Chain, interface{}) error
+	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
 
 type ErrTokensGalleryNotFoundByContract struct {
-	ContractAddress AddressValue
+	ContractAddress Address
 	Chain           Chain
 }
 
 type ErrTokenGalleryNotFoundByIdentifiers struct {
 	TokenID         TokenID
-	ContractAddress AddressValue
+	ContractAddress Address
 	Chain           Chain
 }
 
 // NewTokenIdentifiers creates a new token identifiers
-func NewTokenIdentifiers(pContractAddress AddressValue, pTokenID TokenID, pChain Chain) TokenIdentifiers {
+func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{
 		TokenID:         pTokenID,
 		ContractAddress: pContractAddress,
@@ -155,7 +155,7 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 	}
 	*t = TokenIdentifiers{
 		TokenID:         TokenID(res[1]),
-		ContractAddress: AddressValue(res[0]),
+		ContractAddress: Address(res[0]),
 		Chain:           Chain(chain),
 	}
 	return nil

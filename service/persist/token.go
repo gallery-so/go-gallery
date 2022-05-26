@@ -343,7 +343,6 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 	switch strings.ToLower(n) {
 	case "ethereum":
 		*c = ChainETH
-
 	}
 	return nil
 }
@@ -710,7 +709,7 @@ func normalizeAddress(address string) string {
 func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
 	result := make([]EthereumAddress, len(pWallets))
 	for i, wallet := range pWallets {
-		result[i] = EthereumAddress(wallet.Address.AddressValue)
+		result[i] = EthereumAddress(wallet.Address)
 	}
 	return result
 }

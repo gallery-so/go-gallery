@@ -100,17 +100,11 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByAddress :one
-SELECT * FROM wallets WHERE address = $1 AND deleted = false;
-
--- name: GetWalletByAddressBatch :batchone
-SELECT * FROM wallets WHERE address = $1 AND deleted = false;
-
 -- name: GetWalletByAddressDetails :one
-SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
+SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetWalletByAddressDetailsBatch :batchone
-SELECT wallets.* FROM wallets INNER JOIN addresses ON wallets.address = addresses.id WHERE addresses.address_value = $1 AND addresses.chain = $2 AND wallets.deleted = false AND addresses.deleted = false;
+SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
 SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
@@ -118,38 +112,14 @@ SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord
 -- name: GetWalletsByUserIDBatch :batchmany
 SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
 
--- name: GetAddressByID :one
-SELECT * FROM addresses WHERE id = $1 AND deleted = false;
-
--- name: GetAddressByIDBatch :batchone
-SELECT * FROM addresses WHERE id = $1 AND deleted = false;
-
--- name: GetAddressByDetails :one
-SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;
-
--- name: GetAddressByDetailsBatch :batchone
-SELECT * FROM addresses WHERE address_value = $1 AND chain = $2 AND deleted = false;
-
--- name: GetAddressByWalletID :one
-SELECT * FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false;
-
--- name: GetAddressByWalletIDBatch :batchone
-SELECT * FROM addresses WHERE ID = (SELECT ADDRESS FROM wallets WHERE wallets.ID = $1) AND deleted = false;
-
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
 -- name: GetContractByIDBatch :batchone
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByAddress :one
-select * FROM contracts WHERE address = $1 AND deleted = false;
-
--- name: GetContractByAddressBatch :batchone
-select * FROM contracts WHERE address = $1 AND deleted = false;
-
 -- name: GetContractByDetails :one
-select * FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false;
+select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetContractByDetailsBatch :batchone
-select * FROM contracts WHERE address = (SELECT ID FROM addresses WHERE addresses.address_value = $1 AND addresses.chain = $2 AND addresses.deleted = false) AND deleted = false;
+select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;

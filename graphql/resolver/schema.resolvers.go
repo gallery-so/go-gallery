@@ -71,7 +71,7 @@ func (r *membershipOwnerResolver) User(ctx context.Context, obj *model.Membershi
 	return resolveGalleryUserByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.AddressValue, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, chain persist.Chain, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
@@ -91,7 +91,7 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.AddressValue, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address, chains []persist.Chain) (model.RemoveUserAddressesPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	err := api.User.RemoveUserAddresses(ctx, addresses, chains)
@@ -262,7 +262,7 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshTokens(ctx context.Context, addresses []*persist.AddressValue, chains []*persist.Chain) (model.RefreshTokensPayloadOrError, error) {
+func (r *mutationResolver) RefreshTokens(ctx context.Context, addresses []*persist.Address, chains []*persist.Chain) (model.RefreshTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	err := api.Nft.RefreshTokens(ctx, addresses)
@@ -277,7 +277,7 @@ func (r *mutationResolver) RefreshTokens(ctx context.Context, addresses []*persi
 	return output, nil
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.AddressValue, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error) {
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address, chain persist.Chain) (model.GetAuthNoncePayloadOrError, error) {
 	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, address, chain)
 	if err != nil {
 		return nil, err
@@ -346,15 +346,15 @@ func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (*model.Gallery
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
 
-func (r *nftResolver) OwnerAddresses(ctx context.Context, obj *model.Nft) ([]*model.Address, error) {
+func (r *nftResolver) OwnerAddresses(ctx context.Context, obj *model.Nft) ([]*persist.Address, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *nftResolver) ContractAddress(ctx context.Context, obj *model.Nft) (*model.Address, error) {
+func (r *nftResolver) ContractAddress(ctx context.Context, obj *model.Nft) (*persist.Address, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *nftResolver) CreatorAddress(ctx context.Context, obj *model.Nft) (*model.Address, error) {
+func (r *nftResolver) CreatorAddress(ctx context.Context, obj *model.Nft) (*persist.Address, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -407,7 +407,7 @@ func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBI
 	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.AddressValue, chain persist.Chain) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.Address, chain persist.Chain) (model.CommunityByAddressOrError, error) {
 	return resolveCommunityByContractAddress(ctx, communityAddress, chain)
 }
 
@@ -436,10 +436,6 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	}
 
 	return output, nil
-}
-
-func (r *walletResolver) Address(ctx context.Context, obj *model.Wallet) (*model.Address, error) {
-	return resolveAddressByWalletID(ctx, obj.Dbid)
 }
 
 func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {

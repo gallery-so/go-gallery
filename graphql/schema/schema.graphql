@@ -37,7 +37,7 @@ directive @goGqlId(fields: [String!]!) on OBJECT
 directive @goEmbedHelper on OBJECT
 
 scalar Time
-scalar AddressValue
+scalar Address
 scalar EthereumAddress
 scalar DBID
 
@@ -62,21 +62,20 @@ type GalleryUser implements Node {
 type Wallet implements Node {
   id: ID!
   dbid: DBID!
-  address: Address @goField(forceResolver: true)
+  address: Address
+  chain: Chain
   walletType: WalletType
   nfts: [Nft] @goField(forceResolver: true)
 }
 
-type Address implements Node {
-  id: ID!
-  dbid: DBID!
-  address: AddressValue
+type AddressDetails {
+  address: Address
   chain: Chain
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-union GalleryUserOrAddress = GalleryUser | Address
+union GalleryUserOrAddress = GalleryUser | AddressDetails
 
 union MediaSubtype =
     ImageMedia
@@ -300,19 +299,20 @@ type CommunityOwner {
     username: String
 }
 
-type Community implements Node @goEmbedHelper @goGqlId(fields: ["contractAddressId"]) {
-    id: ID!
+type Community implements Node
+  @goGqlId(fields: ["contractAddress", "chain"]) {
+  id: ID!
 
-    lastUpdated: Time
+  lastUpdated: Time
 
-    contractAddress: Address
-    creatorAddress: Address
-    chain: Chain
-    name: String
-    description: String
-    previewImage: String
+  contractAddress: Address
+  creatorAddress: Address
+  chain: Chain
+  name: String
+  description: String
+  previewImage: String
 
-    owners: [CommunityOwner]
+  owners: [CommunityOwner]
 }
 
 # We have this extra type in case we need to stick authed data
@@ -356,7 +356,7 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   nftById(id: DBID!): NftByIdOrError
   collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(communityAddress: AddressValue!, chain: Chain!): CommunityByAddressOrError
+  communityByAddress(communityAddress: Address!, chain: Chain!): CommunityByAddressOrError
   generalAllowlist: [Wallet!]
 }
 
@@ -573,7 +573,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-  address: AddressValue!
+  address: Address!
   chain: Chain!
   nonce: String!
   signature: String! @scrub
@@ -583,12 +583,12 @@ input EoaAuth {
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [AddressValue!]!
+    addresses: [Address!]!
     chains: [Chain!]!
 }
 
 input GnosisSafeAuth {
-  address: AddressValue!
+  address: Address!
   nonce: String!
 }
 
@@ -624,12 +624,12 @@ type CreateUserPayload {
 type Mutation {
   # User Mutations
   addUserAddress(
-    address: AddressValue!
+    address: Address!
     chain: Chain!
     authMechanism: AuthMechanism!
   ): AddUserAddressPayloadOrError @authRequired
   removeUserAddresses(
-    addresses: [AddressValue!]!
+    addresses: [Address!]!
     chains: [Chain!]!
   ): RemoveUserAddressesPayloadOrError @authRequired
   updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
@@ -658,11 +658,11 @@ type Mutation {
     @authRequired
 
   # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshTokens(addresses: [AddressValue]!, chains: [Chain]!): RefreshTokensPayloadOrError
+  refreshTokens(addresses: [Address]!, chains: [Chain]!): RefreshTokensPayloadOrError
     @authRequired
 
   getAuthNonce(
-    address: AddressValue!
+    address: Address!
     chain: Chain!
   ): GetAuthNoncePayloadOrError
 

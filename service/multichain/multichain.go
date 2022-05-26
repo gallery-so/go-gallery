@@ -13,7 +13,6 @@ type Provider struct {
 	TokenRepo    persist.TokenGalleryRepository
 	ContractRepo persist.ContractGalleryRepository
 	UserRepo     persist.UserRepository
-	AddressRepo  persist.AddressRepository
 	Chains       map[persist.Chain]ChainProvider
 }
 
@@ -35,10 +34,10 @@ type ChainAgnosticToken struct {
 	TokenURI         persist.TokenURI              `json:"token_uri"`
 	TokenID          persist.TokenID               `json:"token_id"`
 	Quantity         persist.HexString             `json:"quantity"`
-	OwnerAddress     persist.AddressValue          `json:"owner_address"`
+	OwnerAddress     persist.Address               `json:"owner_address"`
 	OwnershipHistory []ChainAgnosticAddressAtBlock `json:"previous_owners"`
 	TokenMetadata    persist.TokenMetadata         `json:"metadata"`
-	ContractAddress  persist.AddressValue          `json:"contract_address"`
+	ContractAddress  persist.Address               `json:"contract_address"`
 	CollectionName   string                        `json:"collection_name"`
 
 	ExternalURL string `json:"external_url"`
@@ -48,16 +47,16 @@ type ChainAgnosticToken struct {
 
 // ChainAgnosticAddressAtBlock is an address at a block
 type ChainAgnosticAddressAtBlock struct {
-	Address persist.AddressValue `json:"address"`
-	Block   persist.BlockNumber  `json:"block"`
+	Address persist.Address     `json:"address"`
+	Block   persist.BlockNumber `json:"block"`
 }
 
 // ChainAgnosticContract is a contract that is agnostic to the chain it is on
 type ChainAgnosticContract struct {
-	Address        persist.AddressValue `json:"address"`
-	Symbol         string               `json:"symbol"`
-	Name           string               `json:"name"`
-	CreatorAddress persist.AddressValue `json:"creator_address"`
+	Address        persist.Address `json:"address"`
+	Symbol         string          `json:"symbol"`
+	Name           string          `json:"name"`
+	CreatorAddress persist.Address `json:"creator_address"`
 
 	LatestBlock persist.BlockNumber `json:"latest_block"`
 }
@@ -70,21 +69,21 @@ type ErrChainNotFound struct {
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
-	GetTokensByWalletAddress(context.Context, persist.AddressValue) ([]ChainAgnosticToken, error)
-	GetTokensByContractAddress(context.Context, persist.AddressValue) ([]ChainAgnosticToken, error)
+	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, error)
+	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, error)
 	GetTokensByTokenIdentifiers(context.Context, persist.TokenIdentifiers) ([]ChainAgnosticToken, error)
-	GetContractByAddress(context.Context, persist.AddressValue) (ChainAgnosticContract, error)
+	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 	// bool is whether or not to update all media content, including the tokens that already have media content
-	UpdateMediaForWallet(context.Context, persist.AddressValue, bool) error
+	UpdateMediaForWallet(context.Context, persist.Address, bool) error
 	// do we want to return the tokens we validate?
 	// bool is whether or not to update all of the tokens regardless of whether we know they exist already
-	ValidateTokensForWallet(context.Context, persist.AddressValue, bool) error
+	ValidateTokensForWallet(context.Context, persist.Address, bool) error
 	// ctx, address, chain, wallet type, nonce, sig
-	VerifySignature(context.Context, persist.AddressValue, persist.WalletType, string, string) (bool, error)
+	VerifySignature(context.Context, persist.Address, persist.WalletType, string, string) (bool, error)
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, addressRepo persist.AddressRepository, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -100,8 +99,8 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 		TokenRepo:    tokenRepo,
 		ContractRepo: contractRepo,
 		UserRepo:     userRepo,
-		AddressRepo:  addressRepo,
-		Chains:       c,
+
+		Chains: c,
 	}
 }
 
@@ -113,44 +112,53 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	errChan := make(chan error)
-	addresses := make([]persist.Address, len(user.Wallets))
-	for i, wallet := range user.Wallets {
-		addresses[i] = wallet.Address
+	chainsToAddresses := make(map[persist.Chain][]persist.Address)
+	for _, wallet := range user.Wallets {
+		if it, ok := chainsToAddresses[wallet.Chain]; ok {
+			it = append(it, wallet.Address)
+			chainsToAddresses[wallet.Chain] = it
+		} else {
+			chainsToAddresses[wallet.Chain] = []persist.Address{wallet.Address}
+		}
 	}
-	for _, addr := range addresses {
-		logrus.Infof("updating media for user %s wallet %s", user.Username, addr.AddressValue)
-		go func(addr persist.Address) {
-			provider, ok := d.Chains[addr.Chain]
-			if !ok {
-				errChan <- ErrChainNotFound{Chain: addr.Chain}
-				return
-			}
-			tokens, err := provider.GetTokensByWalletAddress(ctx, addr.AddressValue)
-			if err != nil {
-				errChan <- err
-				return
-			}
+	for c, a := range chainsToAddresses {
+		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
+		chain := c
+		addresses := a
+		for _, addr := range addresses {
+			go func(addr persist.Address, chain persist.Chain) {
+				provider, ok := d.Chains[chain]
+				if !ok {
+					errChan <- ErrChainNotFound{Chain: chain}
+					return
+				}
+				tokens, err := provider.GetTokensByWalletAddress(ctx, addr)
+				if err != nil {
+					errChan <- err
+					return
+				}
 
-			newTokens, err := tokensToTokens(ctx, tokens, addr.Chain, userID, addresses, d.AddressRepo)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			errChan <- d.TokenRepo.BulkUpsert(ctx, newTokens)
-		}(addr)
+				newTokens, err := tokensToTokens(ctx, tokens, chain, user, addresses)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				errChan <- d.TokenRepo.BulkUpsert(ctx, newTokens)
+			}(addr, chain)
+		}
 	}
-	for i := 0; i < len(addresses); i++ {
+	for i := 0; i < len(user.Wallets); i++ {
 		err := <-errChan
 		if err != nil {
 			return err
 		}
-		logrus.Infof("updated tokens for wallet %s", user.Wallets[i].Address.AddressValue)
+		logrus.Infof("updated tokens for wallet %s", user.Wallets[i].Address)
 	}
 	return nil
 }
 
 // VerifySignature verifies a signature for a wallet address
-func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress persist.AddressValue, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
+func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress persist.Address, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
 	provider, ok := d.Chains[pChain]
 	if !ok {
 		return false, ErrChainNotFound{Chain: pChain}
@@ -158,17 +166,33 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return provider.VerifySignature(ctx, pAddress, pWalletType, pNonce, pSig)
 }
 
-func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUserID persist.DBID, ownerAddresses []persist.Address, addressRepo persist.AddressRepository) ([]persist.TokenGallery, error) {
+func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.TokenGallery, error) {
 	res := make([]persist.TokenGallery, len(tokens))
+	seen := make(map[persist.TokenIdentifiers][]persist.Wallet)
+	addressToWallets := make(map[persist.Address]persist.Wallet)
+	for _, wallet := range ownerUser.Wallets {
+		for _, addr := range ownerAddresses {
+			if wallet.Address == addr {
+				addressToWallets[addr] = wallet
+				break
+			}
+		}
+	}
 	for i, token := range tokens {
-		ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chain, addressRepo)
+		ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 		}
-		contractAddress, err := addressRepo.GetByDetails(ctx, token.ContractAddress, chain)
-		if err != nil {
-			if _, ok := err.(persist.ErrAddressNotFoundByDetails); !ok {
-				return nil, fmt.Errorf("failed to get contract address for token: %s", err)
+
+		ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chain)
+
+		if w, ok := addressToWallets[token.OwnerAddress]; ok {
+			if it, ok := seen[ti]; ok {
+				it = append(it, w)
+				seen[ti] = it
+
+			} else {
+				seen[ti] = []persist.Wallet{w}
 			}
 		}
 
@@ -181,11 +205,11 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 			TokenURI:         token.TokenURI,
 			TokenID:          token.TokenID,
 			Quantity:         token.Quantity,
-			OwnerUserID:      ownerUserID,
-			OwnerAddresses:   ownerAddresses,
+			OwnerUserID:      ownerUser.ID,
+			OwnerAddresses:   seen[ti],
 			OwnershipHistory: ownership,
 			TokenMetadata:    token.TokenMetadata,
-			ContractAddress:  contractAddress,
+			ContractAddress:  token.ContractAddress,
 			ExternalURL:      persist.NullString(token.ExternalURL),
 			BlockNumber:      token.BlockNumber,
 		}
@@ -194,17 +218,12 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 
 }
 
-func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnosticAddressAtBlock, chain persist.Chain, addressRepo persist.AddressRepository) ([]persist.AddressAtBlock, error) {
+func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnosticAddressAtBlock, chain persist.Chain) ([]persist.AddressAtBlock, error) {
 	res := make([]persist.AddressAtBlock, len(addresses))
 	for i, addr := range addresses {
-		dbAddr, err := addressRepo.GetByDetails(ctx, addr.Address, chain)
-		if err != nil {
-			if _, ok := err.(persist.ErrAddressNotFoundByDetails); !ok {
-				return nil, err
-			}
-		}
+
 		res[i] = persist.AddressAtBlock{
-			Address: dbAddr,
+			Address: addr.Address,
 			Block:   addr.Block,
 		}
 	}

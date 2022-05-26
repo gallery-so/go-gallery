@@ -27,7 +27,7 @@ type UserUpdateInfoInput struct {
 }
 
 type CreateUserInput struct {
-	Address    AddressValue
+	Address    Address
 	Chain      Chain
 	WalletType WalletType
 }
@@ -36,11 +36,11 @@ type CreateUserInput struct {
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
 	Create(context.Context, CreateUserInput) (DBID, error)
-	AddWallet(context.Context, DBID, AddressValue, Chain, WalletType) error
-	RemoveWallet(context.Context, DBID, AddressValue, Chain) error
+	AddWallet(context.Context, DBID, Address, Chain, WalletType) error
+	RemoveWallet(context.Context, DBID, Address, Chain) error
 	GetByID(context.Context, DBID) (User, error)
 	GetByWallet(context.Context, DBID) (User, error)
-	GetByAddressDetails(context.Context, AddressValue, Chain) (User, error)
+	GetByAddressDetails(context.Context, Address, Chain) (User, error)
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
 	MergeUsers(context.Context, DBID, DBID) error
@@ -50,7 +50,7 @@ type UserRepository interface {
 type ErrUserNotFound struct {
 	UserID        DBID
 	WalletID      DBID
-	Address       AddressValue
+	Address       Address
 	Chain         Chain
 	Username      string
 	Authenticator string
@@ -61,7 +61,7 @@ func (e ErrUserNotFound) Error() string {
 }
 
 type ErrUserAlreadyExists struct {
-	Address       AddressValue
+	Address       Address
 	Chain         Chain
 	Authenticator string
 	Username      string

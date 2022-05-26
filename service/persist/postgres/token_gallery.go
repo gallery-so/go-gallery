@@ -218,7 +218,7 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 }
 
 // GetByContract retrieves all tokens associated with a contract
-func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAddress persist.AddressValue, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
+func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAddress persist.Address, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
@@ -252,7 +252,7 @@ func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAd
 }
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address
-func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.AddressValue, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
+func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
@@ -335,28 +335,11 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 		return nil
 	}
 
-	owners := map[string]bool{}
-	for _, token := range pTokens {
-		// TODO do we need to do this or will multichain handle this?
-		if token.TokenType != persist.TokenTypeERC721 {
-			continue
-		}
-		for _, ownership := range token.OwnershipHistory {
-			if !owners[ownership.Address.String()] {
-				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(token.ContractAddress.AddressValue, token.TokenID, token.Chain))
-				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, ownership.Address.ID); err != nil {
-					return err
-				}
-				owners[ownership.Address.String()] = true
-			}
-		}
-	}
-
 	logrus.Infof("Checking 0 quantities for tokens...")
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress.AddressValue, token.TokenID, token.Chain))
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress.ID, token.OwnerUserID); err != nil {
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, token.Chain))
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerUserID); err != nil {
 				return err
 			}
 			if len(pTokens) < i+1 {
@@ -482,7 +465,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 }
 
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user
-func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.AddressValue, pChain persist.Chain, pUpdate interface{}) error {
+func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, pUpdate interface{}) error {
 	var res sql.Result
 	var err error
 	switch pUpdate.(type) {
@@ -528,8 +511,8 @@ func (t *TokenGalleryRepository) Count(pCtx context.Context, pTokenType persist.
 	return count, nil
 }
 
-func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.DBID) error {
-	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
+func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pOwnerUserID persist.DBID) error {
+	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerUserID)
 	return err
 }
 

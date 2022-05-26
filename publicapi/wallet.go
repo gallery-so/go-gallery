@@ -37,7 +37,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 	return &address, nil
 }
 
-func (api WalletAPI) GetWalletByDetails(ctx context.Context, address persist.AddressValue, chain persist.Chain) (*sqlc.Wallet, error) {
+func (api WalletAPI) GetWalletByDetails(ctx context.Context, address persist.Address, chain persist.Chain) (*sqlc.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"address": {address, "required"},

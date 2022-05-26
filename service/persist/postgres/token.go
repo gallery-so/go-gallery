@@ -320,7 +320,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 		for _, ownership := range token.OwnershipHistory {
 			if !owners[ownership.Address.String()] {
-				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(persist.AddressValue(token.ContractAddress.String()), token.TokenID, token.Chain))
+				logrus.Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
 				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
 					return err
 				}
@@ -332,7 +332,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	logrus.Infof("Checking 0 quantities for tokens...")
 	for i, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
-			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.AddressValue(token.ContractAddress.String()), token.TokenID, token.Chain))
+			logrus.Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
 			}

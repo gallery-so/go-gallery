@@ -109,12 +109,12 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 
 			has := false
 			for _, addr := range user.Addresses {
-				if addr.Address.Chain != persist.ChainETH {
+				if addr.Chain != persist.ChainETH {
 					continue
 				}
 				allowlist := auth.GetAllowlistContracts()
 				for k, v := range allowlist {
-					if found, _ := eth.HasNFTs(gc, k, v, persist.EthereumAddress(addr.Address.AddressValue), ethClient); found {
+					if found, _ := eth.HasNFTs(gc, k, v, persist.EthereumAddress(addr.Address), ethClient); found {
 						has = true
 						break
 					}

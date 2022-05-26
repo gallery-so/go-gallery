@@ -147,7 +147,7 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 }
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, error) {
 	assets, err := FetchAssetsForWallet(ctx, persist.EthereumAddress(address.String()), "", 0, nil)
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
-func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.AddressValue) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, error) {
 	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(address), "", "", 0, nil)
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.T
 }
 
 // GetContractByAddress returns a contract for a contract address
-func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.AddressValue) (multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Address) (multichain.ChainAgnosticContract, error) {
 	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract), 0)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
@@ -184,13 +184,13 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Ad
 
 // UpdateMediaForWallet updates media for a wallet address
 // bool is whether or not to update all media content, including the tokens that already have media content
-func (p *Provider) UpdateMediaForWallet(context.Context, persist.AddressValue, bool) error {
+func (p *Provider) UpdateMediaForWallet(context.Context, persist.Address, bool) error {
 	return nil
 }
 
 // ValidateTokensForWallet validates tokens for a wallet address
 // bool is whether or not to update all of the tokens regardless of whether we know they exist already
-func (p *Provider) ValidateTokensForWallet(context.Context, persist.AddressValue, bool) error {
+func (p *Provider) ValidateTokensForWallet(context.Context, persist.Address, bool) error {
 	return nil
 }
 
@@ -567,8 +567,8 @@ func assetsToTokens(ctx context.Context, openseaNfts []Asset, ethClient *ethclie
 			Description:     nft.Description,
 			TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
 			TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-			OwnerAddress:    persist.AddressValue(nft.Owner.Address.String()),
-			ContractAddress: persist.AddressValue(nft.Contract.ContractAddress.String()),
+			OwnerAddress:    persist.Address(nft.Owner.Address.String()),
+			ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
 			ExternalURL:     nft.ExternalURL,
 			BlockNumber:     persist.BlockNumber(block),
 			TokenMetadata:   metadata,
@@ -585,10 +585,10 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 		return multichain.ChainAgnosticContract{}, err
 	}
 	return multichain.ChainAgnosticContract{
-		Address:        persist.AddressValue(openseaContract.Address.String()),
+		Address:        persist.Address(openseaContract.Address.String()),
 		Symbol:         openseaContract.Symbol,
 		Name:           openseaContract.Collection.Name,
-		CreatorAddress: persist.AddressValue(openseaContract.Collection.PayoutAddress),
+		CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		LatestBlock:    persist.BlockNumber(block),
 	}, nil
 }
@@ -643,7 +643,7 @@ func openseaToDBNft(pCtx context.Context, pWalletAddress persist.EthereumAddress
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.AddressValue, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign

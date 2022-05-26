@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -20,6 +21,7 @@ type Wallet struct {
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
 	Address    Address    `json:"address"`
+	Chain      Chain      `json:"chain"`
 	WalletType WalletType `json:"wallet_type"`
 }
 
@@ -27,6 +29,14 @@ type Wallet struct {
 type WalletType int
 
 type WalletList []Wallet
+
+// AddressValue represents the value of an address
+type Address string
+
+type AddressDetails struct {
+	AddressValue Address `json:"address"`
+	Chain        Chain   `json:"chain"`
+}
 
 const (
 	// WalletTypeEOA represents an externally owned account (regular wallet address)
@@ -37,9 +47,8 @@ const (
 
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
-	GetByAddressDetails(context.Context, AddressValue, Chain) (Wallet, error)
-	GetByAddress(context.Context, DBID) (Wallet, error)
-	Insert(context.Context, AddressValue, Chain, WalletType) (DBID, error)
+	GetByAddressDetails(context.Context, Address, Chain) (Wallet, error)
+	Insert(context.Context, Address, Chain, WalletType) (DBID, error)
 }
 
 func (l WalletList) Value() (driver.Value, error) {
@@ -85,9 +94,31 @@ func (wa WalletType) MarshalGQL(w io.Writer) {
 	w.Write([]byte{uint8(wa)})
 }
 
+func (n Address) String() string {
+	return string(n)
+}
+
+// Value implements the database/sql driver Valuer interface for the NullString type
+func (n Address) Value() (driver.Value, error) {
+	if n.String() == "" {
+		return "", nil
+	}
+	return strings.ToValidUTF8(strings.ReplaceAll(n.String(), "\\u0000", ""), ""), nil
+}
+
+// Scan implements the database/sql Scanner interface for the NullString type
+func (n *Address) Scan(value interface{}) error {
+	if value == nil {
+		*n = Address("")
+		return nil
+	}
+	*n = Address(value.([]uint8))
+	return nil
+}
+
 // ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination
 type ErrWalletNotFoundByAddressDetails struct {
-	Address AddressValue
+	Address Address
 	Chain   Chain
 }
 

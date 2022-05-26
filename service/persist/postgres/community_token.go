@@ -45,7 +45,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getContractStmt, err := db.PrepareContext(ctx, `SELECT NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
 	checkNoErr(err)
 
-	getWalletByDetailsStmt, err := db.PrepareContext(ctx, `SELECT wallets.ID,wallets.Version,wallets.CREATED_AT,wallets.LAST_UPDATED,wallets.WALLET_TYPE,addresses.ID,addresses.VERSION,addresses.CREATED_AT,addresses.LAST_UPDATED,addresses.ADDRESS_VALUE,addresses.CHAIN FROM wallets LEFT JOIN addresses ON wallets.ADDRESS = addresses.ID WHERE addresses.ADDRESS_VALUE = $1 AND addresses.CHAIN = $2 AND addresses.DELETED = false AND wallets.DELETED = false;`)
+	getWalletByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN,WALLET_TYPE FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
 	getAddressByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS_VALUE,CHAIN FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false;`)
@@ -67,7 +67,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 }
 
 // GetByAddress returns a community by its address
-func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress persist.AddressValue, pChain persist.Chain) (persist.Community, error) {
+func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress persist.Address, pChain persist.Chain) (persist.Community, error) {
 	var community persist.Community
 
 	bs, err := c.cache.Get(ctx, pAddress.String())
@@ -79,23 +79,13 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 		return community, nil
 	}
 
-	var contractAddress persist.Address
-
-	err = c.getAddressByDetailsStmt.QueryRowContext(ctx, pAddress, pChain).Scan(&contractAddress.ID, &contractAddress.Version, &contractAddress.CreationTime, &contractAddress.LastUpdated, &contractAddress.AddressValue, &contractAddress.Chain)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return persist.Community{}, persist.ErrCommunityNotFound{CommunityAddress: pAddress, Chain: pChain}
-		}
-		return persist.Community{}, err
-	}
-
 	community = persist.Community{
-		ContractAddress: contractAddress,
+		ContractAddress: pAddress,
 	}
 
 	hasDescription := true
 
-	addressIDs := make([]persist.DBID, 0, 20)
+	addresses := make([]persist.Address, 0, 20)
 
 	rows, err := c.getInfoStmt.QueryContext(ctx, pAddress)
 	if err != nil {
@@ -103,12 +93,12 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 	}
 	defer rows.Close()
 
-	seen := map[persist.DBID]bool{}
+	seen := map[persist.Address]bool{}
 
 	for rows.Next() {
 		tempDesc := community.Description
 
-		var address persist.DBID
+		var address persist.Address
 		var media persist.Media
 		err = rows.Scan(&address, &community.Description, &media)
 		if err != nil {
@@ -124,7 +114,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 		}
 
 		if !seen[address] {
-			addressIDs = append(addressIDs, address)
+			addresses = append(addresses, address)
 		}
 
 		seen[address] = true
@@ -147,17 +137,17 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pAddress pe
 		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
 	}
 
-	community.Owners = make([]persist.CommunityOwner, 0, len(addressIDs))
-	for _, addressID := range addressIDs {
+	community.Owners = make([]persist.CommunityOwner, 0, len(addresses))
+	for _, address := range addresses {
 		var username persist.NullString
-		err := c.getUserByAddressStmt.QueryRowContext(ctx, addressID).Scan(&username)
+		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&username)
 		if err != nil {
 			return persist.Community{}, fmt.Errorf("error getting user by address: %w", err)
 		}
-		wallet := persist.Wallet{Address: persist.Address{}}
-		err = c.getWalletByDetailsStmt.QueryRowContext(ctx, addressID).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.WalletType, &wallet.Address.ID, &wallet.Address.Version, &wallet.Address.CreationTime, &wallet.Address.AddressValue, &wallet.Address.Chain)
+		wallet := persist.Wallet{}
+		err = c.getWalletByDetailsStmt.QueryRowContext(ctx, address).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address, &wallet.Chain, &wallet.WalletType)
 		if err != nil {
-			logrus.Warnf("error getting wallet of member of community '%s' by address '%s': %s", pAddress, addressID, err)
+			logrus.Warnf("error getting wallet of member of community '%s' by address '%s': %s", pAddress, address, err)
 			continue
 		}
 		community.Owners = append(community.Owners, persist.CommunityOwner{Wallet: wallet, Username: username})
