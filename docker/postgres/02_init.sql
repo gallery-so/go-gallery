@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
-    ADDRESSES varchar(255) [],
+    WALLETS varchar(255) [],
     BIO varchar
 );
 

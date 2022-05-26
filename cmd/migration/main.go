@@ -104,7 +104,7 @@ func copyUsersToTempTable(pg *sql.DB) error {
 
 func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) {
 
-	rows, err := pg.Query(`SELECT ID,ADDRESSES FROM temp_users;`)
+	rows, err := pg.Query(`SELECT ID,WALLETS FROM temp_users;`)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) 
 }
 
 func clearAddressesColumn(pg *sql.DB) error {
-	_, err := pg.Exec(`UPDATE users SET ADDRESSES = $1;`, []persist.DBID{})
+	_, err := pg.Exec(`UPDATE users SET WALLETS = $1;`, []persist.DBID{})
 	if err != nil {
 		return err
 	}
@@ -143,14 +143,14 @@ func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]pers
 			userWallets := make([]persist.DBID, len(addresses))
 			for i, address := range addresses {
 				walletID := persist.GenerateID()
-				_, err = tx.Exec(`INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE,CHAIN) VALUES ($1,$2,$3,$4,0) ON CONFLICT (ADDRESS) DO NOTHING;`, walletID, 0, address, persist.WalletTypeEOA)
+				_, err = tx.Exec(`INSERT INTO WALLETS (ID,VERSION,ADDRESS,WALLET_TYPE,CHAIN) VALUES ($1,$2,$3,$4,0) ON CONFLICT (ADDRESS) DO NOTHING;`, walletID, 0, address, persist.WalletTypeEOA)
 				if err != nil {
 					return err
 				}
 
 				userWallets[i] = walletID
 			}
-			_, err = tx.Exec(`UPDATE users SET ADDRESSES = $1 WHERE ID = $2;`, userWallets, id)
+			_, err = tx.Exec(`UPDATE users SET WALLETS = $1 WHERE ID = $2;`, userWallets, id)
 			if err != nil {
 				return err
 			}
@@ -333,7 +333,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	var ownerUserID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(ADDRESSES);`, walletID).Scan(&ownerUserID)
+	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(WALLETS);`, walletID).Scan(&ownerUserID)
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}

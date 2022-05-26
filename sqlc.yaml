@@ -13,7 +13,7 @@ packages:
 # the override should come _before_ the * entry
 overrides:
   # Users
-  - column: "users.addresses"
+  - column: "users.wallets"
     go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
 
   # Galleries

@@ -101,7 +101,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 	deleteCollectionStmt, err := db.PrepareContext(ctx, `UPDATE collections_v2 SET DELETED = true WHERE ID = $1 AND OWNER_USER_ID = $2;`)
 	checkNoErr(err)
 
-	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT w.ID FROM users u, unnest(u.ADDRESSES) WITH ORDINALITY AS d(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet WHERE u.ID = $1;`)
+	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT w.ID FROM users u, unnest(u.WALLETS) WITH ORDINALITY AS d(wallet, wallet_ord) LEFT JOIN wallets w on w.ID = wallet WHERE u.ID = $1;`)
 	checkNoErr(err)
 
 	checkOwnNFTsStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens WHERE OWNER_USER_ID = $1 AND ID = ANY($2);`)

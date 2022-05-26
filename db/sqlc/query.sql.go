@@ -385,29 +385,8 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 	return items, nil
 }
 
-const getUserByAddress = `-- name: GetUserByAddress :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE $1::varchar = ANY(addresses) AND deleted = false
-`
-
-func (q *Queries) GetUserByAddress(ctx context.Context, address string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByAddress, address)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Username,
-		&i.UsernameIdempotent,
-		&i.Addresses,
-		&i.Bio,
-	)
-	return i, err
-}
-
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -421,14 +400,14 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.CreatedAt,
 		&i.Username,
 		&i.UsernameIdempotent,
-		&i.Addresses,
+		&i.Wallets,
 		&i.Bio,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -442,7 +421,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.CreatedAt,
 		&i.Username,
 		&i.UsernameIdempotent,
-		&i.Addresses,
+		&i.Wallets,
 		&i.Bio,
 	)
 	return i, err
@@ -494,7 +473,7 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, e
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {

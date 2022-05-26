@@ -228,7 +228,7 @@ type User struct {
 	CreatedAt          time.Time
 	Username           sql.NullString
 	UsernameIdempotent sql.NullString
-	Addresses          persist.WalletList
+	Wallets            persist.WalletList
 	Bio                sql.NullString
 }
 

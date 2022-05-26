@@ -73,22 +73,6 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
-func (api UserAPI) GetUserByAddress(ctx context.Context, address persist.DBID) (*sqlc.User, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"address": {address, "required,eth_addr"},
-	}); err != nil {
-		return nil, err
-	}
-
-	user, err := api.loaders.UserByAddress.Load(address)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
-}
-
 func (api UserAPI) AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

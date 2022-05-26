@@ -10,12 +10,6 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND de
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
--- name: GetUserByAddress :one
-SELECT * FROM users WHERE sqlc.arg(address)::varchar = ANY(addresses) AND deleted = false;
-
--- name: GetUserByAddressBatch :batchone
-SELECT * FROM users WHERE $1::varchar = ANY(addresses) AND deleted = false;
-
 -- name: GetGalleryById :one
 SELECT * FROM galleries WHERE id = $1 AND deleted = false;
 
@@ -101,10 +95,10 @@ SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = fa
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
-SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
+SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
 -- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
+SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;

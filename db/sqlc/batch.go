@@ -238,7 +238,7 @@ func (b *GetContractByIDBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.addresses, u.bio FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
 `
@@ -278,7 +278,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.CreatedAt,
 				&i.Username,
 				&i.UsernameIdempotent,
-				&i.Addresses,
+				&i.Wallets,
 				&i.Bio,
 			); err != nil {
 				break
@@ -298,7 +298,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.addresses, u.bio FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
 `
@@ -338,7 +338,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.CreatedAt,
 				&i.Username,
 				&i.UsernameIdempotent,
-				&i.Addresses,
+				&i.Wallets,
 				&i.Bio,
 			); err != nil {
 				break
@@ -904,58 +904,8 @@ func (b *GetTokensByUserIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE $1::varchar = ANY(addresses) AND deleted = false
-`
-
-type GetUserByAddressBatchBatchResults struct {
-	br  pgx.BatchResults
-	ind int
-}
-
-func (q *Queries) GetUserByAddressBatch(ctx context.Context, dollar_1 []string) *GetUserByAddressBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range dollar_1 {
-		vals := []interface{}{
-			a,
-		}
-		batch.Queue(getUserByAddressBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetUserByAddressBatchBatchResults{br, 0}
-}
-
-func (b *GetUserByAddressBatchBatchResults) QueryRow(f func(int, User, error)) {
-	for {
-		row := b.br.QueryRow()
-		var i User
-		err := row.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Addresses,
-			&i.Bio,
-		)
-		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
-			break
-		}
-		if f != nil {
-			f(b.ind, i, err)
-		}
-		b.ind++
-	}
-}
-
-func (b *GetUserByAddressBatchBatchResults) Close() error {
-	return b.br.Close()
-}
-
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -987,7 +937,7 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.CreatedAt,
 			&i.Username,
 			&i.UsernameIdempotent,
-			&i.Addresses,
+			&i.Wallets,
 			&i.Bio,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -1005,7 +955,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -1037,7 +987,7 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.CreatedAt,
 			&i.Username,
 			&i.UsernameIdempotent,
-			&i.Addresses,
+			&i.Wallets,
 			&i.Bio,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -1159,7 +1109,7 @@ func (b *GetWalletByIDBatchBatchResults) Close() error {
 }
 
 const getWalletsByUserIDBatch = `-- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 type GetWalletsByUserIDBatchBatchResults struct {

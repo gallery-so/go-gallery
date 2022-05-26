@@ -45,7 +45,6 @@ type Loaders struct {
 
 	UserByUserId             UserLoaderByID
 	UserByUsername           UserLoaderByString
-	UserByAddress            UserLoaderByAddress
 	GalleryByGalleryId       GalleryLoaderByID
 	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
@@ -80,12 +79,6 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUsername(ctx, loaders, q),
-	}
-
-	loaders.UserByAddress = UserLoaderByAddress{
-		maxBatch: defaultMaxBatchOne,
-		wait:     defaultWaitTime,
-		fetch:    loadUserByAddress(ctx, loaders, q),
 	}
 
 	loaders.GalleryByGalleryId = GalleryLoaderByID{
@@ -193,10 +186,6 @@ func (l *Loaders) ClearUserCaches() {
 	l.UserByUserId.cache = nil
 	l.UserByUserId.mu.Unlock()
 
-	l.UserByAddress.mu.Lock()
-	l.UserByAddress.cache = nil
-	l.UserByAddress.mu.Unlock()
-
 	l.UserByUsername.mu.Lock()
 	l.UserByUsername.cache = nil
 	l.UserByUsername.mu.Unlock()
@@ -268,9 +257,6 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.UserByUsername.Prime(user.Username.String, user)
-				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address.ID, user)
-				}
 			}
 
 			users[i], errors[i] = user, err
@@ -296,40 +282,6 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.UserByUserId.Prime(user.ID, user)
-				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address.ID, user)
-				}
-			}
-
-			users[i], errors[i] = user, err
-		})
-
-		return users, errors
-	}
-}
-
-func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
-	return func(addresses []persist.DBID) ([]sqlc.User, []error) {
-		users := make([]sqlc.User, len(addresses))
-		errors := make([]error, len(addresses))
-
-		addressStrings := make([]string, len(addresses))
-		for i, address := range addresses {
-			addressStrings[i] = address.String()
-		}
-
-		b := q.GetUserByAddressBatch(ctx, addressStrings)
-		defer b.Close()
-
-		b.QueryRow(func(i int, user sqlc.User, err error) {
-			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{WalletID: addresses[i]}
-			}
-
-			// Add results to other loaders' caches
-			if err == nil {
-				loaders.UserByUserId.Prime(user.ID, user)
-				loaders.UserByUsername.Prime(user.Username.String, user)
 			}
 
 			users[i], errors[i] = user, err

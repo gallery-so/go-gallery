@@ -18,7 +18,7 @@ type TokenGalleryRepository struct {
 	createStmt                              *sql.Stmt
 	getByUserIDStmt                         *sql.Stmt
 	getByUserIDPaginateStmt                 *sql.Stmt
-	getUserAddressesStmt                    *sql.Stmt
+	getUserWalletsStmt                      *sql.Stmt
 	getByContractStmt                       *sql.Stmt
 	getByContractPaginateStmt               *sql.Stmt
 	getByTokenIDStmt                        *sql.Stmt
@@ -54,7 +54,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) 
 	getByUserIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE OWNER_USER_ID = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1 AND DELETED = false;`)
+	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT WALLETS FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByContractStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC;`)
@@ -117,7 +117,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) 
 		createStmt:                              createStmt,
 		getByUserIDStmt:                         getByUserIDStmt,
 		getByUserIDPaginateStmt:                 getByUserIDPaginateStmt,
-		getUserAddressesStmt:                    getUserAddressesStmt,
+		getUserWalletsStmt:                      getUserWalletsStmt,
 		getByContractStmt:                       getByContractStmt,
 		getByContractPaginateStmt:               getByContractPaginateStmt,
 		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
@@ -435,7 +435,7 @@ func (t *TokenGalleryRepository) UpdateByIDUnsafe(pCtx context.Context, pID pers
 // UpdateByID updates a token by its ID
 func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 	var addresses []persist.Wallet
-	err := t.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
+	err := t.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return err
 	}

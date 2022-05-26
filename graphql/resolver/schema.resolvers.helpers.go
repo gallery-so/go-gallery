@@ -165,16 +165,6 @@ func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.
 	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, address persist.DBID) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return userToModel(ctx, *user), nil
-}
-
 func resolveGalleriesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Gallery, error) {
 	galleries, err := publicapi.For(ctx).Gallery.GetGalleriesByUserId(ctx, userID)
 
@@ -353,15 +343,15 @@ func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 }
 
 func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Wallet, error) {
-	addresses, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]*model.Wallet, 0, len(addresses))
+	output := make([]*model.Wallet, 0, len(wallets))
 
-	for _, address := range addresses {
+	for _, address := range wallets {
 		output = append(output, walletToModelSqlc(ctx, address))
 	}
 
@@ -394,9 +384,9 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	userApi := publicapi.For(ctx).User
 	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
 
-	wallets := make([]*model.Wallet, len(user.Addresses))
-	for i, address := range user.Addresses {
-		wallets[i] = walletToModelPersist(ctx, address)
+	wallets := make([]*model.Wallet, len(user.Wallets))
+	for i, wallet := range user.Wallets {
+		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
 	return &model.GalleryUser{

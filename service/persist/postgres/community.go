@@ -23,7 +23,7 @@ type CommunityRepository struct {
 	db    *sql.DB
 
 	getInfoStmt            *sql.Stmt
-	getUserByAddressStmt   *sql.Stmt
+	getUserByWalletIDStmt  *sql.Stmt
 	getWalletByDetailsStmt *sql.Stmt
 	getPreviewNFTsStmt     *sql.Stmt
 }
@@ -42,7 +42,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 	)
 	checkNoErr(err)
 
-	getUserByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE ADDRESSES @> ARRAY[$1]:: varchar[] AND DELETED = false`)
+	getUserByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE WALLETS @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
 	getWalletByDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,CHAIN,WALLET_TYPE FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
@@ -55,7 +55,7 @@ func NewCommunityRepository(db *sql.DB, cache memstore.Cache) *CommunityReposito
 		cache:                  cache,
 		db:                     db,
 		getInfoStmt:            getInfoStmt,
-		getUserByAddressStmt:   getUserByAddressStmt,
+		getUserByWalletIDStmt:  getUserByWalletIDStmt,
 		getWalletByDetailsStmt: getWalletByDetailsStmt,
 		getPreviewNFTsStmt:     getPreviewNFTsStmt,
 	}
@@ -135,7 +135,7 @@ func (c *CommunityRepository) GetByAddress(ctx context.Context, pCommunityAddres
 
 		var username persist.NullString
 		var userID persist.DBID
-		err := c.getUserByAddressStmt.QueryRowContext(ctx, address).Scan(&userID, &username)
+		err := c.getUserByWalletIDStmt.QueryRowContext(ctx, address).Scan(&userID, &username)
 		if err != nil {
 			logger.For(ctx).Warnf("error getting member of community '%s' by address '%s': %s", pCommunityAddress, address, err)
 			continue
