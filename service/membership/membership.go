@@ -3,10 +3,11 @@ package membership
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
