@@ -25,8 +25,11 @@ type EventMessage struct {
 
 func newClient(ctx context.Context) (*gcptasks.Client, error) {
 	trace := tracing.NewTracingInterceptor(true)
-	dopt := grpc.WithUnaryInterceptor(trace.UnaryInterceptor)
-	copts := []option.ClientOption{option.WithGRPCDialOption(dopt)}
+
+	copts := []option.ClientOption{
+		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(trace.UnaryInterceptor)),
+		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
+	}
 
 	if viper.GetString("ENV") == "local" {
 		copts = append(
