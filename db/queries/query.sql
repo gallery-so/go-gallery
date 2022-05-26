@@ -46,35 +46,23 @@ SELECT c.* FROM galleries g, unnest(g.collections)
     INNER JOIN collections c ON c.id = x.coll_id
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord;
 
--- name: GetNftById :one
-SELECT * FROM nfts WHERE id = $1 AND deleted = false;
-
--- name: GetNftByIdBatch :batchone
-SELECT * FROM nfts WHERE id = $1 AND deleted = false;
-
--- name: GetNftsByCollectionId :many
-SELECT n.* FROM collections c, unnest(c.nfts)
-    WITH ORDINALITY AS x(nft_id, nft_ord)
-    INNER JOIN nfts n ON n.id = x.nft_id
-    WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
-
--- name: GetNftsByCollectionIdBatch :batchmany
-SELECT n.* FROM collections c, unnest(c.nfts)
-    WITH ORDINALITY AS x(nft_id, nft_ord)
-    INNER JOIN nfts n ON n.id = x.nft_id
-    WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
-
--- name: GetTokensByUserID :many
-SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
-
--- name: GetTokensByUserIDBatch :batchmany
-SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
-
--- name: GetTokenByID :one
+-- name: GetTokenById :one
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
 
--- name: GetTokenByIDBatch :batchone
+-- name: GetTokenByIdBatch :batchone
 SELECT * FROM tokens WHERE id = $1 AND deleted = false;
+
+-- name: GetTokensByCollectionId :many
+SELECT t.* FROM collections c, unnest(c.nfts)
+    WITH ORDINALITY AS x(nft_id, nft_ord)
+    INNER JOIN tokens t ON t.id = x.nft_id
+    WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
+
+-- name: GetTokensByCollectionIdBatch :batchmany
+SELECT t.* FROM collections c, unnest(c.nfts)
+    WITH ORDINALITY AS x(nft_id, nft_ord)
+    INNER JOIN tokens t ON t.id = x.nft_id
+    WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
@@ -112,7 +100,6 @@ select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 -- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
-
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.follower = u.id
@@ -123,5 +110,5 @@ SELECT u.* FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false;
 
--- name: GetNftsByWalletIdBatch :batchmany
+-- name: GetTokensByWalletIdBatch :batchmany
 SELECT * FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false;

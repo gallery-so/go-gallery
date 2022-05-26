@@ -10,8 +10,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// FollowersLoaderByIdConfig captures the config to create a new FollowersLoaderById
-type FollowersLoaderByIdConfig struct {
+// UsersLoaderByIDConfig captures the config to create a new UsersLoaderByID
+type UsersLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
 	Fetch func(keys []persist.DBID) ([][]sqlc.User, []error)
 
@@ -22,17 +22,17 @@ type FollowersLoaderByIdConfig struct {
 	MaxBatch int
 }
 
-// NewFollowersLoaderById creates a new FollowersLoaderById given a fetch, wait, and maxBatch
-func NewFollowersLoaderById(config FollowersLoaderByIdConfig) *FollowersLoaderById {
-	return &FollowersLoaderById{
+// NewUsersLoaderByID creates a new UsersLoaderByID given a fetch, wait, and maxBatch
+func NewUsersLoaderByID(config UsersLoaderByIDConfig) *UsersLoaderByID {
+	return &UsersLoaderByID{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// FollowersLoaderById batches and caches requests
-type FollowersLoaderById struct {
+// UsersLoaderByID batches and caches requests
+type UsersLoaderByID struct {
 	// this method provides the data for the loader
 	fetch func(keys []persist.DBID) ([][]sqlc.User, []error)
 
@@ -49,13 +49,13 @@ type FollowersLoaderById struct {
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *followersLoaderByIdBatch
+	batch *usersLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type followersLoaderByIdBatch struct {
+type usersLoaderByIDBatch struct {
 	keys    []persist.DBID
 	data    [][]sqlc.User
 	error   []error
@@ -64,14 +64,14 @@ type followersLoaderByIdBatch struct {
 }
 
 // Load a User by key, batching and caching will be applied automatically
-func (l *FollowersLoaderById) Load(key persist.DBID) ([]sqlc.User, error) {
+func (l *UsersLoaderByID) Load(key persist.DBID) ([]sqlc.User, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *FollowersLoaderById) LoadThunk(key persist.DBID) func() ([]sqlc.User, error) {
+func (l *UsersLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.User, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -80,7 +80,7 @@ func (l *FollowersLoaderById) LoadThunk(key persist.DBID) func() ([]sqlc.User, e
 		}
 	}
 	if l.batch == nil {
-		l.batch = &followersLoaderByIdBatch{done: make(chan struct{})}
+		l.batch = &usersLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -114,7 +114,7 @@ func (l *FollowersLoaderById) LoadThunk(key persist.DBID) func() ([]sqlc.User, e
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *FollowersLoaderById) LoadAll(keys []persist.DBID) ([][]sqlc.User, []error) {
+func (l *UsersLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.User, []error) {
 	results := make([]func() ([]sqlc.User, error), len(keys))
 
 	for i, key := range keys {
@@ -132,7 +132,7 @@ func (l *FollowersLoaderById) LoadAll(keys []persist.DBID) ([][]sqlc.User, []err
 // LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *FollowersLoaderById) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.User, []error) {
+func (l *UsersLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.User, []error) {
 	results := make([]func() ([]sqlc.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -150,7 +150,7 @@ func (l *FollowersLoaderById) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *FollowersLoaderById) Prime(key persist.DBID, value []sqlc.User) bool {
+func (l *UsersLoaderByID) Prime(key persist.DBID, value []sqlc.User) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -165,13 +165,13 @@ func (l *FollowersLoaderById) Prime(key persist.DBID, value []sqlc.User) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *FollowersLoaderById) Clear(key persist.DBID) {
+func (l *UsersLoaderByID) Clear(key persist.DBID) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *FollowersLoaderById) unsafeSet(key persist.DBID, value []sqlc.User) {
+func (l *UsersLoaderByID) unsafeSet(key persist.DBID, value []sqlc.User) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]sqlc.User{}
 	}
@@ -180,7 +180,7 @@ func (l *FollowersLoaderById) unsafeSet(key persist.DBID, value []sqlc.User) {
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *followersLoaderByIdBatch) keyIndex(l *FollowersLoaderById, key persist.DBID) int {
+func (b *usersLoaderByIDBatch) keyIndex(l *UsersLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -204,7 +204,7 @@ func (b *followersLoaderByIdBatch) keyIndex(l *FollowersLoaderById, key persist.
 	return pos
 }
 
-func (b *followersLoaderByIdBatch) startTimer(l *FollowersLoaderById) {
+func (b *usersLoaderByIDBatch) startTimer(l *UsersLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -220,7 +220,7 @@ func (b *followersLoaderByIdBatch) startTimer(l *FollowersLoaderById) {
 	b.end(l)
 }
 
-func (b *followersLoaderByIdBatch) end(l *FollowersLoaderById) {
+func (b *usersLoaderByIDBatch) end(l *UsersLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

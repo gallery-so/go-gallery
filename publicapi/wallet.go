@@ -61,7 +61,7 @@ func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	a, err := api.loaders.WalletByUserID.Load(userID)
+	a, err := api.loaders.WalletsByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}

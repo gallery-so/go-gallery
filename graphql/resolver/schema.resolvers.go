@@ -25,7 +25,7 @@ func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection)
 }
 
 func (r *collectionResolver) Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
+	nfts, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
@@ -255,12 +255,12 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 		collectionID = *input.CollectionID
 	}
 
-	err := api.Nft.UpdateNftInfo(ctx, input.NftID, collectionID, input.CollectorsNote)
+	err := api.Token.UpdateTokenInfo(ctx, input.NftID, collectionID, input.CollectorsNote)
 	if err != nil {
 		return nil, err
 	}
 
-	nft, err := api.Nft.GetNftById(ctx, input.NftID)
+	nft, err := api.Token.GetTokenById(ctx, input.NftID)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 func (r *mutationResolver) RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Nft.RefreshTokens(ctx)
+	err := api.Token.RefreshTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (*model.Gallery
 }
 
 func (r *nftResolver) OwnedByWallets(ctx context.Context, obj *model.Nft) ([]*model.Wallet, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, obj.Dbid)
+	nft, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}

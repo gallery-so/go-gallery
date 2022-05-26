@@ -237,7 +237,7 @@ func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*mo
 }
 
 func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+	nft, err := publicapi.For(ctx).Token.GetTokenById(ctx, nftID)
 
 	if err != nil {
 		return nil, err
@@ -247,7 +247,7 @@ func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, err
 }
 
 func resolveNftsByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Nft, error) {
-	tokens, err := publicapi.For(ctx).Nft.GetTokensByWalletID(ctx, walletID)
+	tokens, err := publicapi.For(ctx).Token.GetTokensByWalletID(ctx, walletID)
 
 	if err != nil {
 		return nil, err
@@ -256,17 +256,8 @@ func resolveNftsByWalletID(ctx context.Context, walletID persist.DBID) ([]*model
 	return nftsToModel(ctx, tokens), nil
 }
 
-func resolveNftsByUserID(ctx context.Context, userId persist.DBID) ([]*model.Nft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByUserID(ctx, userId)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return nftsToModel(ctx, nfts), nil
-}
 func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (*model.GalleryUser, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+	nft, err := publicapi.For(ctx).Token.GetTokenById(ctx, nftID)
 
 	if err != nil {
 		return nil, err

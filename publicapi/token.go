@@ -33,23 +33,23 @@ type ErrTokenRefreshFailed struct {
 func (e ErrTokenRefreshFailed) Error() string {
 	return e.Message
 }
-func (api TokenAPI) GetNftById(ctx context.Context, nftID persist.DBID) (*sqlc.Token, error) {
+func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"nftID": {nftID, "required"},
+		"tokenID": {tokenID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	nft, err := api.loaders.TokenByID.Load(nftID)
+	token, err := api.loaders.TokenByTokenID.Load(tokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &nft, nil
+	return &token, nil
 }
 
-func (api TokenAPI) GetNftsByCollectionId(ctx context.Context, collectionID persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID) ([]sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -57,28 +57,12 @@ func (api TokenAPI) GetNftsByCollectionId(ctx context.Context, collectionID pers
 		return nil, err
 	}
 
-	nfts, err := api.loaders.TokensByCollectionID.Load(collectionID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
 
-	return nfts, nil
-}
-
-func (api TokenAPI) GetNftsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Token, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"ownerUserID": {userID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	nfts, err := api.loaders.TokenByUserID.Load(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return nfts, nil
+	return tokens, nil
 }
 
 func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]sqlc.Token, error) {
@@ -89,7 +73,7 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByWalletId.Load(walletID)
+	tokens, err := api.loaders.TokensByWalletID.Load(walletID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +99,10 @@ func (api TokenAPI) RefreshTokens(ctx context.Context) error {
 	return nil
 }
 
-func (api TokenAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
+func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"nftID":          {nftID, "required"},
+		"tokenID":        {tokenID, "required"},
 		"collectorsNote": {collectorsNote, "nft_note"},
 	}); err != nil {
 		return err
@@ -136,7 +120,7 @@ func (api TokenAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, colle
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	err = api.repos.TokenRepository.UpdateByID(ctx, nftID, userID, update)
+	err = api.repos.TokenRepository.UpdateByID(ctx, tokenID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -145,7 +129,7 @@ func (api TokenAPI) UpdateNftInfo(ctx context.Context, nftID persist.DBID, colle
 
 	// Send event
 	nftData := persist.NftEvent{CollectionID: collectionID, CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, nftID, nftData)
+	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, tokenID, nftData)
 
 	return nil
 }

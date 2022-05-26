@@ -10,8 +10,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// TokenLoaderByManyIDConfig captures the config to create a new TokenLoaderByManyID
-type TokenLoaderByManyIDConfig struct {
+// TokensLoaderByIDConfig captures the config to create a new TokensLoaderByID
+type TokensLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
 	Fetch func(keys []persist.DBID) ([][]sqlc.Token, []error)
 
@@ -22,17 +22,17 @@ type TokenLoaderByManyIDConfig struct {
 	MaxBatch int
 }
 
-// NewTokenLoaderByManyID creates a new TokenLoaderByManyID given a fetch, wait, and maxBatch
-func NewTokenLoaderByManyID(config TokenLoaderByManyIDConfig) *TokenLoaderByManyID {
-	return &TokenLoaderByManyID{
+// NewTokensLoaderByID creates a new TokensLoaderByID given a fetch, wait, and maxBatch
+func NewTokensLoaderByID(config TokensLoaderByIDConfig) *TokensLoaderByID {
+	return &TokensLoaderByID{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// TokenLoaderByManyID batches and caches requests
-type TokenLoaderByManyID struct {
+// TokensLoaderByID batches and caches requests
+type TokensLoaderByID struct {
 	// this method provides the data for the loader
 	fetch func(keys []persist.DBID) ([][]sqlc.Token, []error)
 
@@ -49,13 +49,13 @@ type TokenLoaderByManyID struct {
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *tokenLoaderByManyIDBatch
+	batch *tokensLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type tokenLoaderByManyIDBatch struct {
+type tokensLoaderByIDBatch struct {
 	keys    []persist.DBID
 	data    [][]sqlc.Token
 	error   []error
@@ -64,14 +64,14 @@ type tokenLoaderByManyIDBatch struct {
 }
 
 // Load a Token by key, batching and caching will be applied automatically
-func (l *TokenLoaderByManyID) Load(key persist.DBID) ([]sqlc.Token, error) {
+func (l *TokensLoaderByID) Load(key persist.DBID) ([]sqlc.Token, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Token.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenLoaderByManyID) LoadThunk(key persist.DBID) func() ([]sqlc.Token, error) {
+func (l *TokensLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.Token, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -80,7 +80,7 @@ func (l *TokenLoaderByManyID) LoadThunk(key persist.DBID) func() ([]sqlc.Token, 
 		}
 	}
 	if l.batch == nil {
-		l.batch = &tokenLoaderByManyIDBatch{done: make(chan struct{})}
+		l.batch = &tokensLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -114,7 +114,7 @@ func (l *TokenLoaderByManyID) LoadThunk(key persist.DBID) func() ([]sqlc.Token, 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokenLoaderByManyID) LoadAll(keys []persist.DBID) ([][]sqlc.Token, []error) {
+func (l *TokensLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.Token, []error) {
 	results := make([]func() ([]sqlc.Token, error), len(keys))
 
 	for i, key := range keys {
@@ -132,7 +132,7 @@ func (l *TokenLoaderByManyID) LoadAll(keys []persist.DBID) ([][]sqlc.Token, []er
 // LoadAllThunk returns a function that when called will block waiting for a Tokens.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokenLoaderByManyID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Token, []error) {
+func (l *TokensLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Token, []error) {
 	results := make([]func() ([]sqlc.Token, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -150,7 +150,7 @@ func (l *TokenLoaderByManyID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokenLoaderByManyID) Prime(key persist.DBID, value []sqlc.Token) bool {
+func (l *TokensLoaderByID) Prime(key persist.DBID, value []sqlc.Token) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -165,13 +165,13 @@ func (l *TokenLoaderByManyID) Prime(key persist.DBID, value []sqlc.Token) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *TokenLoaderByManyID) Clear(key persist.DBID) {
+func (l *TokensLoaderByID) Clear(key persist.DBID) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *TokenLoaderByManyID) unsafeSet(key persist.DBID, value []sqlc.Token) {
+func (l *TokensLoaderByID) unsafeSet(key persist.DBID, value []sqlc.Token) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]sqlc.Token{}
 	}
@@ -180,7 +180,7 @@ func (l *TokenLoaderByManyID) unsafeSet(key persist.DBID, value []sqlc.Token) {
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *tokenLoaderByManyIDBatch) keyIndex(l *TokenLoaderByManyID, key persist.DBID) int {
+func (b *tokensLoaderByIDBatch) keyIndex(l *TokensLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -204,7 +204,7 @@ func (b *tokenLoaderByManyIDBatch) keyIndex(l *TokenLoaderByManyID, key persist.
 	return pos
 }
 
-func (b *tokenLoaderByManyIDBatch) startTimer(l *TokenLoaderByManyID) {
+func (b *tokensLoaderByIDBatch) startTimer(l *TokensLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -220,7 +220,7 @@ func (b *tokenLoaderByManyIDBatch) startTimer(l *TokenLoaderByManyID) {
 	b.end(l)
 }
 
-func (b *tokenLoaderByManyIDBatch) end(l *TokenLoaderByManyID) {
+func (b *tokensLoaderByIDBatch) end(l *TokensLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
