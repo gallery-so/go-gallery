@@ -26,11 +26,13 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.15.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/hamba/avro v1.6.6 // indirect
+	github.com/hasura/go-graphql-client v0.6.5 // indirect
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/go-ipfs-files v0.1.1 // indirect
 	github.com/jackc/pgconn v1.11.0
 	github.com/jackc/pgtype v1.10.0
 	github.com/jackc/pgx/v4 v4.15.0
+	github.com/klauspost/compress v1.15.2 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/libp2p/go-libp2p-core v0.14.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
@@ -44,6 +46,7 @@ require (
 	github.com/qmuntal/gltf v0.22.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shopspring/decimal v1.3.1 // indirect
+	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/viper v1.10.1
@@ -55,6 +58,7 @@ require (
 	github.com/wealdtech/go-ens/v3 v3.5.2
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000 // indirect
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
 	google.golang.org/api v0.72.0
 	google.golang.org/appengine v1.6.7

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -14,6 +15,7 @@ type UserEventRepository struct {
 	getByEventIDStmt             *sql.Stmt
 	getMatchingEventsForUserStmt *sql.Stmt
 	getMatchingEventBeforeStmt   *sql.Stmt
+	markSentStmt                 *sql.Stmt
 }
 
 func NewUserEventRepository(db *sql.DB) *UserEventRepository {
@@ -42,9 +44,12 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
 		`SELECT ID, USER_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM user_events
-		 WHERE USER_ID = $1 AND EVENT_CODE = $2 AND LAST_UPDATED < $3
+		 WHERE USER_ID = $1 AND EVENT_CODE = $2 AND LAST_UPDATED < $3 AND SENT = true
 		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
 	)
+	checkNoErr(err)
+
+	markSentStmt, err := db.PrepareContext(ctx, `UPDATE user_events SET SENT = true, LAST_UPDATED = now() WHERE ID = $1`)
 	checkNoErr(err)
 
 	return &UserEventRepository{
@@ -53,6 +58,7 @@ func NewUserEventRepository(db *sql.DB) *UserEventRepository {
 		getByEventIDStmt:             getByEventIDStmt,
 		getMatchingEventsForUserStmt: getMatchingEventsForUserStmt,
 		getMatchingEventBeforeStmt:   getMatchingEventBeforeStmt,
+		markSentStmt:                 markSentStmt,
 	}
 }
 
@@ -101,4 +107,22 @@ func (e *UserEventRepository) GetEventBefore(ctx context.Context, event persist.
 		return nil, err
 	}
 	return &evt, nil
+}
+
+func (e *UserEventRepository) MarkSent(ctx context.Context, eventID persist.DBID) error {
+	res, err := e.markSentStmt.ExecContext(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("user event(%s) doesn't exist", eventID)
+	}
+
+	return nil
 }

@@ -7,7 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/shurcooL/graphql"
 	"github.com/spf13/viper"
 )
 
@@ -55,8 +56,8 @@ func CaptureExceptions() gin.HandlerFunc {
 	}
 }
 
-func handlersInit(router *gin.Engine, userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.NftEventRepository, collectionEventRepo persist.CollectionEventRepository) *gin.Engine {
+func handlersInit(router *gin.Engine, repos persist.Repositories, gql *graphql.Client) *gin.Engine {
 	router.GET("/ping", ping())
-	router.POST("/tasks/feed-event", TaskRequired(), CaptureExceptions(), handleMessage(userRepo, userEventRepo, tokenEventRepo, collectionEventRepo))
+	router.POST("/tasks/feed-event", TaskRequired(), CaptureExceptions(), handleMessage(repos, gql))
 	return router
 }
