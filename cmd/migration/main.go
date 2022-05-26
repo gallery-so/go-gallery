@@ -33,31 +33,28 @@ func run() {
 	logrus.Info("Full migration...")
 
 	// Users migration
-	logrus.Info("Copying users to temp table...")
-	if err := copyUsersToTempTable(pgClient); err != nil {
-		panic(err)
-	}
-	logrus.Info("Copying users to temp table... Done")
 
-	logrus.Info("Clearing addresses column in users table...")
-	if err := clearAddressesColumn(pgClient); err != nil {
-		panic(err)
-	}
-	logrus.Info("Clearing addresses column in users table... Done")
+	// if err := copyBack(pgClient); err != nil {
+	// 	panic(err)
+	// }
 
-	logrus.Info("Getting all users wallets...")
-	idsToAddresses, err := getAllUsersWallets(pgClient)
-	if err != nil {
-		panic(err)
-	}
-	logrus.Info("Getting all users wallets... Done")
-	logrus.Infof("Found %d users", len(idsToAddresses))
+	// if err := copyUsersToTempTable(pgClient); err != nil {
+	// 	panic(err)
+	// }
 
-	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
-	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
-		panic(err)
-	}
-	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
+	// logrus.Info("Getting all users wallets...")
+	// idsToAddresses, err := getAllUsersWallets(pgClient)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logrus.Info("Getting all users wallets... Done")
+	// logrus.Infof("Found %d users", len(idsToAddresses))
+
+	// logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+	// 	panic(err)
+	// }
+	// logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	// NFTs migration
 
@@ -90,14 +87,33 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
+func copyBack(pg *sql.DB) error {
+	var sel int
+	pg.QueryRow(`SELECT 1 FROM temp_users WHERE CARDINALITY(WALLETS) > 0;`).Scan(&sel)
+	if sel > 0 {
+		logrus.Info("Found temp_users with addresses... copying back to original table")
+		_, err := pg.Exec(`
+		UPDATE users u SET WALLETS = (SELECT WALLETS FROM temp_users WHERE ID = u.ID)
+	`)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func copyUsersToTempTable(pg *sql.DB) error {
-	_, err := pg.Exec(`
-		DROP TABLE IF EXISTS temp_users;
+	var sel int
+	err := pg.QueryRow(`SELECT 1 FROM temp_users WHERE DELETED = false;`).Scan(&sel)
+	if err != nil && sel == 0 {
+		logrus.Info("Copying users to temp table...")
+		_, err = pg.Exec(`
 		CREATE TABLE temp_users AS
 			SELECT * FROM users;
-	`)
-	if err != nil {
-		return err
+		`)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -123,46 +139,26 @@ func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) 
 	return idToAddress, nil
 }
 
-func clearAddressesColumn(pg *sql.DB) error {
-	_, err := pg.Exec(`UPDATE users SET WALLETS = $1;`, []persist.DBID{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]persist.Address) error {
+	pg.Exec(`TRUNCATE wallets;`)
 	bar := progressbar.Default(int64(len(idsToAddresses)), "Creating Wallets")
 	for id, addresses := range idsToAddresses {
-		tx, err := pg.Begin()
-		if err != nil {
-			return err
-		}
-		err = func() error {
-			defer tx.Rollback()
-			userWallets := make([]persist.DBID, len(addresses))
-			for i, address := range addresses {
-				walletID := persist.GenerateID()
-				_, err = tx.Exec(`INSERT INTO WALLETS (ID,VERSION,ADDRESS,WALLET_TYPE,CHAIN) VALUES ($1,$2,$3,$4,0) ON CONFLICT (ADDRESS) DO NOTHING;`, walletID, 0, address, persist.WalletTypeEOA)
-				if err != nil {
-					return err
-				}
 
-				userWallets[i] = walletID
-			}
-			_, err = tx.Exec(`UPDATE users SET WALLETS = $1 WHERE ID = $2;`, userWallets, id)
+		userWallets := make([]persist.DBID, len(addresses))
+		for i, address := range addresses {
+			walletID := persist.GenerateID()
+			_, err := pg.Exec(`INSERT INTO wallets (ID,VERSION,ADDRESS,WALLET_TYPE,CHAIN) VALUES ($1,$2,$3,$4,0) ON CONFLICT DO NOTHING;`, walletID, 0, address, persist.WalletTypeEOA)
 			if err != nil {
 				return err
 			}
-			err = tx.Commit()
-			if err != nil {
-				return err
-			}
-			return nil
-		}()
+
+			userWallets[i] = walletID
+		}
+		_, err := pg.Exec(`UPDATE users SET WALLETS = $1 WHERE ID = $2;`, userWallets, id)
 		if err != nil {
 			return err
 		}
+
 		bar.Add(1)
 	}
 	return nil
@@ -226,7 +222,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		select {
 		case toUpsert, ok := <-toUpsertChan:
 			if i == perUpsert || !ok {
-				err = upsertTokens(pg, tokens)
+				err = upsertTokens(pg, dedupeTokens(tokens))
 				if err != nil {
 					return err
 				}

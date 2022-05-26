@@ -85,7 +85,7 @@ func NewEthClient() *ethclient.Client {
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 10)
+	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
 
@@ -161,9 +161,14 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		it, err := ipfsClient.Cat(path)
 		if err != nil {
-			bs, nextErr := getIPFSPI(ctx, path)
+			if err == context.Canceled {
+				c, cancel := context.WithTimeout(context.Background(), time.Second*30)
+				defer cancel()
+				ctx = c
+			}
+			bs, nextErr := getIPFSAPI(ctx, path)
 			if nextErr == nil {
-				return bs, nil
+				return removeBOM(bs), nil
 			}
 
 			return nil, fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
@@ -173,7 +178,16 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, it, 1024*1024*1024)
 		if err != nil {
-			return nil, err
+			if err == context.Canceled {
+				c, cancel := context.WithTimeout(context.Background(), time.Second*30)
+				defer cancel()
+				ctx = c
+			}
+			bs, nextErr := getIPFSAPI(ctx, path)
+			if nextErr == nil {
+				return removeBOM(bs), nil
+			}
+			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, path)
 		}
 
 		return removeBOM(buf.Bytes()), nil
@@ -198,7 +212,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting data from http: %s - %s", err, asString)
 		}
 
 		return removeBOM(buf.Bytes()), nil
@@ -216,7 +230,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, it, 1024*1024*1024)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, query)
 		}
 
 		return removeBOM(buf.Bytes()), nil
@@ -228,7 +242,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return removeBOM([]byte(asString[idx:])), nil
 
 	default:
-		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
+		return nil, fmt.Errorf("unknown token URI type: %s - %s", turi.Type(), turi)
 	}
 
 }
@@ -267,7 +281,12 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 
 		it, err := ipfsClient.Cat(path)
 		if err != nil {
-			bs, nextErr := getIPFSPI(ctx, path)
+			if err == context.Canceled {
+				c, cancel := context.WithTimeout(context.Background(), time.Second*10)
+				defer cancel()
+				ctx = c
+			}
+			bs, nextErr := getIPFSAPI(ctx, path)
 			if nextErr == nil {
 				return json.Unmarshal(bs, into)
 			}
@@ -331,7 +350,7 @@ func removeBOM(bs []byte) []byte {
 	return bs
 }
 
-func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
+func getIPFSAPI(pCtx context.Context, hash string) ([]byte, error) {
 	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", hash)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
