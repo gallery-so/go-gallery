@@ -41,7 +41,7 @@ func (t TracingInterceptor) UnaryInterceptor(ctx context.Context, method string,
 				"HTTP Method":  appReq.AppEngineHttpRequest.HttpMethod,
 				"Relative URI": appReq.AppEngineHttpRequest.RelativeUri,
 				"Headers":      appReq.AppEngineHttpRequest.Headers,
-				"Body":         appReq.AppEngineHttpRequest.GetBody(),
+				"Body":         string(appReq.AppEngineHttpRequest.GetBody()),
 			})
 		}
 	}
