@@ -36,9 +36,10 @@ func (r *Community) ID() GqlID {
 	// (b) the field exists but is not a string type
 	//-----------------------------------------------------------------------------------------------
 	// Please create binding methods on the Community type with the following signatures:
+	// func (r *Community) GetGqlIDField_ContractAddress() string
 	// func (r *Community) GetGqlIDField_Chain() string
 	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("Community:%s:%s", *r.ContractAddress, r.GetGqlIDField_Chain()))
+	return GqlID(fmt.Sprintf("Community:%s:%s", r.GetGqlIDField_ContractAddress(), r.GetGqlIDField_Chain()))
 }
 
 func (r *Gallery) ID() GqlID {
@@ -64,7 +65,7 @@ func (r *Wallet) ID() GqlID {
 type NodeFetcher struct {
 	OnCollection     func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionNft  func(ctx context.Context, nftId string, collectionId string) (*CollectionNft, error)
-	OnCommunity      func(ctx context.Context, contractAddress persist.Address, chain string) (*Community, error)
+	OnCommunity      func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnGallery        func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser    func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
@@ -96,7 +97,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		if len(ids) != 2 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCommunity(ctx, persist.Address(ids[0]), string(ids[1]))
+		return n.OnCommunity(ctx, string(ids[0]), string(ids[1]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}

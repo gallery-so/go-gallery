@@ -299,7 +299,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 			if addr.String() != persist.ZeroAddress.String() {
 				logger.For(ctx).Debug("Event is to real address")
 				// does to have the NFT?
-				wallet, err := walletRepository.GetByAddressDetails(ctx, persist.Address(addr), persist.ChainETH)
+				wallet, err := walletRepository.GetByChainAddress(ctx, persist.NewChainAddress(persist.Address(addr), persist.ChainETH))
 				if err != nil {
 					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s: no wallet found for address", addr, id)
 					ownersChan <- persist.TokenHolder{}
@@ -424,8 +424,8 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			walletIDs := make([]persist.DBID, len(token.OwnerAddresses))
-			for i, w := range token.OwnerAddresses {
+			walletIDs := make([]persist.DBID, len(token.OwnedByWallets))
+			for i, w := range token.OwnedByWallets {
 				walletIDs[i] = w.ID
 			}
 			membershipOwner := fillMembershipOwnerToken(ctx, walletIDs, id, ethClient, userRepository, galleryRepository, walletRepository)

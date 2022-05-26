@@ -20,9 +20,9 @@ type BackupRepository struct {
 	deleteBackupStmt      *sql.Stmt
 	insertBackupStmt      *sql.Stmt
 
-	getUserAddressesStmt *sql.Stmt
-	ownsNFTStmt          *sql.Stmt
-	undeleteNFTStmt      *sql.Stmt
+	getUserWalletsStmt *sql.Stmt
+	ownsNFTStmt        *sql.Stmt
+	undeleteNFTStmt    *sql.Stmt
 
 	updateCollectionNFTsStmt *sql.Stmt
 	updateGalleryStmt        *sql.Stmt
@@ -53,7 +53,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY, CREATED_AT) VALUES ($1, $2, $3, $4, $5);`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
+	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT WALLETS FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
 	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = $2 AND DELETED = false);`)
@@ -77,9 +77,9 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 		getBackupsStmt:        getBackupsStmt,
 		getBackupByIDStmt:     getBackupByIDStmt,
 
-		getUserAddressesStmt: getUserAddressesStmt,
-		ownsNFTStmt:          ownsNFTStmt,
-		undeleteNFTStmt:      undeleteNFTStmt,
+		getUserWalletsStmt: getUserWalletsStmt,
+		ownsNFTStmt:        ownsNFTStmt,
+		undeleteNFTStmt:    undeleteNFTStmt,
 
 		updateCollectionNFTsStmt: updateCollectionNFTsStmt,
 		updateGalleryStmt:        updateGalleryStmt,
@@ -220,7 +220,7 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 	}
 
 	var addresses []persist.EthereumAddress
-	err = b.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
+	err = b.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return fmt.Errorf("could not get user addresses for user %s: %w", pUserID, err)
 	}

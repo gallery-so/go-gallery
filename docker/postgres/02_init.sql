@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     USERNAME varchar(255),
     USERNAME_IDEMPOTENT varchar(255),
-    ADDRESSES varchar(255) [],
+    WALLETS varchar(255) [],
     BIO varchar
 );
 
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     MEDIA jsonb,
     CHAIN int,
     OWNER_USER_ID varchar(255),
-    OWNER_ADDRESSES varchar(255) [],
+    OWNED_BY_WALLETS varchar(255) [],
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,
@@ -265,7 +265,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     CHAIN int
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_address_idx on wallets (ADDRESS, CHAIN);
 
 CREATE TABLE IF NOT EXISTS follows (
     ID varchar(255) PRIMARY KEY,

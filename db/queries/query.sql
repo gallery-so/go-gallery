@@ -10,12 +10,6 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND de
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
--- name: GetUserByAddress :one
-SELECT * FROM users WHERE sqlc.arg(address)::varchar = ANY(addresses) AND deleted = false;
-
--- name: GetUserByAddressBatch :batchone
-SELECT * FROM users WHERE $1::varchar = ANY(addresses) AND deleted = false;
-
 -- name: GetGalleryById :one
 SELECT * FROM galleries WHERE id = $1 AND deleted = false;
 
@@ -70,12 +64,6 @@ SELECT n.* FROM collections c, unnest(c.nfts)
     INNER JOIN nfts n ON n.id = x.nft_id
     WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
 
--- name: GetNftsByOwnerAddress :many
-SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
-
--- name: GetNftsByOwnerAddressBatch :batchmany
-SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
-
 -- name: GetTokensByUserID :many
 SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
 
@@ -100,17 +88,17 @@ SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 -- name: GetWalletByIDBatch :batchone
 SELECT * FROM wallets WHERE id = $1 AND deleted = false;
 
--- name: GetWalletByAddressDetails :one
+-- name: GetWalletByChainAddress :one
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
--- name: GetWalletByAddressDetailsBatch :batchone
+-- name: GetWalletByChainAddressBatch :batchone
 SELECT wallets.* FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false;
 
 -- name: GetWalletsByUserID :many
-SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
+SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
 -- name: GetWalletsByUserIDBatch :batchmany
-SELECT w.* FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord;
+SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord;
 
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
@@ -118,10 +106,10 @@ select * FROM contracts WHERE id = $1 AND deleted = false;
 -- name: GetContractByIDBatch :batchone
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByDetails :one
+-- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
--- name: GetContractByDetailsBatch :batchone
+-- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
 
@@ -134,3 +122,6 @@ SELECT u.* FROM follows f
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false;
+
+-- name: GetNftsByWalletIdBatch :batchmany
+SELECT * FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false;

@@ -10,10 +10,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// WalletLoaderByAddressDetailsConfig captures the config to create a new WalletLoaderByAddressDetails
-type WalletLoaderByAddressDetailsConfig struct {
+// ContractLoaderByChainAddressConfig captures the config to create a new ContractLoaderByChainAddress
+type ContractLoaderByChainAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.ChainAddress) ([]sqlc.Wallet, []error)
+	Fetch func(keys []persist.ChainAddress) ([]sqlc.Contract, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -22,19 +22,19 @@ type WalletLoaderByAddressDetailsConfig struct {
 	MaxBatch int
 }
 
-// NewWalletLoaderByAddressDetails creates a new WalletLoaderByAddressDetails given a fetch, wait, and maxBatch
-func NewWalletLoaderByAddressDetails(config WalletLoaderByAddressDetailsConfig) *WalletLoaderByAddressDetails {
-	return &WalletLoaderByAddressDetails{
+// NewContractLoaderByChainAddress creates a new ContractLoaderByChainAddress given a fetch, wait, and maxBatch
+func NewContractLoaderByChainAddress(config ContractLoaderByChainAddressConfig) *ContractLoaderByChainAddress {
+	return &ContractLoaderByChainAddress{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// WalletLoaderByAddressDetails batches and caches requests
-type WalletLoaderByAddressDetails struct {
+// ContractLoaderByChainAddress batches and caches requests
+type ContractLoaderByChainAddress struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.ChainAddress) ([]sqlc.Wallet, []error)
+	fetch func(keys []persist.ChainAddress) ([]sqlc.Contract, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,51 +45,51 @@ type WalletLoaderByAddressDetails struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.ChainAddress]sqlc.Wallet
+	cache map[persist.ChainAddress]sqlc.Contract
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *walletLoaderByAddressDetailsBatch
+	batch *contractLoaderByChainAddressBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type walletLoaderByAddressDetailsBatch struct {
+type contractLoaderByChainAddressBatch struct {
 	keys    []persist.ChainAddress
-	data    []sqlc.Wallet
+	data    []sqlc.Contract
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a Wallet by key, batching and caching will be applied automatically
-func (l *WalletLoaderByAddressDetails) Load(key persist.ChainAddress) (sqlc.Wallet, error) {
+// Load a Contract by key, batching and caching will be applied automatically
+func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (sqlc.Contract, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a Wallet.
+// LoadThunk returns a function that when called will block waiting for a Contract.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderByAddressDetails) LoadThunk(key persist.ChainAddress) func() (sqlc.Wallet, error) {
+func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (sqlc.Contract, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.Wallet, error) {
+		return func() (sqlc.Contract, error) {
 			return it, nil
 		}
 	}
 	if l.batch == nil {
-		l.batch = &walletLoaderByAddressDetailsBatch{done: make(chan struct{})}
+		l.batch = &contractLoaderByChainAddressBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.Wallet, error) {
+	return func() (sqlc.Contract, error) {
 		<-batch.done
 
-		var data sqlc.Wallet
+		var data sqlc.Contract
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,43 +114,43 @@ func (l *WalletLoaderByAddressDetails) LoadThunk(key persist.ChainAddress) func(
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *WalletLoaderByAddressDetails) LoadAll(keys []persist.ChainAddress) ([]sqlc.Wallet, []error) {
-	results := make([]func() (sqlc.Wallet, error), len(keys))
+func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]sqlc.Contract, []error) {
+	results := make([]func() (sqlc.Contract, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	wallets := make([]sqlc.Wallet, len(keys))
+	contracts := make([]sqlc.Contract, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		wallets[i], errors[i] = thunk()
+		contracts[i], errors[i] = thunk()
 	}
-	return wallets, errors
+	return contracts, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a Wallets.
+// LoadAllThunk returns a function that when called will block waiting for a Contracts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderByAddressDetails) LoadAllThunk(keys []persist.ChainAddress) func() ([]sqlc.Wallet, []error) {
-	results := make([]func() (sqlc.Wallet, error), len(keys))
+func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]sqlc.Contract, []error) {
+	results := make([]func() (sqlc.Contract, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.Wallet, []error) {
-		wallets := make([]sqlc.Wallet, len(keys))
+	return func() ([]sqlc.Contract, []error) {
+		contracts := make([]sqlc.Contract, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			wallets[i], errors[i] = thunk()
+			contracts[i], errors[i] = thunk()
 		}
-		return wallets, errors
+		return contracts, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *WalletLoaderByAddressDetails) Prime(key persist.ChainAddress, value sqlc.Wallet) bool {
+func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value sqlc.Contract) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -161,22 +161,22 @@ func (l *WalletLoaderByAddressDetails) Prime(key persist.ChainAddress, value sql
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *WalletLoaderByAddressDetails) Clear(key persist.ChainAddress) {
+func (l *ContractLoaderByChainAddress) Clear(key persist.ChainAddress) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *WalletLoaderByAddressDetails) unsafeSet(key persist.ChainAddress, value sqlc.Wallet) {
+func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value sqlc.Contract) {
 	if l.cache == nil {
-		l.cache = map[persist.ChainAddress]sqlc.Wallet{}
+		l.cache = map[persist.ChainAddress]sqlc.Contract{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *walletLoaderByAddressDetailsBatch) keyIndex(l *WalletLoaderByAddressDetails, key persist.ChainAddress) int {
+func (b *contractLoaderByChainAddressBatch) keyIndex(l *ContractLoaderByChainAddress, key persist.ChainAddress) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -200,7 +200,7 @@ func (b *walletLoaderByAddressDetailsBatch) keyIndex(l *WalletLoaderByAddressDet
 	return pos
 }
 
-func (b *walletLoaderByAddressDetailsBatch) startTimer(l *WalletLoaderByAddressDetails) {
+func (b *contractLoaderByChainAddressBatch) startTimer(l *ContractLoaderByChainAddress) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -216,7 +216,7 @@ func (b *walletLoaderByAddressDetailsBatch) startTimer(l *WalletLoaderByAddressD
 	b.end(l)
 }
 
-func (b *walletLoaderByAddressDetailsBatch) end(l *WalletLoaderByAddressDetails) {
+func (b *contractLoaderByChainAddressBatch) end(l *ContractLoaderByChainAddress) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

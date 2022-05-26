@@ -12,9 +12,9 @@ import (
 type WalletRepository struct {
 	db *sql.DB
 
-	insertStmt              *sql.Stmt
-	getByIDStmt             *sql.Stmt
-	getByAddressDetailsStmt *sql.Stmt
+	insertStmt            *sql.Stmt
+	getByIDStmt           *sql.Stmt
+	getByChainAddressStmt *sql.Stmt
 }
 
 // NewWalletRepository creates a new postgres repository for interacting with wallets
@@ -28,14 +28,14 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ID = $1 AND DELETED = FALSE;`)
 	checkNoErr(err)
 
-	getByAddressDetailsStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = FALSE;`)
+	getByChainAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = FALSE;`)
 	checkNoErr(err)
 
 	return &WalletRepository{
-		db:                      db,
-		getByIDStmt:             getByIDStmt,
-		getByAddressDetailsStmt: getByAddressDetailsStmt,
-		insertStmt:              insertStmt,
+		db:                    db,
+		getByIDStmt:           getByIDStmt,
+		getByChainAddressStmt: getByChainAddressStmt,
+		insertStmt:            insertStmt,
 	}
 }
 
@@ -53,13 +53,13 @@ func (w *WalletRepository) GetByID(ctx context.Context, ID persist.DBID) (persis
 
 }
 
-// GetByAddressDetails returns a wallet by address and chain
-func (w *WalletRepository) GetByAddressDetails(ctx context.Context, addr persist.Address, chain persist.Chain) (persist.Wallet, error) {
+// GetByChainAddress returns a wallet by address and chain
+func (w *WalletRepository) GetByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (persist.Wallet, error) {
 	var wallet persist.Wallet
-	err := w.getByAddressDetailsStmt.QueryRowContext(ctx, addr, chain).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address, &wallet.WalletType, &wallet.Chain)
+	err := w.getByChainAddressStmt.QueryRowContext(ctx, chainAddress.Address(), chainAddress.Chain()).Scan(&wallet.ID, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated, &wallet.Address, &wallet.WalletType, &wallet.Chain)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return wallet, persist.ErrWalletNotFoundByAddressDetails{Address: addr, Chain: chain}
+			return wallet, persist.ErrWalletNotFoundByChainAddress{ChainAddress: chainAddress}
 		}
 		return wallet, err
 	}
@@ -68,15 +68,15 @@ func (w *WalletRepository) GetByAddressDetails(ctx context.Context, addr persist
 }
 
 // Insert inserts a wallet by its address and chain
-func (w *WalletRepository) Insert(ctx context.Context, addr persist.Address, chain persist.Chain, walletType persist.WalletType) (persist.DBID, error) {
+func (w *WalletRepository) Insert(ctx context.Context, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
 
-	_, err := w.insertStmt.ExecContext(ctx, persist.GenerateID(), 0, addr, chain, walletType)
+	_, err := w.insertStmt.ExecContext(ctx, persist.GenerateID(), 0, chainAddress.Address(), chainAddress.Chain(), walletType)
 	if err != nil {
 		return "", err
 	}
 
-	// rather than using the ID generated above, we must retrieve it because in the case of conflict the ID above would be innacurate.
-	wa, err := w.GetByAddressDetails(ctx, addr, chain)
+	// rather than using the ID generated above, we must retrieve it because in the case of conflict the ID above would be inaccurate.
+	wa, err := w.GetByChainAddress(ctx, chainAddress)
 	if err != nil {
 		return "", err
 	}

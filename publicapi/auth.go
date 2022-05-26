@@ -22,10 +22,9 @@ type AuthAPI struct {
 	multiChainProvier *multichain.Provider
 }
 
-func (api AuthAPI) NewNonceAuthenticator(address persist.Address, chain persist.Chain, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
+func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainAddress, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
 	authenticator := auth.NonceAuthenticator{
-		Address:            address,
-		Chain:              chain,
+		ChainAddress:       chainAddress,
 		Nonce:              nonce,
 		Signature:          signature,
 		WalletType:         walletType,
@@ -38,11 +37,11 @@ func (api AuthAPI) NewNonceAuthenticator(address persist.Address, chain persist.
 	return authenticator
 }
 
-func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.Address, chain persist.Chain) (nonce string, userExists bool, err error) {
+func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (nonce string, userExists bool, err error) {
 	gc := util.GinContextFromContext(ctx)
 	authed := auth.GetUserAuthedFromCtx(gc)
 
-	return auth.GetAuthNonce(ctx, address, chain, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.WalletRepository, api.ethClient)
+	return auth.GetAuthNonce(ctx, chainAddress, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.WalletRepository, api.ethClient)
 }
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {

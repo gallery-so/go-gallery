@@ -137,13 +137,6 @@ type AddUserAddressPayload struct {
 
 func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
 
-type AddressDetails struct {
-	Address *persist.Address `json:"address"`
-	Chain   *persist.Chain   `json:"chain"`
-}
-
-func (AddressDetails) IsGalleryUserOrAddress() {}
-
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
 	MediaURL         *string        `json:"mediaURL"`
@@ -201,14 +194,14 @@ func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type Community struct {
-	LastUpdated     *time.Time       `json:"lastUpdated"`
-	ContractAddress *persist.Address `json:"contractAddress"`
-	CreatorAddress  *persist.Address `json:"creatorAddress"`
-	Chain           *persist.Chain   `json:"chain"`
-	Name            *string          `json:"name"`
-	Description     *string          `json:"description"`
-	PreviewImage    *string          `json:"previewImage"`
-	Owners          []*TokenHolder   `json:"owners"`
+	LastUpdated     *time.Time            `json:"lastUpdated"`
+	ContractAddress *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
+	Chain           *persist.Chain        `json:"chain"`
+	Name            *string               `json:"name"`
+	Description     *string               `json:"description"`
+	PreviewImage    *string               `json:"previewImage"`
+	Owners          []*TokenHolder        `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -237,9 +230,8 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
-	UserID    *persist.DBID     `json:"userId"`
-	Addresses []persist.Address `json:"addresses"`
-	Chains    []persist.Chain   `json:"chains"`
+	UserID         *persist.DBID           `json:"userId"`
+	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
 }
 
 type DeleteCollectionPayload struct {
@@ -249,10 +241,9 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type EoaAuth struct {
-	Address   persist.Address `json:"address"`
-	Chain     persist.Chain   `json:"chain"`
-	Nonce     string          `json:"nonce"`
-	Signature string          `json:"signature"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Nonce        string                `json:"nonce"`
+	Signature    string                `json:"signature"`
 }
 
 type ErrAuthenticationFailed struct {
@@ -497,28 +488,28 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	Dbid                  persist.DBID       `json:"dbid"`
-	CreationTime          *time.Time         `json:"creationTime"`
-	LastUpdated           *time.Time         `json:"lastUpdated"`
-	CollectorsNote        *string            `json:"collectorsNote"`
-	Media                 MediaSubtype       `json:"media"`
-	TokenType             *TokenType         `json:"tokenType"`
-	Chain                 *persist.Chain     `json:"chain"`
-	Name                  *string            `json:"name"`
-	Description           *string            `json:"description"`
-	TokenURI              *string            `json:"tokenUri"`
-	TokenID               *string            `json:"tokenId"`
-	Quantity              *string            `json:"quantity"`
-	Owner                 *GalleryUser       `json:"owner"`
-	OwnerAddresses        []*persist.Address `json:"ownerAddresses"`
-	OwnershipHistory      []*OwnerAtBlock    `json:"ownershipHistory"`
-	TokenMetadata         *string            `json:"tokenMetadata"`
-	ContractAddress       *persist.Address   `json:"contractAddress"`
-	ExternalURL           *string            `json:"externalUrl"`
-	BlockNumber           *string            `json:"blockNumber"`
-	CreatorAddress        *persist.Address   `json:"creatorAddress"`
-	OpenseaCollectionName *string            `json:"openseaCollectionName"`
-	OpenseaID             *int               `json:"openseaId"`
+	Dbid                  persist.DBID          `json:"dbid"`
+	CreationTime          *time.Time            `json:"creationTime"`
+	LastUpdated           *time.Time            `json:"lastUpdated"`
+	CollectorsNote        *string               `json:"collectorsNote"`
+	Media                 MediaSubtype          `json:"media"`
+	TokenType             *TokenType            `json:"tokenType"`
+	Chain                 *persist.Chain        `json:"chain"`
+	Name                  *string               `json:"name"`
+	Description           *string               `json:"description"`
+	TokenURI              *string               `json:"tokenUri"`
+	TokenID               *string               `json:"tokenId"`
+	Quantity              *string               `json:"quantity"`
+	Owner                 *GalleryUser          `json:"owner"`
+	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
+	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	TokenMetadata         *string               `json:"tokenMetadata"`
+	ContractAddress       *persist.ChainAddress `json:"contractAddress"`
+	ExternalURL           *string               `json:"externalUrl"`
+	BlockNumber           *string               `json:"blockNumber"`
+	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
+	OpenseaCollectionName *string               `json:"openseaCollectionName"`
+	OpenseaID             *int                  `json:"openseaId"`
 }
 
 func (Nft) IsNode()           {}
@@ -680,11 +671,11 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	Dbid       persist.DBID        `json:"dbid"`
-	Address    *persist.Address    `json:"address"`
-	Chain      *persist.Chain      `json:"chain"`
-	WalletType *persist.WalletType `json:"walletType"`
-	Nfts       []*Nft              `json:"nfts"`
+	Dbid         persist.DBID          `json:"dbid"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Chain        *persist.Chain        `json:"chain"`
+	WalletType   *persist.WalletType   `json:"walletType"`
+	Nfts         []*Nft                `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}

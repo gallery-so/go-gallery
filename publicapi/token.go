@@ -81,9 +81,24 @@ func (api TokenAPI) GetNftsByUserID(ctx context.Context, userID persist.DBID) ([
 	return nfts, nil
 }
 
-func (api TokenAPI) RefreshTokens(ctx context.Context, addresses []*persist.Address) error {
-	// No validation to do here -- addresses is an optional comma-separated list of addresses
+func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]sqlc.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"walletID": {walletID, "required"},
+	}); err != nil {
+		return nil, err
+	}
 
+	tokens, err := api.loaders.TokensByWalletId.Load(walletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (api TokenAPI) RefreshTokens(ctx context.Context) error {
+	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err

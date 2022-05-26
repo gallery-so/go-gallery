@@ -17,7 +17,11 @@ func (r *CollectionNft) GetGqlIDField_CollectionID() string {
 }
 
 func (r *Community) GetGqlIDField_Chain() string {
-	return fmt.Sprint(r.Chain)
+	return fmt.Sprint(r.ContractAddress.Chain())
+}
+
+func (r *Community) GetGqlIDField_ContractAddress() string {
+	return r.ContractAddress.Address().String()
 }
 
 type HelperCollectionNftData struct {

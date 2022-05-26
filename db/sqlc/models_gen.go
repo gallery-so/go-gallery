@@ -217,7 +217,7 @@ type Token struct {
 	ExternalUrl      sql.NullString
 	BlockNumber      sql.NullInt64
 	OwnerUserID      persist.DBID
-	OwnerAddresses   []string
+	OwnedByWallets   persist.DBIDList
 }
 
 type User struct {
@@ -228,7 +228,7 @@ type User struct {
 	CreatedAt          time.Time
 	Username           sql.NullString
 	UsernameIdempotent sql.NullString
-	Addresses          persist.WalletList
+	Wallets            persist.WalletList
 	Bio                sql.NullString
 }
 

@@ -129,7 +129,7 @@ func (e ErrSignatureVerificationFailed) Error() string {
 }
 
 type ErrDoesNotOwnRequiredNFT struct {
-	addresses []persist.AddressDetails
+	addresses []persist.ChainAddress
 }
 
 func (e ErrDoesNotOwnRequiredNFT) Error() string {
@@ -137,12 +137,11 @@ func (e ErrDoesNotOwnRequiredNFT) Error() string {
 }
 
 type ErrNonceNotFound struct {
-	Address persist.Address
-	Chain   persist.Chain
+	ChainAddress persist.ChainAddress
 }
 
 func (e ErrNonceNotFound) Error() string {
-	return fmt.Sprintf("nonce not found for address: %s - %d", e.Address, e.Chain)
+	return fmt.Sprintf("nonce not found for address: %s", e.ChainAddress)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -154,8 +153,7 @@ func GenerateNonce() string {
 }
 
 type NonceAuthenticator struct {
-	Address            persist.Address
-	Chain              persist.Chain
+	ChainAddress       persist.ChainAddress
 	Nonce              string
 	Signature          string
 	WalletType         persist.WalletType
@@ -167,14 +165,14 @@ type NonceAuthenticator struct {
 }
 
 func (e NonceAuthenticator) GetDescription() string {
-	return fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType)
+	return fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.ChainAddress, e.Nonce, e.Signature, e.WalletType)
 }
 
 func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 
-	nonce, userID, _ := GetUserWithNonce(pCtx, e.Address, e.Chain, e.UserRepo, e.NonceRepo, e.WalletRepo)
+	nonce, userID, _ := GetUserWithNonce(pCtx, e.ChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
-		return nil, ErrNonceNotFound{Address: e.Address, Chain: e.Chain}
+		return nil, ErrNonceNotFound{ChainAddress: e.ChainAddress}
 	}
 
 	if e.WalletType != persist.WalletTypeEOA {
@@ -183,7 +181,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		}
 	}
 
-	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.Address, e.Chain, e.WalletType)
+	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.ChainAddress, e.WalletType)
 	if err != nil {
 		return nil, ErrSignatureVerificationFailed{err}
 	}
@@ -192,7 +190,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, e.Address, e.Chain, userID, e.NonceRepo)
+	err = NonceRotate(pCtx, e.ChainAddress, userID, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -209,12 +207,12 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 			wallets[i] = Wallet{Address: wallet.Address, Chain: wallet.Chain, WalletType: wallet.WalletType}
 		}
 
-		if !containsAddress(wallets, Wallet{Address: e.Address, Chain: e.Chain, WalletType: e.WalletType}) {
-			_, err := e.WalletRepo.Insert(pCtx, e.Address, e.Chain, e.WalletType)
+		if !containsAddress(wallets, Wallet{Address: e.ChainAddress.Address(), Chain: e.ChainAddress.Chain(), WalletType: e.WalletType}) {
+			_, err := e.WalletRepo.Insert(pCtx, e.ChainAddress, e.WalletType)
 			if err != nil {
 				return nil, err
 			}
-			wallet, err := e.WalletRepo.GetByAddressDetails(pCtx, e.Address, e.Chain)
+			wallet, err := e.WalletRepo.GetByChainAddress(pCtx, e.ChainAddress)
 			if err != nil {
 				return nil, err
 			}
@@ -222,11 +220,11 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 			wallets[cap(wallets)-1] = Wallet{Address: wallet.Address, Chain: wallet.Chain, WalletType: wallet.WalletType}
 		}
 	} else {
-		_, err := e.WalletRepo.Insert(pCtx, e.Address, e.Chain, e.WalletType)
+		_, err := e.WalletRepo.Insert(pCtx, e.ChainAddress, e.WalletType)
 		if err != nil {
 			return nil, err
 		}
-		wallet, err := e.WalletRepo.GetByAddressDetails(pCtx, e.Address, e.Chain)
+		wallet, err := e.WalletRepo.GetByChainAddress(pCtx, e.ChainAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -239,34 +237,6 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 	}
 
 	return &authResult, nil
-}
-
-// LoginREST will run the login pipeline and memorize the result
-func LoginREST(pCtx context.Context, pInput LoginInput,
-	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
-
-	authenticator := NonceAuthenticator{
-		Address:    pInput.Address,
-		Nonce:      pInput.Nonce,
-		Signature:  pInput.Signature,
-		WalletType: pInput.WalletType,
-		UserRepo:   userRepo,
-		NonceRepo:  nonceRepo,
-		EthClient:  ec,
-	}
-
-	userID, err := Login(pCtx, authenticator)
-	if err != nil {
-		return LoginOutput{}, err
-	}
-
-	output := LoginOutput{
-		SignatureValid: true,
-		UserID:         userID,
-	}
-
-	return output, nil
 }
 
 // Login logs in a user with a given authentication scheme
@@ -300,10 +270,10 @@ func Logout(pCtx context.Context) {
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pPreAuthed bool,
+func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPreAuthed bool,
 	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
-	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
+	wallet, err := walletRepository.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
 		return "", false, err
 	}
@@ -317,7 +287,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist
 	if !userExists {
 
 		if !pPreAuthed {
-			if hasNft, err := HasAllowlistNFT(pCtx, []persist.AddressDetails{{pAddress, pChain}}, ethClient); !hasNft {
+			if hasNft, err := HasAllowlistNFT(pCtx, []persist.ChainAddress{pChainAddress}, ethClient); !hasNft {
 				return "", false, err
 			}
 		}
@@ -325,9 +295,9 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist
 		dbNonce, err := nonceRepo.Get(pCtx, wallet.ID)
 		if err != nil || dbNonce.ID == "" {
 			create := persist.CreateNonceInput{
-				Address: pAddress,
+				Address: pChainAddress.Address(),
 				Value:   GenerateNonce(),
-				Chain:   pChain,
+				Chain:   pChainAddress.Chain(),
 			}
 
 			err = nonceRepo.Create(pCtx, create)
@@ -354,14 +324,14 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pChain persist
 	return nonce, userExists, nil
 }
 
-func HasAllowlistNFT(ctx context.Context, addresses []persist.AddressDetails, ethClient *ethclient.Client) (bool, error) {
+func HasAllowlistNFT(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
-		if addr.Chain != persist.ChainETH {
+		if addr.Chain() != persist.ChainETH {
 			continue
 		}
 		for k, v := range allowlist {
-			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.AddressValue), ethClient)
+			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.Address()), ethClient)
 			if found {
 				return true, nil
 			} else if err != nil {
@@ -373,30 +343,13 @@ func HasAllowlistNFT(ctx context.Context, addresses []persist.AddressDetails, et
 	return false, ErrDoesNotOwnRequiredNFT{addresses: addresses}
 }
 
-// GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
-
-	nonce, userExists, err := GetAuthNonce(pCtx, pInput.Address, pInput.Chain, pPreAuthed, userRepo, nonceRepo, walletRepo, ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	output := GetPreflightOutput{
-		Nonce:      nonce,
-		UserExists: userExists,
-	}
-
-	return &output, nil
-}
-
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
 
 	newNonce := persist.CreateNonceInput{
 		Value:   GenerateNonce(),
-		Address: pAddress,
-		Chain:   pChain,
+		Address: pChainAddress.Address(),
+		Chain:   pChainAddress.Chain(),
 	}
 
 	err := nonceRepo.Create(pCtx, newNonce)
@@ -409,9 +362,9 @@ func NonceRotate(pCtx context.Context, pAddress persist.Address, pChain persist.
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
 
-	wallet, err := walletRepository.GetByAddressDetails(pCtx, pAddress, pChain)
+	wallet, err := walletRepository.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
 		return "", "", err
 	}
@@ -430,7 +383,7 @@ func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, pChain per
 	if user.ID != "" {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress, Chain: pChain}
+		return nonceValue, userID, persist.ErrUserNotFound{ChainAddress: pChainAddress}
 	}
 
 	return nonceValue, userID, nil

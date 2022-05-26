@@ -3,6 +3,7 @@ package multichain
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
@@ -158,22 +159,22 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 }
 
 // VerifySignature verifies a signature for a wallet address
-func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pAddress persist.Address, pChain persist.Chain, pWalletType persist.WalletType) (bool, error) {
-	provider, ok := d.Chains[pChain]
+func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainAddress, pWalletType persist.WalletType) (bool, error) {
+	provider, ok := d.Chains[pChainAddress.Chain()]
 	if !ok {
-		return false, ErrChainNotFound{Chain: pChain}
+		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
-	return provider.VerifySignature(ctx, pAddress, pWalletType, pNonce, pSig)
+	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
 }
 
 func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.TokenGallery, error) {
 	res := make([]persist.TokenGallery, len(tokens))
 	seen := make(map[persist.TokenIdentifiers][]persist.Wallet)
-	addressToWallets := make(map[persist.Address]persist.Wallet)
+	addressToWallets := make(map[string]persist.Wallet)
 	for _, wallet := range ownerUser.Wallets {
 		for _, addr := range ownerAddresses {
 			if wallet.Address == addr {
-				addressToWallets[addr] = wallet
+				addressToWallets[strings.ToLower(addr.String())] = wallet
 				break
 			}
 		}
@@ -186,7 +187,7 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 
 		ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chain)
 
-		if w, ok := addressToWallets[token.OwnerAddress]; ok {
+		if w, ok := addressToWallets[strings.ToLower(token.OwnerAddress.String())]; ok {
 			if it, ok := seen[ti]; ok {
 				it = append(it, w)
 				seen[ti] = it
@@ -206,7 +207,7 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 			TokenID:          token.TokenID,
 			Quantity:         token.Quantity,
 			OwnerUserID:      ownerUser.ID,
-			OwnerAddresses:   seen[ti],
+			OwnedByWallets:   seen[ti],
 			OwnershipHistory: ownership,
 			TokenMetadata:    token.TokenMetadata,
 			ContractAddress:  token.ContractAddress,
