@@ -31,7 +31,7 @@ type TokenGallery struct {
 	TokenID          TokenID   `json:"token_id"`
 	Quantity         HexString `json:"quantity"`
 	OwnerUserID      DBID
-	OwnerAddresses   []Wallet         `json:"owner_addresses"`
+	OwnedByWallets   []Wallet         `json:"owned_by_wallets"`
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
 	ContractAddress  Address          `json:"contract_address"`

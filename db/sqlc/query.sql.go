@@ -306,58 +306,8 @@ func (q *Queries) GetNftsByCollectionId(ctx context.Context, id persist.DBID) ([
 	return items, nil
 }
 
-const getNftsByOwnerAddress = `-- name: GetNftsByOwnerAddress :many
-SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE owner_address = $1 AND deleted = false
-`
-
-func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.Address) ([]Nft, error) {
-	rows, err := q.db.Query(ctx, getNftsByOwnerAddress, ownerAddress)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Nft
-	for rows.Next() {
-		var i Nft
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.ExternalUrl,
-			&i.CreatorAddress,
-			&i.CreatorName,
-			&i.OwnerAddress,
-			&i.MultipleOwners,
-			&i.Contract,
-			&i.OpenseaID,
-			&i.OpenseaTokenID,
-			&i.TokenCollectionName,
-			&i.ImageUrl,
-			&i.ImageThumbnailUrl,
-			&i.ImagePreviewUrl,
-			&i.ImageOriginalUrl,
-			&i.AnimationUrl,
-			&i.AnimationOriginalUrl,
-			&i.AcquisitionDate,
-			&i.TokenMetadataUrl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTokenByID = `-- name: GetTokenByID :one
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, error) {
@@ -384,13 +334,13 @@ func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, err
 		&i.ExternalUrl,
 		&i.BlockNumber,
 		&i.OwnerUserID,
-		&i.OwnerAddresses,
+		&i.OwnedByWallets,
 	)
 	return i, err
 }
 
 const getTokensByUserID = `-- name: GetTokensByUserID :many
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE owner_user_id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
@@ -423,7 +373,7 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
-			&i.OwnerAddresses,
+			&i.OwnedByWallets,
 		); err != nil {
 			return nil, err
 		}

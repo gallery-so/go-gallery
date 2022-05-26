@@ -31,7 +31,7 @@ overrides:
     go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
 
   # Tokens
-  - column: "tokens.owner_addresses"
+  - column: "tokens.owned_by_wallets"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
   # Membership

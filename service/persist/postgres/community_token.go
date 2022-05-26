@@ -33,7 +33,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	defer cancel()
 
 	getInfoStmt, err := db.PrepareContext(ctx,
-		`SELECT n.OWNER_ADDRESSES,n.DESCRIPTION,n.MEDIA
+		`SELECT n.OWNED_BY_WALLETS,n.DESCRIPTION,n.MEDIA
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
 	LEFT JOIN collections c ON c.ID = coll
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM tokens n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
@@ -47,7 +47,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getContractStmt, err := db.PrepareContext(ctx, `SELECT NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
 	checkNoErr(err)
 
-	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNER_ADDRESSES && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
+	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &CommunityTokenRepository{

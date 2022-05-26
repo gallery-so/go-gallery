@@ -396,8 +396,8 @@ func (r *nftResolver) OwnedByWallets(ctx context.Context, obj *model.Nft) ([]*mo
 		return nil, err
 	}
 
-	wallets := make([]*model.Wallet, len(nft.OwnerAddresses))
-	for i, walletID := range nft.OwnerAddresses {
+	wallets := make([]*model.Wallet, len(nft.OwnedByWallets))
+	for i, walletID := range nft.OwnedByWallets {
 		wallets[i], err = resolveWalletByWalletID(ctx, walletID)
 		if err != nil {
 			sentryutil.ReportError(ctx, err)

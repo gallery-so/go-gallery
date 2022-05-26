@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     MEDIA jsonb,
     CHAIN int,
     OWNER_USER_ID varchar(255),
-    OWNER_ADDRESSES varchar(255) [],
+    OWNED_BY_WALLETS varchar(255) [],
     TOKEN_URI varchar,
     TOKEN_TYPE varchar,
     TOKEN_ID varchar,

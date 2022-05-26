@@ -52,7 +52,6 @@ type Loaders struct {
 	CollectionByCollectionId CollectionLoaderByID
 	CollectionsByGalleryId   CollectionsLoaderByID
 	NftByNftId               NftLoaderByID
-	NftsByOwnerAddress       NftsLoaderByAddress
 	NftsByCollectionId       NftsLoaderByID
 	MembershipByMembershipId MembershipLoaderById
 	WalletByWalletId         WalletLoaderById
@@ -123,12 +122,6 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadNftByNftId(ctx, loaders, q),
-	}
-
-	loaders.NftsByOwnerAddress = NftsLoaderByAddress{
-		maxBatch: defaultMaxBatchMany,
-		wait:     defaultWaitTime,
-		fetch:    loadNftsByOwnerAddress(ctx, loaders, q),
 	}
 
 	loaders.NftsByCollectionId = NftsLoaderByID{
@@ -237,10 +230,6 @@ func (l *Loaders) ClearNftCaches() {
 	l.NftByNftId.mu.Lock()
 	l.NftByNftId.cache = nil
 	l.NftByNftId.mu.Unlock()
-
-	l.NftsByOwnerAddress.mu.Lock()
-	l.NftsByOwnerAddress.cache = nil
-	l.NftsByOwnerAddress.mu.Unlock()
 
 	l.NftsByCollectionId.mu.Lock()
 	l.NftsByCollectionId.cache = nil
@@ -490,30 +479,6 @@ func loadNftByNftId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrNFTNotFoundByID{ID: nftIds[i]}
-			}
-		})
-
-		return nfts, errors
-	}
-}
-
-func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.Address) ([][]sqlc.Nft, []error) {
-	return func(addresses []persist.Address) ([][]sqlc.Nft, []error) {
-		nfts := make([][]sqlc.Nft, len(addresses))
-		errors := make([]error, len(addresses))
-
-		b := q.GetNftsByOwnerAddressBatch(ctx, addresses)
-		defer b.Close()
-
-		b.Query(func(i int, n []sqlc.Nft, err error) {
-			nfts[i] = n
-			errors[i] = err
-
-			// Add results to the NftByNftId loader's cache
-			if errors[i] == nil {
-				for _, nft := range nfts[i] {
-					loaders.NftByNftId.Prime(nft.ID, nft)
-				}
 			}
 		})
 

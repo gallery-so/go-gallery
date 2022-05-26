@@ -423,8 +423,8 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			walletIDs := make([]persist.DBID, len(token.OwnerAddresses))
-			for i, w := range token.OwnerAddresses {
+			walletIDs := make([]persist.DBID, len(token.OwnedByWallets))
+			for i, w := range token.OwnedByWallets {
 				walletIDs[i] = w.ID
 			}
 			membershipOwner := fillMembershipOwnerToken(ctx, walletIDs, id, ethClient, userRepository, galleryRepository, walletRepository)

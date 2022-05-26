@@ -207,7 +207,7 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 			TokenID:          token.TokenID,
 			Quantity:         token.Quantity,
 			OwnerUserID:      ownerUser.ID,
-			OwnerAddresses:   seen[ti],
+			OwnedByWallets:   seen[ti],
 			OwnershipHistory: ownership,
 			TokenMetadata:    token.TokenMetadata,
 			ContractAddress:  token.ContractAddress,

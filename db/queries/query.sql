@@ -70,12 +70,6 @@ SELECT n.* FROM collections c, unnest(c.nfts)
     INNER JOIN nfts n ON n.id = x.nft_id
     WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord;
 
--- name: GetNftsByOwnerAddress :many
-SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
-
--- name: GetNftsByOwnerAddressBatch :batchmany
-SELECT * FROM nfts WHERE owner_address = $1 AND deleted = false;
-
 -- name: GetTokensByUserID :many
 SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
 
@@ -136,4 +130,4 @@ SELECT u.* FROM follows f
     WHERE f.follower = $1 AND f.deleted = false;
 
 -- name: GetNftsByWalletIdBatch :batchmany
-SELECT * FROM tokens WHERE $1 = ANY(owner_addresses) AND deleted = false;
+SELECT * FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false;
