@@ -11,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 )
 
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
@@ -389,16 +390,21 @@ func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (*model.Gallery
 	return resolveNftOwnerByNftID(ctx, obj.Dbid)
 }
 
-func (r *nftResolver) OwnerAddresses(ctx context.Context, obj *model.Nft) ([]*persist.Address, error) {
-	panic(fmt.Errorf("not implemented"))
-}
+func (r *nftResolver) OwnedByWallets(ctx context.Context, obj *model.Nft) ([]*model.Wallet, error) {
+	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
 
-func (r *nftResolver) ContractAddress(ctx context.Context, obj *model.Nft) (*persist.Address, error) {
-	panic(fmt.Errorf("not implemented"))
-}
+	wallets := make([]*model.Wallet, len(nft.OwnerAddresses))
+	for i, walletID := range nft.OwnerAddresses {
+		wallets[i], err = resolveWalletByWalletID(ctx, walletID)
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}
 
-func (r *nftResolver) CreatorAddress(ctx context.Context, obj *model.Nft) (*persist.Address, error) {
-	panic(fmt.Errorf("not implemented"))
+	return wallets, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {

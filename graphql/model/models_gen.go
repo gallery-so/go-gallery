@@ -160,13 +160,6 @@ type AuthNonce struct {
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
-type ChainAddress struct {
-	Address *persist.Address `json:"address"`
-	Chain   *persist.Chain   `json:"chain"`
-}
-
-func (ChainAddress) IsGalleryUserOrAddress() {}
-
 type Collection struct {
 	Dbid           persist.DBID      `json:"dbid"`
 	Version        *int              `json:"version"`
@@ -201,14 +194,14 @@ func (CollectionNft) IsNode()                     {}
 func (CollectionNft) IsCollectionNftByIDOrError() {}
 
 type Community struct {
-	LastUpdated     *time.Time       `json:"lastUpdated"`
-	ContractAddress *persist.Address `json:"contractAddress"`
-	CreatorAddress  *persist.Address `json:"creatorAddress"`
-	Chain           *persist.Chain   `json:"chain"`
-	Name            *string          `json:"name"`
-	Description     *string          `json:"description"`
-	PreviewImage    *string          `json:"previewImage"`
-	Owners          []*TokenHolder   `json:"owners"`
+	LastUpdated     *time.Time            `json:"lastUpdated"`
+	ContractAddress *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
+	Chain           *persist.Chain        `json:"chain"`
+	Name            *string               `json:"name"`
+	Description     *string               `json:"description"`
+	PreviewImage    *string               `json:"previewImage"`
+	Owners          []*TokenHolder        `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -495,28 +488,28 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type Nft struct {
-	Dbid                  persist.DBID       `json:"dbid"`
-	CreationTime          *time.Time         `json:"creationTime"`
-	LastUpdated           *time.Time         `json:"lastUpdated"`
-	CollectorsNote        *string            `json:"collectorsNote"`
-	Media                 MediaSubtype       `json:"media"`
-	TokenType             *TokenType         `json:"tokenType"`
-	Chain                 *persist.Chain     `json:"chain"`
-	Name                  *string            `json:"name"`
-	Description           *string            `json:"description"`
-	TokenURI              *string            `json:"tokenUri"`
-	TokenID               *string            `json:"tokenId"`
-	Quantity              *string            `json:"quantity"`
-	Owner                 *GalleryUser       `json:"owner"`
-	OwnerAddresses        []*persist.Address `json:"ownerAddresses"`
-	OwnershipHistory      []*OwnerAtBlock    `json:"ownershipHistory"`
-	TokenMetadata         *string            `json:"tokenMetadata"`
-	ContractAddress       *persist.Address   `json:"contractAddress"`
-	ExternalURL           *string            `json:"externalUrl"`
-	BlockNumber           *string            `json:"blockNumber"`
-	CreatorAddress        *persist.Address   `json:"creatorAddress"`
-	OpenseaCollectionName *string            `json:"openseaCollectionName"`
-	OpenseaID             *int               `json:"openseaId"`
+	Dbid                  persist.DBID          `json:"dbid"`
+	CreationTime          *time.Time            `json:"creationTime"`
+	LastUpdated           *time.Time            `json:"lastUpdated"`
+	CollectorsNote        *string               `json:"collectorsNote"`
+	Media                 MediaSubtype          `json:"media"`
+	TokenType             *TokenType            `json:"tokenType"`
+	Chain                 *persist.Chain        `json:"chain"`
+	Name                  *string               `json:"name"`
+	Description           *string               `json:"description"`
+	TokenURI              *string               `json:"tokenUri"`
+	TokenID               *string               `json:"tokenId"`
+	Quantity              *string               `json:"quantity"`
+	Owner                 *GalleryUser          `json:"owner"`
+	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
+	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	TokenMetadata         *string               `json:"tokenMetadata"`
+	ContractAddress       *persist.ChainAddress `json:"contractAddress"`
+	ExternalURL           *string               `json:"externalUrl"`
+	BlockNumber           *string               `json:"blockNumber"`
+	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
+	OpenseaCollectionName *string               `json:"openseaCollectionName"`
+	OpenseaID             *int                  `json:"openseaId"`
 }
 
 func (Nft) IsNode()           {}
@@ -678,11 +671,11 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	Dbid       persist.DBID        `json:"dbid"`
-	Address    *persist.Address    `json:"address"`
-	Chain      *persist.Chain      `json:"chain"`
-	WalletType *persist.WalletType `json:"walletType"`
-	Nfts       []*Nft              `json:"nfts"`
+	Dbid         persist.DBID          `json:"dbid"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Chain        *persist.Chain        `json:"chain"`
+	WalletType   *persist.WalletType   `json:"walletType"`
+	Nfts         []*Nft                `json:"nfts"`
 }
 
 func (Wallet) IsNode()                {}

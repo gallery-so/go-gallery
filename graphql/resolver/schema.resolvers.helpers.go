@@ -31,15 +31,18 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnNft:            resolveNftByNftID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByContractAddressGqlID,
 
 	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
 		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
 	},
 
-	//OnCommunity: func(ctx context.Context, contractAddress persist.Address) (*model.Community, error) {
-	//	return resolveCommunityByContractAddress(ctx, contractAddress, false)
-	//},
+	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
+		if parsed, err := strconv.Atoi(chain); err == nil {
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), false)
+		} else {
+			return nil, err
+		}
+	},
 }
 
 func init() {
@@ -333,21 +336,6 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community), nil
 }
 
-func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress persist.Address, chain string) (*model.Community, error) {
-	parsed, err := strconv.Atoi(chain)
-	if err != nil {
-		return nil, err
-	}
-
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, persist.NewChainAddress(contractAddress, persist.Chain(parsed)), false)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return communityToModel(ctx, *community), nil
-}
-
 func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 	addresses, err := publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
 
@@ -427,23 +415,27 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 }
 
 func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {
+	chainAddress := persist.NewChainAddress(wallet.Address, wallet.Chain)
+
 	return &model.Wallet{
-		Dbid:       wallet.ID,
-		WalletType: &wallet.WalletType,
-		Address:    &wallet.Address,
-		Chain:      &wallet.Chain,
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         wallet.ID,
+		WalletType:   &wallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &wallet.Chain,
+		Nfts:         nil, // handled by dedicated resolver
 	}
 }
 
 func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
 	chain := persist.Chain(wallet.Chain.Int32)
+	chainAddress := persist.NewChainAddress(wallet.Address, chain)
+
 	return &model.Wallet{
-		Dbid:       wallet.ID,
-		WalletType: &wallet.WalletType,
-		Address:    &wallet.Address,
-		Chain:      &chain,
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         wallet.ID,
+		WalletType:   &wallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &chain,
+		Nfts:         nil, // handled by dedicated resolver
 	}
 }
 
@@ -511,7 +503,8 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 }
 
 func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
-	chainEthereum := persist.ChainETH
+	chain := persist.Chain(nft.Chain.Int32)
+	contractAddress := persist.NewChainAddress(persist.Address(nft.ContractAddress.String), chain)
 	//openseaID := int(nft.OpenseaID.Int64)
 
 	return &model.Nft{
@@ -520,11 +513,11 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		LastUpdated:    &nft.LastUpdated,
 		CollectorsNote: &nft.CollectorsNote.String,
 		Media:          getMediaForToken(nft),
-		TokenType:      nil,            // TODO: later
-		Chain:          &chainEthereum, // Everything's Ethereum right now
+		TokenType:      nil, // TODO: later
+		Chain:          &chain,
 		Name:           &nft.Name.String,
 		Description:    &nft.Description.String,
-		OwnerAddresses: nil, // handled by dedicated resolver
+		OwnedByWallets: nil, // handled by dedicated resolver
 		TokenURI:       nil, // TODO: later
 		TokenID:        &nft.TokenID.String,
 		// TODO-EZRA: Does the frontend have something that can replace this?
@@ -533,12 +526,11 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  nil, // handled by dedicated resolver
+		ContractAddress:  &contractAddress,
 		ExternalURL:      &nft.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
-		CreatorAddress:        nil, // handled by dedicated resolver
 		OpenseaCollectionName: nil, // TODO: later
 	}
 }
@@ -553,6 +545,8 @@ func nftsToModel(ctx context.Context, nft []sqlc.Token) []*model.Nft {
 
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {
 	lastUpdated := community.LastUpdated.Time()
+	contractAddress := persist.NewChainAddress(community.ContractAddress, community.Chain)
+	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
 
 	owners := make([]*model.TokenHolder, len(community.Owners))
 	for i, owner := range community.Owners {
@@ -561,8 +555,8 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 
 	return &model.Community{
 		LastUpdated:     &lastUpdated,
-		ContractAddress: &community.ContractAddress,
-		CreatorAddress:  &community.CreatorAddress,
+		ContractAddress: &contractAddress,
+		CreatorAddress:  &creatorAddress,
 		Name:            util.StringToPointer(community.Name.String()),
 		Description:     util.StringToPointer(community.Description.String()),
 		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
@@ -573,12 +567,14 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
 	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.NewChainAddress(persist.Address(address), persist.ChainETH))
 	chain := persist.Chain(dbWallet.Chain.Int32)
+	chainAddress := persist.NewChainAddress(dbWallet.Address, chain)
+
 	return &model.Wallet{
-		Dbid:       dbWallet.ID,
-		WalletType: &dbWallet.WalletType,
-		Address:    &dbWallet.Address,
-		Chain:      &chain,
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         dbWallet.ID,
+		WalletType:   &dbWallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &chain,
+		Nfts:         nil, // handled by dedicated resolver
 	}
 }
 

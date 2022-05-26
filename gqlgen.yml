@@ -49,9 +49,9 @@ models:
   Chain:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Chain
-#  ChainAddress:
-#    model:
-#      - github.com/mikeydub/go-gallery/service/persist.ChainAddress
+  ChainAddress:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainAddress
   ChainAddressInput:
     model:
       - github.com/mikeydub/go-gallery/service/persist.ChainAddress

@@ -50,6 +50,10 @@ type ChainAddress struct {
 	chain      Chain
 }
 
+// IsGalleryUserOrAddress is an empty function that satisfies the gqlgen IsGalleryUserOrAddress interface,
+// allowing ChainAddress to be used in GraphQL resolvers that return the GalleryUserOrAddress type.
+func (c *ChainAddress) IsGalleryUserOrAddress() {}
+
 func NewChainAddress(address Address, chain Chain) ChainAddress {
 	ca := ChainAddress{
 		addressSet: true,

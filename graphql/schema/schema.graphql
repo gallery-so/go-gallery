@@ -63,7 +63,7 @@ type GalleryUser implements Node {
 type Wallet implements Node {
   id: ID!
   dbid: DBID!
-  address: Address
+  chainAddress: ChainAddress
   chain: Chain
   walletType: WalletType
   nfts: [Nft] @goField(forceResolver: true)
@@ -234,15 +234,15 @@ type Nft implements Node {
   tokenId: String
   quantity: String # source is a hex string
   owner: GalleryUser @goField(forceResolver: true)
-  ownerAddresses: [Address] @goField(forceResolver: true)
+  ownedByWallets: [Wallet] @goField(forceResolver: true)
   ownershipHistory: [OwnerAtBlock]
   tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: Address @goField(forceResolver: true)
+  contractAddress: ChainAddress
   externalUrl: String
   blockNumber: String # source is uint64
   # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
   # struct and may ultimately end up elsewhere
-  creatorAddress: Address @goField(forceResolver: true)
+  creatorAddress: ChainAddress
   openseaCollectionName: String
 
     # temporary field while we're dependent on opensea
@@ -307,8 +307,8 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
 
   lastUpdated: Time
 
-  contractAddress: Address
-  creatorAddress: Address
+  contractAddress: ChainAddress
+  creatorAddress: ChainAddress
   chain: Chain
   name: String
   description: String
