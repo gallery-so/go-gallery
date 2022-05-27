@@ -448,7 +448,7 @@ func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress
 	return resolveCommunityByContractAddress(ctx, communityAddress, refresh)
 }
 
-func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
+func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	return resolveGeneralAllowlist(ctx)
 }
 
