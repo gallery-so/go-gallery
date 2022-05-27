@@ -203,9 +203,9 @@ func filterTokenHolders(holdersChannel chan persist.TokenHolder, numHolders int,
 			}
 
 			tokenHolderByUserId[owner.UserID] = &persist.TokenHolder{
-				UserID:      owner.UserID,
-				WalletIDs:   []persist.DBID{walletID},
-				PreviewNFTs: owner.PreviewNFTs,
+				UserID:        owner.UserID,
+				WalletIDs:     []persist.DBID{walletID},
+				PreviewTokens: owner.PreviewTokens,
 			}
 		}
 	}
@@ -306,7 +306,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 					return
 				}
 				membershipOwner := fillMembershipOwner(ctx, []persist.DBID{wallet.ID}, id, ethClient, userRepository, galleryRepository, walletRepository)
-				if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
+				if membershipOwner.PreviewTokens != nil && len(membershipOwner.PreviewTokens) > 0 {
 					logger.For(ctx).Debugf("Adding membership owner %s for ID %s", addr, id)
 					ownersChan <- membershipOwner
 				} else {
@@ -350,7 +350,7 @@ func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id pers
 		if err == nil && len(galleries) > 0 {
 			gallery := galleries[0]
 			if gallery.Collections != nil && len(gallery.Collections) > 0 {
-				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
+				membershipOwner.PreviewTokens = nft.GetPreviewsFromCollections(gallery.Collections)
 			}
 		}
 
@@ -390,7 +390,7 @@ func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id
 		if err == nil && len(galleries) > 0 {
 			gallery := galleries[0]
 			if gallery.Collections != nil || len(gallery.Collections) > 0 {
-				membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
+				membershipOwner.PreviewTokens = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
 			}
 		}
 
@@ -429,7 +429,7 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 				walletIDs[i] = w.ID
 			}
 			membershipOwner := fillMembershipOwnerToken(ctx, walletIDs, id, ethClient, userRepository, galleryRepository, walletRepository)
-			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
+			if membershipOwner.PreviewTokens != nil && len(membershipOwner.PreviewTokens) > 0 {
 				ownersChan <- membershipOwner
 			} else {
 				ownersChan <- persist.TokenHolder{}

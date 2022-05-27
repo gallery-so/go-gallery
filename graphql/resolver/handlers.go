@@ -152,9 +152,9 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			addresses[i] = persist.NewChainAddress(w.Address, persist.Chain(w.Chain.Int32))
 		}
 
-		if hasNft, err := auth.HasAllowlistNFT(ctx, addresses, ethClient); !hasNft {
+		if hasToken, err := auth.HasAllowlistToken(ctx, addresses, ethClient); !hasToken {
 			errorMsg := err.Error()
-			modelErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
+			modelErr := model.ErrDoesNotOwnRequiredToken{Message: errorMsg}
 			return makeErrNotAuthorized(errorMsg, modelErr), nil
 		}
 

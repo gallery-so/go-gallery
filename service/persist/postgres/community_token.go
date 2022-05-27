@@ -154,9 +154,9 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 			tokenHolder.WalletIDs = append(tokenHolder.WalletIDs, walletID)
 		} else {
 			tokenHolders[userID] = &persist.TokenHolder{
-				UserID:      userID,
-				WalletIDs:   []persist.DBID{walletID},
-				PreviewNFTs: nil,
+				UserID:        userID,
+				WalletIDs:     []persist.DBID{walletID},
+				PreviewTokens: nil,
 			}
 		}
 	}
@@ -183,7 +183,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 			}
 		}
 
-		tokenHolder.PreviewNFTs = previewNFTs
+		tokenHolder.PreviewTokens = previewNFTs
 		community.Owners = append(community.Owners, *tokenHolder)
 	}
 

@@ -18,8 +18,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"CollectionNftByIdOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(CollectionNftByIDOrError)
+	"CollectionTokenByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CollectionTokenByIDOrError)
 		return obj, ok
 	},
 
@@ -83,11 +83,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"NftByIdOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(NftByIDOrError)
-		return obj, ok
-	},
-
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
 		return obj, ok
@@ -100,6 +95,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"RemoveUserAddressesPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RemoveUserAddressesPayloadOrError)
+		return obj, ok
+	},
+
+	"TokenByIdOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(TokenByIDOrError)
 		return obj, ok
 	},
 
@@ -118,8 +118,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"UpdateCollectionNftsPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(UpdateCollectionNftsPayloadOrError)
+	"UpdateCollectionTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateCollectionTokensPayloadOrError)
 		return obj, ok
 	},
 
@@ -128,8 +128,8 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"UpdateNftInfoPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(UpdateNftInfoPayloadOrError)
+	"UpdateTokenInfoPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateTokenInfoPayloadOrError)
 		return obj, ok
 	},
 

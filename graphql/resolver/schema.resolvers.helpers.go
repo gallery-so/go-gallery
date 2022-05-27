@@ -29,11 +29,11 @@ var nodeFetcher = model.NodeFetcher{
 	OnCollection:     resolveCollectionByCollectionID,
 	OnGalleryUser:    resolveGalleryUserByUserID,
 	OnMembershipTier: resolveMembershipTierByMembershipId,
-	OnNft:            resolveNftByNftID,
+	OnToken:          resolveTokenByTokenID,
 	OnWallet:         resolveWalletByAddress,
 
-	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
-		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
+		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
 	},
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
@@ -61,7 +61,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case auth.ErrAuthenticationFailed:
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
 	case auth.ErrDoesNotOwnRequiredNFT:
-		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
+		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case persist.ErrUserAlreadyExists:
@@ -69,7 +69,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrNFTNotFoundByID:
-		mappedErr = model.ErrNftNotFound{Message: message}
+		mappedErr = model.ErrTokenNotFound{Message: message}
 	case persist.ErrCommunityNotFound:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
@@ -203,8 +203,8 @@ func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) 
 	return output, nil
 }
 
-func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.CollectionNft, error) {
-	nft, err := resolveNftByNftID(ctx, nftID)
+func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
+	token, err := resolveTokenByTokenID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,16 +214,16 @@ func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collecti
 		return nil, err
 	}
 
-	collectionNft := &model.CollectionNft{
-		HelperCollectionNftData: model.HelperCollectionNftData{
-			NftId:        nftID,
+	collectionToken := &model.CollectionToken{
+		HelperCollectionTokenData: model.HelperCollectionTokenData{
+			TokenId:      tokenID,
 			CollectionId: collectionID,
 		},
-		Nft:        nft,
+		Token:      token,
 		Collection: collection,
 	}
 
-	return collectionNft, nil
+	return collectionToken, nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
@@ -236,34 +236,34 @@ func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*mo
 	return gallery, nil
 }
 
-func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, error) {
-	nft, err := publicapi.For(ctx).Token.GetTokenById(ctx, nftID)
+func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return nftToModel(ctx, *nft), nil
+	return tokenToModel(ctx, *token), nil
 }
 
-func resolveNftsByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Nft, error) {
+func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Token, error) {
 	tokens, err := publicapi.For(ctx).Token.GetTokensByWalletID(ctx, walletID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return nftsToModel(ctx, tokens), nil
+	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (*model.GalleryUser, error) {
-	nft, err := publicapi.For(ctx).Token.GetTokenById(ctx, nftID)
+func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserByUserID(ctx, nft.OwnerUserID)
+	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
 func resolveWalletByWalletID(ctx context.Context, walletID persist.DBID) (*model.Wallet, error) {
@@ -403,7 +403,7 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 		WalletType:   &wallet.WalletType,
 		ChainAddress: &chainAddress,
 		Chain:        &wallet.Chain,
-		Nfts:         nil, // handled by dedicated resolver
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 
@@ -416,7 +416,7 @@ func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
 		WalletType:   &wallet.WalletType,
 		ChainAddress: &chainAddress,
 		Chain:        &chain,
-		Nfts:         nil, // handled by dedicated resolver
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 
@@ -431,7 +431,7 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 		Gallery:        nil, // handled by dedicated resolver
 		Layout:         layoutToModel(ctx, collection.Layout),
 		Hidden:         &collection.Hidden,
-		Nfts:           nil, // handled by dedicated resolver
+		Tokens:         nil, // handled by dedicated resolver
 	}
 }
 
@@ -470,37 +470,37 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 }
 
 func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *model.TokenHolder {
-	previewNfts := make([]*string, len(tokenHolder.PreviewNFTs))
-	for i, nft := range tokenHolder.PreviewNFTs {
-		previewNfts[i] = util.StringToPointer(nft.String())
+	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
+	for i, token := range tokenHolder.PreviewTokens {
+		previewTokens[i] = util.StringToPointer(token.String())
 	}
 
 	return &model.TokenHolder{
 		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
 		User:                  nil, // handled by dedicated resolver
 		Wallets:               nil, // handled by dedicated resolver
-		PreviewNfts:           previewNfts,
+		PreviewTokens:         previewTokens,
 	}
 }
 
-func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
-	chain := persist.Chain(nft.Chain.Int32)
-	contractAddress := persist.NewChainAddress(persist.Address(nft.ContractAddress.String), chain)
-	//openseaID := int(nft.OpenseaID.Int64)
+func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
+	chain := persist.Chain(token.Chain.Int32)
+	contractAddress := persist.NewChainAddress(persist.Address(token.ContractAddress.String), chain)
+	//openseaID := int(token.OpenseaID.Int64)
 
-	return &model.Nft{
-		Dbid:           nft.ID,
-		CreationTime:   &nft.CreatedAt,
-		LastUpdated:    &nft.LastUpdated,
-		CollectorsNote: &nft.CollectorsNote.String,
-		Media:          getMediaForToken(nft),
+	return &model.Token{
+		Dbid:           token.ID,
+		CreationTime:   &token.CreatedAt,
+		LastUpdated:    &token.LastUpdated,
+		CollectorsNote: &token.CollectorsNote.String,
+		Media:          getMediaForToken(token),
 		TokenType:      nil, // TODO: later
 		Chain:          &chain,
-		Name:           &nft.Name.String,
-		Description:    &nft.Description.String,
+		Name:           &token.Name.String,
+		Description:    &token.Description.String,
 		OwnedByWallets: nil, // handled by dedicated resolver
 		TokenURI:       nil, // TODO: later
-		TokenID:        &nft.TokenID.String,
+		TokenID:        &token.TokenID.String,
 		// TODO-EZRA: Does the frontend have something that can replace this?
 		//OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
@@ -508,7 +508,7 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    nil, // TODO: later
 		ContractAddress:  &contractAddress,
-		ExternalURL:      &nft.ExternalUrl.String,
+		ExternalURL:      &token.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
@@ -516,10 +516,10 @@ func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
 	}
 }
 
-func nftsToModel(ctx context.Context, nft []sqlc.Token) []*model.Nft {
-	res := make([]*model.Nft, len(nft))
-	for i, nft := range nft {
-		res[i] = nftToModel(ctx, nft)
+func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
+	res := make([]*model.Token, len(token))
+	for i, token := range token {
+		res[i] = tokenToModel(ctx, token)
 	}
 	return res
 }
@@ -555,7 +555,7 @@ func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddres
 		WalletType:   &dbWallet.WalletType,
 		ChainAddress: &chainAddress,
 		Chain:        &chain,
-		Nfts:         nil, // handled by dedicated resolver
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 

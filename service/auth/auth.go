@@ -287,7 +287,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 	if !userExists {
 
 		if !pPreAuthed {
-			if hasNft, err := HasAllowlistNFT(pCtx, []persist.ChainAddress{pChainAddress}, ethClient); !hasNft {
+			if hasNft, err := HasAllowlistToken(pCtx, []persist.ChainAddress{pChainAddress}, ethClient); !hasNft {
 				return "", false, err
 			}
 		}
@@ -324,7 +324,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 	return nonce, userExists, nil
 }
 
-func HasAllowlistNFT(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
+func HasAllowlistToken(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
 		if addr.Chain() != persist.ChainETH {

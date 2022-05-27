@@ -8,12 +8,12 @@ import (
 
 type GqlID string
 
-func (r *CollectionNft) GetGqlIDField_NftID() string {
-	return r.NftId.String()
+func (r *CollectionToken) GetGqlIDField_TokenID() string {
+	return r.TokenId.String()
 }
 
-func (r *CollectionNft) GetGqlIDField_CollectionID() string {
-	return r.CollectionId.String()
+func (r *CollectionToken) GetGqlIDField_CollectionID() string {
+	return r.TokenId.String()
 }
 
 func (r *Community) GetGqlIDField_Chain() string {
@@ -24,8 +24,8 @@ func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }
 
-type HelperCollectionNftData struct {
-	NftId        persist.DBID
+type HelperCollectionTokenData struct {
+	TokenId      persist.DBID
 	CollectionId persist.DBID
 }
 
