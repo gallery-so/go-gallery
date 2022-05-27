@@ -15,10 +15,9 @@ import (
 type UserRepository struct {
 	db                    *sql.DB
 	updateInfoStmt        *sql.Stmt
-	existsByAddressStmt   *sql.Stmt
 	createStmt            *sql.Stmt
 	getByIDStmt           *sql.Stmt
-	getByAddressStmt      *sql.Stmt
+	getByWalletIDStmt     *sql.Stmt
 	getByUsernameStmt     *sql.Stmt
 	deleteStmt            *sql.Stmt
 	getGalleriesStmt      *sql.Stmt
@@ -29,6 +28,8 @@ type UserRepository struct {
 	getWalletStmt         *sql.Stmt
 	addWalletStmt         *sql.Stmt
 	removeWalletStmt      *sql.Stmt
+	addFollowerStmt       *sql.Stmt
+	removeFollowerStmt    *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -40,16 +41,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	existsByAddressStmt, err := db.PrepareContext(ctx, `SELECT 1 FROM users WHERE EXISTS(SELECT 1 FROM addresses WHERE ADDRESS_VALUE = $1 AND CHAIN = $2 AND DELETED = false);`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, WALLETS) VALUES ($1, $2) RETURNING ID;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, ADDRESSES) VALUES ($1, $2) RETURNING ID;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,ADDRESSES,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
-	checkNoErr(err)
-
-	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(ADDRESSES) AND DELETED = false;`)
+	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
@@ -76,21 +74,26 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	getWalletStmt, err := db.PrepareContext(ctx, `SELECT ADDRESS,CHAIN,WALLET_TYPE,VERSION,CREATED_AT,LAST_UPDATED FROM wallets WHERE ID = $1;`)
 	checkNoErr(err)
 
-	addWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = array_append(ADDRESSES, $1) WHERE ID = $2;`)
+	addWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET WALLETS = array_append(WALLETS, $1) WHERE ID = $2;`)
 	checkNoErr(err)
 
-	removeWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET ADDRESSES = array_remove(ADDRESSES, $1) WHERE ID = $2;`)
+	removeWalletStmt, err := db.PrepareContext(ctx, `UPDATE users SET WALLETS = array_remove(WALLETS, $1) WHERE ID = $2;`)
+	checkNoErr(err)
+
+	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false`)
+	checkNoErr(err)
+
+	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
 	checkNoErr(err)
 
 	return &UserRepository{
-		db:                  db,
-		updateInfoStmt:      updateInfoStmt,
-		existsByAddressStmt: existsByAddressStmt,
-		createStmt:          createStmt,
-		getByIDStmt:         getByIDStmt,
-		getByAddressStmt:    getByAddressStmt,
-		getByUsernameStmt:   getByUsernameStmt,
-		deleteStmt:          deleteStmt,
+		db:                db,
+		updateInfoStmt:    updateInfoStmt,
+		createStmt:        createStmt,
+		getByIDStmt:       getByIDStmt,
+		getByWalletIDStmt: getByWalletIDStmt,
+		getByUsernameStmt: getByUsernameStmt,
+		deleteStmt:        deleteStmt,
 
 		getGalleriesStmt:      getGalleriesStmt,
 		updateCollectionsStmt: updateCollectionsStmt,
@@ -100,6 +103,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		getWalletStmt:         getWalletStmt,
 		addWalletStmt:         addWalletStmt,
 		removeWalletStmt:      removeWalletStmt,
+		addFollowerStmt:       addFollowerStmt,
+		removeFollowerStmt:    removeFollowerStmt,
 	}
 }
 
@@ -181,21 +186,21 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 	return user, nil
 }
 
-// GetByAddressDetails gets the user with the given address in their list of addresses
+// GetByChainAddress gets the user with the given address in their list of addresses
 // TODO use string and chain to get the user
-func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress persist.Address, pChain persist.Chain) (persist.User, error) {
+func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress persist.ChainAddress) (persist.User, error) {
 	var walletID persist.DBID
 
-	err := u.getWalletIDStmt.QueryRowContext(pCtx, pAddress, pChain).Scan(&walletID)
+	err := u.getWalletIDStmt.QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain()).Scan(&walletID)
 	if err != nil {
 		return persist.User{}, err
 	}
 
 	var user persist.User
-	err = u.getByAddressStmt.QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err = u.getByWalletIDStmt.QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return persist.User{}, persist.ErrUserNotFound{Address: pAddress, Chain: pChain, WalletID: walletID}
+			return persist.User{}, persist.ErrUserNotFound{ChainAddress: pChainAddress, WalletID: walletID}
 		}
 		return persist.User{}, err
 	}
@@ -209,7 +214,7 @@ func (u *UserRepository) GetByAddressDetails(pCtx context.Context, pAddress pers
 func (u *UserRepository) GetByWallet(pCtx context.Context, pWallet persist.DBID) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByAddressStmt.QueryRowContext(pCtx, pWallet).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWallet).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{WalletID: pWallet}
@@ -356,4 +361,14 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	}
 
 	return tx.Commit()
+}
+
+func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.addFollowerStmt.ExecContext(pCtx, persist.GenerateID(), follower, followee)
+	return err
+}
+
+func (u *UserRepository) RemoveFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
+	_, err := u.removeFollowerStmt.ExecContext(pCtx, follower, followee)
+	return err
 }

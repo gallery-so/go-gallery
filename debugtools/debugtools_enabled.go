@@ -29,11 +29,11 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 	if viper.GetString("ENV") != "local" {
 		return nil, errors.New("DebugAuthenticator may only be used in a local environment")
 	}
-	wallets := make([]auth.Wallet, len(d.Addresses))
-	for i, address := range d.Addresses {
+	wallets := make([]auth.Wallet, len(d.ChainAddresses))
+	for i, chainAddress := range d.ChainAddresses {
 		wallets[i] = auth.Wallet{
-			Address:    address,
-			Chain:      d.Chains[i],
+			Address:    chainAddress.Address(),
+			Chain:      chainAddress.Chain(),
 			WalletType: persist.WalletTypeEOA,
 		}
 	}

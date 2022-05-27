@@ -10,10 +10,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// ContractLoaderByAddressDetailsConfig captures the config to create a new ContractLoaderByAddressDetails
-type ContractLoaderByAddressDetailsConfig struct {
+// TokensLoaderByIDConfig captures the config to create a new TokensLoaderByID
+type TokensLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.AddressDetails) ([]sqlc.Contract, []error)
+	Fetch func(keys []persist.DBID) ([][]sqlc.Token, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -22,19 +22,19 @@ type ContractLoaderByAddressDetailsConfig struct {
 	MaxBatch int
 }
 
-// NewContractLoaderByAddressDetails creates a new ContractLoaderByAddressDetails given a fetch, wait, and maxBatch
-func NewContractLoaderByAddressDetails(config ContractLoaderByAddressDetailsConfig) *ContractLoaderByAddressDetails {
-	return &ContractLoaderByAddressDetails{
+// NewTokensLoaderByID creates a new TokensLoaderByID given a fetch, wait, and maxBatch
+func NewTokensLoaderByID(config TokensLoaderByIDConfig) *TokensLoaderByID {
+	return &TokensLoaderByID{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// ContractLoaderByAddressDetails batches and caches requests
-type ContractLoaderByAddressDetails struct {
+// TokensLoaderByID batches and caches requests
+type TokensLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.AddressDetails) ([]sqlc.Contract, []error)
+	fetch func(keys []persist.DBID) ([][]sqlc.Token, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,51 +45,51 @@ type ContractLoaderByAddressDetails struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.AddressDetails]sqlc.Contract
+	cache map[persist.DBID][]sqlc.Token
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *contractLoaderByAddressDetailsBatch
+	batch *tokensLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type contractLoaderByAddressDetailsBatch struct {
-	keys    []persist.AddressDetails
-	data    []sqlc.Contract
+type tokensLoaderByIDBatch struct {
+	keys    []persist.DBID
+	data    [][]sqlc.Token
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a Contract by key, batching and caching will be applied automatically
-func (l *ContractLoaderByAddressDetails) Load(key persist.AddressDetails) (sqlc.Contract, error) {
+// Load a Token by key, batching and caching will be applied automatically
+func (l *TokensLoaderByID) Load(key persist.DBID) ([]sqlc.Token, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a Contract.
+// LoadThunk returns a function that when called will block waiting for a Token.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) func() (sqlc.Contract, error) {
+func (l *TokensLoaderByID) LoadThunk(key persist.DBID) func() ([]sqlc.Token, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.Contract, error) {
+		return func() ([]sqlc.Token, error) {
 			return it, nil
 		}
 	}
 	if l.batch == nil {
-		l.batch = &contractLoaderByAddressDetailsBatch{done: make(chan struct{})}
+		l.batch = &tokensLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.Contract, error) {
+	return func() ([]sqlc.Token, error) {
 		<-batch.done
 
-		var data sqlc.Contract
+		var data []sqlc.Token
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,69 +114,73 @@ func (l *ContractLoaderByAddressDetails) LoadThunk(key persist.AddressDetails) f
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *ContractLoaderByAddressDetails) LoadAll(keys []persist.AddressDetails) ([]sqlc.Contract, []error) {
-	results := make([]func() (sqlc.Contract, error), len(keys))
+func (l *TokensLoaderByID) LoadAll(keys []persist.DBID) ([][]sqlc.Token, []error) {
+	results := make([]func() ([]sqlc.Token, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	contracts := make([]sqlc.Contract, len(keys))
+	tokens := make([][]sqlc.Token, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		contracts[i], errors[i] = thunk()
+		tokens[i], errors[i] = thunk()
 	}
-	return contracts, errors
+	return tokens, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a Contracts.
+// LoadAllThunk returns a function that when called will block waiting for a Tokens.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByAddressDetails) LoadAllThunk(keys []persist.AddressDetails) func() ([]sqlc.Contract, []error) {
-	results := make([]func() (sqlc.Contract, error), len(keys))
+func (l *TokensLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]sqlc.Token, []error) {
+	results := make([]func() ([]sqlc.Token, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.Contract, []error) {
-		contracts := make([]sqlc.Contract, len(keys))
+	return func() ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			contracts[i], errors[i] = thunk()
+			tokens[i], errors[i] = thunk()
 		}
-		return contracts, errors
+		return tokens, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *ContractLoaderByAddressDetails) Prime(key persist.AddressDetails, value sqlc.Contract) bool {
+func (l *TokensLoaderByID) Prime(key persist.DBID, value []sqlc.Token) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
-		l.unsafeSet(key, value)
+		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
+		// and end up with the whole cache pointing to the same value.
+		cpy := make([]sqlc.Token, len(value))
+		copy(cpy, value)
+		l.unsafeSet(key, cpy)
 	}
 	l.mu.Unlock()
 	return !found
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *ContractLoaderByAddressDetails) Clear(key persist.AddressDetails) {
+func (l *TokensLoaderByID) Clear(key persist.DBID) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *ContractLoaderByAddressDetails) unsafeSet(key persist.AddressDetails, value sqlc.Contract) {
+func (l *TokensLoaderByID) unsafeSet(key persist.DBID, value []sqlc.Token) {
 	if l.cache == nil {
-		l.cache = map[persist.AddressDetails]sqlc.Contract{}
+		l.cache = map[persist.DBID][]sqlc.Token{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *contractLoaderByAddressDetailsBatch) keyIndex(l *ContractLoaderByAddressDetails, key persist.AddressDetails) int {
+func (b *tokensLoaderByIDBatch) keyIndex(l *TokensLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -200,7 +204,7 @@ func (b *contractLoaderByAddressDetailsBatch) keyIndex(l *ContractLoaderByAddres
 	return pos
 }
 
-func (b *contractLoaderByAddressDetailsBatch) startTimer(l *ContractLoaderByAddressDetails) {
+func (b *tokensLoaderByIDBatch) startTimer(l *TokensLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -216,7 +220,7 @@ func (b *contractLoaderByAddressDetailsBatch) startTimer(l *ContractLoaderByAddr
 	b.end(l)
 }
 
-func (b *contractLoaderByAddressDetailsBatch) end(l *ContractLoaderByAddressDetails) {
+func (b *tokensLoaderByIDBatch) end(l *TokensLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

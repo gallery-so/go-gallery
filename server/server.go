@@ -4,28 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
-	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
@@ -34,6 +33,7 @@ import (
 func Init() {
 	setDefaults()
 
+	initLogger()
 	initSentry()
 
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
@@ -44,24 +44,21 @@ func Init() {
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
 func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
-	log.Info("initializing server...")
-
-	log.SetReportCaller(true)
+	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
-		log.SetLevel(log.DebugLevel)
 		gin.SetMode(gin.DebugMode)
 	}
 
 	router := gin.Default()
-	router.Use(middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
+	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.GinContextToContext(), middleware.ErrLogger())
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		log.Info("registering validation")
+		logger.For(nil).Info("registering validation")
 		validate.RegisterCustomValidators(v)
 	}
 
-	if err := redis.ClearCache(); err != nil {
+	if err := redis.ClearCache(redis.GalleriesDB); err != nil {
 		panic(err)
 	}
 
@@ -82,7 +79,7 @@ func newStorageClient() *storage.Client {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
 	}
 	if err != nil {
-		log.Errorf("error creating storage client: %v", err)
+		logger.For(nil).Errorf("error creating storage client: %v", err)
 	}
 	return s
 }
@@ -153,7 +150,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		UserEventRepository:       postgres.NewUserEventRepository(db),
 		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
 		NftEventRepository:        postgres.NewNftEventRepository(db),
-		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
+		CommunityRepository:       postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
 		WalletRepository:          postgres.NewWalletRepository(db),
 	}
 }
@@ -166,39 +163,45 @@ func newEthClient() *ethclient.Client {
 	return client
 }
 
+func initLogger() {
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.SetReportCaller(true)
+
+		if viper.GetString("ENV") != "production" {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+
+		if viper.GetString("ENV") == "local" {
+			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+		} else {
+			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
+			logger.SetFormatter(&logrus.JSONFormatter{})
+		}
+	})
+}
+
 func initSentry() {
 	if viper.GetString("ENV") == "local" {
-		log.Info("skipping sentry init")
+		logger.For(nil).Info("skipping sentry init")
 		return
 	}
 
-	log.Info("initializing sentry...")
+	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
-		BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
-			if event.Request == nil {
-				return event
-			}
-
-			var scrubbed []string
-			for _, c := range strings.Split(event.Request.Cookies, "; ") {
-				if !strings.HasPrefix(c, auth.JWTCookieKey) {
-					scrubbed = append(scrubbed, c)
-				}
-			}
-			cookies := strings.Join(scrubbed, "; ")
-
-			event.Request.Cookies = cookies
-			event.Request.Headers["Cookie"] = cookies
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			event = sentryutil.ScrubEventCookies(event, hint)
+			event = sentryutil.UpdateErrorFingerprints(event, hint)
 			return event
 		},
 	})
 
 	if err != nil {
-		log.Fatalf("failed to start sentry: %s", err)
+		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
 }
 

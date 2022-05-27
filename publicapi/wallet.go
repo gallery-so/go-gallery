@@ -24,7 +24,7 @@ type WalletAPI struct {
 func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (*sqlc.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"addressID": {walletID, "required"},
+		"walletID": {walletID, "required"},
 	}); err != nil {
 		return nil, err
 	}
@@ -37,16 +37,15 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 	return &address, nil
 }
 
-func (api WalletAPI) GetWalletByDetails(ctx context.Context, address persist.Address, chain persist.Chain) (*sqlc.Wallet, error) {
+func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*sqlc.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"address": {address, "required"},
-		"chain":   {chain, "required"},
+		"chainAddress.Address": {chainAddress.Address(), "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	a, err := api.loaders.WalletByAddressDetails.Load(persist.AddressDetails{AddressValue: address, Chain: chain})
+	a, err := api.loaders.WalletByChainAddress.Load(chainAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +61,7 @@ func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	a, err := api.loaders.WalletByUserID.Load(userID)
+	a, err := api.loaders.WalletsByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}

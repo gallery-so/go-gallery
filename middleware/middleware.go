@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"net/http"
 	"strings"
 
@@ -13,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -202,7 +206,7 @@ func ErrLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		if len(c.Errors) > 0 {
-			logrus.Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
+			logger.For(c).Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
 		}
 	}
 }
@@ -214,6 +218,52 @@ func GinContextToContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.WithValue(c.Request.Context(), util.GinContextKey, c)
 		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
+}
+
+func Sentry(reportGinErrors bool) gin.HandlerFunc {
+	handler := sentrygin.New(sentrygin.Options{Repanic: true})
+
+	return func(c *gin.Context) {
+		// Clone a new hub for each request
+		hub := sentry.CurrentHub().Clone()
+
+		// We scrub JWT cookies from error events with a BeforeSend hook on our Sentry client, but
+		// according to Sentry docs, BeforeSend isn't called for tracing transactions. Instead, we
+		// have to use an event processor to scrub JWT cookies from transactions, so add one here.
+		// See: https://develop.sentry.dev/sdk/performance/#interaction-with-beforesend-and-event-processors
+		hub.Scope().AddEventProcessor(sentryutil.ScrubEventCookies)
+
+		// Add the cloned hub to the request context so sentrygin will find it
+		c.Request = c.Request.WithContext(sentry.SetHubOnContext(c.Request.Context(), hub))
+
+		// Invoke the sentrygin handler. We don't call c.Next() here because sentrygin does it for us.
+		handler(c)
+
+		if reportGinErrors {
+			for _, err := range c.Errors {
+				sentryutil.ReportError(c, err)
+			}
+		}
+	}
+}
+
+func Tracing() gin.HandlerFunc {
+	// Trace outgoing HTTP requests
+	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true)
+
+	return func(c *gin.Context) {
+		description := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
+		span, ctx := tracing.StartSpan(c.Request.Context(), "gin.server", description,
+			sentry.TransactionName(description),
+			sentry.ContinueFromRequest(c.Request),
+		)
+
+		defer tracing.FinishSpan(span)
+
+		c.Request = c.Request.WithContext(ctx)
+
 		c.Next()
 	}
 }

@@ -9,6 +9,7 @@ const (
 )
 const (
 	UserCreatedEvent = (UserEventCode << 8) + iota + 1
+	UserFollowedEvent
 )
 const (
 	NftCollectorsNoteAddedEvent = (NftEventCode << 8) + iota + 1

@@ -89,11 +89,11 @@ func setDefaults() {
 
 func copyBack(pg *sql.DB) error {
 	var sel int
-	pg.QueryRow(`SELECT 1 FROM temp_users WHERE CARDINALITY(ADDRESSES) > 0;`).Scan(&sel)
+	pg.QueryRow(`SELECT 1 FROM temp_users WHERE CARDINALITY(WALLETS) > 0;`).Scan(&sel)
 	if sel > 0 {
 		logrus.Info("Found temp_users with addresses... copying back to original table")
 		_, err := pg.Exec(`
-		UPDATE users u SET ADDRESSES = (SELECT ADDRESSES FROM temp_users WHERE ID = u.ID)
+		UPDATE users u SET WALLETS = (SELECT WALLETS FROM temp_users WHERE ID = u.ID)
 	`)
 		if err != nil {
 			return err
@@ -120,7 +120,7 @@ func copyUsersToTempTable(pg *sql.DB) error {
 
 func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) {
 
-	rows, err := pg.Query(`SELECT ID,ADDRESSES FROM temp_users;`)
+	rows, err := pg.Query(`SELECT ID,WALLETS FROM temp_users;`)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]pers
 
 			userWallets[i] = walletID
 		}
-		_, err := pg.Exec(`UPDATE users SET ADDRESSES = $1 WHERE ID = $2;`, userWallets, id)
+		_, err := pg.Exec(`UPDATE users SET WALLETS = $1 WHERE ID = $2;`, userWallets, id)
 		if err != nil {
 			return err
 		}
@@ -329,7 +329,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	var ownerUserID persist.DBID
-	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(ADDRESSES);`, walletID).Scan(&ownerUserID)
+	err = pg.QueryRow(`SELECT ID FROM users WHERE $1 = ANY(WALLETS);`, walletID).Scan(&ownerUserID)
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
@@ -344,7 +344,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
-		OwnerAddresses:   []persist.Wallet{{ID: walletID}},
+		OwnedByWallets:   []persist.Wallet{{ID: walletID}},
 		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
 		TokenID:          nft.OpenseaTokenID,
 		OwnerUserID:      ownerUserID,
@@ -374,16 +374,16 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 		tokens = current
 	}
 
-	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNER_ADDRESSES,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
+	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
 	vals := make([]interface{}, 0, len(tokens)*paramsPerRow)
 	for i, token := range tokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnerAddresses, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_USER_ID) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNER_ADDRESSES = EXCLUDED.OWNER_ADDRESSES,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_USER_ID) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
 
 	_, err := pg.ExecContext(ctx, sqlStr, vals...)
 	if err != nil {

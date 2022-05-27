@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -16,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -42,13 +43,13 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 			return nil, fmt.Errorf("Failed to get owners for token: %s, %v", v, err)
 		}
 		if len(owners) == 0 {
-			logrus.Errorf("No owners found for token: %s", v)
+			logger.For(ctx).Errorf("No owners found for token: %s", v)
 			continue
 		}
 		go func(id persist.TokenID, o []persist.EthereumAddress) {
 			tier, err := processOwners(ctx, id, md, o, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
 			if err != nil {
-				logrus.Errorf("Failed to process membership events for token: %s, %v", id, err)
+				logger.For(ctx).Errorf("Failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
 		}(v, owners)
@@ -83,16 +84,16 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
 	tierChan := make(chan persist.MembershipTier)
 	for _, v := range MembershipTierIDs {
 		go func(id persist.TokenID) {
-			tier, err := processEventsToken(ctx, id, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository)
+			tier, err := processEventsToken(ctx, id, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository, walletRepository)
 			if err != nil {
-				logrus.Errorf("Failed to process membership events for token: %s, %v", id, err)
+				logger.For(ctx).Errorf("Failed to process membership events for token: %s, %v", id, err)
 			}
 			tierChan <- tier
 		}(v)
@@ -105,10 +106,10 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 }
 
 // UpdateMembershipTierToken fetches all membership cards for a token ID
-func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	_, err := processCurrentTierToken(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository)
+	_, err := processCurrentTierToken(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
 	if err != nil {
 		return persist.MembershipTier{}, fmt.Errorf("Failed to process membership events for token: %s, %v", pTokenID, err)
 	}
@@ -120,7 +121,7 @@ func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository pe
 		return persist.MembershipTier{}, fmt.Errorf("No membership cards found for token: %s", pTokenID)
 	}
 
-	return processEventsToken(ctx, pTokenID, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository)
+	return processEventsToken(ctx, pTokenID, ethClient, userRepository, nftRepository, galleryRepository, membershipRepository, walletRepository)
 }
 
 // OpenseaFetchMembershipCards recursively fetches all membership cards for a token ID
@@ -151,7 +152,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.EthereumAddress, tokenI
 				return nil, fmt.Errorf("timed out fetching membership cards %d at url: %s", tokenID.Base10Int(), urlStr)
 			}
 
-			logrus.Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
+			logger.For(nil).Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")
 			time.Sleep(time.Second * 2 * time.Duration(pRetry+1))
 			return OpenseaFetchMembershipCards(contractAddress, tokenID, pOffset, pRetry+1)
 		}
@@ -179,96 +180,98 @@ func OpenseaFetchMembershipCards(contractAddress persist.EthereumAddress, tokenI
 	return result, nil
 }
 
+func filterTokenHolders(holdersChannel chan persist.TokenHolder, numHolders int, tokenID persist.TokenID) []persist.TokenHolder {
+	receivedWalletIDs := map[persist.DBID]bool{}
+	tokenHolderByUserId := map[persist.DBID]*persist.TokenHolder{}
+
+	for i := 0; i < numHolders; i++ {
+		owner := <-holdersChannel
+		for _, walletID := range owner.WalletIDs {
+			if walletID == "" || receivedWalletIDs[walletID] {
+				logger.For(nil).Debugf("Skipping duplicate or empty walletID for ID %s: %s", tokenID, walletID)
+				continue
+			}
+
+			if owner.UserID == "" {
+				logger.For(nil).Debugf("Skipping empty userID for ID %s: userID=%s", tokenID, owner.UserID)
+				continue
+			}
+
+			if existingUser, ok := tokenHolderByUserId[owner.UserID]; ok {
+				existingUser.WalletIDs = append(existingUser.WalletIDs, walletID)
+				continue
+			}
+
+			tokenHolderByUserId[owner.UserID] = &persist.TokenHolder{
+				UserID:        owner.UserID,
+				WalletIDs:     []persist.DBID{walletID},
+				PreviewTokens: owner.PreviewTokens,
+			}
+		}
+	}
+
+	filtered := make([]persist.TokenHolder, 0, len(tokenHolderByUserId))
+	for _, tokenHolder := range tokenHolderByUserId {
+		filtered = append(filtered, *tokenHolder)
+	}
+
+	return filtered
+}
+
 func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
 	if err != nil {
-		logrus.Errorf("Failed to get membership tier for token: %s, %v", pTokenID, err)
+		logger.For(ctx).Errorf("Failed to get membership tier for token: %s, %v", pTokenID, err)
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwner(ctx, owner.Address, pTokenID, ethClient, userRepository, galleryRepository, walletRepository)
+			owner := fillMembershipOwner(ctx, owner.WalletIDs, pTokenID, ethClient, userRepository, galleryRepository, walletRepository)
 			ownersChan <- owner
 		})
 	}
-	receivedOwners := map[persist.EthereumAddress]bool{}
-	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
-	for i := 0; i < len(tier.Owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address.String() == "" {
-			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", pTokenID, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logrus.Debugf("Skipping duplicate username for ID %s: %s", pTokenID, owner.Username)
-			continue
-		}
-		newOwners = append(newOwners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
-	tier.Owners = newOwners
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tier.Owners), pTokenID)
 	wp.StopWait()
-	logrus.Debugf("Done receiving owners for token %s", pTokenID)
+	logger.For(ctx).Debugf("Done receiving owners for token %s", pTokenID)
 
 	err = membershipRepository.UpsertByTokenID(ctx, pTokenID, tier)
 	if err != nil {
-		logrus.Errorf("Error upserting membership tier %s: %s", pTokenID, err)
+		logger.For(ctx).Errorf("Error upserting membership tier %s: %s", pTokenID, err)
 		return persist.MembershipTier{}, err
 	}
 
 	return tier, nil
 }
 
-func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository) (persist.MembershipTier, error) {
+func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
 	if err != nil {
-		logrus.Errorf("Failed to get membership tier for token: %s, %v", pTokenID, err)
+		logger.For(ctx).Errorf("Failed to get membership tier for token: %s, %v", pTokenID, err)
 		return persist.MembershipTier{}, nil
 	}
 	wp := workerpool.New(10)
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	for _, v := range tier.Owners {
 		owner := v
 		wp.Submit(func() {
-			owner := fillMembershipOwnerToken(ctx, owner.UserID, owner.Address, pTokenID, ethClient, userRepository, galleryRepository)
+			owner := fillMembershipOwnerToken(ctx, owner.WalletIDs, pTokenID, ethClient, userRepository, galleryRepository, walletRepository)
 			ownersChan <- owner
 		})
 	}
-	receivedOwners := map[persist.EthereumAddress]bool{}
-	receivedUsers := map[string]bool{}
-	newOwners := make([]persist.MembershipOwner, 0, len(tier.Owners))
-	for i := 0; i < len(tier.Owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address.String() == "" {
-			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", pTokenID, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logrus.Debugf("Skipping duplicate username for ID %s: %s", pTokenID, owner.Username)
-			continue
-		}
-		newOwners = append(newOwners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
-	tier.Owners = newOwners
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tier.Owners), pTokenID)
 	wp.StopWait()
-	logrus.Debugf("Done receiving owners for token %s", pTokenID)
+	logger.For(ctx).Debugf("Done receiving owners for token %s", pTokenID)
 
 	err = membershipRepository.UpsertByTokenID(ctx, pTokenID, tier)
 	if err != nil {
-		logrus.Errorf("Error upserting membership tier %s: %s", pTokenID, err)
+		logger.For(ctx).Errorf("Error upserting membership tier %s: %s", pTokenID, err)
 		return persist.MembershipTier{}, err
 	}
 
@@ -280,128 +283,133 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
-	logrus.Infof("Fetching membership tier: %s", id)
+	logger.For(ctx).Infof("Fetching membership tier: %s", id)
 
 	tier.Name = persist.NullString(metadata.Name)
 	tier.AssetURL = persist.NullString(metadata.Image)
 
-	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
-	tier.Owners = make([]persist.MembershipOwner, 0, len(owners))
+	logger.For(ctx).Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for i, o := range owners {
 		addr := o
 		wp.Submit(func() {
-			logrus.Debugf("Processing event for ID %s %+v %d", id, addr, i)
+			logger.For(ctx).Debugf("Processing event for ID %s %+v %d", id, addr, i)
 			if addr.String() != persist.ZeroAddress.String() {
-				logrus.Debug("Event is to real address")
+				logger.For(ctx).Debug("Event is to real address")
 				// does to have the NFT?
-				membershipOwner := fillMembershipOwner(ctx, addr, id, ethClient, userRepository, galleryRepository, walletRepository)
-				if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
-					logrus.Debugf("Adding membership owner %s for ID %s", membershipOwner.Address, id)
+				wallet, err := walletRepository.GetByChainAddress(ctx, persist.NewChainAddress(persist.Address(addr), persist.ChainETH))
+				if err != nil {
+					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s: no wallet found for address", addr, id)
+					ownersChan <- persist.TokenHolder{}
+					return
+				}
+				membershipOwner := fillMembershipOwner(ctx, []persist.DBID{wallet.ID}, id, ethClient, userRepository, galleryRepository, walletRepository)
+				if membershipOwner.PreviewTokens != nil && len(membershipOwner.PreviewTokens) > 0 {
+					logger.For(ctx).Debugf("Adding membership owner %s for ID %s", addr, id)
 					ownersChan <- membershipOwner
 				} else {
-					logrus.Debugf("Skipping membership owner %s for ID %s", membershipOwner.Address, id)
-					ownersChan <- persist.MembershipOwner{}
+					logger.For(ctx).Debugf("Skipping membership owner %s for ID %s", addr, id)
+					ownersChan <- persist.TokenHolder{}
 				}
 				return
 			}
-			logrus.Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
-			ownersChan <- persist.MembershipOwner{}
+			logger.For(ctx).Debugf("Event is to 0x0000000000000000000000000000000000000000 for ID %s", id)
+			ownersChan <- persist.TokenHolder{}
 		})
 
 	}
-	receivedOwners := map[persist.EthereumAddress]bool{}
-	receivedUsers := map[string]bool{}
-	for i := 0; i < len(owners); i++ {
-		owner := <-ownersChan
-		if receivedOwners[owner.Address] || owner.Address.String() == "" {
-			logrus.Debugf("Skipping duplicate or empty owner for ID %s: %s", id, owner.Address)
-			continue
-		}
-		if owner.Username != "" && receivedUsers[strings.ToLower(owner.Username.String())] {
-			logrus.Debugf("Skipping duplicate username for ID %s: %s", id, owner.Username)
-			continue
-		}
-		tier.Owners = append(tier.Owners, owner)
-		receivedOwners[owner.Address] = true
-		if owner.Username != "" {
-			receivedUsers[strings.ToLower(owner.Username.String())] = true
-		}
-	}
+
+	tier.Owners = filterTokenHolders(ownersChan, len(owners), id)
 	wp.StopWait()
-	logrus.Debugf("Done receiving owners for token %s", id)
+	logger.For(ctx).Debugf("Done receiving owners for token %s", id)
 
 	err := membershipRepository.UpsertByTokenID(ctx, id, tier)
 	if err != nil {
-		logrus.Errorf("Error upserting membership tier %s: %s", id, err)
+		logger.For(ctx).Errorf("Error upserting membership tier %s: %s", id, err)
 		return persist.MembershipTier{}, err
 	}
 
 	return tier, nil
 }
 
-func fillMembershipOwner(ctx context.Context, pAddress persist.EthereumAddress, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{Address: pAddress}
+func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
-	wallet, err := walletRepository.GetByAddressDetails(ctx, persist.Address(pAddress.String()), persist.ChainETH)
-	if err != nil {
-		logrus.Errorf("Error getting wallet for address %s: %s", pAddress, err)
-		return membershipOwner
-	}
-	glryUser, err := userRepository.GetByWallet(ctx, wallet.ID)
-	if err != nil || glryUser.Username == "" {
-		logrus.WithError(err).Errorf("Failed to get user for address %s", pAddress)
-		return membershipOwner
-	}
-	membershipOwner.Username = glryUser.Username
-	membershipOwner.UserID = glryUser.ID
-
-	galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-	if err == nil && len(galleries) > 0 {
-		gallery := galleries[0]
-		if gallery.Collections != nil && len(gallery.Collections) > 0 {
-			membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollections(gallery.Collections)
+	for _, walletID := range pWalletIDs {
+		glryUser, err := userRepository.GetByWallet(ctx, walletID)
+		if err != nil || glryUser.Username == "" {
+			logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", walletID)
+			continue
 		}
+
+		membershipOwner.UserID = glryUser.ID
+
+		galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+		if err == nil && len(galleries) > 0 {
+			gallery := galleries[0]
+			if gallery.Collections != nil && len(gallery.Collections) > 0 {
+				membershipOwner.PreviewTokens = nft.GetPreviewsFromCollections(gallery.Collections)
+			}
+		}
+
+		return membershipOwner
 	}
 
 	return membershipOwner
 }
 
-func fillMembershipOwnerToken(ctx context.Context, pUserID persist.DBID, pAddress persist.EthereumAddress, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository) persist.MembershipOwner {
-	membershipOwner := persist.MembershipOwner{}
+func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
+	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
-	glryUser, err := userRepository.GetByID(ctx, pUserID)
-	if err != nil || glryUser.Username == "" {
-		logrus.WithError(err).Errorf("Failed to get user for ID %s", pUserID)
-		return membershipOwner
-	}
-	membershipOwner.Username = glryUser.Username
-	membershipOwner.UserID = glryUser.ID
-	membershipOwner.Address = pAddress
-
-	galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-	if err == nil && len(galleries) > 0 {
-		gallery := galleries[0]
-		if gallery.Collections != nil || len(gallery.Collections) > 0 {
-			membershipOwner.PreviewNFTs = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
+	for _, walletID := range pWalletIDs {
+		wallet, err := walletRepository.GetByID(ctx, walletID)
+		if err != nil {
+			logger.For(ctx).WithError(err).Errorf("Failed to get wallet with ID %s", walletID)
+			continue
 		}
+
+		if wallet.Chain != persist.ChainETH {
+			continue
+		}
+
+		if hasNFT, _ := eth.HasNFT(ctx, PremiumCards, id, persist.EthereumAddress(wallet.Address), ethClient); !hasNFT {
+			continue
+		}
+
+		glryUser, err := userRepository.GetByWallet(ctx, walletID)
+		if err != nil || glryUser.Username == "" {
+			logger.For(ctx).WithError(err).Errorf("Failed to get user for walletID %s", walletID)
+			continue
+		}
+
+		membershipOwner.UserID = glryUser.ID
+
+		galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
+		if err == nil && len(galleries) > 0 {
+			gallery := galleries[0]
+			if gallery.Collections != nil || len(gallery.Collections) > 0 {
+				membershipOwner.PreviewTokens = nft.GetPreviewsFromCollectionsToken(gallery.Collections)
+			}
+		}
+
+		return membershipOwner
 	}
 
 	return membershipOwner
 }
 
-func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository) (persist.MembershipTier, error) {
+func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
 	}
-	logrus.Infof("Fetching membership tier: %s", id)
+	logger.For(ctx).Infof("Fetching membership tier: %s", id)
 
 	tokens, err := nftRepository.GetByTokenIdentifiers(ctx, persist.TokenID(id), persist.Address(PremiumCards), persist.ChainETH, -1, 0)
 	if err != nil || len(tokens) == 0 {
-		logrus.WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
+		logger.For(ctx).WithError(err).Errorf("Failed to fetch membership cards for token: %s", id)
 		return tier, nil
 	}
 	initialToken := tokens[0]
@@ -409,39 +417,33 @@ func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethc
 	tier.Name = persist.NullString(initialToken.Name)
 	tier.AssetURL = persist.NullString(initialToken.Media.MediaURL)
 
-	logrus.Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
+	logger.For(ctx).Infof("Fetched membership cards for token %s with name %s and asset URL %s ", id, tier.Name, tier.AssetURL)
 
-	tier.Owners = make([]persist.MembershipOwner, 0, len(tokens))
-
-	ownersChan := make(chan persist.MembershipOwner)
+	ownersChan := make(chan persist.TokenHolder)
 	wp := workerpool.New(10)
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
-			addr := persist.EthereumAddress("")
-			if len(token.OwnerAddresses) > 0 {
-				addr = persist.EthereumAddress(token.OwnerAddresses[0].Address)
+			walletIDs := make([]persist.DBID, len(token.OwnedByWallets))
+			for i, w := range token.OwnedByWallets {
+				walletIDs[i] = w.ID
 			}
-			membershipOwner := fillMembershipOwnerToken(ctx, token.OwnerUserID, addr, id, ethClient, userRepository, galleryRepository)
-			if membershipOwner.PreviewNFTs != nil && len(membershipOwner.PreviewNFTs) > 0 {
+			membershipOwner := fillMembershipOwnerToken(ctx, walletIDs, id, ethClient, userRepository, galleryRepository, walletRepository)
+			if membershipOwner.PreviewTokens != nil && len(membershipOwner.PreviewTokens) > 0 {
 				ownersChan <- membershipOwner
 			} else {
-				ownersChan <- persist.MembershipOwner{}
+				ownersChan <- persist.TokenHolder{}
 			}
 		})
 
 	}
-	for i := 0; i < len(tokens); i++ {
-		owner := <-ownersChan
-		if owner.Address.String() != "" {
-			tier.Owners = append(tier.Owners, <-ownersChan)
-		}
-	}
+
+	tier.Owners = filterTokenHolders(ownersChan, len(tokens), id)
 	wp.StopWait()
 
 	err = membershipRepository.UpsertByTokenID(ctx, id, tier)
 	if err != nil {
-		logrus.Errorf("Error upserting membership tier: %s", err)
+		logger.For(ctx).Errorf("Error upserting membership tier: %s", err)
 		return persist.MembershipTier{}, err
 	}
 
@@ -466,7 +468,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 	galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
 
 	if forceRefresh {
-		logrus.Infof("Force refresh - updating membership tiers")
+		logger.For(ctx).Infof("Force refresh - updating membership tiers")
 	}
 
 	allTiers, err := membershipRepository.GetAll(ctx)
@@ -474,7 +476,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 		return nil, err
 	}
 
-	logrus.Debugf("Found %d membership tiers in the DB", len(allTiers))
+	logger.For(ctx).Debugf("Found %d membership tiers in the DB", len(allTiers))
 
 	if len(allTiers) > 0 {
 		if len(allTiers) != len(MembershipTierIDs) {
@@ -486,7 +488,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 
 			for _, tierID := range MembershipTierIDs {
 				if ok := tiers[tierID]; !ok {
-					logrus.Infof("Tier not found - updating membership tier %s", tierID)
+					logger.For(ctx).Infof("Tier not found - updating membership tier %s", tierID)
 					newTier, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, walletRepository, ethClient, ipfsClient, arweaveClient, stg)
 					if err != nil {
 						return nil, err
@@ -499,7 +501,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 		tiersToUpdate := make([]persist.TokenID, 0, len(allTiers))
 		for _, tier := range allTiers {
 			if time.Since(tier.LastUpdated.Time()) > time.Hour || forceRefresh {
-				logrus.Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
+				logger.For(ctx).Infof("Tier %s not updated in the last hour - updating membership tier", tier.TokenID)
 				tiersToUpdate = append(tiersToUpdate, tier.TokenID)
 			}
 		}
@@ -509,7 +511,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 				for _, tierID := range tiersToUpdate {
 					_, err := UpdateMembershipTier(tierID, membershipRepository, userRepository, galleryRepository, walletRepository, ethClient, ipfsClient, arweaveClient, stg)
 					if err != nil {
-						logrus.WithError(err).Errorf("Failed to update membership tier %s", tierID)
+						logger.For(ctx).WithError(err).Errorf("Failed to update membership tier %s", tierID)
 					}
 				}
 			}()
@@ -518,7 +520,7 @@ func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipReposi
 		return OrderMembershipTiers(allTiers), nil
 	}
 
-	logrus.Infof("No tiers found - updating membership tiers")
+	logger.For(ctx).Infof("No tiers found - updating membership tiers")
 	membershipTiers, err := UpdateMembershipTiers(membershipRepository, userRepository, galleryRepository, walletRepository, ethClient, ipfsClient, arweaveClient, stg)
 	if err != nil {
 		return nil, err

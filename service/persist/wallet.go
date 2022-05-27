@@ -3,6 +3,7 @@ package persist
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -30,12 +31,93 @@ type WalletType int
 
 type WalletList []Wallet
 
-// AddressValue represents the value of an address
+// Address represents the value of an address
 type Address string
 
-type AddressDetails struct {
-	AddressValue Address `json:"address"`
-	Chain        Chain   `json:"chain"`
+//type ChainAddress struct {
+//	Address Address `json:"address"`
+//	Chain   Chain   `json:"chain"`
+//}
+//
+//func (c ChainAddress) String() string {
+//	return fmt.Sprintf("%d:%s", c.Chain, c.Address)
+//}
+
+type ChainAddress struct {
+	addressSet bool
+	chainSet   bool
+	address    Address
+	chain      Chain
+}
+
+// IsGalleryUserOrAddress is an empty function that satisfies the gqlgen IsGalleryUserOrAddress interface,
+// allowing ChainAddress to be used in GraphQL resolvers that return the GalleryUserOrAddress type.
+func (c *ChainAddress) IsGalleryUserOrAddress() {}
+
+func NewChainAddress(address Address, chain Chain) ChainAddress {
+	ca := ChainAddress{
+		addressSet: true,
+		chainSet:   true,
+		address:    address,
+		chain:      chain,
+	}
+
+	ca.updateCasing()
+	return ca
+}
+
+func (c *ChainAddress) Address() Address {
+	return c.address
+}
+
+func (c *ChainAddress) Chain() Chain {
+	return c.chain
+}
+
+func (c *ChainAddress) updateCasing() {
+	switch c.chain {
+	// TODO: Add an IsCaseSensitive to the Chain type?
+	case ChainETH:
+		c.address = Address(strings.ToLower(c.address.String()))
+	}
+}
+
+// GQLSetAddressFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainAddress) GQLSetAddressFromResolver(address Address) error {
+	if c.addressSet {
+		return errors.New("ChainAddress.address may only be set once")
+	}
+
+	c.address = address
+	c.addressSet = true
+
+	if c.chainSet {
+		c.updateCasing()
+	}
+
+	return nil
+}
+
+// GQLSetChainFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
+	if c.chainSet {
+		return errors.New("ChainAddress.chain may only be set once")
+	}
+
+	c.chain = chain
+	c.chainSet = true
+
+	if c.addressSet {
+		c.updateCasing()
+	}
+
+	return nil
+}
+
+func (c ChainAddress) String() string {
+	return fmt.Sprintf("%d:%s", c.chain, c.address)
 }
 
 const (
@@ -47,8 +129,9 @@ const (
 
 // WalletRepository represents a repository for interacting with persisted wallets
 type WalletRepository interface {
-	GetByAddressDetails(context.Context, Address, Chain) (Wallet, error)
-	Insert(context.Context, Address, Chain, WalletType) (DBID, error)
+	GetByID(context.Context, DBID) (Wallet, error)
+	GetByChainAddress(context.Context, ChainAddress) (Wallet, error)
+	Insert(context.Context, ChainAddress, WalletType) (DBID, error)
 }
 
 func (l WalletList) Value() (driver.Value, error) {
@@ -112,14 +195,17 @@ func (n *Address) Scan(value interface{}) error {
 		*n = Address("")
 		return nil
 	}
-	*n = Address(value.([]uint8))
+	*n = Address(value.(string))
 	return nil
 }
 
-// ErrWalletNotFoundByAddressDetails is an error type for when a wallet is not found by address and chain unique combination
-type ErrWalletNotFoundByAddressDetails struct {
-	Address Address
-	Chain   Chain
+type ErrWalletNotFoundByID struct {
+	WalletID DBID
+}
+
+// ErrWalletNotFoundByChainAddress is an error type for when a wallet is not found by address and chain unique combination
+type ErrWalletNotFoundByChainAddress struct {
+	ChainAddress ChainAddress
 }
 
 // ErrWalletNotFoundByAddress is an error type for when a wallet is not found by address's ID
@@ -127,8 +213,12 @@ type ErrWalletNotFoundByAddress struct {
 	Address DBID
 }
 
-func (e ErrWalletNotFoundByAddressDetails) Error() string {
-	return fmt.Sprintf("wallet not found by address details: %s | chain: %s", e.Address, e.Chain)
+func (e ErrWalletNotFoundByID) Error() string {
+	return fmt.Sprintf("wallet not found by id: %s", e.WalletID)
+}
+
+func (e ErrWalletNotFoundByChainAddress) Error() string {
+	return fmt.Sprintf("wallet not found by chain address: %s | chain: %d", e.ChainAddress.Address(), e.ChainAddress.Chain())
 }
 
 func (e ErrWalletNotFoundByAddress) Error() string {

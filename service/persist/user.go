@@ -40,33 +40,33 @@ type UserRepository interface {
 	RemoveWallet(context.Context, DBID, Address, Chain) error
 	GetByID(context.Context, DBID) (User, error)
 	GetByWallet(context.Context, DBID) (User, error)
-	GetByAddressDetails(context.Context, Address, Chain) (User, error)
+	GetByChainAddress(context.Context, ChainAddress) (User, error)
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
 	MergeUsers(context.Context, DBID, DBID) error
+	AddFollower(pCtx context.Context, follower DBID, followee DBID) error
+	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 }
 
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
 	UserID        DBID
 	WalletID      DBID
-	Address       Address
-	Chain         Chain
+	ChainAddress  ChainAddress
 	Username      string
 	Authenticator string
 }
 
 func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s,username: %s, authenticator: %s", e.Address, e.WalletID, e.UserID, e.Username, e.Authenticator)
+	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s,username: %s, authenticator: %s", e.ChainAddress, e.WalletID, e.UserID, e.Username, e.Authenticator)
 }
 
 type ErrUserAlreadyExists struct {
-	Address       Address
-	Chain         Chain
+	ChainAddress  ChainAddress
 	Authenticator string
 	Username      string
 }
 
 func (e ErrUserAlreadyExists) Error() string {
-	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.Address, e.Authenticator)
+	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.ChainAddress, e.Authenticator)
 }

@@ -102,6 +102,13 @@ type Feature struct {
 	ForceEnabledUserIds []string
 }
 
+type Follow struct {
+	ID       persist.DBID
+	Follower persist.DBID
+	Followee persist.DBID
+	Deleted  bool
+}
+
 type Gallery struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -136,7 +143,7 @@ type Membership struct {
 	TokenID     sql.NullString
 	Name        sql.NullString
 	AssetUrl    sql.NullString
-	Owners      persist.MembershipOwnerList
+	Owners      persist.TokenHolderList
 }
 
 type Nft struct {
@@ -210,7 +217,7 @@ type Token struct {
 	ExternalUrl      sql.NullString
 	BlockNumber      sql.NullInt64
 	OwnerUserID      persist.DBID
-	OwnerAddresses   []string
+	OwnedByWallets   persist.DBIDList
 }
 
 type User struct {
@@ -221,7 +228,7 @@ type User struct {
 	CreatedAt          time.Time
 	Username           sql.NullString
 	UsernameIdempotent sql.NullString
-	Addresses          persist.WalletList
+	Wallets            persist.WalletList
 	Bio                sql.NullString
 }
 

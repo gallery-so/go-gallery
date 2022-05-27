@@ -74,17 +74,17 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 	return items, nil
 }
 
-const getContractByDetails = `-- name: GetContractByDetails :one
+const getContractByChainAddress = `-- name: GetContractByChainAddress :one
 select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetContractByDetailsParams struct {
+type GetContractByChainAddressParams struct {
 	Address sql.NullString
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetContractByDetails(ctx context.Context, arg GetContractByDetailsParams) (Contract, error) {
-	row := q.db.QueryRow(ctx, getContractByDetails, arg.Address, arg.Chain)
+func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContractByChainAddressParams) (Contract, error) {
+	row := q.db.QueryRow(ctx, getContractByChainAddress, arg.Address, arg.Chain)
 	var i Contract
 	err := row.Scan(
 		&i.ID,
@@ -216,152 +216,12 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
-const getNftById = `-- name: GetNftById :one
-SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE id = $1 AND deleted = false
+const getTokenById = `-- name: GetTokenById :one
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE id = $1 AND deleted = false
 `
 
-func (q *Queries) GetNftById(ctx context.Context, id persist.DBID) (Nft, error) {
-	row := q.db.QueryRow(ctx, getNftById, id)
-	var i Nft
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Name,
-		&i.Description,
-		&i.CollectorsNote,
-		&i.ExternalUrl,
-		&i.CreatorAddress,
-		&i.CreatorName,
-		&i.OwnerAddress,
-		&i.MultipleOwners,
-		&i.Contract,
-		&i.OpenseaID,
-		&i.OpenseaTokenID,
-		&i.TokenCollectionName,
-		&i.ImageUrl,
-		&i.ImageThumbnailUrl,
-		&i.ImagePreviewUrl,
-		&i.ImageOriginalUrl,
-		&i.AnimationUrl,
-		&i.AnimationOriginalUrl,
-		&i.AcquisitionDate,
-		&i.TokenMetadataUrl,
-	)
-	return i, err
-}
-
-const getNftsByCollectionId = `-- name: GetNftsByCollectionId :many
-SELECT n.id, n.deleted, n.version, n.last_updated, n.created_at, n.name, n.description, n.collectors_note, n.external_url, n.creator_address, n.creator_name, n.owner_address, n.multiple_owners, n.contract, n.opensea_id, n.opensea_token_id, n.token_collection_name, n.image_url, n.image_thumbnail_url, n.image_preview_url, n.image_original_url, n.animation_url, n.animation_original_url, n.acquisition_date, n.token_metadata_url FROM collections c, unnest(c.nfts)
-    WITH ORDINALITY AS x(nft_id, nft_ord)
-    INNER JOIN nfts n ON n.id = x.nft_id
-    WHERE c.id = $1 AND c.deleted = false AND n.deleted = false ORDER BY x.nft_ord
-`
-
-func (q *Queries) GetNftsByCollectionId(ctx context.Context, id persist.DBID) ([]Nft, error) {
-	rows, err := q.db.Query(ctx, getNftsByCollectionId, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Nft
-	for rows.Next() {
-		var i Nft
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.ExternalUrl,
-			&i.CreatorAddress,
-			&i.CreatorName,
-			&i.OwnerAddress,
-			&i.MultipleOwners,
-			&i.Contract,
-			&i.OpenseaID,
-			&i.OpenseaTokenID,
-			&i.TokenCollectionName,
-			&i.ImageUrl,
-			&i.ImageThumbnailUrl,
-			&i.ImagePreviewUrl,
-			&i.ImageOriginalUrl,
-			&i.AnimationUrl,
-			&i.AnimationOriginalUrl,
-			&i.AcquisitionDate,
-			&i.TokenMetadataUrl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getNftsByOwnerAddress = `-- name: GetNftsByOwnerAddress :many
-SELECT id, deleted, version, last_updated, created_at, name, description, collectors_note, external_url, creator_address, creator_name, owner_address, multiple_owners, contract, opensea_id, opensea_token_id, token_collection_name, image_url, image_thumbnail_url, image_preview_url, image_original_url, animation_url, animation_original_url, acquisition_date, token_metadata_url FROM nfts WHERE owner_address = $1 AND deleted = false
-`
-
-func (q *Queries) GetNftsByOwnerAddress(ctx context.Context, ownerAddress persist.Address) ([]Nft, error) {
-	rows, err := q.db.Query(ctx, getNftsByOwnerAddress, ownerAddress)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Nft
-	for rows.Next() {
-		var i Nft
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Name,
-			&i.Description,
-			&i.CollectorsNote,
-			&i.ExternalUrl,
-			&i.CreatorAddress,
-			&i.CreatorName,
-			&i.OwnerAddress,
-			&i.MultipleOwners,
-			&i.Contract,
-			&i.OpenseaID,
-			&i.OpenseaTokenID,
-			&i.TokenCollectionName,
-			&i.ImageUrl,
-			&i.ImageThumbnailUrl,
-			&i.ImagePreviewUrl,
-			&i.ImageOriginalUrl,
-			&i.AnimationUrl,
-			&i.AnimationOriginalUrl,
-			&i.AcquisitionDate,
-			&i.TokenMetadataUrl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTokenByID = `-- name: GetTokenByID :one
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE id = $1 AND deleted = false
-`
-
-func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, error) {
-	row := q.db.QueryRow(ctx, getTokenByID, id)
+func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
+	row := q.db.QueryRow(ctx, getTokenById, id)
 	var i Token
 	err := row.Scan(
 		&i.ID,
@@ -384,17 +244,20 @@ func (q *Queries) GetTokenByID(ctx context.Context, id persist.DBID) (Token, err
 		&i.ExternalUrl,
 		&i.BlockNumber,
 		&i.OwnerUserID,
-		&i.OwnerAddresses,
+		&i.OwnedByWallets,
 	)
 	return i, err
 }
 
-const getTokensByUserID = `-- name: GetTokensByUserID :many
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owner_addresses FROM tokens WHERE owner_user_id = $1 AND deleted = false
+const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.contract_address, t.collectors_note, t.media, t.chain, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets FROM collections c, unnest(c.nfts)
+    WITH ORDINALITY AS x(nft_id, nft_ord)
+    INNER JOIN tokens t ON t.id = x.nft_id
+    WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord
 `
 
-func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
-	rows, err := q.db.Query(ctx, getTokensByUserID, ownerUserID)
+func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByCollectionId, id)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +286,7 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 			&i.ExternalUrl,
 			&i.BlockNumber,
 			&i.OwnerUserID,
-			&i.OwnerAddresses,
+			&i.OwnedByWallets,
 		); err != nil {
 			return nil, err
 		}
@@ -435,29 +298,8 @@ func (q *Queries) GetTokensByUserID(ctx context.Context, ownerUserID persist.DBI
 	return items, nil
 }
 
-const getUserByAddress = `-- name: GetUserByAddress :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE $1::varchar = ANY(addresses) AND deleted = false
-`
-
-func (q *Queries) GetUserByAddress(ctx context.Context, address string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByAddress, address)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Username,
-		&i.UsernameIdempotent,
-		&i.Addresses,
-		&i.Bio,
-	)
-	return i, err
-}
-
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -471,14 +313,14 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.CreatedAt,
 		&i.Username,
 		&i.UsernameIdempotent,
-		&i.Addresses,
+		&i.Wallets,
 		&i.Bio,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, addresses, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -492,23 +334,23 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.CreatedAt,
 		&i.Username,
 		&i.UsernameIdempotent,
-		&i.Addresses,
+		&i.Wallets,
 		&i.Bio,
 	)
 	return i, err
 }
 
-const getWalletByAddressDetails = `-- name: GetWalletByAddressDetails :one
+const getWalletByChainAddress = `-- name: GetWalletByChainAddress :one
 SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wallets.version, wallets.address, wallets.wallet_type, wallets.chain FROM wallets WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
-type GetWalletByAddressDetailsParams struct {
+type GetWalletByChainAddressParams struct {
 	Address persist.Address
 	Chain   sql.NullInt32
 }
 
-func (q *Queries) GetWalletByAddressDetails(ctx context.Context, arg GetWalletByAddressDetailsParams) (Wallet, error) {
-	row := q.db.QueryRow(ctx, getWalletByAddressDetails, arg.Address, arg.Chain)
+func (q *Queries) GetWalletByChainAddress(ctx context.Context, arg GetWalletByChainAddressParams) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByChainAddress, arg.Address, arg.Chain)
 	var i Wallet
 	err := row.Scan(
 		&i.ID,
@@ -544,7 +386,7 @@ func (q *Queries) GetWalletByID(ctx context.Context, id persist.DBID) (Wallet, e
 }
 
 const getWalletsByUserID = `-- name: GetWalletsByUserID :many
-SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.addresses) WITH ORDINALITY AS a(addr, addr_ord) INNER JOIN wallets w on w.id = a.addr WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.addr_ord
+SELECT w.id, w.created_at, w.last_updated, w.deleted, w.version, w.address, w.wallet_type, w.chain FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, wallet_ord)INNER JOIN wallets w on w.id = a.wallet_id WHERE u.id = $1 AND u.deleted = false AND w.deleted = false ORDER BY a.wallet_ord
 `
 
 func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wallet, error) {

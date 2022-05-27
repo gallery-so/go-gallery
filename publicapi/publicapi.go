@@ -31,13 +31,14 @@ type PublicAPI struct {
 	Collection *CollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
-	Nft        *TokenAPI
+	Token      *TokenAPI
 	Wallet     *WalletAPI
 	Misc       *MiscAPI
 }
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider) {
-	loaders := dataloader.NewLoaders(ctx, queries)
+	// Use the request context so dataloaders will add their traces to the request span
+	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries)
 	validator := newValidator()
 
 	api := &PublicAPI{
@@ -49,7 +50,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Nft:        &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
+		Token:      &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Wallet:     &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:       &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 	}

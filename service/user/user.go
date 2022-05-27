@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
 )
 
 var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
@@ -92,13 +92,14 @@ type MergeUsersInput struct {
 func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, multichainProvider *multichain.Provider) (CreateUserOutput, error) {
 
 	output := &CreateUserOutput{}
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 
-	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, pInput.Chain, userRepo, nonceRepo, walletRepo)
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
-		return CreateUserOutput{}, auth.ErrNonceNotFound{Address: pInput.Address, Chain: pInput.Chain}
+		return CreateUserOutput{}, auth.ErrNonceNotFound{ChainAddress: chainAddress}
 	}
 	if id != "" {
-		return CreateUserOutput{}, persist.ErrUserAlreadyExists{Address: pInput.Address, Chain: pInput.Chain}
+		return CreateUserOutput{}, persist.ErrUserAlreadyExists{ChainAddress: chainAddress}
 	}
 
 	if pInput.WalletType != persist.WalletTypeEOA {
@@ -107,9 +108,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 		}
 	}
 
-	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature,
-		nonce,
-		pInput.Address, pInput.Chain, pInput.WalletType)
+	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
@@ -140,15 +139,15 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 			defer cancel()
 			err := validateNFTsForUser(ctx, userID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("validateNFTsForUser")
+				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
 			}
 		}()
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pInput.Address, pInput.Chain, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+			err := ensureMediaContent(ctx, chainAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("ensureMediaForUser")
+				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
@@ -160,7 +159,7 @@ func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRep
 
 	output.JWTtoken = jwtTokenStr
 
-	err = auth.NonceRotate(pCtx, pInput.Address, pInput.Chain, userID, nonceRepo)
+	err = auth.NonceRotate(pCtx, chainAddress, userID, nonceRepo)
 	if err != nil {
 		return CreateUserOutput{}, err
 	}
@@ -227,50 +226,20 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	return userID, galleryID, nil
 }
 
-// CreateUserREST creates a new user
-func CreateUserREST(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryRepository, ethClient *ethclient.Client) (CreateUserOutput, error) {
-
-	authenticator := auth.NonceAuthenticator{
-		Address:    pInput.Address,
-		Nonce:      pInput.Nonce,
-		Signature:  pInput.Signature,
-		WalletType: pInput.WalletType,
-		UserRepo:   userRepo,
-		NonceRepo:  nonceRepo,
-		EthClient:  ethClient,
-	}
-
-	userID, galleryID, err := CreateUser(pCtx, authenticator, userRepo, galleryRepo)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	output := CreateUserOutput{
-		SignatureValid: true,
-		UserID:         userID,
-		GalleryID:      galleryID,
-	}
-
-	return output, nil
-}
-
 // RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddresses []persist.Address, pChains []persist.Chain,
+func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pChainAddresses []persist.ChainAddress,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
-	if len(pAddresses) != len(pChains) {
-		return fmt.Errorf("number of addresses (%d) does not match number of chains (%d)", len(pAddresses), len(pChains))
-	}
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
 
-	if len(user.Wallets) <= len(pAddresses) {
+	if len(user.Wallets) <= len(pChainAddresses) {
 		return errUserCannotRemoveAllAddresses
 	}
-	for i := 0; i < len(pAddresses); i++ {
-		if err := userRepo.RemoveWallet(pCtx, pUserID, pAddresses[i], pChains[i]); err != nil {
+	for _, chainAddress := range pChainAddresses {
+		if err := userRepo.RemoveWallet(pCtx, pUserID, chainAddress.Address(), chainAddress.Chain()); err != nil {
 			return err
 		}
 	}
@@ -279,7 +248,7 @@ func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pAddres
 }
 
 // AddWalletToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, pChain persist.Chain, addressAuth auth.Authenticator,
+func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -290,11 +259,11 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress persis
 	addressUserID := authResult.UserID
 
 	if addressUserID != "" {
-		return ErrAddressOwnedByUser{Address: pAddress, Chain: pChain, OwnerID: addressUserID}
+		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pAddress, Chain: pChain}) {
-		return ErrAddressNotOwnedByUser{Address: pAddress, Chain: pChain, UserID: addressUserID}
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
+		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
 	// TODO insert wallet and update user with wallet
@@ -303,7 +272,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pAddress persis
 }
 
 // AddAddressToUserToken adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress persist.Address, pChain persist.Chain, pWalletType persist.WalletType, addressAuth auth.Authenticator,
+func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -314,11 +283,11 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 	addressUserID := authResult.UserID
 
 	if addressUserID != "" {
-		return ErrAddressOwnedByUser{Address: pAddress, OwnerID: addressUserID}
+		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pAddress, Chain: pChain}) {
-		return ErrAddressNotOwnedByUser{Address: pAddress, UserID: addressUserID}
+	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
+		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
 	defer func() {
@@ -330,21 +299,21 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pAddress 
 			defer cancel()
 			err := validateNFTsForUser(ctx, pUserID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("validateNFTsForUser")
+				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
 			}
 		}()
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancel()
-			err := ensureMediaContent(ctx, pAddress, pChain, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
+			err := ensureMediaContent(ctx, pChainAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
 			if err != nil {
-				logrus.WithError(err).Error("ensureMediaForUser")
+				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
 			}
 		}()
 	}()
 
 	// TODO add address to user waterfalls to wallet and address table
-	if err := userRepo.AddWallet(pCtx, pUserID, pAddress, pChain, pWalletType); err != nil {
+	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress.Address(), pChainAddress.Chain(), pWalletType); err != nil {
 		return err
 	}
 
@@ -374,6 +343,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 
 	var user persist.User
 	var err error
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 	switch {
 	case pInput.UserID != "":
 		user, err = userRepo.GetByID(pCtx, pInput.UserID)
@@ -388,7 +358,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 		}
 		break
 	case pInput.Address.String() != "":
-		user, err = userRepo.GetByAddressDetails(pCtx, pInput.Address, pInput.Chain)
+		user, err = userRepo.GetByChainAddress(pCtx, chainAddress)
 		if err != nil {
 			return GetUserOutput{}, err
 		}
@@ -396,7 +366,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	}
 
 	if user.ID == "" {
-		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, Address: pInput.Address, Username: pInput.Username}
+		return GetUserOutput{}, persist.ErrUserNotFound{UserID: pInput.UserID, ChainAddress: chainAddress, Username: pInput.Username}
 	}
 
 	output := GetUserOutput{
@@ -446,9 +416,10 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 
 // MergeUsers merges two users together
 func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
-	nonce, id, _ := auth.GetUserWithNonce(pCtx, pInput.Address, pInput.Chain, userRepo, nonceRepo, walletRepo)
+	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
+	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
 	if nonce == "" {
-		return auth.ErrNonceNotFound{Address: pInput.Address}
+		return auth.ErrNonceNotFound{ChainAddress: chainAddress}
 	}
 	if id != pInput.SecondUserID {
 		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
@@ -460,9 +431,7 @@ func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo
 		}
 	}
 
-	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature,
-		nonce,
-		pInput.Address, pInput.Chain, pInput.WalletType)
+	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
 	if err != nil {
 		return err
 	}
@@ -483,14 +452,14 @@ func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo pe
 
 	// _, err := indexer.ValidateNFTs(pCtx, input, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
 	// if err != nil {
-	// 	logrus.Errorf("Error validating user NFTs %s: %s", pUserID, err)
+	// 	logger.For(pCtx).Errorf("Error validating user NFTs %s: %s", pUserID, err)
 	// 	return err
 	// }
 	return nil
 }
 
 // TODO need interface for interacting with other chains for this
-func ensureMediaContent(pCtx context.Context, pAddress persist.Address, pChain persist.Chain, tokenRepo persist.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+func ensureMediaContent(pCtx context.Context, pChainAddress persist.ChainAddress, tokenRepo persist.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	// input := indexer.UpdateMediaInput{
 	// 	OwnerAddress: pAddress,
@@ -554,23 +523,21 @@ func (e ErrUserAlreadyExists) Error() string {
 }
 
 type ErrAddressOwnedByUser struct {
-	Address persist.Address
-	Chain   persist.Chain
-	OwnerID persist.DBID
+	ChainAddress persist.ChainAddress
+	OwnerID      persist.DBID
 }
 
 func (e ErrAddressOwnedByUser) Error() string {
-	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.Address, e.OwnerID)
+	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.ChainAddress, e.OwnerID)
 }
 
 type ErrAddressNotOwnedByUser struct {
-	Address persist.Address
-	Chain   persist.Chain
-	UserID  persist.DBID
+	ChainAddress persist.ChainAddress
+	UserID       persist.DBID
 }
 
 func (e ErrAddressNotOwnedByUser) Error() string {
-	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.Address, e.UserID)
+	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {

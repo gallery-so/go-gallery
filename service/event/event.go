@@ -30,6 +30,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories) {
 	userDispatcher := UserDispatcher{Handlers: map[persist.EventCode][]UserEventHandler{}}
 	userTask := cloudtask.UserFeedTask{UserEventRepo: repos.UserEventRepository}
 	userDispatcher.Handle(persist.UserCreatedEvent, &userTask)
+	userDispatcher.Handle(persist.UserFollowedEvent, &userTask)
 
 	// Nft events
 	nftDispatcher := NftDispatcher{Handlers: map[persist.EventCode][]NftEventHandler{}}

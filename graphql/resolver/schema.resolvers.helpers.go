@@ -11,14 +11,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/debugtools"
+	"github.com/spf13/viper"
+
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
@@ -28,12 +29,19 @@ var nodeFetcher = model.NodeFetcher{
 	OnCollection:     resolveCollectionByCollectionID,
 	OnGalleryUser:    resolveGalleryUserByUserID,
 	OnMembershipTier: resolveMembershipTierByMembershipId,
-	OnNft:            resolveNftByNftID,
+	OnToken:          resolveTokenByTokenID,
 	OnWallet:         resolveWalletByAddress,
-	OnCommunity:      resolveCommunityByContractAddressGqlID,
 
-	OnCollectionNft: func(ctx context.Context, nftId string, collectionId string) (*model.CollectionNft, error) {
-		return resolveCollectionNftByIDs(ctx, persist.DBID(nftId), persist.DBID(collectionId))
+	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
+		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
+	},
+
+	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
+		if parsed, err := strconv.Atoi(chain); err == nil {
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), false)
+		} else {
+			return nil, err
+		}
 	},
 }
 
@@ -53,7 +61,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case auth.ErrAuthenticationFailed:
 		mappedErr = model.ErrAuthenticationFailed{Message: message}
 	case auth.ErrDoesNotOwnRequiredNFT:
-		mappedErr = model.ErrDoesNotOwnRequiredNft{Message: message}
+		mappedErr = model.ErrDoesNotOwnRequiredToken{Message: message}
 	case persist.ErrUserNotFound:
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case persist.ErrUserAlreadyExists:
@@ -61,7 +69,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrNFTNotFoundByID:
-		mappedErr = model.ErrNftNotFound{Message: message}
+		mappedErr = model.ErrTokenNotFound{Message: message}
 	case persist.ErrCommunityNotFound:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
@@ -73,7 +81,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 
 	if mappedErr != nil {
 		if converted, ok := model.ConvertToModelType(mappedErr, gqlTypeName); ok {
-			addError(ctx, err, converted)
 			return converted, true
 		}
 	}
@@ -92,17 +99,17 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 			if m.Debug.UserID != nil {
 				userID = *m.Debug.UserID
 			}
-			return debugtools.NewDebugAuthenticator(userID, m.Debug.Addresses, m.Debug.Chains), nil
+			return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(m.Debug.ChainAddresses)), nil
 		}
 	}
 
-	if m.Eoa != nil {
-		return authApi.NewNonceAuthenticator(m.Eoa.Address, m.Eoa.Chain, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
+	if m.Eoa != nil && m.Eoa.ChainAddress != nil {
+		return authApi.NewNonceAuthenticator(*m.Eoa.ChainAddress, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return authApi.NewNonceAuthenticator(m.Eoa.Address, persist.ChainETH, m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
+		return authApi.NewNonceAuthenticator(persist.NewChainAddress(m.GnosisSafe.Address, persist.ChainETH), m.Eoa.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -118,18 +125,38 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
-func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+func resolveFollowersByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return userToModel(ctx, *user), nil
+	var output = make([]*model.GalleryUser, len(followers))
+	for i, user := range followers {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
 }
 
-func resolveGalleryUserByAddress(ctx context.Context, address persist.DBID) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, address)
+func resolveFollowingByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
+	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*model.GalleryUser, len(following))
+	for i, user := range following {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, nil
+}
+
+func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
@@ -176,8 +203,8 @@ func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) 
 	return output, nil
 }
 
-func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (*model.CollectionNft, error) {
-	nft, err := resolveNftByNftID(ctx, nftID)
+func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
+	token, err := resolveTokenByTokenID(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,16 +214,16 @@ func resolveCollectionNftByIDs(ctx context.Context, nftID persist.DBID, collecti
 		return nil, err
 	}
 
-	collectionNft := &model.CollectionNft{
-		HelperCollectionNftData: model.HelperCollectionNftData{
-			NftId:        nftID,
+	collectionToken := &model.CollectionToken{
+		HelperCollectionTokenData: model.HelperCollectionTokenData{
+			TokenId:      tokenID,
 			CollectionId: collectionID,
 		},
-		Nft:        nft,
+		Token:      token,
 		Collection: collection,
 	}
 
-	return collectionNft, nil
+	return collectionToken, nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
@@ -209,33 +236,43 @@ func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*mo
 	return gallery, nil
 }
 
-func resolveNftByNftID(ctx context.Context, nftID persist.DBID) (*model.Nft, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return nftToModel(ctx, *nft), nil
+	return tokenToModel(ctx, *token), nil
 }
 
-func resolveNftsByUserID(ctx context.Context, userId persist.DBID) ([]*model.Nft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByUserID(ctx, userId)
+func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByWalletID(ctx, walletID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return nftsToModel(ctx, nfts), nil
+	return tokensToModel(ctx, tokens), nil
 }
-func resolveNftOwnerByNftID(ctx context.Context, nftID persist.DBID) (*model.GalleryUser, error) {
-	nft, err := publicapi.For(ctx).Nft.GetNftById(ctx, nftID)
+
+func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveGalleryUserByUserID(ctx, nft.OwnerUserID)
+	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
+}
+
+func resolveWalletByWalletID(ctx context.Context, walletID persist.DBID) (*model.Wallet, error) {
+	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return walletToModelSqlc(ctx, *wallet), nil
 }
 
 func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.Wallet, error) {
@@ -270,23 +307,8 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.Address, chain persist.Chain) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, chain)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return communityToModel(ctx, *community), nil
-}
-
-func resolveCommunityByContractAddressGqlID(ctx context.Context, contractAddress persist.Address, chain string) (*model.Community, error) {
-	parsed, err := strconv.Atoi(chain)
-	if err != nil {
-		return nil, err
-	}
-
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, persist.Chain(parsed))
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
 
 	if err != nil {
 		return nil, err
@@ -312,15 +334,15 @@ func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
 }
 
 func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Wallet, error) {
-	addresses, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
+	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]*model.Wallet, 0, len(addresses))
+	output := make([]*model.Wallet, 0, len(wallets))
 
-	for _, address := range addresses {
+	for _, address := range wallets {
 		output = append(output, walletToModelSqlc(ctx, address))
 	}
 
@@ -353,37 +375,48 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	userApi := publicapi.For(ctx).User
 	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
 
-	wallets := make([]*model.Wallet, len(user.Addresses))
-	for i, address := range user.Addresses {
-		wallets[i] = walletToModelPersist(ctx, address)
+	wallets := make([]*model.Wallet, len(user.Wallets))
+	for i, wallet := range user.Wallets {
+		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
 	return &model.GalleryUser{
-		Dbid:                user.ID,
-		Username:            &user.Username.String,
-		Bio:                 &user.Bio.String,
-		Wallets:             wallets,
-		Galleries:           nil, // handled by dedicated resolver
+		Dbid:     user.ID,
+		Username: &user.Username.String,
+		Bio:      &user.Bio.String,
+		Wallets:  wallets,
+
+		// each handeled by dedicated resolver
+		Galleries: nil,
+		Followers: nil,
+		Following: nil,
+
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
 }
 
 func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {
+	chainAddress := persist.NewChainAddress(wallet.Address, wallet.Chain)
+
 	return &model.Wallet{
-		Dbid:       wallet.ID,
-		WalletType: &wallet.WalletType,
-		Address:    &wallet.Address,
-		Chain:      &wallet.Chain,
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         wallet.ID,
+		WalletType:   &wallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &wallet.Chain,
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 
 func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
+	chain := persist.Chain(wallet.Chain.Int32)
+	chainAddress := persist.NewChainAddress(wallet.Address, chain)
+
 	return &model.Wallet{
-		Dbid:       wallet.ID,
-		WalletType: &wallet.WalletType,
-		Address:    nil, // handled by dedicated resolver
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         wallet.ID,
+		WalletType:   &wallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &chain,
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 
@@ -398,15 +431,15 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 		Gallery:        nil, // handled by dedicated resolver
 		Layout:         layoutToModel(ctx, collection.Layout),
 		Hidden:         &collection.Hidden,
-		Nfts:           nil, // handled by dedicated resolver
+		Tokens:         nil, // handled by dedicated resolver
 	}
 }
 
 func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -420,10 +453,10 @@ func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *mod
 }
 
 func persistMembershipTierToModel(ctx context.Context, membershipTier persist.MembershipTier) *model.MembershipTier {
-	owners := make([]*model.MembershipOwner, 0, len(membershipTier.Owners))
+	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
-			owners = append(owners, persistMembershipOwnerToModel(ctx, owner))
+			owners = append(owners, tokenHolderToModel(ctx, owner))
 		}
 	}
 
@@ -436,72 +469,75 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 	}
 }
 
-func persistMembershipOwnerToModel(ctx context.Context, membershipOwner persist.MembershipOwner) *model.MembershipOwner {
-	previewNfts := make([]*string, len(membershipOwner.PreviewNFTs))
-	for i, nft := range membershipOwner.PreviewNFTs {
-		previewNfts[i] = util.StringToPointer(nft.String())
+func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *model.TokenHolder {
+	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
+	for i, token := range tokenHolder.PreviewTokens {
+		previewTokens[i] = util.StringToPointer(token.String())
 	}
-	return &model.MembershipOwner{
-		Dbid:        membershipOwner.UserID,
-		Address:     &membershipOwner.Address,
-		User:        nil, // handled by dedicated resolver
-		PreviewNfts: previewNfts,
+
+	return &model.TokenHolder{
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
+		User:                  nil, // handled by dedicated resolver
+		Wallets:               nil, // handled by dedicated resolver
+		PreviewTokens:         previewTokens,
 	}
 }
 
-func nftToModel(ctx context.Context, nft sqlc.Token) *model.Nft {
-	chainEthereum := persist.ChainETH
+func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
+	chain := persist.Chain(token.Chain.Int32)
+	contractAddress := persist.NewChainAddress(persist.Address(token.ContractAddress.String), chain)
+	//openseaID := int(token.OpenseaID.Int64)
 
-	return &model.Nft{
-		Dbid:             nft.ID,
-		CreationTime:     &nft.CreatedAt,
-		LastUpdated:      &nft.LastUpdated,
-		CollectorsNote:   &nft.CollectorsNote.String,
-		Media:            getMediaForToken(nft),
-		TokenType:        nil,            // TODO: later
-		Chain:            &chainEthereum, // Everything's Ethereum right now
-		Name:             &nft.Name.String,
-		Description:      &nft.Description.String,
-		OwnerAddresses:   nil, // handled by dedicated resolver
-		TokenURI:         nil, // TODO: later
-		TokenID:          &nft.TokenID.String,
+	return &model.Token{
+		Dbid:           token.ID,
+		CreationTime:   &token.CreatedAt,
+		LastUpdated:    &token.LastUpdated,
+		CollectorsNote: &token.CollectorsNote.String,
+		Media:          getMediaForToken(token),
+		TokenType:      nil, // TODO: later
+		Chain:          &chain,
+		Name:           &token.Name.String,
+		Description:    &token.Description.String,
+		OwnedByWallets: nil, // handled by dedicated resolver
+		TokenURI:       nil, // TODO: later
+		TokenID:        &token.TokenID.String,
+		// TODO-EZRA: Does the frontend have something that can replace this?
+		//OpenseaID:        &openseaID,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  nil, // handled by dedicated resolver
-		ExternalURL:      &nft.ExternalUrl.String,
+		ContractAddress:  &contractAddress,
+		ExternalURL:      &token.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
-		CreatorAddress:        nil, // handled by dedicated resolver
 		OpenseaCollectionName: nil, // TODO: later
 	}
 }
 
-func nftsToModel(ctx context.Context, nft []sqlc.Token) []*model.Nft {
-	res := make([]*model.Nft, len(nft))
-	for i, nft := range nft {
-		res[i] = nftToModel(ctx, nft)
+func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
+	res := make([]*model.Token, len(token))
+	for i, token := range token {
+		res[i] = tokenToModel(ctx, token)
 	}
 	return res
 }
 
 func communityToModel(ctx context.Context, community persist.Community) *model.Community {
 	lastUpdated := community.LastUpdated.Time()
+	contractAddress := persist.NewChainAddress(community.ContractAddress, community.Chain)
+	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
 
-	owners := make([]*model.CommunityOwner, len(community.Owners))
-	for i := range community.Owners {
-		owners[i] = &model.CommunityOwner{
-			Address:  walletToModelPersist(ctx, community.Owners[i].Wallet),
-			Username: util.StringToPointer(community.Owners[i].Username.String()),
-		}
+	owners := make([]*model.TokenHolder, len(community.Owners))
+	for i, owner := range community.Owners {
+		owners[i] = tokenHolderToModel(ctx, owner)
 	}
 
 	return &model.Community{
 		LastUpdated:     &lastUpdated,
-		ContractAddress: &community.ContractAddress,
-		CreatorAddress:  &community.CreatorAddress,
+		ContractAddress: &contractAddress,
+		CreatorAddress:  &creatorAddress,
 		Name:            util.StringToPointer(community.Name.String()),
 		Description:     util.StringToPointer(community.Description.String()),
 		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
@@ -510,14 +546,16 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 }
 
 func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
-	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByDetails(ctx, persist.Address(address.String()), persist.ChainETH)
+	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.NewChainAddress(persist.Address(address), persist.ChainETH))
 	chain := persist.Chain(dbWallet.Chain.Int32)
+	chainAddress := persist.NewChainAddress(dbWallet.Address, chain)
+
 	return &model.Wallet{
-		Dbid:       dbWallet.ID,
-		WalletType: &dbWallet.WalletType,
-		Address:    &dbWallet.Address,
-		Chain:      &chain,
-		Nfts:       nil, // handled by dedicated resolver
+		Dbid:         dbWallet.ID,
+		WalletType:   &dbWallet.WalletType,
+		ChainAddress: &chainAddress,
+		Chain:        &chain,
+		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 
@@ -678,4 +716,16 @@ func getInvalidMedia(media persist.Media) model.InvalidMedia {
 		MediaType:        nil,
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
+}
+
+func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
+	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
+
+	for _, address := range chainAddresses {
+		if address != nil {
+			addresses = append(addresses, *address)
+		}
+	}
+
+	return addresses
 }

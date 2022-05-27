@@ -1,8 +1,8 @@
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
-  forceResolver: Boolean
-  name: String
+    forceResolver: Boolean
+    name: String
 ) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 # Add @authRequired to any field that requires a user to be logged in. NOTE: Any field tagged with
@@ -38,388 +38,393 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
-scalar EthereumAddress
 scalar DBID
 
 interface Node {
-  id: ID!
+    id: ID!
 }
 
 interface Error {
-  message: String!
+    message: String!
 }
 
 type GalleryUser implements Node {
-  id: ID!
-  dbid: DBID!
-  username: String
-  bio: String
-  wallets: [Wallet] @goField(forceResolver: true)
-  galleries: [Gallery] @goField(forceResolver: true)
-  isAuthenticatedUser: Boolean
+    id: ID!
+    dbid: DBID!
+    username: String
+    bio: String
+    wallets: [Wallet] @goField(forceResolver: true)
+    galleries: [Gallery] @goField(forceResolver: true)
+    isAuthenticatedUser: Boolean
+    followers: [GalleryUser] @goField(forceResolver: true)
+    following: [GalleryUser] @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
-  id: ID!
-  dbid: DBID!
-  address: Address
-  chain: Chain
-  walletType: WalletType
-  nfts: [Nft] @goField(forceResolver: true)
+    id: ID!
+    dbid: DBID!
+    chainAddress: ChainAddress
+    chain: Chain
+    walletType: WalletType
+    tokens: [Token] @goField(forceResolver: true)
 }
 
-type AddressDetails {
-  address: Address
-  chain: Chain
+type ChainAddress {
+    address: Address
+    chain: Chain
+}
+
+input ChainAddressInput {
+    address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
 
-union GalleryUserOrAddress = GalleryUser | AddressDetails
+union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
-  | VideoMedia
-  | AudioMedia
-  | TextMedia
-  | HtmlMedia
-  | JsonMedia
-  | GltfMedia
-  | UnknownMedia
-  | InvalidMedia
+    | VideoMedia
+    | AudioMedia
+    | TextMedia
+    | HtmlMedia
+    | JsonMedia
+    | GltfMedia
+    | UnknownMedia
+    | InvalidMedia
 
 type PreviewURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 type ImageURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 type VideoURLSet {
-  raw: String
-  small: String
-  medium: String
-  large: String
+    raw: String
+    small: String
+    medium: String
+    large: String
 }
 
 interface Media {
-  # Various sizes of preview images for the media
-  previewURLs: PreviewURLSet
+    # Various sizes of preview images for the media
+    previewURLs: PreviewURLSet
 
-  # The original source URL for the media (may be IPFS, etc)
-  mediaURL: String
+    # The original source URL for the media (may be IPFS, etc)
+    mediaURL: String
 
-  # The type of media, as determined by the backend. May be redundant given the approach we're using here
-  # (media subtypes implementing the Media interface)
-  mediaType: String
+    # The type of media, as determined by the backend. May be redundant given the approach we're using here
+    # (media subtypes implementing the Media interface)
+    mediaType: String
 
-  # All Media types will also have something like contentRenderURL or contentRenderURLs,
-  # which are the URL(s) that should actually be used for rendering the media's content
+    # All Media types will also have something like contentRenderURL or contentRenderURLs,
+    # which are the URL(s) that should actually be used for rendering the media's content
 }
 
 type ImageMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURLs: ImageURLSet
+    contentRenderURLs: ImageURLSet
 }
 
 type VideoMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURLs: VideoURLSet
+    contentRenderURLs: VideoURLSet
 }
 
 type AudioMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type TextMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type JsonMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type GltfMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type UnknownMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
-  previewURLs: PreviewURLSet
-  mediaURL: String
-  mediaType: String
+    previewURLs: PreviewURLSet
+    mediaURL: String
+    mediaType: String
 
-  contentRenderURL: String
+    contentRenderURL: String
 }
 
 enum TokenType {
-  ERC721
-  ERC1155
-  ERC20
+    ERC721
+    ERC1155
+    ERC20
 }
 
 enum Chain {
-  Ethereum
-  Arbitrum
-  Polygon
-  Optimism
+    Ethereum
+    Arbitrum
+    Polygon
+    Optimism
 }
 enum WalletType {
-  EOA
-  GnosisSafe
+    EOA
+    GnosisSafe
 }
 
-type Nft implements Node {
-  id: ID!
-  dbid: DBID!
-  creationTime: Time
-  lastUpdated: Time
-  collectorsNote: String
-  media: MediaSubtype
-  tokenType: TokenType
-  chain: Chain
-  name: String
-  description: String
-  tokenUri: String
-  tokenId: String
-  quantity: String # source is a hex string
-  owner: GalleryUser @goField(forceResolver: true)
-  ownerAddresses: [Address] @goField(forceResolver: true)
-  ownershipHistory: [OwnerAtBlock]
-  tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-  contractAddress: Address @goField(forceResolver: true)
-  externalUrl: String
-  blockNumber: String # source is uint64
-  # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
-  # struct and may ultimately end up elsewhere
-  creatorAddress: Address @goField(forceResolver: true)
-  openseaCollectionName: String
+type Token implements Node {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    collectorsNote: String
+    media: MediaSubtype
+    tokenType: TokenType
+    chain: Chain
+    name: String
+    description: String
+    tokenUri: String
+    tokenId: String
+    quantity: String # source is a hex string
+    owner: GalleryUser @goField(forceResolver: true)
+    ownedByWallets: [Wallet] @goField(forceResolver: true)
+    ownershipHistory: [OwnerAtBlock]
+    tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
+    contractAddress: ChainAddress
+    externalUrl: String
+    blockNumber: String # source is uint64
+    # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
+    # struct and may ultimately end up elsewhere
+    creatorAddress: ChainAddress
+    openseaCollectionName: String
+
+    # temporary field while we're dependent on opensea
+    openseaId: Int
 }
 
 type OwnerAtBlock {
-  # TODO: will need to store addresses to make this resolver work
-  owner: GalleryUserOrAddress @goField(forceResolver: true)
-  blockNumber: String # source is uint64
+    # TODO: will need to store addresses to make this resolver work
+    owner: GalleryUserOrAddress @goField(forceResolver: true)
+    blockNumber: String # source is uint64
 }
 
-type CollectionNft implements Node
-  @goEmbedHelper
-  @goGqlId(fields: ["nftId", "collectionId"]) {
-  id: ID!
-  nft: Nft
-  collection: Collection
+type CollectionToken implements Node
+@goEmbedHelper
+@goGqlId(fields: ["tokenId", "collectionId"]) {
+    id: ID!
+    token: Token
+    collection: Collection
 }
 
 type CollectionLayout {
-  columns: Int
-  whitespace: [Int]
+    columns: Int
+    whitespace: [Int]
 }
 
 type Collection implements Node {
-  id: ID!
-  dbid: DBID!
-  version: Int
-  name: String
-  collectorsNote: String
-  gallery: Gallery @goField(forceResolver: true)
-  layout: CollectionLayout
-  hidden: Boolean
-  nfts: [CollectionNft] @goField(forceResolver: true)
+    id: ID!
+    dbid: DBID!
+    version: Int
+    name: String
+    collectorsNote: String
+    gallery: Gallery @goField(forceResolver: true)
+    layout: CollectionLayout
+    hidden: Boolean
+    tokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
-  id: ID!
-  dbid: DBID!
-  owner: GalleryUser @goField(forceResolver: true)
-  collections: [Collection] @goField(forceResolver: true)
+    id: ID!
+    dbid: DBID!
+    owner: GalleryUser @goField(forceResolver: true)
+    collections: [Collection] @goField(forceResolver: true)
 }
 
-type MembershipOwner {
-  dbid: DBID!
-  address: EthereumAddress
-  user: GalleryUser @goField(forceResolver: true)
-  previewNfts: [String]
+type TokenHolder @goEmbedHelper {
+    wallets: [Wallet] @goField(forceResolver: true)
+    user: GalleryUser @goField(forceResolver: true)
+    previewTokens: [String]
 }
 
 type MembershipTier implements Node {
-  id: ID!
-  dbid: DBID!
-  name: String
-  assetUrl: String
-  tokenId: String
-  owners: [MembershipOwner]
+    id: ID!
+    dbid: DBID!
+    name: String
+    assetUrl: String
+    tokenId: String
+    owners: [TokenHolder]
 }
 
-type CommunityOwner {
-    address: Wallet 
-    username: String
-}
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
+    id: ID!
 
-type Community implements Node
-  @goGqlId(fields: ["contractAddress", "chain"]) {
-  id: ID!
+    lastUpdated: Time
 
-  lastUpdated: Time
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
+    name: String
+    description: String
+    previewImage: String
 
-  contractAddress: Address
-  creatorAddress: Address
-  chain: Chain
-  name: String
-  description: String
-  previewImage: String
-
-  owners: [CommunityOwner]
+    owners: [TokenHolder]
 }
 
 # We have this extra type in case we need to stick authed data
 # in here one day.
 type ViewerGallery {
-  gallery: Gallery
+    gallery: Gallery
 }
 
 type Viewer {
-  user: GalleryUser @goField(forceResolver: true)
-  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+    user: GalleryUser @goField(forceResolver: true)
+    viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
+union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
-  message: String!
+    message: String!
 }
 
-union NftByIdOrError = Nft | ErrNftNotFound
+union TokenByIdOrError = Token | ErrTokenNotFound
 
-type ErrNftNotFound implements Error {
-  message: String!
+type ErrTokenNotFound implements Error {
+    message: String!
 }
 
 union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
-union CollectionNftByIdOrError =
-    CollectionNft
-  | ErrCollectionNotFound
-  | ErrNftNotFound
+union CollectionTokenByIdOrError =
+    CollectionToken
+    | ErrCollectionNotFound
+    | ErrTokenNotFound
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound
 
 type Query {
-  node(id: ID!): Node
-  viewer: ViewerOrError @authRequired
-  userByUsername(username: String!): UserByUsernameOrError
-  membershipTiers(forceRefresh: Boolean): [MembershipTier]
-  collectionById(id: DBID!): CollectionByIdOrError
-  nftById(id: DBID!): NftByIdOrError
-  collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-  communityByAddress(communityAddress: Address!, chain: Chain!): CommunityByAddressOrError
-  generalAllowlist: [Wallet!]
+    node(id: ID!): Node
+    viewer: ViewerOrError @authRequired
+    userByUsername(username: String!): UserByUsernameOrError
+    userById(id: DBID!): UserByIdOrError
+    membershipTiers(forceRefresh: Boolean): [MembershipTier]
+    collectionById(id: DBID!): CollectionByIdOrError
+    tokenById(id: DBID!): TokenByIdOrError
+    collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
+    generalAllowlist: [Wallet!]
 }
 
 input CollectionLayoutInput {
-  columns: Int!
-  whitespace: [Int!]!
+    columns: Int!
+    whitespace: [Int!]!
 }
 
 input CreateCollectionInput {
-  galleryId: DBID!
-  name: String!
-  collectorsNote: String!
-  nfts: [DBID!]!
-  layout: CollectionLayoutInput!
+    galleryId: DBID!
+    name: String!
+    collectorsNote: String!
+    tokens: [DBID!]!
+    layout: CollectionLayoutInput!
 }
 
 union CreateCollectionPayloadOrError =
     CreateCollectionPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type CreateCollectionPayload {
-  collection: Collection
+    collection: Collection
 }
 
 union DeleteCollectionPayloadOrError =
     DeleteCollectionPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
-  | ErrCollectionNotFound
+    | ErrNotAuthorized
+    | ErrInvalidInput
+    | ErrCollectionNotFound
 
 type DeleteCollectionPayload {
-  gallery: Gallery
+    gallery: Gallery
 }
 
 input UpdateCollectionInfoInput {
-  collectionId: DBID!
-  name: String!
-  collectorsNote: String!
+    collectionId: DBID!
+    name: String!
+    collectorsNote: String!
 }
 
 union UpdateCollectionInfoPayloadOrError =
     UpdateCollectionInfoPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
-  collection: Collection
+    collection: Collection
 }
 
-input UpdateCollectionNftsInput {
-  collectionId: DBID!
-  nfts: [DBID!]!
-  layout: CollectionLayoutInput!
+input UpdateCollectionTokensInput {
+    collectionId: DBID!
+    tokens: [DBID!]!
+    layout: CollectionLayoutInput!
 }
 
-union UpdateCollectionNftsPayloadOrError =
-    UpdateCollectionNftsPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+union UpdateCollectionTokensPayloadOrError =
+    UpdateCollectionTokensPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
-type UpdateCollectionNftsPayload {
-  collection: Collection
+type UpdateCollectionTokensPayload {
+    collection: Collection
 }
 
 input UpdateCollectionHiddenInput {
@@ -437,59 +442,59 @@ type UpdateCollectionHiddenPayload {
 }
 
 input UpdateGalleryCollectionsInput {
-  galleryId: DBID!
-  collections: [DBID!]!
+    galleryId: DBID!
+    collections: [DBID!]!
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
     UpdateGalleryCollectionsPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type UpdateGalleryCollectionsPayload {
-  gallery: Gallery
+    gallery: Gallery
 }
 
-input UpdateNftInfoInput {
-    nftId: DBID!
+input UpdateTokenInfoInput {
+    tokenId: DBID!
     collectorsNote: String!
 
-    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Optional (for now). Lets the backend know what collection the token was being edited in.
     # Currently used to generate feedbot URLs.
     collectionId: DBID
 }
 
-union UpdateNftInfoPayloadOrError =
-    UpdateNftInfoPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+union UpdateTokenInfoPayloadOrError =
+    UpdateTokenInfoPayload
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
-type UpdateNftInfoPayload {
-  nft: Nft
+type UpdateTokenInfoPayload {
+    token: Token
 }
 
 union AddUserAddressPayloadOrError =
     AddUserAddressPayload
-  | ErrAuthenticationFailed
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrAuthenticationFailed
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type AddUserAddressPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 union RemoveUserAddressesPayloadOrError =
     RemoveUserAddressesPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+    | ErrNotAuthorized
+    | ErrInvalidInput
 
 type RemoveUserAddressesPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 input UpdateUserInfoInput {
-  username: String!
-  bio: String!
+    username: String!
+    bio: String!
 }
 
 union UpdateUserInfoPayloadOrError =
@@ -499,7 +504,7 @@ union UpdateUserInfoPayloadOrError =
     | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 union RefreshTokensPayloadOrError =
@@ -508,26 +513,26 @@ union RefreshTokensPayloadOrError =
     | ErrOpenSeaRefreshFailed
 
 type RefreshTokensPayload {
-  viewer: Viewer
+    viewer: Viewer
 }
 
 type AuthNonce {
-  nonce: String
-  userExists: Boolean
+    nonce: String
+    userExists: Boolean
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredNFT
+union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
 
 type ErrAuthenticationFailed implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrUserAlreadyExists implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrUserNotFound implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrCommunityNotFound implements Error {
@@ -536,30 +541,30 @@ type ErrCommunityNotFound implements Error {
 
 union AuthorizationError =
     ErrNoCookie
-  | ErrInvalidToken
-  | ErrDoesNotOwnRequiredNFT
+    | ErrInvalidToken
+    | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
-  message: String!
-  cause: AuthorizationError!
+    message: String!
+    cause: AuthorizationError!
 }
 
 type ErrInvalidInput implements Error {
-  message: String!
-  parameters: [String!]!
-  reasons: [String!]!
+    message: String!
+    parameters: [String!]!
+    reasons: [String!]!
 }
 
 type ErrNoCookie implements Error {
-  message: String!
+    message: String!
 }
 
 type ErrInvalidToken implements Error {
-  message: String!
+    message: String!
 }
 
-type ErrDoesNotOwnRequiredNFT implements Error {
-  message: String!
+type ErrDoesNotOwnRequiredToken implements Error {
+    message: String!
 }
 
 type ErrOpenSeaRefreshFailed implements Error {
@@ -567,36 +572,34 @@ type ErrOpenSeaRefreshFailed implements Error {
 }
 
 input AuthMechanism {
-  eoa: EoaAuth
-  gnosisSafe: GnosisSafeAuth
-  debug: DebugAuth
+    eoa: EoaAuth
+    gnosisSafe: GnosisSafeAuth
+    debug: DebugAuth
 }
 
 input EoaAuth {
-  address: Address!
-  chain: Chain!
-  nonce: String!
-  signature: String! @scrub
+    chainAddress: ChainAddressInput!
+    nonce: String!
+    signature: String! @scrub
 }
 
 # DebugAuth always succeeds and returns the supplied userId and addresses.
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
-    chains: [Chain!]!
+    chainAddresses:[ChainAddressInput!]!
 }
 
 input GnosisSafeAuth {
-  address: Address!
-  nonce: String!
+    address: Address!
+    nonce: String!
 }
 
 union LoginPayloadOrError =
     LoginPayload
-  | ErrUserNotFound
-  | ErrAuthenticationFailed
-  | ErrDoesNotOwnRequiredNFT
+    | ErrUserNotFound
+    | ErrAuthenticationFailed
+    | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
     # TODO: Remove userId in favor of viewer
@@ -610,63 +613,65 @@ type LogoutPayload {
 
 union CreateUserPayloadOrError =
     CreateUserPayload
-  | ErrUserAlreadyExists
-  | ErrAuthenticationFailed
-  | ErrDoesNotOwnRequiredNFT
+    | ErrUserAlreadyExists
+    | ErrAuthenticationFailed
+    | ErrDoesNotOwnRequiredToken
 
 type CreateUserPayload {
-  userId: DBID
-  galleryId: DBID
-  # TODO: Remove userId and galleryId in favor of viewer
-   viewer: Viewer
+    userId: DBID
+    galleryId: DBID
+    # TODO: Remove userId and galleryId in favor of viewer
+    viewer: Viewer
+}
+
+union FollowUserPayloadOrError =
+    FollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+union UnfollowUserPayloadOrError =
+    UnfollowUserPayload
+    | ErrAuthenticationFailed
+    | ErrUserNotFound
+    | ErrInvalidInput
+
+type FollowUserPayload {
+    viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
+}
+
+type UnfollowUserPayload {
+    viewer: Viewer
+    user: GalleryUser @goField(forceResolver: true)
 }
 
 type Mutation {
-  # User Mutations
-  addUserAddress(
-    address: Address!
-    chain: Chain!
-    authMechanism: AuthMechanism!
-  ): AddUserAddressPayloadOrError @authRequired
-  removeUserAddresses(
-    addresses: [Address!]!
-    chains: [Chain!]!
-  ): RemoveUserAddressesPayloadOrError @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
-    @authRequired
+    # User Mutations
+    addUserAddress(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
+    removeUserAddresses(chainAddresses: [ChainAddressInput!]!): RemoveUserAddressesPayloadOrError @authRequired
+    updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
-  # Gallery Mutations
-  updateGalleryCollections(
-    input: UpdateGalleryCollectionsInput!
-  ): UpdateGalleryCollectionsPayloadOrError @authRequired
+    # Gallery Mutations
+    updateGalleryCollections(input: UpdateGalleryCollectionsInput!): UpdateGalleryCollectionsPayloadOrError @authRequired
 
-  # Collection Mutations
-  createCollection(
-    input: CreateCollectionInput!
-  ): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
-    @authRequired
-  updateCollectionInfo(
-    input: UpdateCollectionInfoInput!
-  ): UpdateCollectionInfoPayloadOrError @authRequired
-  updateCollectionNfts(
-    input: UpdateCollectionNftsInput!
-  ): UpdateCollectionNftsPayloadOrError @authRequired
+    # Collection Mutations
+    createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
+    deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
+    updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
+    updateCollectionTokens(input: UpdateCollectionTokensInput!): UpdateCollectionTokensPayloadOrError @authRequired
 
-  # Nft Mutations
-  updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError
-    @authRequired
+    # Token Mutations
+    updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-  # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-  refreshTokens(addresses: [Address]!, chains: [Chain]!): RefreshTokensPayloadOrError
-    @authRequired
+    refreshTokens: RefreshTokensPayloadOrError @authRequired
 
-  getAuthNonce(
-    address: Address!
-    chain: Chain!
-  ): GetAuthNoncePayloadOrError
+    getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-  createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
-  login(authMechanism: AuthMechanism!): LoginPayloadOrError
-  logout: LogoutPayload
+    createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+    login(authMechanism: AuthMechanism!): LoginPayloadOrError
+    logout: LogoutPayload
+
+    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 }
