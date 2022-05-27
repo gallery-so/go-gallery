@@ -317,17 +317,18 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community), nil
 }
 
-func resolveGeneralAllowlist(ctx context.Context) ([]*model.Wallet, error) {
+func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
 	addresses, err := publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]*model.Wallet, 0, len(addresses))
+	output := make([]*persist.ChainAddress, 0, len(addresses))
 
 	for _, address := range addresses {
-		output = append(output, ethAddressToWalletModel(ctx, address))
+		chainAddress := persist.NewChainAddress(persist.Address(address), persist.ChainETH)
+		output = append(output, &chainAddress)
 	}
 
 	return output, nil
@@ -542,20 +543,6 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 		Description:     util.StringToPointer(community.Description.String()),
 		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
 		Owners:          owners,
-	}
-}
-
-func ethAddressToWalletModel(ctx context.Context, address persist.EthereumAddress) *model.Wallet {
-	dbWallet, _ := publicapi.For(ctx).Wallet.GetWalletByChainAddress(ctx, persist.NewChainAddress(persist.Address(address), persist.ChainETH))
-	chain := persist.Chain(dbWallet.Chain.Int32)
-	chainAddress := persist.NewChainAddress(dbWallet.Address, chain)
-
-	return &model.Wallet{
-		Dbid:         dbWallet.ID,
-		WalletType:   &dbWallet.WalletType,
-		ChainAddress: &chainAddress,
-		Chain:        &chain,
-		Tokens:       nil, // handled by dedicated resolver
 	}
 }
 

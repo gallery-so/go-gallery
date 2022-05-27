@@ -362,7 +362,7 @@ type Query {
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
-    generalAllowlist: [Wallet!]
+    generalAllowlist: [ChainAddress!]
 }
 
 input CollectionLayoutInput {
