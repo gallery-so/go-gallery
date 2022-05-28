@@ -35,7 +35,7 @@ func coreInit(pqClient *sql.DB) *gin.Engine {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	gql := graphql.NewClient(viper.GetString("GALLERY_API"), nil)
+	gql := graphql.NewClient(viper.GetString("GALLERY_API"), http.DefaultClient)
 
 	repos := persist.Repositories{
 		UserEventRepository:       postgres.NewUserEventRepository(pqClient),
@@ -101,6 +101,7 @@ func initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventHeaders(event, hint)

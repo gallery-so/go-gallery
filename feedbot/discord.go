@@ -3,7 +3,6 @@ package feedbot
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,25 +10,6 @@ import (
 
 	"github.com/spf13/viper"
 )
-
-type DiscordPoster struct {
-	renderQuery func(Query) string
-}
-
-func (d *DiscordPoster) withQuery(ctx context.Context, q Query) error {
-	content := d.renderQuery(q)
-
-	message, err := json.Marshal(map[string]interface{}{
-		"content": content,
-		"tts":     false,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return sendMessage(ctx, message)
-}
 
 func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
 	url := fmt.Sprintf("%s/channels/%s/messages", viper.GetString("DISCORD_API"), viper.GetString("CHANNEL_ID"))
@@ -46,13 +26,12 @@ func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
 }
 
 func sendMessage(ctx context.Context, message []byte) error {
-	client := http.Client{}
 	req, err := prepareRequest(ctx, message)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
