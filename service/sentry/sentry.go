@@ -76,7 +76,7 @@ func ScrubEventCookies(event *sentry.Event, hint *sentry.EventHint) *sentry.Even
 }
 
 func ScrubEventHeaders(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Request == nil {
+	if event == nil || event.Request == nil {
 		return event
 	}
 

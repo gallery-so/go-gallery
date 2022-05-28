@@ -14,7 +14,6 @@ import (
 
 func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerFunc {
 	builder := NewQueryBuilder(repos, gql)
-
 	return func(c *gin.Context) {
 		msg := cloudtask.EventMessage{}
 		if err := c.ShouldBindJSON(&msg); err != nil {
@@ -22,13 +21,13 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
-		query, err := builder.NewQuery(c, msg)
+		query, err := builder.NewQuery(c.Request.Context(), msg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		handled, err := feedPosts.SearchFor(c, query)
+		handled, err := feedPosts.SearchFor(c.Request.Context(), query)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return

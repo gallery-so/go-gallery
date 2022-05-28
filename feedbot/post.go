@@ -10,6 +10,7 @@ import (
 )
 
 type Post struct {
+	name     string
 	criteria []func(Query) bool
 	renderer func(Query) string
 }
@@ -34,8 +35,10 @@ func (p *Post) Handle(ctx context.Context, q Query) (bool, error) {
 }
 
 func (p *Post) Matches(q Query) bool {
-	for _, criteria := range p.criteria {
-		if !criteria(q) {
+	for i, criteria := range p.criteria {
+		match := criteria(q)
+		logger.For(nil).Debugf("%s.%d is %v", p.name, i, match)
+		if !match {
 			return false
 		}
 	}
@@ -61,12 +64,13 @@ func (f Feed) SearchFor(ctx context.Context, q Query) (bool, error) {
 
 	for _, p := range f {
 		if p.Matches(q) {
+			logger.For(ctx).Debugf("event=%s matches post=%s", q.EventID, p.name)
 			handled, err = p.Handle(ctx, q)
 			break
 		}
 	}
 
-	logger.For(ctx).Debugf("event=%s handled: %v", q.EventID, handled)
+	logger.For(ctx).Debugf("event=%s handled=%v err=%v", q.EventID, handled, err)
 	return handled, err
 }
 
@@ -83,6 +87,7 @@ func nftURL(username, collectionID, nftID string) string {
 }
 
 var userCreatedPost = Post{
+	name:     "UserCreated",
 	criteria: append(baseCriteria, isUserFollowedEvent, userNoEventsBefore),
 	renderer: func(q Query) string {
 		return fmt.Sprintf("**%s** joined Gallery: %s", q.Username, userURL(q.Username))
@@ -90,6 +95,7 @@ var userCreatedPost = Post{
 }
 
 var userFollowedPost = Post{
+	name:     "UserFollowed",
 	criteria: append(baseCriteria, isUserFollowedEvent, followedUserHasUsername),
 	renderer: func(q Query) string {
 		return fmt.Sprintf("**%s** followed **%s**: %s", q.Username, q.FollowedUsername, userURL(q.FollowedUsername))
@@ -97,6 +103,7 @@ var userFollowedPost = Post{
 }
 
 var nftCollectorsNoteAddedPost = Post{
+	name:     "CollectorsNoteAdded",
 	criteria: append(baseCriteria, isNftCollectorsNoteAddedEvent, nftHasCollectorsNote, nftBelongsToCollection),
 	renderer: func(q Query) string {
 		var message string
@@ -110,6 +117,7 @@ var nftCollectorsNoteAddedPost = Post{
 }
 
 var collectionCreatedPost = Post{
+	name:     "CollectionCreated",
 	criteria: append(baseCriteria, isCollectionCreatedEvent, collectionHasNfts),
 	renderer: func(q Query) string {
 		var message string
@@ -123,6 +131,7 @@ var collectionCreatedPost = Post{
 }
 
 var collectionCollectorsNoteAddedPost = Post{
+	name:     "CollectionCollectorsNoteAdded",
 	criteria: append(baseCriteria, isCollectionCollectorsNoteAddedEvent, collectionHasCollectorsNote),
 	renderer: func(q Query) string {
 		var message string
@@ -136,6 +145,7 @@ var collectionCollectorsNoteAddedPost = Post{
 }
 
 var collectionTokensAddedPost = Post{
+	name:     "CollectionTokensAdded",
 	criteria: append(baseCriteria, isCollectionTokensAddedEvent, collectionHasNfts, collectionHasNewTokensAdded),
 	renderer: func(q Query) string {
 		var tokensAdded int
