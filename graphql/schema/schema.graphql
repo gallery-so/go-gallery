@@ -473,22 +473,22 @@ type UpdateTokenInfoPayload {
     token: Token
 }
 
-union AddUserAddressPayloadOrError =
-    AddUserAddressPayload
+union AddUserWalletPayloadOrError =
+    AddUserWalletPayload
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type AddUserAddressPayload {
+type AddUserWalletPayload {
     viewer: Viewer
 }
 
-union RemoveUserAddressesPayloadOrError =
-    RemoveUserAddressesPayload
+union RemoveUserWalletsPayloadOrError =
+    RemoveUserWalletsPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type RemoveUserAddressesPayload {
+type RemoveUserWalletsPayload {
     viewer: Viewer
 }
 
@@ -648,8 +648,8 @@ type UnfollowUserPayload {
 
 type Mutation {
     # User Mutations
-    addUserAddress(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
-    removeUserAddresses(chainAddresses: [ChainAddressInput!]!): RemoveUserAddressesPayloadOrError @authRequired
+    addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
+    removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
     updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
     # Gallery Mutations

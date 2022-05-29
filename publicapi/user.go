@@ -73,7 +73,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
-func (api UserAPI) AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
+func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"chainAddress.Address": {chainAddress.Address(), "required"},
@@ -96,10 +96,10 @@ func (api UserAPI) AddUserAddress(ctx context.Context, chainAddress persist.Chai
 	return nil
 }
 
-func (api UserAPI) RemoveUserAddresses(ctx context.Context, chainAddresses []persist.ChainAddress) error {
+func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		// "addresses": {addresses, "required,unique,dive,required,eth_addr"}, // TODO: Figure out appropriate validation
+		"walletIDs": {walletIDs, "required,unique,dive,required"},
 	}); err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (api UserAPI) RemoveUserAddresses(ctx context.Context, chainAddresses []per
 		return err
 	}
 
-	err = user.RemoveAddressesFromUser(ctx, userID, chainAddresses, api.repos.UserRepository, api.repos.WalletRepository)
+	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
 	if err != nil {
 		return err
 	}

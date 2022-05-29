@@ -80,7 +80,7 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
@@ -88,28 +88,27 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, chainAddress pers
 		return nil, err
 	}
 
-	err = api.User.AddUserAddress(ctx, chainAddress, authenticator)
+	err = api.User.AddWalletToUser(ctx, chainAddress, authenticator)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.AddUserAddressPayload{
+	output := &model.AddUserWalletPayload{
 		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error) {
 	api := publicapi.For(ctx)
-	addresses := chainAddressPointersToChainAddresses(chainAddresses)
 
-	err := api.User.RemoveUserAddresses(ctx, addresses)
+	err := api.User.RemoveWalletsFromUser(ctx, walletIds)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.RemoveUserAddressesPayload{
+	output := &model.RemoveUserWalletsPayload{
 		Viewer: resolveViewer(ctx),
 	}
 

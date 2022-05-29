@@ -59,7 +59,7 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
-	AddUserAddressPayload struct {
+	AddUserWalletPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -265,7 +265,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserAddress           func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AddUserWallet            func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
@@ -274,7 +274,7 @@ type ComplexityRoot struct {
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
 		RefreshTokens            func(childComplexity int) int
-		RemoveUserAddresses      func(childComplexity int, chainAddresses []*persist.ChainAddress) int
+		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionTokens   func(childComplexity int, input model.UpdateCollectionTokensInput) int
@@ -312,7 +312,7 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
-	RemoveUserAddressesPayload struct {
+	RemoveUserWalletsPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -444,8 +444,8 @@ type GalleryUserResolver interface {
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 }
 type MutationResolver interface {
-	AddUserAddress(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
-	RemoveUserAddresses(ctx context.Context, chainAddresses []*persist.ChainAddress) (model.RemoveUserAddressesPayloadOrError, error)
+	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
+	RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error)
 	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
@@ -515,12 +515,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
-	case "AddUserAddressPayload.viewer":
-		if e.complexity.AddUserAddressPayload.Viewer == nil {
+	case "AddUserWalletPayload.viewer":
+		if e.complexity.AddUserWalletPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.AddUserAddressPayload.Viewer(childComplexity), true
+		return e.complexity.AddUserWalletPayload.Viewer(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -1215,17 +1215,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MembershipTier.TokenID(childComplexity), true
 
-	case "Mutation.addUserAddress":
-		if e.complexity.Mutation.AddUserAddress == nil {
+	case "Mutation.addUserWallet":
+		if e.complexity.Mutation.AddUserWallet == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_addUserAddress_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_addUserWallet_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddUserAddress(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
+		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
@@ -1313,17 +1313,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RefreshTokens(childComplexity), true
 
-	case "Mutation.removeUserAddresses":
-		if e.complexity.Mutation.RemoveUserAddresses == nil {
+	case "Mutation.removeUserWallets":
+		if e.complexity.Mutation.RemoveUserWallets == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_removeUserAddresses_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_removeUserWallets_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["chainAddresses"].([]*persist.ChainAddress)), true
+		return e.complexity.Mutation.RemoveUserWallets(childComplexity, args["walletIds"].([]persist.DBID)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -1556,12 +1556,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RefreshTokensPayload.Viewer(childComplexity), true
 
-	case "RemoveUserAddressesPayload.viewer":
-		if e.complexity.RemoveUserAddressesPayload.Viewer == nil {
+	case "RemoveUserWalletsPayload.viewer":
+		if e.complexity.RemoveUserWalletsPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.RemoveUserAddressesPayload.Viewer(childComplexity), true
+		return e.complexity.RemoveUserWalletsPayload.Viewer(childComplexity), true
 
 	case "TextMedia.contentRenderURL":
 		if e.complexity.TextMedia.ContentRenderURL == nil {
@@ -2515,22 +2515,22 @@ type UpdateTokenInfoPayload {
     token: Token
 }
 
-union AddUserAddressPayloadOrError =
-    AddUserAddressPayload
+union AddUserWalletPayloadOrError =
+    AddUserWalletPayload
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type AddUserAddressPayload {
+type AddUserWalletPayload {
     viewer: Viewer
 }
 
-union RemoveUserAddressesPayloadOrError =
-    RemoveUserAddressesPayload
+union RemoveUserWalletsPayloadOrError =
+    RemoveUserWalletsPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type RemoveUserAddressesPayload {
+type RemoveUserWalletsPayload {
     viewer: Viewer
 }
 
@@ -2690,8 +2690,8 @@ type UnfollowUserPayload {
 
 type Mutation {
     # User Mutations
-    addUserAddress(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
-    removeUserAddresses(chainAddresses: [ChainAddressInput!]!): RemoveUserAddressesPayloadOrError @authRequired
+    addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
+    removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
     updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
     # Gallery Mutations
@@ -2740,7 +2740,7 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_addUserAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.ChainAddress
@@ -2854,18 +2854,18 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []*persist.ChainAddress
-	if tmp, ok := rawArgs["chainAddresses"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
-		arg0, err = ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, tmp)
+	var arg0 []persist.DBID
+	if tmp, ok := rawArgs["walletIds"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletIds"))
+		arg0, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["chainAddresses"] = arg0
+	args["walletIds"] = arg0
 	return args, nil
 }
 
@@ -3150,7 +3150,7 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AddUserAddressPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _AddUserWalletPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AddUserWalletPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3158,7 +3158,7 @@ func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, f
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "AddUserAddressPayload",
+		Object:     "AddUserWalletPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6425,7 +6425,7 @@ func (ec *executionContext) _MembershipTier_owners(ctx context.Context, field gr
 	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_addUserWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6442,7 +6442,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_addUserAddress_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_addUserWallet_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6451,7 +6451,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserAddress(rctx, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism))
+			return ec.resolvers.Mutation().AddUserWallet(rctx, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6467,10 +6467,10 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.AddUserAddressPayloadOrError); ok {
+		if data, ok := tmp.(model.AddUserWalletPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserAddressPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserWalletPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6479,12 +6479,12 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.AddUserAddressPayloadOrError)
+	res := resTmp.(model.AddUserWalletPayloadOrError)
 	fc.Result = res
-	return ec.marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOAddUserWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserWalletPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_removeUserWallets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6501,7 +6501,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_removeUserAddresses_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_removeUserWallets_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6510,7 +6510,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["chainAddresses"].([]*persist.ChainAddress))
+			return ec.resolvers.Mutation().RemoveUserWallets(rctx, args["walletIds"].([]persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6526,10 +6526,10 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.RemoveUserAddressesPayloadOrError); ok {
+		if data, ok := tmp.(model.RemoveUserWalletsPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserAddressesPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserWalletsPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6538,9 +6538,9 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.RemoveUserAddressesPayloadOrError)
+	res := resTmp.(model.RemoveUserWalletsPayloadOrError)
 	fc.Result = res
-	return ec.marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalORemoveUserWalletsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserWalletsPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_updateUserInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -7966,7 +7966,7 @@ func (ec *executionContext) _RefreshTokensPayload_viewer(ctx context.Context, fi
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _RemoveUserAddressesPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveUserAddressesPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _RemoveUserWalletsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveUserWalletsPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -7974,7 +7974,7 @@ func (ec *executionContext) _RemoveUserAddressesPayload_viewer(ctx context.Conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "RemoveUserAddressesPayload",
+		Object:     "RemoveUserWalletsPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -11627,17 +11627,17 @@ func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Contex
 
 // region    ************************** interface.gotpl ***************************
 
-func (ec *executionContext) _AddUserAddressPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddUserAddressPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.AddUserAddressPayload:
-		return ec._AddUserAddressPayload(ctx, sel, &obj)
-	case *model.AddUserAddressPayload:
+	case model.AddUserWalletPayload:
+		return ec._AddUserWalletPayload(ctx, sel, &obj)
+	case *model.AddUserWalletPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._AddUserAddressPayload(ctx, sel, obj)
+		return ec._AddUserWalletPayload(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -12347,17 +12347,17 @@ func (ec *executionContext) _RefreshTokensPayloadOrError(ctx context.Context, se
 	}
 }
 
-func (ec *executionContext) _RemoveUserAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveUserAddressesPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _RemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.RemoveUserAddressesPayload:
-		return ec._RemoveUserAddressesPayload(ctx, sel, &obj)
-	case *model.RemoveUserAddressesPayload:
+	case model.RemoveUserWalletsPayload:
+		return ec._RemoveUserWalletsPayload(ctx, sel, &obj)
+	case *model.RemoveUserWalletsPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._RemoveUserAddressesPayload(ctx, sel, obj)
+		return ec._RemoveUserWalletsPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -12711,19 +12711,19 @@ func (ec *executionContext) _ViewerOrError(ctx context.Context, sel ast.Selectio
 
 // region    **************************** object.gotpl ****************************
 
-var addUserAddressPayloadImplementors = []string{"AddUserAddressPayload", "AddUserAddressPayloadOrError"}
+var addUserWalletPayloadImplementors = []string{"AddUserWalletPayload", "AddUserWalletPayloadOrError"}
 
-func (ec *executionContext) _AddUserAddressPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AddUserAddressPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, addUserAddressPayloadImplementors)
+func (ec *executionContext) _AddUserWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AddUserWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, addUserWalletPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AddUserAddressPayload")
+			out.Values[i] = graphql.MarshalString("AddUserWalletPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AddUserAddressPayload_viewer(ctx, field, obj)
+				return ec._AddUserWalletPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -13233,7 +13233,7 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserAddressPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -13357,7 +13357,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -13470,7 +13470,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -14330,16 +14330,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "addUserAddress":
+		case "addUserWallet":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_addUserAddress(ctx, field)
+				return ec._Mutation_addUserWallet(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "removeUserAddresses":
+		case "removeUserWallets":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_removeUserAddresses(ctx, field)
+				return ec._Mutation_removeUserWallets(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -14819,19 +14819,19 @@ func (ec *executionContext) _RefreshTokensPayload(ctx context.Context, sel ast.S
 	return out
 }
 
-var removeUserAddressesPayloadImplementors = []string{"RemoveUserAddressesPayload", "RemoveUserAddressesPayloadOrError"}
+var removeUserWalletsPayloadImplementors = []string{"RemoveUserWalletsPayload", "RemoveUserWalletsPayloadOrError"}
 
-func (ec *executionContext) _RemoveUserAddressesPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveUserAddressesPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, removeUserAddressesPayloadImplementors)
+func (ec *executionContext) _RemoveUserWalletsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveUserWalletsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, removeUserWalletsPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("RemoveUserAddressesPayload")
+			out.Values[i] = graphql.MarshalString("RemoveUserWalletsPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._RemoveUserAddressesPayload_viewer(ctx, field, obj)
+				return ec._RemoveUserWalletsPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -16650,11 +16650,11 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddUserAddressPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOAddUserWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._AddUserAddressPayloadOrError(ctx, sel, v)
+	return ec._AddUserWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (persist.Address, error) {
@@ -17270,11 +17270,11 @@ func (ec *executionContext) marshalORefreshTokensPayloadOrError2githubᚗcomᚋm
 	return ec._RefreshTokensPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserAddressesPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalORemoveUserWalletsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._RemoveUserAddressesPayloadOrError(ctx, sel, v)
+	return ec._RemoveUserWalletsPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕᚖstring(ctx context.Context, v interface{}) ([]*string, error) {
