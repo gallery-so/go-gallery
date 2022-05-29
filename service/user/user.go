@@ -226,20 +226,18 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	return userID, galleryID, nil
 }
 
-// RemoveAddressesFromUser removes any amount of addresses from a user in the DB
-func RemoveAddressesFromUser(pCtx context.Context, pUserID persist.DBID, pChainAddresses []persist.ChainAddress,
-	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
-
+// RemoveWalletsFromUser removes any amount of addresses from a user in the DB
+func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletIDs []persist.DBID, userRepo persist.UserRepository) error {
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return err
 	}
 
-	if len(user.Wallets) <= len(pChainAddresses) {
+	if len(user.Wallets) <= len(pWalletIDs) {
 		return errUserCannotRemoveAllAddresses
 	}
-	for _, chainAddress := range pChainAddresses {
-		if err := userRepo.RemoveWallet(pCtx, pUserID, chainAddress.Address(), chainAddress.Chain()); err != nil {
+	for _, walletID := range pWalletIDs {
+		if err := userRepo.RemoveWallet(pCtx, pUserID, walletID); err != nil {
 			return err
 		}
 	}

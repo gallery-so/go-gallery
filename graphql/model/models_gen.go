@@ -11,8 +11,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type AddUserAddressPayloadOrError interface {
-	IsAddUserAddressPayloadOrError()
+type AddUserWalletPayloadOrError interface {
+	IsAddUserWalletPayloadOrError()
 }
 
 type AuthorizationError interface {
@@ -83,8 +83,8 @@ type RefreshTokensPayloadOrError interface {
 	IsRefreshTokensPayloadOrError()
 }
 
-type RemoveUserAddressesPayloadOrError interface {
-	IsRemoveUserAddressesPayloadOrError()
+type RemoveUserWalletsPayloadOrError interface {
+	IsRemoveUserWalletsPayloadOrError()
 }
 
 type TokenByIDOrError interface {
@@ -131,11 +131,11 @@ type ViewerOrError interface {
 	IsViewerOrError()
 }
 
-type AddUserAddressPayload struct {
+type AddUserWalletPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
+func (AddUserWalletPayload) IsAddUserWalletPayloadOrError() {}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -250,12 +250,12 @@ type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrAuthenticationFailed) IsAddUserAddressPayloadOrError() {}
-func (ErrAuthenticationFailed) IsError()                        {}
-func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
-func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
-func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()     {}
-func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()   {}
+func (ErrAuthenticationFailed) IsAddUserWalletPayloadOrError() {}
+func (ErrAuthenticationFailed) IsError()                       {}
+func (ErrAuthenticationFailed) IsLoginPayloadOrError()         {}
+func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()    {}
+func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()    {}
+func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()  {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -298,8 +298,8 @@ func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
-func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
-func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
+func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
+func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
@@ -332,8 +332,8 @@ func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
-func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
-func (ErrNotAuthorized) IsRemoveUserAddressesPayloadOrError()      {}
+func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
+func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsRefreshTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                  {}
@@ -505,11 +505,11 @@ type RefreshTokensPayload struct {
 
 func (RefreshTokensPayload) IsRefreshTokensPayloadOrError() {}
 
-type RemoveUserAddressesPayload struct {
+type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (RemoveUserAddressesPayload) IsRemoveUserAddressesPayloadOrError() {}
+func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
 
 type TextMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

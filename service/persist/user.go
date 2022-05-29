@@ -37,7 +37,7 @@ type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
 	Create(context.Context, CreateUserInput) (DBID, error)
 	AddWallet(context.Context, DBID, Address, Chain, WalletType) error
-	RemoveWallet(context.Context, DBID, Address, Chain) error
+	RemoveWallet(context.Context, DBID, DBID) error
 	GetByID(context.Context, DBID) (User, error)
 	GetByWallet(context.Context, DBID) (User, error)
 	GetByChainAddress(context.Context, ChainAddress) (User, error)
