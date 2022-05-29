@@ -13,7 +13,6 @@ import (
 )
 
 func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerFunc {
-	builder := NewQueryBuilder(repos, gql)
 	return func(c *gin.Context) {
 		msg := cloudtask.EventMessage{}
 		if err := c.ShouldBindJSON(&msg); err != nil {
@@ -21,19 +20,17 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 			return
 		}
 
+		builder := QueryBuilder{repos, gql}
 		query, err := builder.NewQuery(c.Request.Context(), msg)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		handled, err := feedPosts.SearchFor(c.Request.Context(), query)
-		if err != nil {
+		if handled, err := feedPosts.SearchFor(c.Request.Context(), query); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
-		}
-
-		if !handled {
+		} else if !handled {
 			c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event=%s matched no rules", msg.ID)})
 			return
 		}

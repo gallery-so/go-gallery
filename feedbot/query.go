@@ -2,7 +2,6 @@ package feedbot
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -37,18 +36,9 @@ type Query struct {
 	LastCollectionEvent      *persist.CollectionEventRecord
 }
 
-func (q Query) String() string {
-	b, _ := json.MarshalIndent(q, "", "\t")
-	return string(b)
-}
-
 type QueryBuilder struct {
 	repos persist.Repositories
 	gql   *graphql.Client
-}
-
-func NewQueryBuilder(repos persist.Repositories, gql *graphql.Client) *QueryBuilder {
-	return &QueryBuilder{repos: repos, gql: gql}
 }
 
 func (qb *QueryBuilder) NewQuery(ctx context.Context, msg cloudtask.EventMessage) (Query, error) {
