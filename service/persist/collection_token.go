@@ -14,9 +14,9 @@ const (
 	MAX_WHITESPACE  = 1000
 )
 
-// CollectionTokenDB is the struct that represents a collection of NFTs in the database
-// CollectionTokenDB will not store the NFTs by value but instead by ID creating a join relationship
-// between collections and NFTS
+// CollectionTokenDB is the struct that represents a collection of tokens in the database
+// CollectionTokenDB will not store the tokens by value but instead by ID creating a join relationship
+// between collections and tokens
 // This struct will only be used when updating or querying the database
 type CollectionTokenDB struct {
 	Version      NullInt32       `json:"version"` // schema version for this model
@@ -30,7 +30,7 @@ type CollectionTokenDB struct {
 	Name           NullString `json:"name"`
 	CollectorsNote NullString `json:"collectors_note"`
 	OwnerUserID    DBID       `json:"owner_user_id"`
-	NFTs           []DBID     `json:"nfts"`
+	Tokens         []DBID     `json:"tokens"`
 
 	// collections can be hidden from public-viewing
 	Hidden NullBool `json:"hidden"`
@@ -73,11 +73,11 @@ type CollectionTokenUpdateInfoInput struct {
 	CollectorsNote NullString `json:"collectors_note"`
 }
 
-// CollectionTokenUpdateNftsInput represents the data that will be changed when updating a collection's NFTs
-type CollectionTokenUpdateNftsInput struct {
+// CollectionTokenUpdateTokensInput represents the data that will be changed when updating a collection's NFTs
+type CollectionTokenUpdateTokensInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	NFTs   []DBID      `json:"nfts"`
+	Tokens []DBID      `json:"tokens"`
 	Layout TokenLayout `json:"layout"`
 }
 
@@ -101,11 +101,11 @@ type CollectionTokenRepository interface {
 	GetByUserID(context.Context, DBID) ([]CollectionToken, error)
 	GetByID(context.Context, DBID) (CollectionToken, error)
 	Update(context.Context, DBID, DBID, interface{}) error
-	UpdateNFTs(context.Context, DBID, DBID, CollectionTokenUpdateNftsInput) error
+	UpdateTokens(context.Context, DBID, DBID, CollectionTokenUpdateTokensInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
-	UpdateNFTsUnsafe(context.Context, DBID, CollectionTokenUpdateNftsInput) error
+	UpdateNFTsUnsafe(context.Context, DBID, CollectionTokenUpdateTokensInput) error
 	// TODO move this to package multichain
-	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionTokenUpdateNftsInput) error
+	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionTokenUpdateTokensInput) error
 	RemoveNFTsOfOldAddresses(context.Context, DBID) error
 	// TODO move this to package multichain
 	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error

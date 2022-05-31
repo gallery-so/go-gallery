@@ -112,12 +112,12 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 
 // Create creates a new collection in the database
 func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.CollectionTokenDB) (persist.DBID, error) {
-	err := ensureTokensOwnedByUser(pCtx, c, pColl.OwnerUserID, pColl.NFTs)
+	err := ensureTokensOwnedByUser(pCtx, c, pColl.OwnerUserID, pColl.Tokens)
 	if err != nil {
 		return "", err
 	}
 	var id persist.DBID
-	err = c.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.NFTs), pColl.Hidden).Scan(&id)
+	err = c.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pColl.Version, pColl.Name, pColl.CollectorsNote, pColl.OwnerUserID, pColl.Layout, pq.Array(pColl.Tokens), pColl.Hidden).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -268,13 +268,13 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBI
 	return c.galleryRepo.RefreshCache(pCtx, pUserID)
 }
 
-// UpdateNFTs updates the nfts of a collection in the database
-func (c *CollectionTokenRepository) UpdateNFTs(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionTokenUpdateNftsInput) error {
-	err := ensureTokensOwnedByUser(pCtx, c, pUserID, pUpdate.NFTs)
+// UpdateTokens updates the nfts of a collection in the database
+func (c *CollectionTokenRepository) UpdateTokens(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+	err := ensureTokensOwnedByUser(pCtx, c, pUserID, pUpdate.Tokens)
 	if err != nil {
 		return err
 	}
-	res, err := c.updateNFTsStmt.ExecContext(pCtx, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID, pUserID)
+	res, err := c.updateNFTsStmt.ExecContext(pCtx, pq.Array(pUpdate.Tokens), pUpdate.Layout, time.Now(), pID, pUserID)
 	if err != nil {
 		return err
 	}
@@ -316,8 +316,8 @@ func (c *CollectionTokenRepository) UpdateUnsafe(pCtx context.Context, pID persi
 }
 
 // UpdateNFTsUnsafe updates the nfts of a collection in the database
-func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID, pUpdate persist.CollectionTokenUpdateNftsInput) error {
-	res, err := c.updateNFTsUnsafeStmt.ExecContext(pCtx, pq.Array(pUpdate.NFTs), pUpdate.Layout, time.Now(), pID)
+func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+	res, err := c.updateNFTsUnsafeStmt.ExecContext(pCtx, pq.Array(pUpdate.Tokens), pUpdate.Layout, time.Now(), pID)
 	if err != nil {
 		return err
 	}
@@ -332,8 +332,8 @@ func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID p
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionTokenUpdateNftsInput) error {
-	nftsToRemove, err := c.nftsToRemoveStmt.QueryContext(pCtx, pq.Array(pOwnerAddresses), pq.Array(pUpdate.NFTs))
+func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+	nftsToRemove, err := c.nftsToRemoveStmt.QueryContext(pCtx, pq.Array(pOwnerAddresses), pq.Array(pUpdate.Tokens))
 	if err != nil {
 		return err
 	}

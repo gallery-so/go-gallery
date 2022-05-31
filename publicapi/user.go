@@ -87,6 +87,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
+	// TODO: Is this the correct method? Seems like it may be more appropriate than the AddAddressToUserToken method.
 	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
 	if err != nil {
 		return err
@@ -120,6 +121,8 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Nothing to validate
+	// TODO-EZRA: Do we still want to start using CreateUserToken here if the indexer is a separate service,
+	// or is the existing CreateUser fine?
 	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
 }
 

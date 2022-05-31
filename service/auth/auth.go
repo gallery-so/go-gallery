@@ -196,6 +196,12 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 	}
 	var wallets []Wallet
 
+	// TODO-EZRA: Unsure about this section -- authentication (imho) shouldn't create wallet entities. It should just
+	// verify ownership of addresses and allow the calling function (create user, add wallet to user, etc) to create
+	// a wallet in the database as appropriate. I think we could remove the walletType here as well, since it'd only be needed by
+	// the function that's creating a wallet (e.g. create user or add wallet to user). Would it be useful to return a
+	// list of the user's Gallery-added wallets in addition to the list of verified addresses? I'm not sure. Or we could
+	// return a map of addresses -> wallets, and verified addresses without corresponding wallets could be nil?
 	if userID != "" {
 		user, err := e.UserRepo.GetByID(pCtx, userID)
 		if err != nil {

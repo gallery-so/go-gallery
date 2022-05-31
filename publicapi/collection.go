@@ -81,15 +81,15 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
-	collection := persist.CollectionDB{
+	collection := persist.CollectionTokenDB{
 		OwnerUserID:    userID,
-		NFTs:           nfts,
+		Tokens:         nfts,
 		Layout:         layout,
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
+	collectionID, err := api.repos.CollectionTokenRepository.Create(ctx, collection)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	err = api.repos.CollectionRepository.Delete(ctx, collectionID, userID)
+	err = api.repos.CollectionTokenRepository.Delete(ctx, collectionID, userID)
 	if err != nil {
 		return err
 	}
@@ -155,12 +155,12 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		return err
 	}
 
-	update := persist.CollectionUpdateInfoInput{
+	update := persist.CollectionTokenUpdateInfoInput{
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
+	err = api.repos.CollectionTokenRepository.Update(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -174,16 +174,16 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	return nil
 }
 
-func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error {
+func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"nfts":         {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
+		"tokens":       {tokens, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
 	}); err != nil {
 		return err
 	}
 
-	layout, err := persist.ValidateLayout(layout, nfts)
+	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
 		return err
 	}
@@ -193,9 +193,9 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionUpdateNftsInput{NFTs: nfts, Layout: layout}
+	update := persist.CollectionTokenUpdateTokensInput{Tokens: tokens, Layout: layout}
 
-	err = api.repos.CollectionRepository.UpdateNFTs(ctx, collectionID, userID, update)
+	err = api.repos.CollectionTokenRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	collectionData := persist.CollectionEvent{NFTs: nfts}
+	collectionData := persist.CollectionEvent{NFTs: tokens}
 	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
 
 	return nil
@@ -223,9 +223,9 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionUpdateHiddenInput{Hidden: persist.NullBool(hidden)}
+	update := persist.CollectionTokenUpdateHiddenInput{Hidden: persist.NullBool(hidden)}
 
-	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
+	err = api.repos.CollectionTokenRepository.Update(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}

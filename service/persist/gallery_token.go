@@ -50,6 +50,7 @@ type GalleryTokenRepository interface {
 	AddCollections(context.Context, DBID, DBID, []DBID) error
 	GetByUserID(context.Context, DBID) ([]GalleryToken, error)
 	GetByID(context.Context, DBID) (GalleryToken, error)
+	RefreshCache(context.Context, DBID) error
 }
 
 // ErrGalleryNotFoundByID is returned when a gallery is not found by its ID

@@ -245,8 +245,8 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 	return nil
 }
 
-// AddWalletToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
+// AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address
+func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
@@ -265,6 +265,9 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	}
 
 	// TODO insert wallet and update user with wallet
+	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress.Address(), pChainAddress.Chain(), pWalletType); err != nil {
+		return err
+	}
 
 	return nil
 }
