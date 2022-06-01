@@ -85,9 +85,11 @@ SELECT * FROM membership WHERE id = $1 AND deleted = false;
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.follower = u.id
-    WHERE f.followee = $1 AND f.deleted = false;
+    WHERE f.followee = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC;
 
 -- name: GetFollowingByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.followee = u.id
-    WHERE f.follower = $1 AND f.deleted = false;
+    WHERE f.follower = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC;
