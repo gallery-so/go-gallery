@@ -57,6 +57,7 @@ type CollectionEvent struct {
 	CreatedAt    time.Time
 	LastUpdated  time.Time
 	Data         pgtype.JSONB
+	Sent         sql.NullBool
 }
 
 type CollectionsV2 struct {
@@ -103,10 +104,12 @@ type Feature struct {
 }
 
 type Follow struct {
-	ID       persist.DBID
-	Follower persist.DBID
-	Followee persist.DBID
-	Deleted  bool
+	ID          persist.DBID
+	Follower    persist.DBID
+	Followee    persist.DBID
+	Deleted     bool
+	CreatedAt   time.Time
+	LastUpdated time.Time
 }
 
 type Gallery struct {
@@ -183,6 +186,7 @@ type NftEvent struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Data        pgtype.JSONB
+	Sent        sql.NullBool
 }
 
 type Nonce struct {
@@ -240,6 +244,7 @@ type UserEvent struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Data        pgtype.JSONB
+	Sent        sql.NullBool
 }
 
 type Wallet struct {

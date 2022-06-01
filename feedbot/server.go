@@ -2,7 +2,6 @@ package feedbot
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,66 +9,51 @@ import (
 	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	log "github.com/sirupsen/logrus"
+	"github.com/shurcooL/graphql"
 )
 
-func handleMessage(userRepo persist.UserRepository, userEventRepo persist.UserEventRepository, tokenEventRepo persist.NftEventRepository, collectionEventRepo persist.CollectionEventRepository) gin.HandlerFunc {
+func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := cloudtask.EventMessage{}
-		if err := c.ShouldBindJSON(&input); err != nil {
+		msg := cloudtask.EventMessage{}
+		if err := c.ShouldBindJSON(&msg); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		ctx, cancel := context.WithCancel(c.Request.Context())
-		defer cancel()
-
-		switch persist.CategoryFromEventCode(input.EventCode) {
-		case persist.UserEventCode:
-			err := handleUserEvents(ctx, userRepo, userEventRepo, input)
-			if err != nil {
-				log.Errorf("error handling user event: %s", err)
-
-				if err == errInvalidUserEvent || err == errMissingUserEvent {
-					util.ErrResponse(c, http.StatusOK, err)
-					return
-				} else {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-			}
-		case persist.NftEventCode:
-			err := handleNftEvents(ctx, userRepo, tokenEventRepo, input)
-			if err != nil {
-				log.Errorf("error handling nft event: %s", err)
-
-				if err == errInvalidNftEvent || err == errMissingNftEvent {
-					util.ErrResponse(c, http.StatusOK, err)
-					return
-				} else {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-			}
-		case persist.CollectionEventCode:
-			err := handleCollectionEvents(ctx, userRepo, collectionEventRepo, input)
-			if err != nil {
-				log.Errorf("error handling collection event: %s", err)
-
-				if err == errInvalidCollectionEvent || err == errMissingCollectionEvent {
-					util.ErrResponse(c, http.StatusOK, err)
-					return
-				} else {
-					util.ErrResponse(c, http.StatusInternalServerError, err)
-					return
-				}
-			}
-		default:
-			util.ErrResponse(c, http.StatusOK, errors.New("unknown event type"))
+		builder := QueryBuilder{repos, gql}
+		query, err := builder.NewQuery(c.Request.Context(), msg)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event(%s) processed", input.ID)})
+		if handled, err := feedPosts.SearchFor(c.Request.Context(), query); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		} else if !handled {
+			c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event=%s matched no rules", msg.ID)})
+			return
+		}
+
+		if err := markSent(c, repos, msg); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event=%s processed", msg.ID)})
+	}
+}
+
+func markSent(ctx context.Context, repos persist.Repositories, msg cloudtask.EventMessage) error {
+	switch persist.CategoryFromEventCode(msg.EventCode) {
+	case persist.UserEventCode:
+		return repos.UserEventRepository.MarkSent(ctx, msg.ID)
+	case persist.NftEventCode:
+		return repos.NftEventRepository.MarkSent(ctx, msg.ID)
+	case persist.CollectionEventCode:
+		return repos.CollectionEventRepository.MarkSent(ctx, msg.ID)
+	default:
+		return fmt.Errorf("failed to mark event as sent, got unknown event: %v", msg.EventCode)
 	}
 }
 

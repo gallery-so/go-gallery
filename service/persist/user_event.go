@@ -18,9 +18,8 @@ type UserEventRecord struct {
 }
 
 type UserEvent struct {
-	Username   string     `json:"username"`
-	Bio        NullString `json:"bio"`
-	FolloweeID DBID       `json:"followee_id"`
+	Bio            NullString `json:"bio"`
+	FollowedUserID DBID       `json:"followed_user_id"`
 }
 
 func (u UserEvent) Value() (driver.Value, error) {
@@ -40,4 +39,5 @@ type UserEventRepository interface {
 	Get(context.Context, DBID) (UserEventRecord, error)
 	GetEventsSince(context.Context, UserEventRecord, time.Time) ([]UserEventRecord, error)
 	GetEventBefore(context.Context, UserEventRecord) (*UserEventRecord, error)
+	MarkSent(context.Context, DBID) error
 }

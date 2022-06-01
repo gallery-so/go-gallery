@@ -150,7 +150,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	userData := persist.UserEvent{Username: username, Bio: persist.NullString(bio)}
+	userData := persist.UserEvent{Bio: persist.NullString(bio)}
 	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
 
 	return nil
@@ -253,8 +253,8 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
 
 	// Send event
-	userData := persist.UserEvent{FolloweeID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
+	userData := persist.UserEvent{FollowedUserID: userID}
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
 
 	return err
 }

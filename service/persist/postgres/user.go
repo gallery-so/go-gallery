@@ -83,7 +83,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false`)
 	checkNoErr(err)
 
-	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
+	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true, LAST_UPDATED = NOW() WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
 	checkNoErr(err)
 
 	return &UserRepository{

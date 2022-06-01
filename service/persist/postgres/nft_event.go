@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -14,6 +15,7 @@ type NftEventRepository struct {
 	getByEventIDStmt                   *sql.Stmt
 	getMatchingEventsForUserAndNftStmt *sql.Stmt
 	getMatchingEventBeforeStmt         *sql.Stmt
+	markSentStmt                       *sql.Stmt
 }
 
 func NewNftEventRepository(db *sql.DB) *NftEventRepository {
@@ -42,9 +44,12 @@ func NewNftEventRepository(db *sql.DB) *NftEventRepository {
 	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
 		`SELECT ID, USER_ID, NFT_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM nft_events
-		 WHERE USER_ID = $1 AND NFT_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4
+		 WHERE USER_ID = $1 AND NFT_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4 AND SENT = true
 		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
 	)
+	checkNoErr(err)
+
+	markSentStmt, err := db.PrepareContext(ctx, `UPDATE nft_events SET SENT = true, LAST_UPDATED = now() WHERE ID = $1`)
 	checkNoErr(err)
 
 	return &NftEventRepository{
@@ -53,6 +58,7 @@ func NewNftEventRepository(db *sql.DB) *NftEventRepository {
 		getByEventIDStmt:                   getByEventIDStmt,
 		getMatchingEventsForUserAndNftStmt: getMatchingEventsForUserAndNftStmt,
 		getMatchingEventBeforeStmt:         getMatchingEventBeforeStmt,
+		markSentStmt:                       markSentStmt,
 	}
 }
 
@@ -102,4 +108,22 @@ func (e *NftEventRepository) GetEventBefore(ctx context.Context, event persist.N
 		return nil, err
 	}
 	return &evt, nil
+}
+
+func (e *NftEventRepository) MarkSent(ctx context.Context, eventID persist.DBID) error {
+	res, err := e.markSentStmt.ExecContext(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("nft event(%s) doesn't exist", eventID)
+	}
+
+	return nil
 }
