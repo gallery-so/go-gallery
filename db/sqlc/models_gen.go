@@ -57,6 +57,7 @@ type CollectionEvent struct {
 	CreatedAt    time.Time
 	LastUpdated  time.Time
 	Data         pgtype.JSONB
+	Sent         sql.NullBool
 }
 
 type CollectionsV2 struct {
@@ -105,7 +106,7 @@ type Follow struct {
 	ID          persist.DBID
 	Follower    persist.DBID
 	Followee    persist.DBID
-	Deleted     sql.NullBool
+	Deleted     bool
 	CreatedAt   time.Time
 	LastUpdated time.Time
 }
@@ -184,6 +185,7 @@ type NftEvent struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Data        pgtype.JSONB
+	Sent        sql.NullBool
 }
 
 type Nonce struct {
@@ -240,4 +242,5 @@ type UserEvent struct {
 	CreatedAt   time.Time
 	LastUpdated time.Time
 	Data        pgtype.JSONB
+	Sent        sql.NullBool
 }
