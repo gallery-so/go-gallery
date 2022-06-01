@@ -3,8 +3,9 @@ package sentryutil
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -71,6 +72,24 @@ func ScrubEventCookies(event *sentry.Event, hint *sentry.EventHint) *sentry.Even
 
 	event.Request.Cookies = cookies
 	event.Request.Headers["Cookie"] = cookies
+	return event
+}
+
+func ScrubEventHeaders(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event == nil || event.Request == nil {
+		return event
+	}
+
+	scrubbed := map[string]string{}
+	for k, v := range event.Request.Headers {
+		if k == "Authorization" {
+			scrubbed[k] = "[filtered]"
+		} else {
+			scrubbed[k] = v
+		}
+	}
+
+	event.Request.Headers = scrubbed
 	return event
 }
 

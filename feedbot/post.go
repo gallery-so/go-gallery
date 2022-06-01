@@ -4,138 +4,85 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
-type Query struct {
-	EventID           persist.DBID
-	EventCode         persist.EventCode
-	EventsSince       int
-	UserID            persist.DBID
-	Username          string
-	NftID             persist.DBID
-	NftName           string
-	NftCollectorsNote string
-	CollectionID      persist.DBID
-	CollectionName    string
-	CollectionNfts    []struct {
-		Nft struct {
-			Dbid persist.DBID
-			Name string
-		}
-	}
-	CollectionCollectorsNote string
-	FollowedUserID           persist.DBID
-	FollowedUsername         string
-	LastUserEvent            *persist.UserEventRecord
-	LastNftEvent             *persist.NftEventRecord
-	LastCollectionEvent      *persist.CollectionEventRecord
-}
-
-func (q Query) String() string {
-	b, _ := json.MarshalIndent(q, "", "\t")
-	return string(b)
-}
-
 type Post struct {
-	name   string
-	rule   []Criterion
-	poster Poster
+	name     string
+	criteria []func(Query) bool
+	poster   Poster
 }
 
-func (f *Post) Handle(ctx context.Context, q Query) (bool, error) {
-	if err := f.poster.withQuery(ctx, q); err != nil {
+type Poster interface {
+	Send(context.Context, Query) error
+}
+
+type DiscordPoster struct {
+	render func(Query) string
+}
+
+func (d *DiscordPoster) Send(ctx context.Context, q Query) error {
+	content := d.render(q)
+
+	message, err := json.Marshal(map[string]interface{}{
+		"content": content,
+		"tts":     false,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return sendMessage(ctx, message)
+}
+
+func (p *Post) Handle(ctx context.Context, q Query) (bool, error) {
+	if err := p.poster.Send(ctx, q); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-type Poster interface {
-	withQuery(context.Context, Query) error
-}
-
-type Feed struct {
-	User       []*Post
-	Nft        []*Post
-	Collection []*Post
-	cache      map[string]bool
-	mu         sync.Mutex
-}
-
-func newFeed() *Feed {
-	criteria := newCriteria()
-	base := []Criterion{
-		criteria.EventIsValid,
-		criteria.EventNoMoreRecentEvents,
-		criteria.UserHasUsername,
-	}
-	return &Feed{
-		User: []*Post{
-			newUserCreatedPost(criteria, base),
-			newUserFollowedPost(criteria, base),
-		},
-		Nft: []*Post{
-			newNftCollectorsNoteAddedPost(criteria, base),
-		},
-		Collection: []*Post{
-			newCollectionCreatedPost(criteria, base),
-			newCollectionCollectorsNoteAddedPost(criteria, base),
-			newCollectionTokensAddedPost(criteria, base),
-		},
-		cache: map[string]bool{},
-	}
-}
-
-func (f *Feed) postMatches(post *Post, q Query) bool {
-	for _, c := range post.rule {
-		key := fmt.Sprintf("%s:%s", q.EventID, c.name)
-
-		if _, ok := f.cache[key]; !ok {
-			f.mu.Lock()
-			f.cache[key] = c.eval(q)
-			f.mu.Unlock()
-		}
-
-		logger.For(nil).Debugf("%s:%s evaluated query as: %v", post.name, c.name, f.cache[key])
-
-		if !f.cache[key] {
+func (p *Post) Matches(q Query) bool {
+	for i, criteria := range p.criteria {
+		match := criteria(q)
+		logger.For(nil).Debugf("%s.%d is %v", p.name, i, match)
+		if !match {
 			return false
 		}
 	}
 	return true
 }
 
-func (f *Feed) SearchFor(ctx context.Context, q Query) (bool, error) {
-	logger.For(ctx).Debugf("handling query: %s", q)
+type Feed []*Post
 
-	var posts []*Post
+var feedPosts = Feed{
+	userCreatedPost(),
+	userFollowedPost(),
+	nftCollectorsNoteAddedPost(),
+	collectionCreatedPost(),
+	collectionCollectorsNoteAddedPost(),
+	collectionTokensAddedPost(),
+}
 
-	switch persist.CategoryFromEventCode(q.EventCode) {
-	case persist.UserEventCode:
-		posts = f.User
-	case persist.NftEventCode:
-		posts = f.Nft
-	case persist.CollectionEventCode:
-		posts = f.Collection
-	}
+func (f Feed) SearchFor(ctx context.Context, q Query) (bool, error) {
+	logger.For(ctx).Debugf("handling event=%s; query=%v", q.EventID, q)
 
-	for _, p := range posts {
-		if f.postMatches(p, q) {
-			handled, err := p.Handle(ctx, q)
+	var handled bool
+	var err error
 
-			if err != nil {
-				return false, err
-			}
-
-			return handled, nil
+	for _, p := range f {
+		if p.Matches(q) {
+			logger.For(ctx).Debugf("event=%s matches post=%s", q.EventID, p.name)
+			handled, err = p.Handle(ctx, q)
+			break
 		}
 	}
 
-	return false, nil
+	logger.For(ctx).Debugf("event=%s handled=%v err=%v", q.EventID, handled, err)
+	return handled, err
 }
 
 func userURL(username string) string {
@@ -150,49 +97,49 @@ func nftURL(username, collectionID, nftID string) string {
 	return fmt.Sprintf("%s/%s", collectionURL(username, collectionID), nftID)
 }
 
-func newUserCreatedPost(critiera Criteria, baseRule []Criterion) *Post {
+func userCreatedPost() *Post {
 	return &Post{
 		name: "UserCreated",
-		rule: append(
-			baseRule,
-			critiera.IsUserCreatedEvent,
-			critiera.UserNoEventsBefore,
+		criteria: append(
+			baseCriteria,
+			isUserFollowedEvent,
+			userNoEventsBefore,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				return fmt.Sprintf("**%s** joined Gallery: %s", q.Username, userURL(q.Username))
 			},
 		},
 	}
 }
 
-func newUserFollowedPost(criteria Criteria, baseRule []Criterion) *Post {
+func userFollowedPost() *Post {
 	return &Post{
 		name: "UserFollowed",
-		rule: append(
-			baseRule,
-			criteria.IsUserFollowedEvent,
-			criteria.FollowedUserHasUsername,
+		criteria: append(
+			baseCriteria,
+			isUserFollowedEvent,
+			followedUserHasUsername,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				return fmt.Sprintf("**%s** followed **%s**: %s", q.Username, q.FollowedUsername, userURL(q.FollowedUsername))
 			},
 		},
 	}
 }
 
-func newNftCollectorsNoteAddedPost(criteria Criteria, baseRule []Criterion) *Post {
+func nftCollectorsNoteAddedPost() *Post {
 	return &Post{
 		name: "NftCollectorsNoteAdded",
-		rule: append(
-			baseRule,
-			criteria.IsNftCollectorsNoteAddedEvent,
-			criteria.NftHasCollectorsNote,
-			criteria.NftBelongsToCollection,
+		criteria: append(
+			baseCriteria,
+			isNftCollectorsNoteAddedEvent,
+			nftHasCollectorsNote,
+			nftBelongsToCollection,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				var message string
 				if q.NftName != "" {
 					message = fmt.Sprintf("**%s** added a collector's note to *%s*: %s", q.Username, q.NftName, nftURL(q.Username, q.CollectionID.String(), q.NftID.String()))
@@ -205,16 +152,16 @@ func newNftCollectorsNoteAddedPost(criteria Criteria, baseRule []Criterion) *Pos
 	}
 }
 
-func newCollectionCreatedPost(criteria Criteria, baseRule []Criterion) *Post {
+func collectionCreatedPost() *Post {
 	return &Post{
 		name: "CollectionCreated",
-		rule: append(
-			baseRule,
-			criteria.IsCollectionCreatedEvent,
-			criteria.CollectionHasNfts,
+		criteria: append(
+			baseCriteria,
+			isCollectionCreatedEvent,
+			collectionHasNfts,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				var message string
 				if q.CollectionName != "" {
 					message = fmt.Sprintf("**%s** created a collection titled '*%s'*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
@@ -227,16 +174,16 @@ func newCollectionCreatedPost(criteria Criteria, baseRule []Criterion) *Post {
 	}
 }
 
-func newCollectionCollectorsNoteAddedPost(criteria Criteria, baseRule []Criterion) *Post {
+func collectionCollectorsNoteAddedPost() *Post {
 	return &Post{
 		name: "CollectionCollectorsNoteAdded",
-		rule: append(
-			baseRule,
-			criteria.IsCollectionCollectorsNoteAddedEvent,
-			criteria.CollectionHasCollectorsNote,
+		criteria: append(
+			baseCriteria,
+			isCollectionCollectorsNoteAddedEvent,
+			collectionHasCollectorsNote,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				var message string
 				if q.CollectionName != "" {
 					message = fmt.Sprintf("**%s** added a collector's note to their collection, *%s*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
@@ -249,17 +196,17 @@ func newCollectionCollectorsNoteAddedPost(criteria Criteria, baseRule []Criterio
 	}
 }
 
-func newCollectionTokensAddedPost(criteria Criteria, baseRule []Criterion) *Post {
+func collectionTokensAddedPost() *Post {
 	return &Post{
 		name: "CollectionTokensAdded",
-		rule: append(
-			baseRule,
-			criteria.IsCollectionTokensAddedEvent,
-			criteria.CollectionHasNfts,
-			criteria.CollectionHasNewTokensAdded,
+		criteria: append(
+			baseCriteria,
+			isCollectionTokensAddedEvent,
+			collectionHasNfts,
+			collectionHasNewTokensAdded,
 		),
 		poster: &DiscordPoster{
-			renderQuery: func(q Query) string {
+			render: func(q Query) string {
 				var tokensAdded int
 				var tokenName string
 

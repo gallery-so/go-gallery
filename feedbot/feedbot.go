@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
-	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/shurcooL/graphql"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -28,14 +28,14 @@ func Init() {
 
 func coreInit(pqClient *sql.DB) *gin.Engine {
 	router := gin.Default()
-	router.Use(middleware.ErrLogger(), sentrygin.New(sentrygin.Options{Repanic: true}))
+	router.Use(middleware.ErrLogger(), middleware.Sentry(true), middleware.Tracing())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		log.SetLevel(log.DebugLevel)
 	}
 
-	gql := graphql.NewClient(viper.GetString("GALLERY_API"), nil)
+	gql := graphql.NewClient(viper.GetString("GALLERY_API"), http.DefaultClient)
 
 	repos := persist.Repositories{
 		UserEventRepository:       postgres.NewUserEventRepository(pqClient),
@@ -101,22 +101,11 @@ func initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
-		BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
-			if event.Request == nil {
-				return event
-			}
-
-			scrubbed := map[string]string{}
-			for k, v := range event.Request.Headers {
-				if k == "Authorization" {
-					scrubbed[k] = "[filtered]"
-				} else {
-					scrubbed[k] = v
-				}
-			}
-
-			event.Request.Headers = scrubbed
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			event = sentryutil.ScrubEventHeaders(event, hint)
+			event = sentryutil.UpdateErrorFingerprints(event, hint)
 			return event
 		},
 	})

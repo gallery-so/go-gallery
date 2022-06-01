@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/viper"
 )
@@ -44,20 +43,8 @@ func TaskRequired() gin.HandlerFunc {
 	}
 }
 
-// CaptureExceptions sends errors to Sentry.
-func CaptureExceptions() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Next()
-		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
-			for _, err := range c.Errors {
-				hub.CaptureException(err)
-			}
-		}
-	}
-}
-
 func handlersInit(router *gin.Engine, repos persist.Repositories, gql *graphql.Client) *gin.Engine {
 	router.GET("/ping", ping())
-	router.POST("/tasks/feed-event", TaskRequired(), CaptureExceptions(), handleMessage(repos, gql))
+	router.POST("/tasks/feed-event", TaskRequired(), handleMessage(repos, gql))
 	return router
 }
