@@ -241,6 +241,7 @@ const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC
 `
 
 type GetFollowersByUserIdBatchBatchResults struct {
@@ -301,6 +302,7 @@ const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC
 `
 
 type GetFollowingByUserIdBatchBatchResults struct {

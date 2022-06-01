@@ -87,7 +87,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 }
 
 // Insert inserts a new backup of a gallery into the database and ensures that old backups are removed
-func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery) error {
+func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.GalleryToken) error {
 	res, err := b.getCurrentBackupsStmt.QueryContext(pCtx, pGallery.ID)
 	if err != nil {
 		return err

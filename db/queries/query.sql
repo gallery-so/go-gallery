@@ -103,12 +103,14 @@ select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.follower = u.id
-    WHERE f.followee = $1 AND f.deleted = false;
+    WHERE f.followee = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC;
 
 -- name: GetFollowingByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.followee = u.id
-    WHERE f.follower = $1 AND f.deleted = false;
+    WHERE f.follower = $1 AND f.deleted = false
+    ORDER BY f.last_updated DESC;
 
 -- name: GetTokensByWalletIdBatch :batchmany
 SELECT * FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false;

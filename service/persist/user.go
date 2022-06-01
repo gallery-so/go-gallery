@@ -27,19 +27,18 @@ type UserUpdateInfoInput struct {
 }
 
 type CreateUserInput struct {
-	Address    Address
-	Chain      Chain
-	WalletType WalletType
+	ChainAddress ChainAddress
+	WalletType   WalletType
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
 	Create(context.Context, CreateUserInput) (DBID, error)
-	AddWallet(context.Context, DBID, Address, Chain, WalletType) error
+	AddWallet(context.Context, DBID, ChainAddress, WalletType) error
 	RemoveWallet(context.Context, DBID, DBID) error
 	GetByID(context.Context, DBID) (User, error)
-	GetByWallet(context.Context, DBID) (User, error)
+	GetByWalletID(context.Context, DBID) (User, error)
 	GetByChainAddress(context.Context, ChainAddress) (User, error)
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error

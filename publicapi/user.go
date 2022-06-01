@@ -87,6 +87,8 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
+	// TODO: Is this the correct method? Seems like it may be more appropriate than the AddAddressToUserToken method.
+	// TODO: We need a wallet type here...or maybe it just comes from the authenticator now?
 	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
 	if err != nil {
 		return err
@@ -120,7 +122,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Nothing to validate
-	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
+	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryTokenRepository)
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
@@ -148,7 +150,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	userData := persist.UserEvent{Username: username, Bio: persist.NullString(bio)}
+	userData := persist.UserEvent{Bio: persist.NullString(bio)}
 	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
 
 	return nil
@@ -251,8 +253,8 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
 
 	// Send event
-	userData := persist.UserEvent{FolloweeID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, userID, userData)
+	userData := persist.UserEvent{FollowedUserID: userID}
+	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
 
 	return err
 }

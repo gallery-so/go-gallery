@@ -83,9 +83,9 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	update := persist.GalleryUpdateInput{Collections: collections}
+	update := persist.GalleryTokenUpdateInput{Collections: collections}
 
-	err = api.repos.GalleryRepository.Update(ctx, galleryID, userID, update)
+	err = api.repos.GalleryTokenRepository.Update(ctx, galleryID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *per
 
 	// TODO: Make sure backups still work here with our gin context retrieval
 	go func(ctx context.Context) {
-		galleries, err := repos.GalleryRepository.GetByUserID(ctx, userID)
+		galleries, err := repos.GalleryTokenRepository.GetByUserID(ctx, userID)
 		if err != nil {
 			return
 		}

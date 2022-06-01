@@ -2,11 +2,12 @@ package cloudtask
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type NftFeedEvent struct {
@@ -15,9 +16,6 @@ type NftFeedEvent struct {
 
 func (t NftFeedEvent) Handle(ctx context.Context, event persist.NftEventRecord) {
 	hub := sentryutil.SentryHubFromContext(ctx)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	saved, err := t.NftEventRepo.Add(ctx, event)
 	if err != nil {

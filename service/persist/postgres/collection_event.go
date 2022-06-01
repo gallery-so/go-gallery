@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -14,6 +15,7 @@ type CollectionEventRepository struct {
 	getByEventIDStmt                         *sql.Stmt
 	getMatchingEventForUserAndCollectionStmt *sql.Stmt
 	getMatchingEventBeforeStmt               *sql.Stmt
+	markSentStmt                             *sql.Stmt
 }
 
 func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
@@ -42,9 +44,12 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 	getMatchingEventBeforeStmt, err := db.PrepareContext(ctx,
 		`SELECT ID, USER_ID, COLLECTION_ID, VERSION, EVENT_CODE, DATA, CREATED_AT, LAST_UPDATED
 		 FROM collection_events
-		 WHERE USER_ID = $1 AND COLLECTION_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4
+		 WHERE USER_ID = $1 AND COLLECTION_ID = $2 AND EVENT_CODE = $3 AND LAST_UPDATED < $4 AND SENT = true
 		 ORDER BY LAST_UPDATED DESC LIMIT 1`,
 	)
+	checkNoErr(err)
+
+	markSentStmt, err := db.PrepareContext(ctx, `UPDATE collection_events SET SENT = true, LAST_UPDATED = now() WHERE ID = $1`)
 	checkNoErr(err)
 
 	return &CollectionEventRepository{
@@ -53,6 +58,7 @@ func NewCollectionEventRepository(db *sql.DB) *CollectionEventRepository {
 		getByEventIDStmt:                         getByEventIDStmt,
 		getMatchingEventForUserAndCollectionStmt: getMatchingEventForUserAndCollectionStmt,
 		getMatchingEventBeforeStmt:               getMatchingEventBeforeStmt,
+		markSentStmt:                             markSentStmt,
 	}
 }
 
@@ -101,4 +107,22 @@ func (e *CollectionEventRepository) GetEventBefore(ctx context.Context, event pe
 		return nil, err
 	}
 	return &evt, nil
+}
+
+func (e *CollectionEventRepository) MarkSent(ctx context.Context, eventID persist.DBID) error {
+	res, err := e.markSentStmt.ExecContext(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("collection event(%s) doesn't exist", eventID)
+	}
+
+	return nil
 }

@@ -198,7 +198,7 @@ func (p *Provider) ValidateTokensForWallet(context.Context, persist.Address, boo
 
 // UpdateAssetsForAcc is a pipeline for getting assets for an account
 func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWalletAddresses []persist.EthereumAddress,
-	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
+	nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository, galleryRepo persist.GalleryTokenRepository, backupRepo persist.BackupRepository) error {
 
 	err := galleryRepo.RefreshCache(pCtx, pUserID)
 	if err != nil {
@@ -235,7 +235,7 @@ func UpdateAssetsForAcc(pCtx context.Context, pUserID persist.DBID, pOwnerWallet
 	}
 
 	// ensure NFTs that a user used to own are no longer in their gallery
-	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionUpdateNftsInput{NFTs: ids}); err != nil {
+	if err := collRepo.ClaimNFTs(pCtx, pUserID, pOwnerWalletAddresses, persist.CollectionTokenUpdateTokensInput{Tokens: ids}); err != nil {
 		return fmt.Errorf("failed to claim NFTs: %w", err)
 	}
 	if err := collRepo.RemoveNFTsOfOldAddresses(pCtx, pUserID); err != nil {

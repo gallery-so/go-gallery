@@ -88,97 +88,9 @@ type MergeUsersInput struct {
 	WalletType   persist.WalletType `json:"wallet_type"`
 }
 
-// CreateUserToken creates a JWT token for the user
-func CreateUserToken(pCtx context.Context, pInput AddUserAddressesInput, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, galleryRepo persist.GalleryTokenRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, multichainProvider *multichain.Provider) (CreateUserOutput, error) {
-
-	output := &CreateUserOutput{}
-	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
-
-	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
-	if nonce == "" {
-		return CreateUserOutput{}, auth.ErrNonceNotFound{ChainAddress: chainAddress}
-	}
-	if id != "" {
-		return CreateUserOutput{}, persist.ErrUserAlreadyExists{ChainAddress: chainAddress}
-	}
-
-	if pInput.WalletType != persist.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
-			return CreateUserOutput{}, auth.ErrNonceMismatch
-		}
-	}
-
-	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	output.SignatureValid = sigValidBool
-	if !sigValidBool {
-		return *output, nil
-	}
-
-	user := persist.CreateUserInput{
-		Address:    pInput.Address,
-		Chain:      pInput.Chain,
-		WalletType: pInput.WalletType,
-	}
-
-	userID, err := userRepo.Create(pCtx, user)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	output.UserID = userID
-
-	defer func() {
-		// user has been created successfully
-		// validate that the user's NFTs are valid and have cached media content
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := validateNFTsForUser(ctx, userID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
-			}
-		}()
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := ensureMediaContent(ctx, chainAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
-			}
-		}()
-	}()
-
-	jwtTokenStr, err := auth.JWTGeneratePipeline(pCtx, userID)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	output.JWTtoken = jwtTokenStr
-
-	err = auth.NonceRotate(pCtx, chainAddress, userID, nonceRepo)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	galleryInsert := persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
-
-	galleryID, err := galleryRepo.Create(pCtx, galleryInsert)
-	if err != nil {
-		return CreateUserOutput{}, err
-	}
-
-	output.GalleryID = galleryID
-
-	return *output, nil
-}
-
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
+	galleryRepo persist.GalleryTokenRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -195,12 +107,11 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 	// auth and that supplies a single address. In the future, a user may authenticate in a way that makes
 	// multiple authenticated addresses available for initial user creation, and we may want to add all of
 	// those addresses to the user's account here.
-	address := authResult.Wallets[0]
+	wallet := authResult.Addresses[0]
 
 	user := persist.CreateUserInput{
-		Address:    address.Address,
-		Chain:      address.Chain,
-		WalletType: address.WalletType,
+		ChainAddress: wallet.ChainAddress,
+		WalletType:   wallet.WalletType,
 	}
 
 	userID, err = userRepo.Create(pCtx, user)
@@ -213,7 +124,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		return "", "", err
 	}
 
-	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err = galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {
@@ -245,7 +156,7 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 	return nil
 }
 
-// AddWalletToUser adds a single address to a user in the DB because a signature needs to be provided and validated per address
+// AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address
 func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
 	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
 
@@ -254,17 +165,20 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	addressUserID := authResult.UserID
+	addressOwnerID := authResult.UserID
 
-	if addressUserID != "" {
-		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
+	if addressOwnerID != "" {
+		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
-		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
+	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
+	if !ok {
+		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressOwnerID}
 	}
 
-	// TODO insert wallet and update user with wallet
+	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -284,7 +198,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAdd
 		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
-	if !auth.ContainsWallet(authResult.Wallets, auth.Wallet{Address: pChainAddress.Address(), Chain: pChainAddress.Chain()}) {
+	if !auth.ContainsWallet(authResult.Addresses, auth.AuthenticatedAddress{ChainAddress: pChainAddress}) {
 		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
@@ -311,7 +225,7 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAdd
 	}()
 
 	// TODO add address to user waterfalls to wallet and address table
-	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress.Address(), pChainAddress.Chain(), pWalletType); err != nil {
+	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress, pWalletType); err != nil {
 		return err
 	}
 

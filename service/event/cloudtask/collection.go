@@ -2,11 +2,12 @@ package cloudtask
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
 )
 
 type CollectionFeedTask struct {
@@ -15,9 +16,6 @@ type CollectionFeedTask struct {
 
 func (c CollectionFeedTask) Handle(ctx context.Context, record persist.CollectionEventRecord) {
 	hub := sentryutil.SentryHubFromContext(ctx)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	saved, err := c.CollectionEventRepo.Add(ctx, record)
 	if err != nil {

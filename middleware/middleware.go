@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"net/http"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -243,7 +244,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 
 		if reportGinErrors {
 			for _, err := range c.Errors {
-				sentryutil.ReportError(c, err)
+				sentryutil.ReportError(c.Request.Context(), err)
 			}
 		}
 	}
@@ -252,6 +253,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 func Tracing() gin.HandlerFunc {
 	// Trace outgoing HTTP requests
 	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true)
+	http.DefaultClient = &http.Client{Transport: http.DefaultTransport}
 
 	return func(c *gin.Context) {
 		description := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)

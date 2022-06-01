@@ -338,7 +338,7 @@ func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id pers
 	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
 	for _, walletID := range pWalletIDs {
-		glryUser, err := userRepository.GetByWallet(ctx, walletID)
+		glryUser, err := userRepository.GetByWalletID(ctx, walletID)
 		if err != nil || glryUser.Username == "" {
 			logger.For(ctx).WithError(err).Errorf("Failed to get user for address %s", walletID)
 			continue
@@ -378,7 +378,7 @@ func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id
 			continue
 		}
 
-		glryUser, err := userRepository.GetByWallet(ctx, walletID)
+		glryUser, err := userRepository.GetByWalletID(ctx, walletID)
 		if err != nil || glryUser.Username == "" {
 			logger.For(ctx).WithError(err).Errorf("Failed to get user for walletID %s", walletID)
 			continue
