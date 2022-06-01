@@ -102,7 +102,7 @@ func userCreatedPost() *Post {
 		name: "UserCreated",
 		criteria: append(
 			baseCriteria,
-			isUserFollowedEvent,
+			isUserCreatedEvent,
 			userNoEventsBefore,
 		),
 		poster: &DiscordPoster{
