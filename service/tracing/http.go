@@ -2,9 +2,10 @@ package tracing
 
 import (
 	"fmt"
-	"github.com/getsentry/sentry-go"
 	"net/http"
 	"strings"
+
+	"github.com/getsentry/sentry-go"
 )
 
 type tracingTransport struct {
@@ -41,9 +42,11 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	response, err := t.RoundTripper.RoundTrip(req)
 
-	AddEventDataToSpan(span, map[string]interface{}{
-		"HTTP Status Code": response.StatusCode,
-	})
+	if err == nil {
+		AddEventDataToSpan(span, map[string]interface{}{
+			"HTTP Status Code": response.StatusCode,
+		})
+	}
 
 	return response, err
 }
