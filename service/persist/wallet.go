@@ -131,6 +131,7 @@ const (
 type WalletRepository interface {
 	GetByID(context.Context, DBID) (Wallet, error)
 	GetByChainAddress(context.Context, ChainAddress) (Wallet, error)
+	GetByUserID(context.Context, DBID) ([]Wallet, error)
 	Insert(context.Context, ChainAddress, WalletType) (DBID, error)
 }
 

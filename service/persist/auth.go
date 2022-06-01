@@ -50,17 +50,10 @@ type CreateLoginAttemptInput struct {
 	ReqHeaders     ReqHeaders `json:"req_headers"`
 }
 
-// CreateNonceInput is a type that holds the input for creating a nonce
-type CreateNonceInput struct {
-	Value   string  `json:"value"`
-	Address Address `json:"address"`
-	Chain   Chain   `json:"chain"`
-}
-
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, DBID) (UserNonce, error)
-	Create(context.Context, CreateNonceInput) error
+	Get(context.Context, ChainAddress) (UserNonce, error)
+	Create(context.Context, string, ChainAddress) error
 }
 
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
@@ -84,9 +77,9 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	Address DBID
+	ChainAddress ChainAddress
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {
-	return fmt.Sprintf("no nonce found for address: %v", e.Address)
+	return fmt.Sprintf("no nonce found for address: %v", e.ChainAddress)
 }
