@@ -196,7 +196,17 @@ func (n *Address) Scan(value interface{}) error {
 		*n = Address("")
 		return nil
 	}
-	*n = Address(value.(string))
+
+	asString, ok := value.(string)
+	if !ok {
+		asUint8Array, ok := value.([]uint8)
+		if !ok {
+			return fmt.Errorf("Address must be a string or []uint8")
+		}
+		asString = string(asUint8Array)
+	}
+
+	*n = Address(asString)
 	return nil
 }
 

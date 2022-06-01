@@ -34,27 +34,27 @@ func run() {
 
 	// Users migration
 
-	// if err := copyBack(pgClient); err != nil {
-	// 	panic(err)
-	// }
+	if err := copyBack(pgClient); err != nil {
+		panic(err)
+	}
 
-	// if err := copyUsersToTempTable(pgClient); err != nil {
-	// 	panic(err)
-	// }
+	if err := copyUsersToTempTable(pgClient); err != nil {
+		panic(err)
+	}
 
-	// logrus.Info("Getting all users wallets...")
-	// idsToAddresses, err := getAllUsersWallets(pgClient)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Getting all users wallets... Done")
-	// logrus.Infof("Found %d users", len(idsToAddresses))
+	logrus.Info("Getting all users wallets...")
+	idsToAddresses, err := getAllUsersWallets(pgClient)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Info("Getting all users wallets... Done")
+	logrus.Infof("Found %d users", len(idsToAddresses))
 
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users...")
-	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
+	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+		panic(err)
+	}
+	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	// NFTs migration
 
