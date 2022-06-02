@@ -56,7 +56,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT WALLETS FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE $1 = ANY(OWNED_BY_WALLETS) AND ID = $2 AND DELETED = false);`)
+	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE OWNED_BY_WALLETS && $1 AND ID = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	updateCollectionNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1;`)
