@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -90,7 +91,7 @@ type MergeUsersInput struct {
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryTokenRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
+	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -124,7 +125,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, userRepo
 		return "", "", err
 	}
 
-	galleryInsert := persist.GalleryTokenDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
 
 	galleryID, err = galleryRepo.Create(pCtx, galleryInsert)
 	if err != nil {

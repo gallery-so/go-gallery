@@ -122,7 +122,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Nothing to validate
-	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryTokenRepository)
+	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {

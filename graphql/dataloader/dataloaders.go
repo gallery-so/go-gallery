@@ -574,7 +574,7 @@ func loadTokenByTokenID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			tokens[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrNFTNotFoundByID{ID: tokenIDs[i]}
+				errors[i] = persist.ErrTokenNotFoundByID{ID: tokenIDs[i]}
 			}
 		})
 

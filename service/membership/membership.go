@@ -84,7 +84,7 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
@@ -106,7 +106,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 }
 
 // UpdateMembershipTierToken fetches all membership cards for a token ID
-func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	_, err := processCurrentTierToken(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
@@ -248,7 +248,7 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 	return tier, nil
 }
 
-func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
 	if err != nil {
@@ -360,7 +360,7 @@ func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id pers
 	return membershipOwner
 }
 
-func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryTokenRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
+func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
 	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
 	for _, walletID := range pWalletIDs {
@@ -400,7 +400,7 @@ func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id
 	return membershipOwner
 }
 
-func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryTokenRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),

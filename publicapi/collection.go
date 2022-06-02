@@ -81,7 +81,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
-	collection := persist.CollectionTokenDB{
+	collection := persist.CollectionDB{
 		OwnerUserID:    userID,
 		Tokens:         nfts,
 		Layout:         layout,
@@ -89,7 +89,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	collectionID, err := api.repos.CollectionTokenRepository.Create(ctx, collection)
+	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	err = api.repos.CollectionTokenRepository.Delete(ctx, collectionID, userID)
+	err = api.repos.CollectionRepository.Delete(ctx, collectionID, userID)
 	if err != nil {
 		return err
 	}
@@ -155,12 +155,12 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		return err
 	}
 
-	update := persist.CollectionTokenUpdateInfoInput{
+	update := persist.CollectionUpdateInfoInput{
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
 	}
 
-	err = api.repos.CollectionTokenRepository.Update(ctx, collectionID, userID, update)
+	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -193,9 +193,9 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionTokenUpdateTokensInput{Tokens: tokens, Layout: layout}
+	update := persist.CollectionUpdateTokensInput{Tokens: tokens, Layout: layout}
 
-	err = api.repos.CollectionTokenRepository.UpdateTokens(ctx, collectionID, userID, update)
+	err = api.repos.CollectionRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -223,9 +223,9 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionTokenUpdateHiddenInput{Hidden: persist.NullBool(hidden)}
+	update := persist.CollectionUpdateHiddenInput{Hidden: persist.NullBool(hidden)}
 
-	err = api.repos.CollectionTokenRepository.Update(ctx, collectionID, userID, update)
+	err = api.repos.CollectionRepository.Update(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
