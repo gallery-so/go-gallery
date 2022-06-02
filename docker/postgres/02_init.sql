@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS nonces (
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     USER_ID varchar(255),
     ADDRESS varchar(255),
+    CHAIN int,
     VALUE varchar(255)
 );
 
@@ -288,3 +289,5 @@ CREATE INDEX IF NOT EXISTS user_id_event_code_last_updated ON user_events (USER_
 CREATE INDEX IF NOT EXISTS user_id_nft_id_event_code_last_updated ON nft_events (USER_ID, NFT_ID, EVENT_CODE, LAST_UPDATED DESC);
 
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_last_updated ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, LAST_UPDATED DESC);
+
+CREATE INDEX IF NOT EXISTS token_owned_by_wallets_idx ON tokens USING GIN (OWNED_BY_WALLETS);
