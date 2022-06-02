@@ -169,7 +169,8 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 
 func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.TokenGallery, error) {
 	res := make([]persist.TokenGallery, len(tokens))
-	seen := make(map[persist.TokenIdentifiers][]persist.Wallet)
+	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
+	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
 	for _, wallet := range ownerUser.Wallets {
 		for _, addr := range ownerAddresses {
@@ -188,13 +189,20 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 		ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chain)
 
 		if w, ok := addressToWallets[strings.ToLower(token.OwnerAddress.String())]; ok {
-			if it, ok := seen[ti]; ok {
+			if it, ok := seenWallets[ti]; ok {
 				it = append(it, w)
-				seen[ti] = it
+				seenWallets[ti] = it
 
 			} else {
-				seen[ti] = []persist.Wallet{w}
+				seenWallets[ti] = []persist.Wallet{w}
 			}
+		}
+
+		if q, ok := seenQuantities[ti]; ok {
+			q = q.Add(token.Quantity)
+			seenQuantities[ti] = q
+		} else {
+			seenQuantities[ti] = token.Quantity
 		}
 
 		res[i] = persist.TokenGallery{
@@ -205,9 +213,9 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 			Description:      persist.NullString(token.Description),
 			TokenURI:         token.TokenURI,
 			TokenID:          token.TokenID,
-			Quantity:         token.Quantity,
+			Quantity:         seenQuantities[ti],
 			OwnerUserID:      ownerUser.ID,
-			OwnedByWallets:   seen[ti],
+			OwnedByWallets:   seenWallets[ti],
 			OwnershipHistory: ownership,
 			TokenMetadata:    token.TokenMetadata,
 			ContractAddress:  token.ContractAddress,

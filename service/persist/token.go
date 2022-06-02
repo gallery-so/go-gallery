@@ -505,6 +505,12 @@ func (hex HexString) BigInt() *big.Int {
 	return it
 }
 
+// Add adds the given hex string to the current hex string
+func (hex HexString) Add(new HexString) HexString {
+	asInt := hex.BigInt()
+	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
+}
+
 // Value implements the driver.Valuer interface for media
 func (m Media) Value() (driver.Value, error) {
 	return json.Marshal(m)
