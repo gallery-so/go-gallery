@@ -199,8 +199,7 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 		}
 
 		if q, ok := seenQuantities[ti]; ok {
-			q = q.Add(token.Quantity)
-			seenQuantities[ti] = q
+			seenQuantities[ti] = q.Add(token.Quantity)
 		} else {
 			seenQuantities[ti] = token.Quantity
 		}
