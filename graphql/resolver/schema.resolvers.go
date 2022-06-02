@@ -246,6 +246,26 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 	return output, nil
 }
 
+func (r *mutationResolver) UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Collection.UpdateCollectionHidden(ctx, input.CollectionID, input.Hidden)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateCollectionHiddenPayload{
+		Collection: collectionToModel(ctx, *collection),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
