@@ -404,7 +404,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 	uriType := asURI.Type()
 	switch uriType {
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
-		req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
+		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
 			return persist.MediaTypeUnknown, err
 		}

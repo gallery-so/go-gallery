@@ -380,7 +380,7 @@ func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
 func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
 	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
 
-	req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
+	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %s", err)
 	}
