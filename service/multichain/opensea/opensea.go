@@ -476,6 +476,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 			BlockNumber:     persist.BlockNumber(block),
 			TokenMetadata:   metadata,
 			Media:           med,
+			Quantity:        "1",
 		}
 		result[i] = token
 	}

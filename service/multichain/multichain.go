@@ -39,7 +39,6 @@ type ChainAgnosticToken struct {
 	OwnershipHistory []ChainAgnosticAddressAtBlock `json:"previous_owners"`
 	TokenMetadata    persist.TokenMetadata         `json:"metadata"`
 	ContractAddress  persist.Address               `json:"contract_address"`
-	CollectionName   string                        `json:"collection_name"`
 
 	ExternalURL string `json:"external_url"`
 

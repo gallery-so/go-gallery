@@ -674,7 +674,7 @@ func getHtmlMedia(media persist.Media) model.HTMLMedia {
 	return model.HTMLMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
