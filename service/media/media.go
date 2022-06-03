@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -376,7 +377,7 @@ outer:
 
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 	case persist.MediaTypeUnknown:
-		mediaType = guessMediaType(bs)
+		mediaType = GuessMediaType(bs)
 		fallthrough
 	default:
 		switch asURI.Type() {
@@ -401,7 +402,8 @@ func PredictMediaType(pCtx context.Context, url string) (mediaType persist.Media
 	}
 	asURI := persist.TokenURI(url)
 	uriType := asURI.Type()
-	if uriType == persist.URITypeHTTP {
+	switch uriType {
+	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
 		if err != nil {
 			return persist.MediaTypeUnknown
@@ -415,31 +417,54 @@ func PredictMediaType(pCtx context.Context, url string) (mediaType persist.Media
 			return persist.MediaTypeUnknown
 		}
 		return persist.MediaFromContentType(contentType)
+	case persist.URITypeIPFS:
+		path := strings.TrimPrefix(asURI.String(), "ipfs://")
+		headers, err := rpc.GetIPFSHeaders(pCtx, path)
+		if err != nil {
+			return persist.MediaTypeUnknown
+		}
+		contentType := headers.Get("Content-Type")
+		if contentType == "" {
+			return persist.MediaTypeUnknown
+		}
+		return persist.MediaFromContentType(contentType)
 	}
 	return persist.MediaTypeUnknown
 }
-func guessMediaType(bs []byte) persist.MediaType {
 
-	copy := bytes.NewBuffer(bs)
+// GuessMediaType guesses the media type of the given bytes.
+func GuessMediaType(bs []byte) persist.MediaType {
+
+	cpy := make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff := bytes.NewBuffer(cpy)
 	var doc gltf.Document
-	if err := gltf.NewDecoder(copy).Decode(&doc); err != nil {
+	if err := gltf.NewDecoder(cpyBuff).Decode(&doc); err == nil {
 		return persist.MediaTypeAnimation
 	}
-	copy = bytes.NewBuffer(bs)
-	if _, err := gif.Decode(copy); err == nil {
+	cpy = make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff = bytes.NewBuffer(cpy)
+	if _, err := gif.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeGIF
 	}
-	copy = bytes.NewBuffer(bs)
-	if _, _, err := image.Decode(copy); err == nil {
+	cpy = make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff = bytes.NewBuffer(cpy)
+	if _, _, err := image.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeImage
 	}
-	copy = bytes.NewBuffer(bs)
-	if _, err := png.Decode(copy); err == nil {
+	cpy = make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff = bytes.NewBuffer(cpy)
+	if _, err := png.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeImage
 
 	}
-	copy = bytes.NewBuffer(bs)
-	if _, err := jpeg.Decode(copy); err == nil {
+	cpy = make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff = bytes.NewBuffer(cpy)
+	if _, err := jpeg.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeImage
 	}
 	return persist.MediaTypeUnknown

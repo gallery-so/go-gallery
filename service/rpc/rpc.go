@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"io"
 	"math/big"
 	"net"
@@ -16,6 +14,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -166,7 +167,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 				defer cancel()
 				ctx = c
 			}
-			bs, nextErr := getIPFSAPI(ctx, path)
+			bs, nextErr := GetIPFSData(ctx, path)
 			if nextErr == nil {
 				return removeBOM(bs), nil
 			}
@@ -183,7 +184,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 				defer cancel()
 				ctx = c
 			}
-			bs, nextErr := getIPFSAPI(ctx, path)
+			bs, nextErr := GetIPFSData(ctx, path)
 			if nextErr == nil {
 				return removeBOM(bs), nil
 			}
@@ -194,7 +195,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
-		return getArweaveData(arweaveClient, path)
+		return GetArweaveData(arweaveClient, path)
 	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
@@ -286,7 +287,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 				defer cancel()
 				ctx = c
 			}
-			bs, nextErr := getIPFSAPI(ctx, path)
+			bs, nextErr := GetIPFSData(ctx, path)
 			if nextErr == nil {
 				return json.Unmarshal(bs, into)
 			}
@@ -298,7 +299,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
-		result, err := getArweaveData(arweaveClient, path)
+		result, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
 			return err
 		}
@@ -350,8 +351,8 @@ func removeBOM(bs []byte) []byte {
 	return bs
 }
 
-func getIPFSAPI(pCtx context.Context, hash string) ([]byte, error) {
-	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", hash)
+func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
+	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
@@ -373,6 +374,26 @@ func getIPFSAPI(pCtx context.Context, hash string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// GetIPFSHeaders returns the headers for the given IPFS hash
+func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
+	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+
+	req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %s", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data from http: %s", err)
+	}
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+	}
+	defer resp.Body.Close()
+
+	return resp.Header, nil
 }
 
 // GetTokenURI returns metadata URI for a given token address.
@@ -492,7 +513,8 @@ func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAdd
 	return "", fmt.Errorf("could not find contract creator")
 }
 
-func getArweaveData(client *goar.Client, id string) ([]byte, error) {
+// GetArweaveData returns the data from an Arweave transaction
+func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
 	tx, err := client.GetTransactionByID(id)
 	if err != nil {
 		return nil, err
@@ -532,6 +554,29 @@ func getArweaveData(client *goar.Client, id string) ([]byte, error) {
 		}
 	}
 	return removeBOM(data), nil
+}
+
+// GetArweaveContentType returns the content-type from an Arweave transaction
+func GetArweaveContentType(client *goar.Client, id string) (string, error) {
+	data, err := client.GetTransactionTags(id)
+	if err != nil {
+		return "", err
+	}
+
+	for _, tag := range data {
+		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
+		if err != nil {
+			return "", err
+		}
+		if strings.EqualFold(string(decodedName), "Content-Encoding") || strings.EqualFold(string(decodedName), "Content-Type") {
+			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
+			if err != nil {
+				return "", err
+			}
+			return string(decodedValue), nil
+		}
+	}
+	return "", nil
 }
 
 func padHex(pHex string, pLength int) string {

@@ -555,9 +555,17 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 		case nft.AnimationURL != "":
 			med.MediaURL = persist.NullString(nft.AnimationURL)
 			med.MediaType = media.PredictMediaType(ctx, nft.AnimationURL)
+		case nft.AnimationOriginalURL != "":
+			med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
+
 		case nft.ImageURL != "":
 			med.MediaURL = persist.NullString(nft.ImageURL)
 			med.MediaType = media.PredictMediaType(ctx, nft.ImageURL)
+		case nft.ImageOriginalURL != "":
+			med.MediaURL = persist.NullString(nft.ImageOriginalURL)
+			med.MediaType = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+
 		default:
 			med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
 			med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
