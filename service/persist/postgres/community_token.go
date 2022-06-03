@@ -80,8 +80,6 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	}
 
 	hasDescription := true
-
-	// TODO-EZRA: I think this is actually "wallets" now
 	walletIDs := make([]persist.DBID, 0, 20)
 
 	rows, err := c.getInfoStmt.QueryContext(ctx, pCommunityAddress.Address())

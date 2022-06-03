@@ -40,7 +40,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*sqlc.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"chainAddress.Address": {chainAddress.Address(), "required"},
+		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
 		return nil, err
 	}

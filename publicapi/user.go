@@ -76,8 +76,8 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"chainAddress.Address": {chainAddress.Address(), "required"},
-		"authenticator":        {authenticator, "required"},
+		"chainAddress":  {chainAddress, "required"},
+		"authenticator": {authenticator, "required"},
 	}); err != nil {
 		return err
 	}
@@ -87,8 +87,6 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	// TODO: Is this the correct method? Seems like it may be more appropriate than the AddAddressToUserToken method.
-	// TODO: We need a wallet type here...or maybe it just comes from the authenticator now?
 	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
 	if err != nil {
 		return err
@@ -180,7 +178,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*persist.Community, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"contractAddress.Address": {contractAddress.Address(), "required"},
+		"contractAddress": {contractAddress, "required"},
 	}); err != nil {
 		return nil, err
 	}
