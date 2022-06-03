@@ -103,7 +103,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"tokenID":        {tokenID, "required"},
-		"collectorsNote": {collectorsNote, "nft_note"},
+		"collectorsNote": {collectorsNote, "token_note"},
 	}); err != nil {
 		return err
 	}

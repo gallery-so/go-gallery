@@ -487,23 +487,20 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
 	contractAddress := persist.NewChainAddress(persist.Address(token.ContractAddress.String), chain)
-	//openseaID := int(token.OpenseaID.Int64)
 
 	return &model.Token{
-		Dbid:           token.ID,
-		CreationTime:   &token.CreatedAt,
-		LastUpdated:    &token.LastUpdated,
-		CollectorsNote: &token.CollectorsNote.String,
-		Media:          getMediaForToken(token),
-		TokenType:      nil, // TODO: later
-		Chain:          &chain,
-		Name:           &token.Name.String,
-		Description:    &token.Description.String,
-		OwnedByWallets: nil, // handled by dedicated resolver
-		TokenURI:       nil, // TODO: later
-		TokenID:        &token.TokenID.String,
-		// TODO-EZRA: Does the frontend have something that can replace this?
-		//OpenseaID:        &openseaID,
+		Dbid:             token.ID,
+		CreationTime:     &token.CreatedAt,
+		LastUpdated:      &token.LastUpdated,
+		CollectorsNote:   &token.CollectorsNote.String,
+		Media:            getMediaForToken(token),
+		TokenType:        nil, // TODO: later
+		Chain:            &chain,
+		Name:             &token.Name.String,
+		Description:      &token.Description.String,
+		OwnedByWallets:   nil, // handled by dedicated resolver
+		TokenURI:         nil, // TODO: later
+		TokenID:          &token.TokenID.String,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
