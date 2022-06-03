@@ -14,11 +14,11 @@ const (
 	MAX_WHITESPACE  = 1000
 )
 
-// CollectionTokenDB is the struct that represents a collection of tokens in the database
-// CollectionTokenDB will not store the tokens by value but instead by ID creating a join relationship
+// CollectionDB is the struct that represents a collection of tokens in the database
+// CollectionDB will not store the tokens by value but instead by ID creating a join relationship
 // between collections and tokens
 // This struct will only be used when updating or querying the database
-type CollectionTokenDB struct {
+type CollectionDB struct {
 	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
@@ -36,11 +36,11 @@ type CollectionTokenDB struct {
 	Hidden NullBool `json:"hidden"`
 }
 
-// CollectionToken represents a collection of NFTs in the application. CollectionToken will contain
+// Collection represents a collection of NFTs in the application. Collection will contain
 // the value of each NFT represented as a struct as opposed to just the ID of the NFT
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
-type CollectionToken struct {
+type Collection struct {
 	Version      NullInt32       `json:"version"` // schema version for this model
 	ID           DBID            `json:"id" binding:"required"`
 	CreationTime CreationTime    `json:"created_at"`
@@ -65,47 +65,47 @@ type TokenLayout struct {
 	// Padding         int   `bson:"padding" json:"padding"`
 }
 
-// CollectionTokenUpdateInfoInput represents the data that will be changed when updating a collection's metadata
-type CollectionTokenUpdateInfoInput struct {
+// CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
+type CollectionUpdateInfoInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Name           NullString `json:"name"`
 	CollectorsNote NullString `json:"collectors_note"`
 }
 
-// CollectionTokenUpdateTokensInput represents the data that will be changed when updating a collection's NFTs
-type CollectionTokenUpdateTokensInput struct {
+// CollectionUpdateTokensInput represents the data that will be changed when updating a collection's NFTs
+type CollectionUpdateTokensInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Tokens []DBID      `json:"tokens"`
 	Layout TokenLayout `json:"layout"`
 }
 
-// CollectionTokenUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
-type CollectionTokenUpdateHiddenInput struct {
+// CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
+type CollectionUpdateHiddenInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Hidden NullBool `json:"hidden"`
 }
 
-// CollectionTokenUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
-type CollectionTokenUpdateDeletedInput struct {
+// CollectionUpdateDeletedInput represents the data that will be changed when updating a collection's deleted status
+type CollectionUpdateDeletedInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Deleted NullBool `json:"-"`
 }
 
-// CollectionTokenRepository represents the interface for interacting with the collection persistence layer
-type CollectionTokenRepository interface {
-	Create(context.Context, CollectionTokenDB) (DBID, error)
-	GetByUserID(context.Context, DBID) ([]CollectionToken, error)
-	GetByID(context.Context, DBID) (CollectionToken, error)
+// CollectionRepository represents the interface for interacting with the collection persistence layer
+type CollectionRepository interface {
+	Create(context.Context, CollectionDB) (DBID, error)
+	GetByUserID(context.Context, DBID) ([]Collection, error)
+	GetByID(context.Context, DBID) (Collection, error)
 	Update(context.Context, DBID, DBID, interface{}) error
-	UpdateTokens(context.Context, DBID, DBID, CollectionTokenUpdateTokensInput) error
+	UpdateTokens(context.Context, DBID, DBID, CollectionUpdateTokensInput) error
 	UpdateUnsafe(context.Context, DBID, interface{}) error
-	UpdateNFTsUnsafe(context.Context, DBID, CollectionTokenUpdateTokensInput) error
+	UpdateNFTsUnsafe(context.Context, DBID, CollectionUpdateTokensInput) error
 	// TODO move this to package multichain
-	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionTokenUpdateTokensInput) error
+	ClaimNFTs(context.Context, DBID, []EthereumAddress, CollectionUpdateTokensInput) error
 	RemoveNFTsOfOldAddresses(context.Context, DBID) error
 	// TODO move this to package multichain
 	RemoveNFTsOfAddresses(context.Context, DBID, []EthereumAddress) error

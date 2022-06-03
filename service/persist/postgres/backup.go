@@ -56,7 +56,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT WALLETS FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = $2 AND DELETED = false);`)
+	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE OWNED_BY_WALLETS && $1 AND ID = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	updateCollectionNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1;`)
@@ -65,7 +65,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $2 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	undeleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET DELETED = false WHERE ID = $1;`)
+	undeleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = false WHERE ID = $1;`)
 	checkNoErr(err)
 
 	return &BackupRepository{
@@ -87,7 +87,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 }
 
 // Insert inserts a new backup of a gallery into the database and ensures that old backups are removed
-func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.GalleryToken) error {
+func (b *BackupRepository) Insert(pCtx context.Context, pGallery persist.Gallery) error {
 	res, err := b.getCurrentBackupsStmt.QueryContext(pCtx, pGallery.ID)
 	if err != nil {
 		return err

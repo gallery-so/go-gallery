@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -85,7 +86,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 
 	update := persist.GalleryTokenUpdateInput{Collections: collections}
 
-	err = api.repos.GalleryTokenRepository.Update(ctx, galleryID, userID, update)
+	err = api.repos.GalleryRepository.Update(ctx, galleryID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -101,7 +102,7 @@ func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *per
 
 	// TODO: Make sure backups still work here with our gin context retrieval
 	go func(ctx context.Context) {
-		galleries, err := repos.GalleryTokenRepository.GetByUserID(ctx, userID)
+		galleries, err := repos.GalleryRepository.GetByUserID(ctx, userID)
 		if err != nil {
 			return
 		}

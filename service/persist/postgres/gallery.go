@@ -5,13 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+const galleryCacheTime = time.Hour * 24 * 3
 
 var errCollsNotOwnedByUser = errors.New("collections not owned by user")
 
@@ -96,7 +99,7 @@ func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenR
 }
 
 // Create creates a new gallery
-func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.GalleryTokenDB) (persist.DBID, error) {
+func (g *GalleryTokenRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
 
 	err := ensureCollsOwnedByUserToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
 	if err != nil {
@@ -239,11 +242,11 @@ func (g *GalleryTokenRepository) AddCollections(pCtx context.Context, pID persis
 }
 
 // GetByUserID returns the galleries owned by the given userID
-func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.GalleryToken, error) {
+func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Gallery, error) {
 	if g.galleriesCache != nil {
 		initial, _ := g.galleriesCache.Get(pCtx, pUserID.String())
 		if len(initial) > 0 {
-			var galleries []persist.GalleryToken
+			var galleries []persist.Gallery
 			err := json.Unmarshal(initial, &galleries)
 			if err != nil {
 				logger.For(pCtx).WithError(err).Errorf("failed to unmarshal galleries cache for userID %s - cached: %s", pUserID, string(initial))
@@ -258,12 +261,12 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 	}
 	defer rows.Close()
 
-	galleries := make(map[persist.DBID]persist.GalleryToken)
-	collections := make(map[persist.DBID][]persist.CollectionToken)
-	var gallery persist.GalleryToken
+	galleries := make(map[persist.DBID]persist.Gallery)
+	collections := make(map[persist.DBID][]persist.Collection)
+	var gallery persist.Gallery
 	var lastCollID persist.DBID
 	for rows.Next() {
-		var collection persist.CollectionToken
+		var collection persist.Collection
 		var nft persist.TokenInCollection
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
@@ -282,7 +285,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
-			colls = make([]persist.CollectionToken, 0, 10)
+			colls = make([]persist.Collection, 0, 10)
 
 		}
 		if lastCollID != collection.ID {
@@ -305,7 +308,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		return nil, err
 	}
 
-	result := make([]persist.GalleryToken, 0, len(galleries))
+	result := make([]persist.Gallery, 0, len(galleries))
 
 	if len(galleries) == 0 {
 		galleriesRaw, err := g.getByUserIDRawStmt.QueryContext(pCtx, pUserID)
@@ -314,12 +317,12 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 		}
 		defer galleriesRaw.Close()
 		for galleriesRaw.Next() {
-			var rawGallery persist.GalleryToken
+			var rawGallery persist.Gallery
 			err := galleriesRaw.Scan(&rawGallery.ID, &rawGallery.Version, &rawGallery.OwnerUserID, &rawGallery.CreationTime, &rawGallery.LastUpdated)
 			if err != nil {
 				return nil, err
 			}
-			rawGallery.Collections = []persist.CollectionToken{}
+			rawGallery.Collections = []persist.Collection{}
 			result = append(result, rawGallery)
 		}
 		if err := galleriesRaw.Err(); err != nil {
@@ -330,7 +333,7 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
-		gallery.Collections = make([]persist.CollectionToken, 0, len(collections))
+		gallery.Collections = make([]persist.Collection, 0, len(collections))
 		for _, coll := range collections {
 			if coll.ID == "" {
 				continue
@@ -354,19 +357,19 @@ func (g *GalleryTokenRepository) GetByUserID(pCtx context.Context, pUserID persi
 }
 
 // GetByID returns the gallery with the given ID
-func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.GalleryToken, error) {
+func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Gallery, error) {
 	rows, err := g.getByIDStmt.QueryContext(pCtx, pID)
 	if err != nil {
-		return persist.GalleryToken{}, err
+		return persist.Gallery{}, err
 	}
 	defer rows.Close()
 
-	galleries := make(map[persist.DBID]persist.GalleryToken)
-	collections := make(map[persist.DBID][]persist.CollectionToken)
-	var gallery persist.GalleryToken
+	galleries := make(map[persist.DBID]persist.Gallery)
+	collections := make(map[persist.DBID][]persist.Collection)
+	var gallery persist.Gallery
 	var lastCollID persist.DBID
 	for rows.Next() {
-		var collection persist.CollectionToken
+		var collection persist.Collection
 		var nft persist.TokenInCollection
 
 		err := rows.Scan(&gallery.ID, &gallery.Version, &gallery.OwnerUserID, &gallery.CreationTime, &gallery.LastUpdated,
@@ -374,7 +377,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 			&collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress,
 			&nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
-			return persist.GalleryToken{}, err
+			return persist.Gallery{}, err
 		}
 		if _, ok := galleries[gallery.ID]; !ok {
 			galleries[gallery.ID] = gallery
@@ -385,7 +388,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		}
 		colls, ok := collections[gallery.ID]
 		if !ok {
-			colls = make([]persist.CollectionToken, 0, 10)
+			colls = make([]persist.Collection, 0, 10)
 
 		}
 		if lastCollID != collection.ID {
@@ -406,28 +409,28 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		lastCollID = collection.ID
 	}
 	if err := rows.Err(); err != nil {
-		return persist.GalleryToken{}, err
+		return persist.Gallery{}, err
 	}
 
 	if len(galleries) > 1 {
-		return persist.GalleryToken{}, errors.New("too many galleries")
+		return persist.Gallery{}, errors.New("too many galleries")
 	}
 
 	if len(galleries) == 0 {
-		res := persist.GalleryToken{Collections: []persist.CollectionToken{}}
+		res := persist.Gallery{Collections: []persist.Collection{}}
 		err := g.getByUserIDRawStmt.QueryRowContext(pCtx, pID).Scan(&res.ID, &res.Version, &res.OwnerUserID, &res.CreationTime, &res.LastUpdated)
 		if err != nil {
-			return persist.GalleryToken{}, err
+			return persist.Gallery{}, err
 		}
 		if res.ID != pID {
-			return persist.GalleryToken{}, persist.ErrGalleryNotFoundByID{ID: pID}
+			return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
 		}
 		return res, nil
 	}
 
 	for _, gallery := range galleries {
 		collections := collections[gallery.ID]
-		gallery.Collections = make([]persist.CollectionToken, 0, len(collections))
+		gallery.Collections = make([]persist.Collection, 0, len(collections))
 		for _, coll := range collections {
 			if coll.ID == "" {
 				continue
@@ -436,7 +439,7 @@ func (g *GalleryTokenRepository) GetByID(pCtx context.Context, pID persist.DBID)
 		}
 		return gallery, nil
 	}
-	return persist.GalleryToken{}, persist.ErrGalleryNotFoundByID{ID: pID}
+	return persist.Gallery{}, persist.ErrGalleryNotFoundByID{ID: pID}
 }
 
 // RefreshCache deletes the given key in the cache

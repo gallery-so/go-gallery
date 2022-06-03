@@ -18,7 +18,7 @@ type Backup struct {
 
 // BackupRepository is the interface for interacting with backed up versions of galleries
 type BackupRepository interface {
-	Insert(context.Context, GalleryToken) error
+	Insert(context.Context, Gallery) error
 	Get(context.Context, DBID) ([]Backup, error)
 	Restore(context.Context, DBID, DBID) error
 }

@@ -22,38 +22,6 @@ CREATE TABLE IF NOT EXISTS galleries (
     COLLECTIONS varchar(255) []
 );
 
-CREATE TABLE IF NOT EXISTS nfts (
-    ID varchar(255) PRIMARY KEY,
-    DELETED boolean NOT NULL DEFAULT false,
-    VERSION int,
-    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    NAME varchar,
-    DESCRIPTION varchar,
-    COLLECTORS_NOTE varchar,
-    EXTERNAL_URL varchar,
-    CREATOR_ADDRESS varchar(255),
-    CREATOR_NAME varchar,
-    OWNER_ADDRESS varchar(255),
-    MULTIPLE_OWNERS boolean,
-    CONTRACT jsonb,
-    OPENSEA_ID bigint,
-    OPENSEA_TOKEN_ID varchar(255),
-    TOKEN_COLLECTION_NAME varchar,
-    IMAGE_URL varchar,
-    IMAGE_THUMBNAIL_URL varchar,
-    IMAGE_PREVIEW_URL varchar,
-    IMAGE_ORIGINAL_URL varchar,
-    ANIMATION_URL varchar,
-    ANIMATION_ORIGINAL_URL varchar,
-    ACQUISITION_DATE varchar,
-    TOKEN_METADATA_URL varchar
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS opensea_id_owner_address_inx ON nfts (OPENSEA_ID, OWNER_ADDRESS)
-WHERE
-    NOT DELETED;
-
 CREATE TABLE IF NOT EXISTS collections (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
@@ -224,6 +192,7 @@ CREATE TABLE IF NOT EXISTS user_events (
     EVENT_CODE int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    SENT bool DEFAULT NULL,
     DATA JSONB
 );
 
@@ -237,6 +206,7 @@ CREATE TABLE IF NOT EXISTS nft_events (
     EVENT_CODE int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    SENT bool DEFAULT NULL,
     DATA JSONB
 );
 
@@ -250,6 +220,7 @@ CREATE TABLE IF NOT EXISTS collection_events (
     EVENT_CODE int,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    SENT bool DEFAULT NULL,
     DATA JSONB
 );
 
@@ -273,7 +244,9 @@ CREATE TABLE IF NOT EXISTS follows (
     FOLLOWER varchar(255) NOT NULL REFERENCES users (ID),
     FOLLOWEE varchar(255) NOT NULL REFERENCES users (ID),
     DELETED bool NOT NULL DEFAULT false,
-    UNIQUE (FOLLOWER, FOLLOWEE)
+    UNIQUE (FOLLOWER, FOLLOWEE),
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows (FOLLOWER);
@@ -281,8 +254,6 @@ CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows (FOLLOWER);
 CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (FOLLOWEE);
 
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_created_at ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, CREATED_AT);
-
-CREATE INDEX IF NOT EXISTS nfts_owner_address_idx ON nfts(owner_address);
 
 CREATE INDEX IF NOT EXISTS user_id_event_code_last_updated ON user_events (USER_ID, EVENT_CODE, LAST_UPDATED DESC);
 

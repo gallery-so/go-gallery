@@ -129,21 +129,16 @@ func setDefaults() {
 }
 
 func newRepos(db *sql.DB) *persist.Repositories {
-	galleriesCache := redis.NewCache(0)
 	galleriesCacheToken := redis.NewCache(1)
-	galleryRepo := postgres.NewGalleryRepository(db, galleriesCache)
 	galleryTokenRepo := postgres.NewGalleryTokenRepository(db, galleriesCacheToken)
 
 	return &persist.Repositories{
 		UserRepository:            postgres.NewUserRepository(db),
 		NonceRepository:           postgres.NewNonceRepository(db),
 		LoginRepository:           postgres.NewLoginRepository(db),
-		NftRepository:             postgres.NewNFTRepository(db, galleryRepo),
 		TokenRepository:           postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:      postgres.NewCollectionRepository(db, galleryRepo),
-		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:         galleryRepo,
-		GalleryTokenRepository:    galleryTokenRepo,
+		CollectionRepository:      postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		GalleryRepository:         galleryTokenRepo,
 		ContractRepository:        postgres.NewContractGalleryRepository(db),
 		BackupRepository:          postgres.NewBackupRepository(db),
 		MembershipRepository:      postgres.NewMembershipRepository(db),

@@ -58,12 +58,9 @@ type Repositories struct {
 	UserRepository            UserRepository
 	NonceRepository           NonceRepository
 	LoginRepository           LoginAttemptRepository
-	NftRepository             NFTRepository
 	TokenRepository           TokenGalleryRepository
 	CollectionRepository      CollectionRepository
-	CollectionTokenRepository CollectionTokenRepository
 	GalleryRepository         GalleryRepository
-	GalleryTokenRepository    GalleryTokenRepository
 	ContractRepository        ContractGalleryRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
