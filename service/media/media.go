@@ -408,23 +408,14 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 		if err != nil {
 			return persist.MediaTypeUnknown, err
 		}
-		headers, err := http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return persist.MediaTypeUnknown, err
 		}
-		contentType := headers.Header.Get("Content-Type")
+		contentType := resp.Header.Get("Content-Type")
 		if contentType == "" {
-			fullReq, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
-			if err != nil {
-				return persist.MediaTypeUnknown, err
-			}
-			fullResp, err := http.DefaultClient.Do(fullReq)
-			if err != nil {
-				return persist.MediaTypeUnknown, err
-			}
-			defer fullResp.Body.Close()
 			bs := &bytes.Buffer{}
-			err = util.CopyMax(bs, fullResp.Body, 1024*1024*1024)
+			err = util.CopyMax(bs, resp.Body, 1024*1024*1024)
 			if err != nil {
 				return persist.MediaTypeUnknown, err
 			}
