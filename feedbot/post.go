@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
@@ -24,7 +25,7 @@ type DiscordPoster struct {
 }
 
 func (d *DiscordPoster) Send(ctx context.Context, q Query) error {
-	content := d.render(q)
+	content := html.UnescapeString(d.render(q))
 
 	message, err := json.Marshal(map[string]interface{}{
 		"content": content,
