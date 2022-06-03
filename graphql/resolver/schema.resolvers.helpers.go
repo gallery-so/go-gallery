@@ -613,7 +613,7 @@ func getImageMedia(media persist.Media) model.ImageMedia {
 	return model.ImageMedia{
 		PreviewURLs:       getPreviewUrls(media),
 		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:         nil,
+		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &imageUrls,
 	}
 }
@@ -648,7 +648,7 @@ func getVideoMedia(media persist.Media) model.VideoMedia {
 	return model.VideoMedia{
 		PreviewURLs:       getPreviewUrls(media),
 		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:         nil,
+		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
 	}
 }
@@ -657,7 +657,7 @@ func getAudioMedia(media persist.Media) model.AudioMedia {
 	return model.AudioMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -666,7 +666,7 @@ func getTextMedia(media persist.Media) model.TextMedia {
 	return model.TextMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -684,7 +684,7 @@ func getJsonMedia(media persist.Media) model.JSONMedia {
 	return model.JSONMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -693,7 +693,7 @@ func getGltfMedia(media persist.Media) model.GltfMedia {
 	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -702,7 +702,7 @@ func getUnknownMedia(media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -711,7 +711,7 @@ func getInvalidMedia(media persist.Media) model.InvalidMedia {
 	return model.InvalidMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
