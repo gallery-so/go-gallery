@@ -299,7 +299,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 		return persist.MediaTypeSVG, nil
 	}
 
-	mediaType := PredictMediaType(pCtx, url)
+	mediaType, _ := PredictMediaType(pCtx, url)
 
 	logger.For(pCtx).Infof("predicting media type for %s: %s", name, mediaType)
 
@@ -391,13 +391,13 @@ outer:
 }
 
 // PredictMediaType guesses the media type of the given URL.
-func PredictMediaType(pCtx context.Context, url string) (mediaType persist.MediaType) {
+func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, error) {
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
 		ext = strings.Split(ext, "?")[0]
 		if t, ok := postfixesToMediaTypes[ext]; ok {
-			return t
+			return t, nil
 		}
 	}
 	asURI := persist.TokenURI(url)
@@ -406,30 +406,48 @@ func PredictMediaType(pCtx context.Context, url string) (mediaType persist.Media
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		req, err := http.NewRequestWithContext(pCtx, "HEAD", url, nil)
 		if err != nil {
-			return persist.MediaTypeUnknown
+			return persist.MediaTypeUnknown, err
 		}
 		headers, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return persist.MediaTypeUnknown
+			return persist.MediaTypeUnknown, err
 		}
 		contentType := headers.Header.Get("Content-Type")
 		if contentType == "" {
-			return persist.MediaTypeUnknown
+			fullReq, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+			if err != nil {
+				return persist.MediaTypeUnknown, err
+			}
+			fullResp, err := http.DefaultClient.Do(fullReq)
+			if err != nil {
+				return persist.MediaTypeUnknown, err
+			}
+			defer fullResp.Body.Close()
+			bs := &bytes.Buffer{}
+			err = util.CopyMax(bs, fullResp.Body, 1024*1024*1024)
+			if err != nil {
+				return persist.MediaTypeUnknown, err
+			}
+			return GuessMediaType(bs.Bytes()), nil
 		}
-		return persist.MediaFromContentType(contentType)
+		return persist.MediaFromContentType(contentType), nil
 	case persist.URITypeIPFS:
 		path := strings.TrimPrefix(asURI.String(), "ipfs://")
 		headers, err := rpc.GetIPFSHeaders(pCtx, path)
 		if err != nil {
-			return persist.MediaTypeUnknown
+			return persist.MediaTypeUnknown, err
 		}
 		contentType := headers.Get("Content-Type")
 		if contentType == "" {
-			return persist.MediaTypeUnknown
+			data, err := rpc.GetIPFSData(pCtx, path)
+			if err != nil {
+				return persist.MediaTypeUnknown, err
+			}
+			return GuessMediaType(data), nil
 		}
-		return persist.MediaFromContentType(contentType)
+		return persist.MediaFromContentType(contentType), nil
 	}
-	return persist.MediaTypeUnknown
+	return persist.MediaTypeUnknown, nil
 }
 
 // GuessMediaType guesses the media type of the given bytes.

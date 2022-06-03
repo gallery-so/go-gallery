@@ -554,21 +554,39 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 		switch {
 		case nft.AnimationURL != "":
 			med.MediaURL = persist.NullString(nft.AnimationURL)
-			med.MediaType = media.PredictMediaType(ctx, nft.AnimationURL)
+			med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
+			if err != nil {
+				logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationURL, err)
+			}
 		case nft.AnimationOriginalURL != "":
 			med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-			med.MediaType = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
+			med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
 
+			if err != nil {
+				logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationOriginalURL, err)
+			}
 		case nft.ImageURL != "":
 			med.MediaURL = persist.NullString(nft.ImageURL)
-			med.MediaType = media.PredictMediaType(ctx, nft.ImageURL)
+			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
+
+			if err != nil {
+				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageURL, err)
+			}
 		case nft.ImageOriginalURL != "":
 			med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-			med.MediaType = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+
+			if err != nil {
+				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageOriginalURL, err)
+			}
 
 		default:
 			med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-			med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+
+			if err != nil {
+				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
+			}
 		}
 
 		token := multichain.ChainAgnosticToken{
