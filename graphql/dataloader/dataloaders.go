@@ -176,6 +176,8 @@ func (l *Loaders) ClearAllCaches() {
 	l.ClearTokenCaches()
 	l.ClearMembershipCaches()
 	l.ClearFollowCaches()
+	l.ClearWalletCaches()
+	l.ClearContractCaches()
 }
 
 func (l *Loaders) ClearUserCaches() {
@@ -224,6 +226,10 @@ func (l *Loaders) ClearTokenCaches() {
 	l.TokensByWalletID.mu.Lock()
 	l.TokensByWalletID.cache = nil
 	l.TokensByWalletID.mu.Unlock()
+
+	l.TokensByUserID.mu.Lock()
+	l.TokensByUserID.cache = nil
+	l.TokensByUserID.mu.Unlock()
 }
 
 func (l *Loaders) ClearMembershipCaches() {
@@ -240,6 +246,30 @@ func (l *Loaders) ClearFollowCaches() {
 	l.FollowingByUserId.mu.Lock()
 	l.FollowingByUserId.cache = nil
 	l.FollowingByUserId.mu.Unlock()
+}
+
+func (l *Loaders) ClearWalletCaches() {
+	l.WalletByWalletId.mu.Lock()
+	l.WalletByWalletId.cache = nil
+	l.WalletByWalletId.mu.Unlock()
+
+	l.WalletByChainAddress.mu.Lock()
+	l.WalletByChainAddress.cache = nil
+	l.WalletByChainAddress.mu.Unlock()
+
+	l.WalletsByUserID.mu.Lock()
+	l.WalletsByUserID.cache = nil
+	l.WalletsByUserID.mu.Unlock()
+}
+
+func (l *Loaders) ClearContractCaches() {
+	l.ContractByContractId.mu.Lock()
+	l.ContractByContractId.cache = nil
+	l.ContractByContractId.mu.Unlock()
+
+	l.ContractByChainAddress.mu.Lock()
+	l.ContractByChainAddress.cache = nil
+	l.ContractByChainAddress.mu.Unlock()
 }
 
 func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
