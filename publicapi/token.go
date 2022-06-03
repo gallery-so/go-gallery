@@ -81,6 +81,22 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByUserID.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
 func (api TokenAPI) RefreshTokens(ctx context.Context) error {
 	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
