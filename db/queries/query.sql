@@ -117,3 +117,10 @@ SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;
 
 -- name: GetTokensByWalletIdsBatch :batchmany
 SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;
+
+-- name: GetTokensByUserId :many
+SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
+
+-- name: GetTokensByUserIdBatch :batchmany
+SELECT * FROM tokens WHERE owner_user_id = $1 AND deleted = false;
+

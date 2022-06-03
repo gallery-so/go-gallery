@@ -53,6 +53,12 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
+
+    # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
+    # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
+    # that appears in more than one of the user's wallets.
+    tokens: [Token] @goField(forceResolver: true)
+
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean

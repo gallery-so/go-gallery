@@ -52,6 +52,7 @@ type Loaders struct {
 	TokenByTokenID           TokenLoaderByID
 	TokensByCollectionID     TokensLoaderByID
 	TokensByWalletID         TokensLoaderByID
+	TokensByUserID           TokensLoaderByID
 	ContractByContractId     ContractLoaderByID
 	ContractByChainAddress   ContractLoaderByChainAddress
 	FollowersByUserId        UsersLoaderByID
@@ -155,6 +156,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadTokensByWalletID(ctx, loaders, q),
+	}
+
+	loaders.TokensByUserID = TokensLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByUserID(ctx, loaders, q),
 	}
 
 	return loaders
@@ -616,6 +623,29 @@ func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 		}
 
 		b := q.GetTokensByWalletIdsBatch(ctx, convertedIds)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(userIDs []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(userIDs))
+		errors := make([]error, len(userIDs))
+
+		b := q.GetTokensByUserIdBatch(ctx, userIDs)
 		defer b.Close()
 
 		b.Query(func(i int, t []sqlc.Token, err error) {

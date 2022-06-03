@@ -256,6 +256,16 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
+func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
 func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*model.GalleryUser, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

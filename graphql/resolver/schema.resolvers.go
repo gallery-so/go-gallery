@@ -64,6 +64,10 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
+	return resolveTokensByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)
 }

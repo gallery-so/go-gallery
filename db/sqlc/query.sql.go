@@ -298,6 +298,52 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) 
 	return items, nil
 }
 
+const getTokensByUserId = `-- name: GetTokensByUserId :many
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE owner_user_id = $1 AND deleted = false
+`
+
+func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBID) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByUserId, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.ContractAddress,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTokensByWalletIds = `-- name: GetTokensByWalletIds :many
 SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
 `
