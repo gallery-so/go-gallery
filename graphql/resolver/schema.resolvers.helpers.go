@@ -487,23 +487,20 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
 	contractAddress := persist.NewChainAddress(persist.Address(token.ContractAddress.String), chain)
-	//openseaID := int(token.OpenseaID.Int64)
 
 	return &model.Token{
-		Dbid:           token.ID,
-		CreationTime:   &token.CreatedAt,
-		LastUpdated:    &token.LastUpdated,
-		CollectorsNote: &token.CollectorsNote.String,
-		Media:          getMediaForToken(token),
-		TokenType:      nil, // TODO: later
-		Chain:          &chain,
-		Name:           &token.Name.String,
-		Description:    &token.Description.String,
-		OwnedByWallets: nil, // handled by dedicated resolver
-		TokenURI:       nil, // TODO: later
-		TokenID:        &token.TokenID.String,
-		// TODO-EZRA: Does the frontend have something that can replace this?
-		//OpenseaID:        &openseaID,
+		Dbid:             token.ID,
+		CreationTime:     &token.CreatedAt,
+		LastUpdated:      &token.LastUpdated,
+		CollectorsNote:   &token.CollectorsNote.String,
+		Media:            getMediaForToken(token),
+		TokenType:        nil, // TODO: later
+		Chain:            &chain,
+		Name:             &token.Name.String,
+		Description:      &token.Description.String,
+		OwnedByWallets:   nil, // handled by dedicated resolver
+		TokenURI:         nil, // TODO: later
+		TokenID:          &token.TokenID.String,
 		Quantity:         nil, // TODO: later
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
@@ -590,28 +587,39 @@ func getFirstNonEmptyString(strings ...string) *string {
 }
 
 func getPreviewUrls(media persist.Media) *model.PreviewURLSet {
+	thumnail := media.ThumbnailURL.String()
+	small := resizeLh3(thumnail, 128)
+	medium := resizeLh3(thumnail, 256)
+	large := resizeLh3(thumnail, 512)
 	return &model.PreviewURLSet{
-		Raw:    remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Small:  remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Medium: remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Large:  remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
+		Raw:    remapLargeImageUrls(&thumnail),
+		Small:  remapLargeImageUrls(&small),
+		Medium: remapLargeImageUrls(&medium),
+		Large:  remapLargeImageUrls(&large),
 	}
 }
 
 func getImageMedia(media persist.Media) model.ImageMedia {
 	imageUrls := model.ImageURLSet{
 		Raw:    remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Small:  remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Medium: remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Large:  remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
+		Small:  remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 128), media.ThumbnailURL.String())),
+		Medium: remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 256), media.ThumbnailURL.String())),
+		Large:  remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 512), media.ThumbnailURL.String())),
 	}
 
 	return model.ImageMedia{
 		PreviewURLs:       getPreviewUrls(media),
 		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:         nil,
+		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &imageUrls,
 	}
+}
+
+func resizeLh3(url string, size int) string {
+	if strings.HasPrefix(url, "https://lh3.googleusercontent.com/") {
+		return fmt.Sprintf("%s=s%d", url, size)
+	}
+	return url
 }
 
 // Temporary method for handling the large "dead ringers" NFT image. This remapping
@@ -637,7 +645,7 @@ func getVideoMedia(media persist.Media) model.VideoMedia {
 	return model.VideoMedia{
 		PreviewURLs:       getPreviewUrls(media),
 		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:         nil,
+		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
 	}
 }
@@ -646,7 +654,7 @@ func getAudioMedia(media persist.Media) model.AudioMedia {
 	return model.AudioMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -655,7 +663,7 @@ func getTextMedia(media persist.Media) model.TextMedia {
 	return model.TextMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -673,7 +681,7 @@ func getJsonMedia(media persist.Media) model.JSONMedia {
 	return model.JSONMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -682,7 +690,7 @@ func getGltfMedia(media persist.Media) model.GltfMedia {
 	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -691,7 +699,7 @@ func getUnknownMedia(media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
@@ -700,7 +708,7 @@ func getInvalidMedia(media persist.Media) model.InvalidMedia {
 	return model.InvalidMedia{
 		PreviewURLs:      getPreviewUrls(media),
 		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:        nil,
+		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }

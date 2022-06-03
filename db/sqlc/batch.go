@@ -562,7 +562,7 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 }
 
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE id = $1 AND deleted = false
 `
 
 type GetTokenByIdBatchBatchResults struct {
@@ -597,7 +597,6 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
 			&i.ContractAddress,
 			&i.CollectorsNote,
 			&i.Media,
-			&i.Chain,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
@@ -608,6 +607,7 @@ func (b *GetTokenByIdBatchBatchResults) QueryRow(f func(int, Token, error)) {
 			&i.BlockNumber,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
+			&i.Chain,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -624,7 +624,7 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokensByCollectionIdBatch = `-- name: GetTokensByCollectionIdBatch :batchmany
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.contract_address, t.collectors_note, t.media, t.chain, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets FROM collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.contract_address, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain FROM collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord
@@ -668,7 +668,6 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Query(f func(int, []Token, er
 				&i.ContractAddress,
 				&i.CollectorsNote,
 				&i.Media,
-				&i.Chain,
 				&i.TokenUri,
 				&i.TokenType,
 				&i.TokenID,
@@ -679,6 +678,7 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Query(f func(int, []Token, er
 				&i.BlockNumber,
 				&i.OwnerUserID,
 				&i.OwnedByWallets,
+				&i.Chain,
 			); err != nil {
 				break
 			}
@@ -696,28 +696,28 @@ func (b *GetTokensByCollectionIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getTokensByWalletIdBatch = `-- name: GetTokensByWalletIdBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false
+const getTokensByWalletIdsBatch = `-- name: GetTokensByWalletIdsBatch :batchmany
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
 `
 
-type GetTokensByWalletIdBatchBatchResults struct {
+type GetTokensByWalletIdsBatchBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-func (q *Queries) GetTokensByWalletIdBatch(ctx context.Context, dollar_1 []interface{}) *GetTokensByWalletIdBatchBatchResults {
+func (q *Queries) GetTokensByWalletIdsBatch(ctx context.Context, ownedByWallets []persist.DBIDList) *GetTokensByWalletIdsBatchBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range dollar_1 {
+	for _, a := range ownedByWallets {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getTokensByWalletIdBatch, vals...)
+		batch.Queue(getTokensByWalletIdsBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetTokensByWalletIdBatchBatchResults{br, 0}
+	return &GetTokensByWalletIdsBatchBatchResults{br, 0}
 }
 
-func (b *GetTokensByWalletIdBatchBatchResults) Query(f func(int, []Token, error)) {
+func (b *GetTokensByWalletIdsBatchBatchResults) Query(f func(int, []Token, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -738,7 +738,6 @@ func (b *GetTokensByWalletIdBatchBatchResults) Query(f func(int, []Token, error)
 				&i.ContractAddress,
 				&i.CollectorsNote,
 				&i.Media,
-				&i.Chain,
 				&i.TokenUri,
 				&i.TokenType,
 				&i.TokenID,
@@ -749,6 +748,7 @@ func (b *GetTokensByWalletIdBatchBatchResults) Query(f func(int, []Token, error)
 				&i.BlockNumber,
 				&i.OwnerUserID,
 				&i.OwnedByWallets,
+				&i.Chain,
 			); err != nil {
 				break
 			}
@@ -762,7 +762,7 @@ func (b *GetTokensByWalletIdBatchBatchResults) Query(f func(int, []Token, error)
 	}
 }
 
-func (b *GetTokensByWalletIdBatchBatchResults) Close() error {
+func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 

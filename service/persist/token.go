@@ -66,6 +66,10 @@ const (
 	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
 	ChainOptimism
+
+	// MaxChainValue is the highest valid chain value, and should always be updated to
+	// point to the most recently added chain type.
+	MaxChainValue = ChainOptimism
 )
 
 const (
@@ -307,6 +311,7 @@ func SniffMediaType(buf []byte) MediaType {
 
 // MediaFromContentType will attempt to convert a content type to a media type
 func MediaFromContentType(contentType string) MediaType {
+	contentType = strings.TrimSpace(contentType)
 	whereCharset := strings.IndexByte(contentType, ';')
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
@@ -562,6 +567,12 @@ func (hex HexString) BigInt() *big.Int {
 		it, _ = big.NewInt(0).SetString(hex.String(), 10)
 	}
 	return it
+}
+
+// Add adds the given hex string to the current hex string
+func (hex HexString) Add(new HexString) HexString {
+	asInt := hex.BigInt()
+	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
 }
 
 // Value implements the driver.Valuer interface for media

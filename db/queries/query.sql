@@ -112,5 +112,8 @@ SELECT u.* FROM follows f
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC;
 
--- name: GetTokensByWalletIdBatch :batchmany
-SELECT * FROM tokens WHERE $1 = ANY(owned_by_wallets) AND deleted = false;
+-- name: GetTokensByWalletIds :many
+SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;
+
+-- name: GetTokensByWalletIdsBatch :batchmany
+SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;

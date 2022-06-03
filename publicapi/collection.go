@@ -14,7 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const maxNftsPerCollection = 1000
+const maxTokensPerCollection = 1000
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
@@ -56,18 +56,18 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
-		"nfts":           {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
+		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return nil, err
 	}
 
-	layout, err := persist.ValidateLayout(layout, nfts)
+	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	collection := persist.CollectionDB{
 		OwnerUserID:    userID,
-		Tokens:         nfts,
+		Tokens:         tokens,
 		Layout:         layout,
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
@@ -178,7 +178,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"tokens":       {tokens, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
+		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return err
 	}
