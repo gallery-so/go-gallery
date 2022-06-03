@@ -49,8 +49,8 @@ func GetPreviewsForUser(pCtx context.Context, galleryRepo persist.GalleryReposit
 }
 
 // GetPreviewsForUserToken returns a slice of 3 preview URLs from a user's collections
-func GetPreviewsForUserToken(pCtx context.Context, galleryRepo persist.GalleryTokenRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
-	var galleries []persist.GalleryToken
+func GetPreviewsForUserToken(pCtx context.Context, galleryRepo persist.GalleryRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
+	var galleries []persist.Gallery
 	var err error
 	if u.UserID != "" {
 		galleries, err = galleryRepo.GetByUserID(pCtx, u.UserID)
@@ -88,8 +88,8 @@ func GetPreviewsFromCollections(pColls []persist.Collection) []persist.NullStrin
 outer:
 	for _, c := range pColls {
 		for _, n := range c.NFTs {
-			if n.ImageThumbnailURL != "" {
-				result = append(result, n.ImageThumbnailURL)
+			if n.Media.ThumbnailURL != "" {
+				result = append(result, n.Media.ThumbnailURL)
 			}
 			if len(result) > 2 {
 				break outer
@@ -104,7 +104,7 @@ outer:
 }
 
 // GetPreviewsFromCollectionsToken returns a slice of 3 preview URLs from a slice of CollectionTokens
-func GetPreviewsFromCollectionsToken(pColls []persist.CollectionToken) []persist.NullString {
+func GetPreviewsFromCollectionsToken(pColls []persist.Collection) []persist.NullString {
 	result := make([]persist.NullString, 0, 3)
 
 outer:
@@ -147,4 +147,3 @@ outer:
 
 // 	return nil
 // }
-

@@ -111,7 +111,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepositor
 }
 
 // Create creates a new collection in the database
-func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.CollectionTokenDB) (persist.DBID, error) {
+func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.CollectionDB) (persist.DBID, error) {
 	err := ensureTokensOwnedByUser(pCtx, c, pColl.OwnerUserID, pColl.Tokens)
 	if err != nil {
 		return "", err
@@ -128,7 +128,7 @@ func (c *CollectionTokenRepository) Create(pCtx context.Context, pColl persist.C
 }
 
 // GetByUserID returns all collections owned by a user
-func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.CollectionToken, error) {
+func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID persist.DBID) ([]persist.Collection, error) {
 	stmt := c.getByUserIDOwnerStmt
 	rawStmt := c.getByUserIDOwnerRawStmt
 
@@ -138,9 +138,9 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 	}
 	defer res.Close()
 
-	collections := make(map[persist.DBID]persist.CollectionToken)
+	collections := make(map[persist.DBID]persist.Collection)
 	for res.Next() {
-		var collection persist.CollectionToken
+		var collection persist.Collection
 		var nft persist.TokenInCollection
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
@@ -160,7 +160,7 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 		return nil, err
 	}
 
-	result := make([]persist.CollectionToken, 0, len(collections))
+	result := make([]persist.Collection, 0, len(collections))
 
 	if len(collections) == 0 {
 		colls, err := rawStmt.QueryContext(pCtx, pUserID)
@@ -169,7 +169,7 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 		}
 		defer colls.Close()
 		for colls.Next() {
-			var rawColl persist.CollectionToken
+			var rawColl persist.Collection
 			err = colls.Scan(&rawColl.ID, &rawColl.OwnerUserID, &rawColl.Name, &rawColl.Version, &rawColl.Deleted, &rawColl.CollectorsNote, &rawColl.Layout, &rawColl.Hidden, &rawColl.CreationTime, &rawColl.LastUpdated)
 			if err != nil {
 				return nil, err
@@ -191,17 +191,17 @@ func (c *CollectionTokenRepository) GetByUserID(pCtx context.Context, pUserID pe
 }
 
 // GetByID returns a collection by its ID
-func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.CollectionToken, error) {
+func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Collection, error) {
 	stmt := c.getByIDOwnerStmt
 	rawStmt := c.getByIDOwnerRawStmt
 
 	res, err := stmt.QueryContext(pCtx, pID)
 	if err != nil {
-		return persist.CollectionToken{}, err
+		return persist.Collection{}, err
 	}
 	defer res.Close()
 
-	var collection persist.CollectionToken
+	var collection persist.Collection
 	nfts := make([]persist.TokenInCollection, 0, 10)
 
 	for res.Next() {
@@ -209,16 +209,16 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		var nft persist.TokenInCollection
 		err = res.Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated, &nft.ID, &nft.OwnerAddress, &nft.Chain, &nft.Name, &nft.Description, &nft.TokenType, &nft.TokenURI, &nft.TokenID, &nft.Media, &nft.TokenMetadata, &nft.ContractAddress, &nft.CreationTime)
 		if err != nil {
-			return persist.CollectionToken{}, err
+			return persist.Collection{}, err
 		}
 		if colID != "" && colID != collection.ID {
-			return persist.CollectionToken{}, fmt.Errorf("mismatched coll ids colID: %s, collection.ID: %s", colID, collection.ID)
+			return persist.Collection{}, fmt.Errorf("mismatched coll ids colID: %s, collection.ID: %s", colID, collection.ID)
 		}
 
 		nfts = append(nfts, nft)
 	}
 	if err := res.Err(); err != nil {
-		return persist.CollectionToken{}, err
+		return persist.Collection{}, err
 	}
 
 	if collection.ID == "" {
@@ -226,12 +226,12 @@ func (c *CollectionTokenRepository) GetByID(pCtx context.Context, pID persist.DB
 		err := rawStmt.QueryRowContext(pCtx, pID).Scan(&collection.ID, &collection.OwnerUserID, &collection.Name, &collection.Version, &collection.Deleted, &collection.CollectorsNote, &collection.Layout, &collection.Hidden, &collection.CreationTime, &collection.LastUpdated)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
+				return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
 			}
-			return persist.CollectionToken{}, err
+			return persist.Collection{}, err
 		}
 		if collection.ID != pID {
-			return persist.CollectionToken{}, persist.ErrCollectionNotFoundByID{ID: pID}
+			return persist.Collection{}, persist.ErrCollectionNotFoundByID{ID: pID}
 		}
 		return collection, nil
 	}
@@ -246,11 +246,11 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBI
 	var res sql.Result
 	var err error
 	switch pUpdate.(type) {
-	case persist.CollectionTokenUpdateInfoInput:
-		update := pUpdate.(persist.CollectionTokenUpdateInfoInput)
+	case persist.CollectionUpdateInfoInput:
+		update := pUpdate.(persist.CollectionUpdateInfoInput)
 		res, err = c.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.Name, time.Now(), pID, pUserID)
-	case persist.CollectionTokenUpdateHiddenInput:
-		update := pUpdate.(persist.CollectionTokenUpdateHiddenInput)
+	case persist.CollectionUpdateHiddenInput:
+		update := pUpdate.(persist.CollectionUpdateHiddenInput)
 		res, err = c.updateHiddenStmt.ExecContext(pCtx, update.Hidden, time.Now(), pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -269,7 +269,7 @@ func (c *CollectionTokenRepository) Update(pCtx context.Context, pID persist.DBI
 }
 
 // UpdateTokens updates the nfts of a collection in the database
-func (c *CollectionTokenRepository) UpdateTokens(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+func (c *CollectionTokenRepository) UpdateTokens(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate persist.CollectionUpdateTokensInput) error {
 	err := ensureTokensOwnedByUser(pCtx, c, pUserID, pUpdate.Tokens)
 	if err != nil {
 		return err
@@ -293,11 +293,11 @@ func (c *CollectionTokenRepository) UpdateUnsafe(pCtx context.Context, pID persi
 	var res sql.Result
 	var err error
 	switch pUpdate.(type) {
-	case persist.CollectionTokenUpdateInfoInput:
-		update := pUpdate.(persist.CollectionTokenUpdateInfoInput)
+	case persist.CollectionUpdateInfoInput:
+		update := pUpdate.(persist.CollectionUpdateInfoInput)
 		res, err = c.updateInfoUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.Name, time.Now(), pID)
-	case persist.CollectionTokenUpdateHiddenInput:
-		update := pUpdate.(persist.CollectionTokenUpdateHiddenInput)
+	case persist.CollectionUpdateHiddenInput:
+		update := pUpdate.(persist.CollectionUpdateHiddenInput)
 		res, err = c.updateHiddenUnsafeStmt.ExecContext(pCtx, update.Hidden, time.Now(), pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -316,7 +316,7 @@ func (c *CollectionTokenRepository) UpdateUnsafe(pCtx context.Context, pID persi
 }
 
 // UpdateNFTsUnsafe updates the nfts of a collection in the database
-func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID persist.DBID, pUpdate persist.CollectionUpdateTokensInput) error {
 	res, err := c.updateNFTsUnsafeStmt.ExecContext(pCtx, pq.Array(pUpdate.Tokens), pUpdate.Layout, time.Now(), pID)
 	if err != nil {
 		return err
@@ -332,7 +332,7 @@ func (c *CollectionTokenRepository) UpdateNFTsUnsafe(pCtx context.Context, pID p
 }
 
 // ClaimNFTs claims nfts from a collection in the database
-func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionTokenUpdateTokensInput) error {
+func (c *CollectionTokenRepository) ClaimNFTs(pCtx context.Context, pUserID persist.DBID, pOwnerAddresses []persist.EthereumAddress, pUpdate persist.CollectionUpdateTokensInput) error {
 	nftsToRemove, err := c.nftsToRemoveStmt.QueryContext(pCtx, pq.Array(pOwnerAddresses), pq.Array(pUpdate.Tokens))
 	if err != nil {
 		return err
