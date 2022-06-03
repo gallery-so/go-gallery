@@ -62,7 +62,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
-		"tokens":         {tokens, fmt.Sprintf("required,unique,max=%d", maxTokensPerCollection)},
+		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"tokens":       {tokens, fmt.Sprintf("required,unique,max=%d", maxTokensPerCollection)},
+		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return err
 	}
