@@ -598,23 +598,22 @@ func getFirstNonEmptyString(strings ...string) *string {
 
 func getPreviewUrls(media persist.Media) *model.PreviewURLSet {
 	thumnail := media.ThumbnailURL.String()
-	small := resizeLh3(thumnail, 128)
-	medium := resizeLh3(thumnail, 256)
-	large := resizeLh3(thumnail, 512)
+
 	return &model.PreviewURLSet{
 		Raw:    remapLargeImageUrls(&thumnail),
-		Small:  remapLargeImageUrls(&small),
-		Medium: remapLargeImageUrls(&medium),
-		Large:  remapLargeImageUrls(&large),
+		Small:  remapLargeImageUrls(&thumnail),
+		Medium: remapLargeImageUrls(&thumnail),
+		Large:  remapLargeImageUrls(&thumnail),
 	}
 }
 
 func getImageMedia(media persist.Media) model.ImageMedia {
+	url := remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()))
 	imageUrls := model.ImageURLSet{
-		Raw:    remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String())),
-		Small:  remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 128), media.ThumbnailURL.String())),
-		Medium: remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 256), media.ThumbnailURL.String())),
-		Large:  remapLargeImageUrls(getFirstNonEmptyString(resizeLh3(media.MediaURL.String(), 512), media.ThumbnailURL.String())),
+		Raw:    url,
+		Small:  url,
+		Medium: url,
+		Large:  url,
 	}
 
 	return model.ImageMedia{
@@ -623,13 +622,6 @@ func getImageMedia(media persist.Media) model.ImageMedia {
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &imageUrls,
 	}
-}
-
-func resizeLh3(url string, size int) string {
-	if strings.HasPrefix(url, "https://lh3.googleusercontent.com/") {
-		return fmt.Sprintf("%s=s%d", url, size)
-	}
-	return url
 }
 
 // Temporary method for handling the large "dead ringers" NFT image. This remapping
