@@ -12,3 +12,5 @@ CREATE TABLE IF NOT EXISTS collections_v2
     NAME            varchar(255),
     LAYOUT          jsonb
 );
+
+ALTER TABLE collections ALTER COLUMN layout TYPE json USING layout::json;
