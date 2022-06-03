@@ -217,7 +217,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getTokenById = `-- name: GetTokenById :one
-SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, chain, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets FROM tokens WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, error) {
@@ -234,7 +234,6 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.ContractAddress,
 		&i.CollectorsNote,
 		&i.Media,
-		&i.Chain,
 		&i.TokenUri,
 		&i.TokenType,
 		&i.TokenID,
@@ -245,12 +244,13 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 		&i.BlockNumber,
 		&i.OwnerUserID,
 		&i.OwnedByWallets,
+		&i.Chain,
 	)
 	return i, err
 }
 
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.contract_address, t.collectors_note, t.media, t.chain, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets FROM collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.contract_address, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain FROM collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord
@@ -276,7 +276,6 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) 
 			&i.ContractAddress,
 			&i.CollectorsNote,
 			&i.Media,
-			&i.Chain,
 			&i.TokenUri,
 			&i.TokenType,
 			&i.TokenID,
@@ -287,6 +286,53 @@ func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) 
 			&i.BlockNumber,
 			&i.OwnerUserID,
 			&i.OwnedByWallets,
+			&i.Chain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokensByWalletIds = `-- name: GetTokensByWalletIds :many
+SELECT id, deleted, version, created_at, last_updated, name, description, contract_address, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+`
+
+func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persist.DBIDList) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByWalletIds, ownedByWallets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.ContractAddress,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
 		); err != nil {
 			return nil, err
 		}

@@ -610,12 +610,12 @@ func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 		tokens := make([][]sqlc.Token, len(walletIds))
 		errors := make([]error, len(walletIds))
 
-		convertedIds := make([]interface{}, len(walletIds))
+		convertedIds := make([]persist.DBIDList, len(walletIds))
 		for i, id := range walletIds {
-			convertedIds[i] = id
+			convertedIds[i] = persist.DBIDList{id}
 		}
 
-		b := q.GetTokensByWalletIdBatch(ctx, convertedIds)
+		b := q.GetTokensByWalletIdsBatch(ctx, convertedIds)
 		defer b.Close()
 
 		b.Query(func(i int, t []sqlc.Token, err error) {
