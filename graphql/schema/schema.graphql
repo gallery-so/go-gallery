@@ -350,7 +350,7 @@ union CollectionTokenByIdOrError =
     | ErrCollectionNotFound
     | ErrTokenNotFound
 
-union CommunityByAddressOrError = Community | ErrCommunityNotFound
+union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 type Query {
     node(id: ID!): Node

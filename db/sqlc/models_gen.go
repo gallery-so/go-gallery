@@ -198,6 +198,7 @@ type Nonce struct {
 	UserID      sql.NullString
 	Address     sql.NullString
 	Value       sql.NullString
+	Chain       sql.NullInt32
 }
 
 type Token struct {
@@ -211,7 +212,6 @@ type Token struct {
 	ContractAddress  sql.NullString
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
-	Chain            sql.NullInt32
 	TokenUri         sql.NullString
 	TokenType        sql.NullString
 	TokenID          sql.NullString
@@ -222,6 +222,7 @@ type Token struct {
 	BlockNumber      sql.NullInt64
 	OwnerUserID      persist.DBID
 	OwnedByWallets   persist.DBIDList
+	Chain            sql.NullInt32
 }
 
 type User struct {

@@ -14,12 +14,12 @@ import (
 )
 
 type AuthAPI struct {
-	repos             *persist.Repositories
-	queries           *sqlc.Queries
-	loaders           *dataloader.Loaders
-	validator         *validator.Validate
-	ethClient         *ethclient.Client
-	multiChainProvier *multichain.Provider
+	repos              *persist.Repositories
+	queries            *sqlc.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	multiChainProvider *multichain.Provider
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainAddress, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -29,7 +29,7 @@ func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainAddress, nonc
 		Signature:          signature,
 		WalletType:         walletType,
 		WalletRepo:         api.repos.WalletRepository,
-		MultichainProvider: api.multiChainProvier,
+		MultichainProvider: api.multiChainProvider,
 		UserRepo:           api.repos.UserRepository,
 		NonceRepo:          api.repos.NonceRepository,
 		EthClient:          api.ethClient,

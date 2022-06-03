@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,8 +65,26 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterAlias("collectors_note", "max_string_length=1200")
 	v.RegisterAlias("collection_name", "max_string_length=200")
 	v.RegisterAlias("collection_note", "max_string_length=600")
-	v.RegisterAlias("nft_note", "max_string_length=1200")
+	v.RegisterAlias("token_note", "max_string_length=1200")
 	v.RegisterAlias("bio", "max_string_length=600")
+
+	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
+}
+
+func ChainAddressValidator(sl validator.StructLevel) {
+	chainAddress := sl.Current().Interface().(persist.ChainAddress)
+
+	address := chainAddress.Address()
+	chain := chainAddress.Chain()
+
+	// TODO: At some point in the future, validate the address based on its chain type.
+	if len(address) == 0 {
+		sl.ReportError(address, "Address", "Address", "required", "")
+	}
+
+	if chain < 0 || chain > persist.MaxChainValue {
+		sl.ReportError(chain, "Chain", "Chain", "valid_chain_type", "")
+	}
 }
 
 // EthValidator validates ethereum addresses

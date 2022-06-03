@@ -66,6 +66,10 @@ const (
 	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
 	ChainOptimism
+
+	// MaxChainValue is the highest valid chain value, and should always be updated to
+	// point to the most recently added chain type.
+	MaxChainValue = ChainOptimism
 )
 
 const (
@@ -248,6 +252,7 @@ func SniffMediaType(buf []byte) MediaType {
 
 // MediaFromContentType will attempt to convert a content type to a media type
 func MediaFromContentType(contentType string) MediaType {
+	contentType = strings.TrimSpace(contentType)
 	whereCharset := strings.IndexByte(contentType, ';')
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]

@@ -310,20 +310,33 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	}
 
 	med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
+	var err error
 	switch {
 	case nft.AnimationURL != "":
 		med.MediaURL = persist.NullString(nft.AnimationURL)
-		med.MediaType = media.PredictMediaType(ctx, nft.AnimationURL.String())
+		med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL.String())
+
+	case nft.AnimationOriginalURL != "":
+		med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
+		med.MediaType, _ = media.PredictMediaType(ctx, nft.AnimationOriginalURL.String())
+
 	case nft.ImageURL != "":
 		med.MediaURL = persist.NullString(nft.ImageURL)
-		med.MediaType = media.PredictMediaType(ctx, nft.ImageURL.String())
+		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageURL.String())
+	case nft.ImageOriginalURL != "":
+		med.MediaURL = persist.NullString(nft.ImageOriginalURL)
+		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageOriginalURL.String())
+
 	default:
 		med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-		med.MediaType = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
+		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
+	}
+	if err != nil {
+		logrus.Infof("Error predicting media type for %v: %s", nft, err)
 	}
 
 	var walletID persist.DBID
-	err := pg.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, nft.OwnerAddress).Scan(&walletID)
+	err = pg.QueryRow(`SELECT ID FROM wallets WHERE ADDRESS = $1;`, nft.OwnerAddress).Scan(&walletID)
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
