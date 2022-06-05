@@ -434,20 +434,16 @@ func (t *TokenGalleryRepository) UpdateByIDUnsafe(pCtx context.Context, pID pers
 
 // UpdateByID updates a token by its ID
 func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
-	var addresses []persist.Wallet
-	err := t.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
-	if err != nil {
-		return err
-	}
-
 	var res sql.Result
+	var err error
+
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
-		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pq.Array(addresses))
+		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pUserID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID, pq.Array(addresses))
+		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
