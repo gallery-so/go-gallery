@@ -11,6 +11,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -83,6 +84,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault("REDIS_URL", "localhost:6379")
 
 	viper.AutomaticEnv()
 }
@@ -183,14 +185,20 @@ func getAllNFTs(pg *sql.DB, nftsChan chan<- persist.NFT) error {
 	return nil
 }
 
+type tokenContractCombo struct {
+	contract persist.ContractGallery
+	token    persist.TokenGallery
+}
+
 func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NFT) error {
 	ctx := context.Background()
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return err
 	}
+	communityRepo := postgres.NewCommunityRepository(pg, redis.NewCache(0))
 
-	toUpsertChan := make(chan persist.TokenGallery)
+	toUpsertChan := make(chan tokenContractCombo)
 	errChan := make(chan error)
 	go func() {
 		defer close(toUpsertChan)
@@ -198,12 +206,18 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		for nft := range nfts {
 			n := nft
 			f := func() {
-				toUpsert, err := nftToToken(ctx, pg, n, block)
+				token, err := nftToToken(ctx, pg, n, block)
 				if err != nil {
 					errChan <- err
 					return
 				}
-				toUpsertChan <- toUpsert
+				comm, err := communityRepo.GetByAddress(ctx, persist.NewChainAddress(token.ContractAddress, token.Chain), true)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				contract := communityToContract(comm)
+				toUpsertChan <- tokenContractCombo{contract, token}
 			}
 
 			wp.Submit(f)
@@ -214,6 +228,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	perUpsert := 2000
 
 	tokens := make([]persist.TokenGallery, perUpsert)
+	contracts := make([]persist.ContractGallery, perUpsert)
 	i := 0
 	j := 0
 	bar := progressbar.Default(int64(perUpsert), "Prepping Upsert")
@@ -226,16 +241,22 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 				if err != nil {
 					return err
 				}
+				err = upsertContracts(pg, dedupeContracts(contracts))
+				if err != nil {
+					return err
+				}
 				if !ok {
 					return nil
 				}
 				tokens = make([]persist.TokenGallery, perUpsert)
+				contracts = make([]persist.ContractGallery, perUpsert)
 				i = 0
 				j++
 				bar = progressbar.Default(int64(perUpsert), fmt.Sprintf("Prepping Upsert"))
 				logrus.Infof("Upserted NFTs %d", j)
 			}
-			tokens[i] = toUpsert
+			tokens[i] = toUpsert.token
+			contracts[i] = toUpsert.contract
 			bar.Add(1)
 			i++
 		case err := <-errChan:
@@ -373,6 +394,15 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 	return token, nil
 }
 
+func communityToContract(community persist.Community) persist.ContractGallery {
+	return persist.ContractGallery{
+		Chain:          community.Chain,
+		Address:        community.ContractAddress,
+		Name:           community.Name,
+		CreatorAddress: community.CreatorAddress,
+	}
+}
+
 func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
@@ -422,6 +452,41 @@ func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
 		seen[key] = token
 	}
 	result := make([]persist.TokenGallery, 0, len(seen))
+	for _, v := range seen {
+		result = append(result, v)
+	}
+	return result
+}
+
+func upsertContracts(pg *sql.DB, pContracts []persist.ContractGallery) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	if len(pContracts) == 0 {
+		return nil
+	}
+	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN) VALUES `
+	vals := make([]interface{}, 0, len(pContracts)*7)
+	for i, contract := range pContracts {
+		sqlStr += generateValuesPlaceholders(7, i*7)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress)
+		sqlStr += ","
+	}
+	sqlStr = sqlStr[:len(sqlStr)-1]
+	sqlStr += ` ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS,CHAIN = EXCLUDED.CHAIN;`
+	_, err := pg.ExecContext(ctx, sqlStr, vals...)
+	if err != nil {
+		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)
+	}
+
+	return nil
+}
+func dedupeContracts(pContracts []persist.ContractGallery) []persist.ContractGallery {
+	seen := map[persist.Address]persist.ContractGallery{}
+	for _, contract := range pContracts {
+		seen[contract.Address] = contract
+	}
+	result := make([]persist.ContractGallery, 0, len(seen))
 	for _, v := range seen {
 		result = append(result, v)
 	}
