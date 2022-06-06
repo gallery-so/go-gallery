@@ -138,12 +138,35 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 					return
 				}
 
+				contracts := make([]ChainAgnosticContract, 0, len(tokens))
+				for _, token := range tokens {
+					contract, err := provider.GetContractByAddress(ctx, token.ContractAddress)
+					if err != nil {
+						errChan <- err
+						return
+					}
+					contracts = append(contracts, contract)
+				}
+
 				newTokens, err := tokensToTokens(ctx, tokens, chain, user, addresses)
 				if err != nil {
 					errChan <- err
 					return
 				}
-				errChan <- d.TokenRepo.BulkUpsert(ctx, newTokens)
+				newContracts, err := contractsToContracts(ctx, contracts, chain, user, addresses)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
+					errChan <- err
+					return
+				}
+				if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
+					errChan <- err
+					return
+				}
+				errChan <- nil
 			}(addr, chain)
 		}
 	}
@@ -220,6 +243,22 @@ func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain pers
 			ExternalURL:      persist.NullString(token.ExternalURL),
 			BlockNumber:      token.BlockNumber,
 		}
+	}
+	return res, nil
+
+}
+
+func contractsToContracts(ctx context.Context, contracts []ChainAgnosticContract, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.ContractGallery, error) {
+	res := make([]persist.ContractGallery, len(contracts))
+	for i, contract := range contracts {
+		res[i] = persist.ContractGallery{
+			Chain:          chain,
+			Address:        contract.Address,
+			Symbol:         persist.NullString(contract.Symbol),
+			Name:           persist.NullString(contract.Name),
+			CreatorAddress: contract.CreatorAddress,
+		}
+
 	}
 	return res, nil
 
