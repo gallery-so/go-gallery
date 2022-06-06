@@ -366,6 +366,9 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		BlockNumber:      persist.BlockNumber(block),
 		TokenMetadata:    metadata,
 		Media:            med,
+		CreationTime:     nft.CreationTime,
+		Deleted:          nft.Deleted,
+		LastUpdated:      nft.LastUpdatedTime,
 	}
 	return token, nil
 }
