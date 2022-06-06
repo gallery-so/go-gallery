@@ -125,6 +125,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
+		upsertedContracts := make(map[persist.Address]bool)
 		for _, addr := range addresses {
 			go func(addr persist.Address, chain persist.Chain) {
 				provider, ok := d.Chains[chain]
@@ -140,12 +141,15 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 
 				contracts := make([]ChainAgnosticContract, 0, len(tokens))
 				for _, token := range tokens {
-					contract, err := provider.GetContractByAddress(ctx, token.ContractAddress)
-					if err != nil {
-						errChan <- err
-						return
+					if !upsertedContracts[token.ContractAddress] {
+						contract, err := provider.GetContractByAddress(ctx, token.ContractAddress)
+						if err != nil {
+							errChan <- err
+							return
+						}
+						contracts = append(contracts, contract)
+						upsertedContracts[token.ContractAddress] = true
 					}
-					contracts = append(contracts, contract)
 				}
 
 				newTokens, err := tokensToTokens(ctx, tokens, chain, user, addresses)
