@@ -112,6 +112,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	errChan := make(chan error)
+	incomingTokens := make(chan []persist.TokenIdentifiers)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 	for _, wallet := range user.Wallets {
 		if it, ok := chainsToAddresses[wallet.Chain]; ok {
@@ -144,9 +145,15 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 					return
 				}
 				errChan <- d.TokenRepo.BulkUpsert(ctx, newTokens)
+				identifiers := make([]persist.TokenIdentifiers, len(newTokens))
+				for i, t := range newTokens {
+					identifiers[i] = persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, t.Chain)
+				}
+				incomingTokens <- identifiers
 			}(addr, chain)
 		}
 	}
+	// ensure all tokens have been upserted
 	for i := 0; i < len(user.Wallets); i++ {
 		err := <-errChan
 		if err != nil {
@@ -154,6 +161,29 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		}
 		logrus.Infof("updated tokens for wallet %s", user.Wallets[i].Address)
 	}
+
+	// ensure all old tokens are deleted
+	ownedTokens := make(map[persist.TokenIdentifiers]bool)
+	for i := 0; i < len(user.Wallets); i++ {
+		identifiers := <-incomingTokens
+		for _, id := range identifiers {
+			ownedTokens[id] = true
+		}
+	}
+
+	allUsersNFTs, err := d.TokenRepo.GetByUserID(ctx, userID, 0, 0)
+	if err != nil {
+		return err
+	}
+	for _, nft := range allUsersNFTs {
+		if !ownedTokens[persist.NewTokenIdentifiers(nft.ContractAddress, nft.TokenID, nft.Chain)] {
+			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
