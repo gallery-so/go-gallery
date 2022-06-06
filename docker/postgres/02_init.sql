@@ -88,9 +88,9 @@ CREATE TABLE IF NOT EXISTS tokens (
     BLOCK_NUMBER bigint
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, OWNER_USER_ID);
+CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_chain_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, CHAIN, OWNER_USER_ID);
 
-CREATE INDEX IF NOT EXISTS token_id_contract_address_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS);
+CREATE INDEX IF NOT EXISTS token_id_contract_address_chain_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, CHAIN);
 
 CREATE INDEX IF NOT EXISTS owner_user_id_idx ON tokens (OWNER_USER_ID);
 
