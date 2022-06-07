@@ -353,8 +353,8 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 
 	output := make([]*model.Wallet, 0, len(wallets))
 
-	for _, address := range wallets {
-		output = append(output, walletToModelSqlc(ctx, address))
+	for _, wallet := range wallets {
+		output = append(output, walletToModelSqlc(ctx, wallet))
 	}
 
 	return output, nil
