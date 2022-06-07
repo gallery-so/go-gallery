@@ -291,11 +291,22 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 
 // RemoveWallet removes an address from user
 func (u *UserRepository) RemoveWallet(pCtx context.Context, pUserID persist.DBID, pWalletID persist.DBID) error {
-	if _, err := u.removeWalletFromUserStmt.ExecContext(pCtx, pWalletID, pUserID); err != nil {
+	tx, err := u.db.BeginTx(pCtx, nil)
+	if err != nil {
 		return err
 	}
 
-	if _, err := u.deleteWalletStmt.ExecContext(pCtx, pWalletID); err != nil {
+	defer tx.Rollback()
+
+	if _, err := tx.StmtContext(pCtx, u.removeWalletFromUserStmt).ExecContext(pCtx, pWalletID, pUserID); err != nil {
+		return err
+	}
+
+	if _, err := tx.StmtContext(pCtx, u.deleteWalletStmt).ExecContext(pCtx, pWalletID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return err
 	}
 
