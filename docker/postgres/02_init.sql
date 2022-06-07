@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     CREATOR_ADDRESS varchar(255)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS address_idx ON contracts (ADDRESS);
+CREATE UNIQUE INDEX IF NOT EXISTS contract_address_chain_idx ON contracts (ADDRESS, CHAIN);
 
 CREATE TABLE IF NOT EXISTS login_attempts (
     ID varchar(255) PRIMARY KEY,

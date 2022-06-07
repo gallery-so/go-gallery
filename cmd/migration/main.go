@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -21,6 +21,7 @@ import (
 )
 
 var bigZero = big.NewInt(0)
+var badMedias int64 = 0
 
 func main() {
 	setDefaults()
@@ -35,30 +36,33 @@ func run() {
 
 	// Users migration
 
-	if err := copyBack(pgClient); err != nil {
-		panic(err)
-	}
+	// if err := copyBack(pgClient); err != nil {
+	// 	panic(err)
+	// }
 
-	if err := copyUsersToTempTable(pgClient); err != nil {
-		panic(err)
-	}
+	// if err := copyUsersToTempTable(pgClient); err != nil {
+	// 	panic(err)
+	// }
 
-	logrus.Info("Getting all users wallets...")
-	idsToAddresses, err := getAllUsersWallets(pgClient)
-	if err != nil {
-		panic(err)
-	}
-	logrus.Info("Getting all users wallets... Done")
-	logrus.Infof("Found %d users", len(idsToAddresses))
+	// logrus.Info("Getting all users wallets...")
+	// idsToAddresses, err := getAllUsersWallets(pgClient)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logrus.Info("Getting all users wallets... Done")
+	// logrus.Infof("Found %d users", len(idsToAddresses))
 
-	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
-	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
-		panic(err)
-	}
-	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
+	// logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+	// 	panic(err)
+	// }
+	// logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	// NFTs migration
 
+	var count int
+	pgClient.QueryRow("SELECT COUNT(*) FROM nfts;").Scan(&count)
+	logrus.Infof("Found %d NFTs", count)
 	nftsChan := make(chan persist.NFT)
 
 	go func() {
@@ -73,8 +77,8 @@ func run() {
 		panic(err)
 	}
 	logrus.Info("Migrating NFTs... Done")
-
 	logrus.Info("Full migration... Done")
+	logrus.Infof("Found %d bad NFTs", badMedias)
 }
 
 func setDefaults() {
@@ -171,6 +175,7 @@ func getAllNFTs(pg *sql.DB, nftsChan chan<- persist.NFT) error {
 	if err != nil {
 		return err
 	}
+
 	defer rows.Close()
 	defer close(nftsChan)
 
@@ -196,7 +201,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	if err != nil {
 		return err
 	}
-	communityRepo := postgres.NewCommunityRepository(pg, redis.NewCache(0))
+	// communityRepo := postgres.NewCommunityRepository(pg, redis.NewCache(0))
 
 	toUpsertChan := make(chan tokenContractCombo)
 	errChan := make(chan error)
@@ -211,13 +216,15 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 					errChan <- err
 					return
 				}
-				comm, err := communityRepo.GetByAddress(ctx, persist.NewChainAddress(token.ContractAddress, token.Chain), true)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				contract := communityToContract(comm)
-				toUpsertChan <- tokenContractCombo{contract, token}
+				// comm, err := communityRepo.GetByAddress(ctx, persist.NewChainAddress(token.ContractAddress, token.Chain), true)
+				// if err != nil {
+				// 	if _, ok := err.(persist.ErrCommunityNotFound); !ok {
+				// 		errChan <- err
+				// 		return
+				// 	}
+				// }
+				// contract := communityToContract(comm)
+				toUpsertChan <- tokenContractCombo{persist.ContractGallery{}, token}
 			}
 
 			wp.Submit(f)
@@ -353,7 +360,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
 	}
 	if err != nil {
-		logrus.Infof("Error predicting media type for %v: %s", nft, err)
+		atomic.AddInt64(&badMedias, 1)
 	}
 
 	var walletID persist.DBID
@@ -429,7 +436,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_USER_ID) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
+	sqlStr += ` ON CONFLICT (TOKEN_ID, CONTRACT_ADDRESS, CHAIN, OWNER_USER_ID) WHERE tokens.DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
 
 	_, err := pg.ExecContext(ctx, sqlStr, vals...)
 	if err != nil {
@@ -469,11 +476,11 @@ func upsertContracts(pg *sql.DB, pContracts []persist.ContractGallery) error {
 	vals := make([]interface{}, 0, len(pContracts)*7)
 	for i, contract := range pContracts {
 		sqlStr += generateValuesPlaceholders(7, i*7)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress)
+		vals = append(vals, persist.GenerateID(), 0, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress, contract.Chain)
 		sqlStr += ","
 	}
 	sqlStr = sqlStr[:len(sqlStr)-1]
-	sqlStr += ` ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS,CHAIN = EXCLUDED.CHAIN;`
+	sqlStr += ` ON CONFLICT (ADDRESS, CHAIN) DO UPDATE SET SYMBOL = EXCLUDED.SYMBOL,NAME = EXCLUDED.NAME,CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS,CHAIN = EXCLUDED.CHAIN;`
 	_, err := pg.ExecContext(ctx, sqlStr, vals...)
 	if err != nil {
 		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)

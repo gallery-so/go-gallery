@@ -61,7 +61,7 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	vals := make([]interface{}, 0, len(pContracts)*7)
 	for i, contract := range pContracts {
 		sqlStr += generateValuesPlaceholders(7, i*7)
-		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress)
+		vals = append(vals, persist.GenerateID(), contract.Version, contract.Address, contract.Symbol, contract.Name, contract.CreatorAddress, contract.Chain)
 		sqlStr += ","
 	}
 	sqlStr = sqlStr[:len(sqlStr)-1]

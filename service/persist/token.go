@@ -731,6 +731,13 @@ func (t *TokenType) Scan(src interface{}) error {
 	return nil
 }
 
+func (c *NFTContract) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), &c)
+}
+
 // NewEthereumTokenIdentifiers creates a new token identifiers
 func NewEthereumTokenIdentifiers(pContractAddress EthereumAddress, pTokenID TokenID) EthereumTokenIdentifiers {
 	return EthereumTokenIdentifiers(fmt.Sprintf("%s+%s", pContractAddress, pTokenID))
