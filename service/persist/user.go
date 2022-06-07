@@ -69,3 +69,21 @@ type ErrUserAlreadyExists struct {
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.ChainAddress, e.Authenticator)
 }
+
+type ErrAddressOwnedByUser struct {
+	ChainAddress ChainAddress
+	OwnerID      DBID
+}
+
+func (e ErrAddressOwnedByUser) Error() string {
+	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.ChainAddress, e.OwnerID)
+}
+
+type ErrAddressNotOwnedByUser struct {
+	ChainAddress ChainAddress
+	UserID       DBID
+}
+
+func (e ErrAddressNotOwnedByUser) Error() string {
+	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
+}

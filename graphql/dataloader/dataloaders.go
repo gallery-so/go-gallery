@@ -534,7 +534,7 @@ func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Que
 
 		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
 			if err == pgx.ErrNoRows {
-				err = persist.ErrWalletNotFoundByChainAddress{ChainAddress: chainAddresses[i]}
+				err = persist.ErrWalletNotFound{ChainAddress: chainAddresses[i]}
 			}
 
 			// Add results to other loaders' caches

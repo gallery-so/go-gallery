@@ -169,12 +169,12 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	addressOwnerID := authResult.UserID
 
 	if addressOwnerID != "" {
-		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
 	if !ok {
-		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressOwnerID}
+		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressOwnerID}
 	}
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {
@@ -196,11 +196,11 @@ func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAdd
 	addressUserID := authResult.UserID
 
 	if addressUserID != "" {
-		return ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
 	}
 
 	if !auth.ContainsWallet(authResult.Addresses, auth.AuthenticatedAddress{ChainAddress: pChainAddress}) {
-		return ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
+		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
 	}
 
 	defer func() {
@@ -433,24 +433,6 @@ type ErrUserAlreadyExists struct {
 
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: address: %s, authenticator: %s", e.Address, e.Authenticator)
-}
-
-type ErrAddressOwnedByUser struct {
-	ChainAddress persist.ChainAddress
-	OwnerID      persist.DBID
-}
-
-func (e ErrAddressOwnedByUser) Error() string {
-	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.ChainAddress, e.OwnerID)
-}
-
-type ErrAddressNotOwnedByUser struct {
-	ChainAddress persist.ChainAddress
-	UserID       persist.DBID
-}
-
-func (e ErrAddressNotOwnedByUser) Error() string {
-	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {
