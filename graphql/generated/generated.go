@@ -129,6 +129,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	ErrAddressOwnedByUser struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrAuthenticationFailed struct {
 		Message func(childComplexity int) int
 	}
@@ -777,6 +781,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DeleteCollectionPayload.Gallery(childComplexity), true
+
+	case "ErrAddressOwnedByUser.message":
+		if e.complexity.ErrAddressOwnedByUser.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAddressOwnedByUser.Message(childComplexity), true
 
 	case "ErrAuthenticationFailed.message":
 		if e.complexity.ErrAuthenticationFailed.Message == nil {
@@ -2549,6 +2560,7 @@ union AddUserWalletPayloadOrError =
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrAddressOwnedByUser
 
 type AddUserWalletPayload {
     viewer: Viewer
@@ -2599,6 +2611,10 @@ type ErrAuthenticationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrAddressOwnedByUser implements Error {
     message: String!
 }
 
@@ -4389,6 +4405,41 @@ func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressOwnedByUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAddressOwnedByUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrAuthenticationFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAuthenticationFailed) (ret graphql.Marshaler) {
@@ -11795,6 +11846,13 @@ func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12049,6 +12107,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrUserAlreadyExists(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -13365,6 +13430,37 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error"}
+
+func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressOwnedByUserImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAddressOwnedByUser")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAddressOwnedByUser_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
