@@ -108,6 +108,7 @@ type TokenGalleryRepository interface {
 	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
+	DeleteByID(context.Context, DBID) error
 }
 
 type ErrTokensGalleryNotFoundByContract struct {
