@@ -210,28 +210,22 @@ func (n *Address) Scan(value interface{}) error {
 	return nil
 }
 
-type ErrWalletNotFoundByID struct {
-	WalletID DBID
+type ErrWalletAlreadyExists struct {
+	WalletID     DBID
+	ChainAddress ChainAddress
+	OwnerID      DBID
 }
 
-// ErrWalletNotFoundByChainAddress is an error type for when a wallet is not found by address and chain unique combination
-type ErrWalletNotFoundByChainAddress struct {
+// ErrWalletNotFound is an error type for when a wallet is not found
+type ErrWalletNotFound struct {
+	WalletID     DBID
 	ChainAddress ChainAddress
 }
 
-// ErrWalletNotFoundByAddress is an error type for when a wallet is not found by address's ID
-type ErrWalletNotFoundByAddress struct {
-	Address DBID
+func (e ErrWalletAlreadyExists) Error() string {
+	return fmt.Sprintf("wallet already exists: wallet ID: %s | chain address: %s | chain: %d | owner ID: %s", e.WalletID, e.ChainAddress.Address(), e.ChainAddress.Chain(), e.OwnerID)
 }
 
-func (e ErrWalletNotFoundByID) Error() string {
-	return fmt.Sprintf("wallet not found by id: %s", e.WalletID)
-}
-
-func (e ErrWalletNotFoundByChainAddress) Error() string {
-	return fmt.Sprintf("wallet not found by chain address: %s | chain: %d", e.ChainAddress.Address(), e.ChainAddress.Chain())
-}
-
-func (e ErrWalletNotFoundByAddress) Error() string {
-	return fmt.Sprintf("wallet not found by address ID: %s", e.Address)
+func (e ErrWalletNotFound) Error() string {
+	return fmt.Sprintf("wallet not found: walletID: %s | chain address: %s | chain: %d ", e.WalletID, e.ChainAddress.Address(), e.ChainAddress.Chain())
 }

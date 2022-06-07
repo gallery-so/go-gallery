@@ -246,6 +246,13 @@ type EoaAuth struct {
 	Signature    string                `json:"signature"`
 }
 
+type ErrAddressOwnedByUser struct {
+	Message string `json:"message"`
+}
+
+func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
+func (ErrAddressOwnedByUser) IsError()                       {}
+
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }

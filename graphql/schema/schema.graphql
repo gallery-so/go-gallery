@@ -484,6 +484,7 @@ union AddUserWalletPayloadOrError =
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrAddressOwnedByUser
 
 type AddUserWalletPayload {
     viewer: Viewer
@@ -534,6 +535,10 @@ type ErrAuthenticationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrAddressOwnedByUser implements Error {
     message: String!
 }
 
