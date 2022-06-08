@@ -42,6 +42,10 @@ func (r *Community) ID() GqlID {
 	return GqlID(fmt.Sprintf("Community:%s:%s", r.GetGqlIDField_ContractAddress(), r.GetGqlIDField_Chain()))
 }
 
+func (r *Contract) ID() GqlID {
+	return GqlID(fmt.Sprintf("Contract:%s", r.Dbid))
+}
+
 func (r *Gallery) ID() GqlID {
 	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
 }
@@ -66,6 +70,7 @@ type NodeFetcher struct {
 	OnCollection      func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
 	OnCommunity       func(ctx context.Context, contractAddress string, chain string) (*Community, error)
+	OnContract        func(ctx context.Context, dbid persist.DBID) (*Contract, error)
 	OnGallery         func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser     func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier  func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
@@ -98,6 +103,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnCommunity(ctx, string(ids[0]), string(ids[1]))
+	case "Contract":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Contract' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnContract(ctx, persist.DBID(ids[0]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -136,6 +146,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionToken")
 	case n.OnCommunity == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCommunity")
+	case n.OnContract == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnContract")
 	case n.OnGallery == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGallery")
 	case n.OnGalleryUser == nil:

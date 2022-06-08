@@ -207,6 +207,17 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type Contract struct {
+	Dbid            persist.DBID          `json:"dbid"`
+	LastUpdated     *time.Time            `json:"lastUpdated"`
+	ContractAddress *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
+	Chain           *persist.Chain        `json:"chain"`
+	Name            *string               `json:"name"`
+}
+
+func (Contract) IsNode() {}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
 	Name           string                 `json:"name"`
@@ -547,7 +558,7 @@ type Token struct {
 	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
 	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
 	TokenMetadata         *string               `json:"tokenMetadata"`
-	ContractAddress       *persist.ChainAddress `json:"contractAddress"`
+	Contract              *Contract             `json:"contract"`
 	ExternalURL           *string               `json:"externalUrl"`
 	BlockNumber           *string               `json:"blockNumber"`
 	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`

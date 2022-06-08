@@ -33,6 +33,12 @@ overrides:
   # Tokens
   - column: "tokens.owned_by_wallets"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+  - column: "tokens.contract"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+  # Contracts
+  - column: "contracts.address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
 
   # Membership
   - column: "membership.owners"
@@ -43,14 +49,14 @@ overrides:
   - column: "wallets.wallet_type"
     go_type: "github.com/mikeydub/go-gallery/service/persist.WalletType"
 
-# Follows
+  # Follows
   - column: "follows.followee"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "follows.follower"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
 
-# Wildcards
-# Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+  # Wildcards
+  # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "*.owner_user_id"
