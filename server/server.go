@@ -142,6 +142,7 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
 		NftEventRepository:        postgres.NewNftEventRepository(db),
 		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
+		EarlyAccessRepository:     postgres.NewEarlyAccessRepository(db),
 	}
 }
 

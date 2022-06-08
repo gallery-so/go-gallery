@@ -71,6 +71,7 @@ type Repositories struct {
 	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
 	CommunityRepository       CommunityRepository
+	EarlyAccessRepository     EarlyAccessRepository
 }
 
 // GenerateID generates a application-wide unique ID

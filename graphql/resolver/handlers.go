@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -81,7 +82,7 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 	return res, err
 }
 
-func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+func AuthRequiredDirectiveHandler(earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 	redisClient := redis.NewCache(redis.RequireNftsDB)
 
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
@@ -147,7 +148,7 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 			return nil, err
 		}
 
-		if hasNft, err := auth.HasAllowlistNFT(ctx, user.Addresses, ethClient); !hasNft {
+		if hasAccess, err := auth.HasGalleryAccess(ctx, user.Addresses, earlyAccessRepo, ethClient); !hasAccess {
 			errorMsg := err.Error()
 			modelErr := model.ErrDoesNotOwnRequiredNft{Message: errorMsg}
 			return makeErrNotAuthorized(errorMsg, modelErr), nil
