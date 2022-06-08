@@ -3,7 +3,6 @@ package multichain
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
@@ -66,12 +65,22 @@ type ErrChainNotFound struct {
 	Chain persist.Chain
 }
 
+type chainTokens struct {
+	chain  persist.Chain
+	tokens []ChainAgnosticToken
+}
+
+type chainContracts struct {
+	chain     persist.Chain
+	contracts []ChainAgnosticContract
+}
+
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
-	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, error)
-	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, error)
-	GetTokensByTokenIdentifiers(context.Context, persist.TokenIdentifiers) ([]ChainAgnosticToken, error)
+	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, persist.TokenIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
@@ -112,7 +121,8 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	errChan := make(chan error)
-	incomingTokens := make(chan []persist.TokenIdentifiers)
+	incomingTokens := make(chan chainTokens)
+	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 	for _, wallet := range user.Wallets {
 		if it, ok := chainsToAddresses[wallet.Chain]; ok {
@@ -126,7 +136,6 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
-		upsertedContracts := make(map[persist.Address]bool)
 		for _, addr := range addresses {
 			go func(addr persist.Address, chain persist.Chain) {
 				provider, ok := d.Chains[chain]
@@ -134,70 +143,56 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 					errChan <- ErrChainNotFound{Chain: chain}
 					return
 				}
-				tokens, err := provider.GetTokensByWalletAddress(ctx, addr)
+				tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
 				if err != nil {
 					errChan <- err
 					return
 				}
 
-				contracts := make([]ChainAgnosticContract, 0, len(tokens))
-				for _, token := range tokens {
-					if !upsertedContracts[token.ContractAddress] {
-						contract, err := provider.GetContractByAddress(ctx, token.ContractAddress)
-						if err != nil {
-							errChan <- err
-							return
-						}
-						contracts = append(contracts, contract)
-						upsertedContracts[token.ContractAddress] = true
-					}
-				}
-
-				newTokens, err := tokensToTokens(ctx, tokens, chain, user, addresses)
-				if err != nil {
-					errChan <- err
-					return
-				}
-        
-				newContracts, err := contractsToContracts(ctx, contracts, chain, user, addresses)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
-					errChan <- err
-					return
-				}
-				if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
-					errChan <- err
-					return
-				}
-				errChan <- nil
-        
-        identifiers := make([]persist.TokenIdentifiers, len(newTokens))
-				for i, t := range newTokens {
-					identifiers[i] = persist.NewTokenIdentifiers(t.ContractAddress, t.TokenID, t.Chain)
-				}
-				incomingTokens <- identifiers
+				incomingTokens <- chainTokens{chain: chain, tokens: tokens}
+				incomingContracts <- chainContracts{chain: chain, contracts: contracts}
 			}(addr, chain)
 		}
 	}
+	allTokens := []chainTokens{}
+	allContracts := []chainContracts{}
 	// ensure all tokens have been upserted
-	for i := 0; i < len(user.Wallets); i++ {
-		err := <-errChan
+	for i := 0; i < (len(user.Wallets) * 2); i++ {
+		select {
+		case incomingTokens := <-incomingTokens:
+			allTokens = append(allTokens, incomingTokens)
+		case incomingContracts := <-incomingContracts:
+			allContracts = append(allContracts, incomingContracts)
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-errChan:
+			return err
+		}
+	}
+	newContracts, err := contractsToContracts(ctx, allContracts)
+	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
+		return err
+	}
+	addressesToContracts := map[string]persist.DBID{}
+	for _, c := range newContracts {
+		newContract, err := d.ContractRepo.GetByAddress(ctx, c.Address, c.Chain)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("updated tokens for wallet %s", user.Wallets[i].Address)
+		addressesToContracts[c.Chain.NormalizeAddress(newContract.Address)] = newContract.ID
+	}
+
+	newTokens, err := tokensToTokens(ctx, allTokens, addressesToContracts, user)
+	if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
+		return err
 	}
 
 	// ensure all old tokens are deleted
-	ownedTokens := make(map[persist.TokenIdentifiers]bool)
-	for i := 0; i < len(user.Wallets); i++ {
-		identifiers := <-incomingTokens
-		for _, id := range identifiers {
-			ownedTokens[id] = true
-		}
+	ownedTokens := make(map[string]bool)
+	for _, t := range newTokens {
+
+		ownedTokens[createUniqueTokenString(t.Chain, t.TokenID, t.Contract)] = true
+
 	}
 
 	allUsersNFTs, err := d.TokenRepo.GetByUserID(ctx, userID, 0, 0)
@@ -205,7 +200,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	for _, nft := range allUsersNFTs {
-		if !ownedTokens[persist.NewTokenIdentifiers(nft.ContractAddress, nft.TokenID, nft.Chain)] {
+		if !ownedTokens[createUniqueTokenString(nft.Chain, nft.TokenID, nft.Contract)] {
 			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err
@@ -214,6 +209,10 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 	}
 
 	return nil
+}
+
+func createUniqueTokenString(chain persist.Chain, tokenID persist.TokenID, contract persist.DBID) string {
+	return fmt.Sprintf("%d-%s-%s", chain, contract, tokenID)
 }
 
 // VerifySignature verifies a signature for a wallet address
@@ -225,74 +224,75 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
 }
 
-func tokensToTokens(ctx context.Context, tokens []ChainAgnosticToken, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.TokenGallery, error) {
-	res := make([]persist.TokenGallery, len(tokens))
+func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+	res := make([]persist.TokenGallery, len(chaintokens))
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
 	for _, wallet := range ownerUser.Wallets {
-		for _, addr := range ownerAddresses {
-			if wallet.Address == addr {
-				addressToWallets[strings.ToLower(addr.String())] = wallet
-				break
-			}
-		}
+		// could a normalized address ever overlap with the normalized address of another chain?
+		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
+		addressToWallets[normalizedAddress] = wallet
 	}
-	for i, token := range tokens {
-		ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chain)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
-		}
-
-		ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chain)
-
-		if w, ok := addressToWallets[strings.ToLower(token.OwnerAddress.String())]; ok {
-			if it, ok := seenWallets[ti]; ok {
-				it = append(it, w)
-				seenWallets[ti] = it
-
-			} else {
-				seenWallets[ti] = []persist.Wallet{w}
+	for i, chainToken := range chaintokens {
+		for _, token := range chainToken.tokens {
+			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 			}
-		}
 
-		if q, ok := seenQuantities[ti]; ok {
-			seenQuantities[ti] = q.Add(token.Quantity)
-		} else {
-			seenQuantities[ti] = token.Quantity
-		}
+			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
-		res[i] = persist.TokenGallery{
-			Media:            token.Media,
-			TokenType:        token.TokenType,
-			Chain:            chain,
-			Name:             persist.NullString(token.Name),
-			Description:      persist.NullString(token.Description),
-			TokenURI:         token.TokenURI,
-			TokenID:          token.TokenID,
-			Quantity:         seenQuantities[ti],
-			OwnerUserID:      ownerUser.ID,
-			OwnedByWallets:   seenWallets[ti],
-			OwnershipHistory: ownership,
-			TokenMetadata:    token.TokenMetadata,
-			ContractAddress:  token.ContractAddress,
-			ExternalURL:      persist.NullString(token.ExternalURL),
-			BlockNumber:      token.BlockNumber,
+			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
+				if it, ok := seenWallets[ti]; ok {
+					it = append(it, w)
+					seenWallets[ti] = it
+
+				} else {
+					seenWallets[ti] = []persist.Wallet{w}
+				}
+			}
+
+			if q, ok := seenQuantities[ti]; ok {
+				seenQuantities[ti] = q.Add(token.Quantity)
+			} else {
+				seenQuantities[ti] = token.Quantity
+			}
+
+			res[i] = persist.TokenGallery{
+				Media:            token.Media,
+				TokenType:        token.TokenType,
+				Chain:            chainToken.chain,
+				Name:             persist.NullString(token.Name),
+				Description:      persist.NullString(token.Description),
+				TokenURI:         token.TokenURI,
+				TokenID:          token.TokenID,
+				Quantity:         seenQuantities[ti],
+				OwnerUserID:      ownerUser.ID,
+				OwnedByWallets:   seenWallets[ti],
+				OwnershipHistory: ownership,
+				TokenMetadata:    token.TokenMetadata,
+				Contract:         contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+				ExternalURL:      persist.NullString(token.ExternalURL),
+				BlockNumber:      token.BlockNumber,
+			}
 		}
 	}
 	return res, nil
 
 }
 
-func contractsToContracts(ctx context.Context, contracts []ChainAgnosticContract, chain persist.Chain, ownerUser persist.User, ownerAddresses []persist.Address) ([]persist.ContractGallery, error) {
-	res := make([]persist.ContractGallery, len(contracts))
-	for i, contract := range contracts {
-		res[i] = persist.ContractGallery{
-			Chain:          chain,
-			Address:        contract.Address,
-			Symbol:         persist.NullString(contract.Symbol),
-			Name:           persist.NullString(contract.Name),
-			CreatorAddress: contract.CreatorAddress,
+func contractsToContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
+	res := make([]persist.ContractGallery, 0, len(contracts))
+	for _, chainContract := range contracts {
+		for _, contract := range chainContract.contracts {
+			res = append(res, persist.ContractGallery{
+				Chain:          chainContract.chain,
+				Address:        contract.Address,
+				Symbol:         persist.NullString(contract.Symbol),
+				Name:           persist.NullString(contract.Name),
+				CreatorAddress: contract.CreatorAddress,
+			})
 		}
 
 	}
