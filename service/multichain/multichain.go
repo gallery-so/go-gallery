@@ -75,6 +75,12 @@ type chainContracts struct {
 	contracts []ChainAgnosticContract
 }
 
+type tokenIdentifiers struct {
+	chain    persist.Chain
+	tokenID  persist.TokenID
+	contract persist.DBID
+}
+
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
@@ -174,12 +180,21 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	addressesToContracts := map[string]persist.DBID{}
+	contractsForChain := map[persist.Chain][]persist.Address{}
 	for _, c := range newContracts {
-		newContract, err := d.ContractRepo.GetByAddress(ctx, c.Address, c.Chain)
+		if _, ok := contractsForChain[c.Chain]; !ok {
+			contractsForChain[c.Chain] = []persist.Address{}
+		}
+		contractsForChain[c.Chain] = append(contractsForChain[c.Chain], c.Address)
+	}
+	for chain, addresses := range contractsForChain {
+		newContracts, err := d.ContractRepo.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
 			return err
 		}
-		addressesToContracts[c.Chain.NormalizeAddress(newContract.Address)] = newContract.ID
+		for _, c := range newContracts {
+			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID
+		}
 	}
 
 	newTokens, err := tokensToTokens(ctx, allTokens, addressesToContracts, user)
@@ -188,11 +203,9 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 	}
 
 	// ensure all old tokens are deleted
-	ownedTokens := make(map[string]bool)
+	ownedTokens := make(map[tokenIdentifiers]bool)
 	for _, t := range newTokens {
-
-		ownedTokens[createUniqueTokenString(t.Chain, t.TokenID, t.Contract)] = true
-
+		ownedTokens[tokenIdentifiers{chain: t.Chain, tokenID: t.TokenID, contract: t.Contract}] = true
 	}
 
 	allUsersNFTs, err := d.TokenRepo.GetByUserID(ctx, userID, 0, 0)
@@ -200,7 +213,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		return err
 	}
 	for _, nft := range allUsersNFTs {
-		if !ownedTokens[createUniqueTokenString(nft.Chain, nft.TokenID, nft.Contract)] {
+		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
 			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err
@@ -244,13 +257,7 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
 			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
-				if it, ok := seenWallets[ti]; ok {
-					it = append(it, w)
-					seenWallets[ti] = it
-
-				} else {
-					seenWallets[ti] = []persist.Wallet{w}
-				}
+				seenWallets[ti] = append(seenWallets[ti], w)
 			}
 
 			if q, ok := seenQuantities[ti]; ok {
@@ -284,15 +291,19 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 
 func contractsToContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
 	res := make([]persist.ContractGallery, 0, len(contracts))
+	seen := make(map[persist.ChainAddress]bool)
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
-			res = append(res, persist.ContractGallery{
-				Chain:          chainContract.chain,
-				Address:        contract.Address,
-				Symbol:         persist.NullString(contract.Symbol),
-				Name:           persist.NullString(contract.Name),
-				CreatorAddress: contract.CreatorAddress,
-			})
+			if _, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; !ok {
+				res = append(res, persist.ContractGallery{
+					Chain:          chainContract.chain,
+					Address:        contract.Address,
+					Symbol:         persist.NullString(contract.Symbol),
+					Name:           persist.NullString(contract.Name),
+					CreatorAddress: contract.CreatorAddress,
+				})
+				seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = true
+			}
 		}
 
 	}

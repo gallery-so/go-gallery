@@ -342,6 +342,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.Contract, token.OwnerUserID, token.Chain); err != nil {
 				return err
 			}
+			continue
 		}
 		newTokens[i] = token
 	}
@@ -514,10 +515,17 @@ func (t *TokenGalleryRepository) deleteTokenUnsafe(pCtx context.Context, pTokenI
 	return err
 }
 
+type uniqueConstraintKey struct {
+	tokenID     persist.TokenID
+	contract    persist.DBID
+	chain       persist.Chain
+	ownerUserID persist.DBID
+}
+
 func (t *TokenGalleryRepository) dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
-	seen := map[string]persist.TokenGallery{}
+	seen := map[uniqueConstraintKey]persist.TokenGallery{}
 	for _, token := range pTokens {
-		key := token.Contract.String() + "-" + token.TokenID.String() + "-" + token.OwnerUserID.String()
+		key := uniqueConstraintKey{chain: token.Chain, contract: token.Contract, tokenID: token.TokenID, ownerUserID: token.OwnerUserID}
 		if seenToken, ok := seen[key]; ok {
 			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
 				continue

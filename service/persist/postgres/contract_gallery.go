@@ -13,6 +13,7 @@ import (
 type ContractGalleryRepository struct {
 	db                  *sql.DB
 	getByAddressStmt    *sql.Stmt
+	getByAddressesStmt  *sql.Stmt
 	upsertByAddressStmt *sql.Stmt
 }
 
@@ -24,10 +25,13 @@ func NewContractGalleryRepository(db *sql.DB) *ContractGalleryRepository {
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
 
+	getByAddressesStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = ANY($1) AND CHAIN = $2 AND DELETED = false;`)
+	checkNoErr(err)
+
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET VERSION = $2, ADDRESS = $3, SYMBOL = $4, NAME = $5, CREATOR_ADDRESS = $6, CHAIN = $7;`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt}
+	return &ContractGalleryRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt}
 }
 
 // GetByAddress returns the contract with the given address
@@ -39,6 +43,31 @@ func (c *ContractGalleryRepository) GetByAddress(pCtx context.Context, pAddress 
 	}
 
 	return contract, nil
+}
+
+// GetByAddresses returns the contract with the given address
+func (c *ContractGalleryRepository) GetByAddresses(pCtx context.Context, pAddresses []persist.Address, pChain persist.Chain) ([]persist.ContractGallery, error) {
+	res := []persist.ContractGallery{}
+	rows, err := c.getByAddressesStmt.QueryContext(pCtx, pAddresses, pChain)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contract persist.ContractGallery
+		err := rows.Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, contract)
+	}
+
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+
+	return res, nil
 }
 
 // UpsertByAddress upserts the contract with the given address
