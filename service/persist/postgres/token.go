@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"

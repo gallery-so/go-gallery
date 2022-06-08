@@ -243,7 +243,7 @@ type Token implements Node {
     ownedByWallets: [Wallet] @goField(forceResolver: true)
     ownershipHistory: [OwnerAtBlock]
     tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-    contractAddress: ChainAddress
+    contract: Contract @goField(forceResolver: true)
     externalUrl: String
     blockNumber: String # source is uint64
     # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
@@ -321,6 +321,18 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
     previewImage: String
 
     owners: [TokenHolder]
+}
+
+type Contract implements Node {
+    id: ID!
+    dbid: DBID!
+
+    lastUpdated: Time
+
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
+    name: String
 }
 
 # We have this extra type in case we need to stick authed data

@@ -60,20 +60,6 @@ type CollectionEvent struct {
 	Sent         sql.NullBool
 }
 
-type CollectionsV2 struct {
-	ID             persist.DBID
-	Deleted        bool
-	OwnerUserID    persist.DBID
-	Nfts           []string
-	Version        sql.NullInt32
-	LastUpdated    time.Time
-	CreatedAt      time.Time
-	Hidden         bool
-	CollectorsNote sql.NullString
-	Name           sql.NullString
-	Layout         pgtype.JSONB
-}
-
 type Contract struct {
 	ID             persist.DBID
 	Deleted        bool
@@ -82,7 +68,7 @@ type Contract struct {
 	LastUpdated    time.Time
 	Name           sql.NullString
 	Symbol         sql.NullString
-	Address        sql.NullString
+	Address        persist.Address
 	LatestBlock    sql.NullInt64
 	CreatorAddress persist.Address
 	Chain          sql.NullInt32
@@ -149,34 +135,6 @@ type Membership struct {
 	Owners      persist.TokenHolderList
 }
 
-type Nft struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	LastUpdated          time.Time
-	CreatedAt            time.Time
-	Name                 sql.NullString
-	Description          sql.NullString
-	CollectorsNote       sql.NullString
-	ExternalUrl          sql.NullString
-	CreatorAddress       persist.Address
-	CreatorName          sql.NullString
-	OwnerAddress         persist.Address
-	MultipleOwners       sql.NullBool
-	Contract             persist.NFTContract
-	OpenseaID            sql.NullInt64
-	OpenseaTokenID       sql.NullString
-	TokenCollectionName  sql.NullString
-	ImageUrl             sql.NullString
-	ImageThumbnailUrl    sql.NullString
-	ImagePreviewUrl      sql.NullString
-	ImageOriginalUrl     sql.NullString
-	AnimationUrl         sql.NullString
-	AnimationOriginalUrl sql.NullString
-	AcquisitionDate      sql.NullString
-	TokenMetadataUrl     sql.NullString
-}
-
 type NftEvent struct {
 	ID          persist.DBID
 	UserID      sql.NullString
@@ -209,7 +167,6 @@ type Token struct {
 	LastUpdated      time.Time
 	Name             sql.NullString
 	Description      sql.NullString
-	ContractAddress  sql.NullString
 	CollectorsNote   sql.NullString
 	Media            pgtype.JSONB
 	TokenUri         sql.NullString
@@ -223,6 +180,7 @@ type Token struct {
 	OwnerUserID      persist.DBID
 	OwnedByWallets   persist.DBIDList
 	Chain            sql.NullInt32
+	Contract         persist.DBID
 }
 
 type User struct {

@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     NAME varchar,
     DESCRIPTION varchar,
-    CONTRACT_ADDRESS varchar(255),
+    CONTRACT varchar(255),
     COLLECTORS_NOTE varchar,
     MEDIA jsonb,
     CHAIN int,
@@ -88,9 +88,9 @@ CREATE TABLE IF NOT EXISTS tokens (
     BLOCK_NUMBER bigint
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_address_chain_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, CHAIN, OWNER_USER_ID) WHERE DELETED = false;
+CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_chain_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT, CHAIN, OWNER_USER_ID) WHERE DELETED = false;
 
-CREATE INDEX IF NOT EXISTS token_id_contract_address_chain_idx ON tokens (TOKEN_ID, CONTRACT_ADDRESS, CHAIN);
+CREATE INDEX IF NOT EXISTS token_id_contract_chain_idx ON tokens (TOKEN_ID, CONTRACT, CHAIN);
 
 CREATE INDEX IF NOT EXISTS owner_user_id_idx ON tokens (OWNER_USER_ID);
 

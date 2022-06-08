@@ -278,6 +278,22 @@ func resolveTokenOwnerByTokenID(ctx context.Context, tokenID persist.DBID) (*mod
 	return resolveGalleryUserByUserID(ctx, token.OwnerUserID)
 }
 
+func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Contract, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contractToModel(ctx, *contract), nil
+}
+
 func resolveWalletByWalletID(ctx context.Context, walletID persist.DBID) (*model.Wallet, error) {
 	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, walletID)
 	if err != nil {
@@ -433,6 +449,21 @@ func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
 	}
 }
 
+func contractToModel(ctx context.Context, contract sqlc.Contract) *model.Contract {
+	chain := persist.Chain(contract.Chain.Int32)
+	addr := persist.NewChainAddress(contract.Address, chain)
+	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
+
+	return &model.Contract{
+		Dbid:            contract.ID,
+		ContractAddress: &addr,
+		CreatorAddress:  &creator,
+		Chain:           &chain,
+		Name:            &contract.Name.String,
+		LastUpdated:     &contract.LastUpdated,
+	}
+}
+
 func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 
@@ -498,7 +529,6 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 
 func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
-	contractAddress := persist.NewChainAddress(persist.Address(token.ContractAddress.String), chain)
 
 	return &model.Token{
 		Dbid:             token.ID,
@@ -517,7 +547,7 @@ func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
 		TokenMetadata:    nil, // TODO: later
-		ContractAddress:  &contractAddress,
+		Contract:         nil, // handled by dedicated resolver
 		ExternalURL:      &token.ExternalUrl.String,
 		BlockNumber:      nil, // TODO: later
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -203,28 +204,38 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	}
 	// communityRepo := postgres.NewCommunityRepository(pg, redis.NewCache(0))
 
-	toUpsertChan := make(chan tokenContractCombo)
+	toUpsertChan := make(chan persist.TokenGallery)
 	errChan := make(chan error)
 	go func() {
 		defer close(toUpsertChan)
 		wp := workerpool.New(1000)
+		contracts := &sync.Map{}
 		for nft := range nfts {
 			n := nft
 			f := func() {
-				token, err := nftToToken(ctx, pg, n, block)
+				normalized := persist.ChainETH.NormalizeAddress(persist.Address(n.Contract.ContractAddress))
+
+				contractID, ok := contracts.Load(normalized)
+				if !ok {
+					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID)
+					if err != nil {
+						if err == sql.ErrNoRows {
+							contractID = persist.GenerateID()
+							_, err = pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5);`, contractID, normalized, n.Contract.ContractName, n.Contract.ContractSymbol, n.CreatorAddress)
+						}
+						if err != nil {
+							errChan <- err
+							return
+						}
+					}
+					contracts.Store(normalized, contractID)
+				}
+				token, err := nftToToken(ctx, pg, n, contractID.(persist.DBID), block)
 				if err != nil {
 					errChan <- err
 					return
 				}
-				// comm, err := communityRepo.GetByAddress(ctx, persist.NewChainAddress(token.ContractAddress, token.Chain), true)
-				// if err != nil {
-				// 	if _, ok := err.(persist.ErrCommunityNotFound); !ok {
-				// 		errChan <- err
-				// 		return
-				// 	}
-				// }
-				// contract := communityToContract(comm)
-				toUpsertChan <- tokenContractCombo{persist.ContractGallery{}, token}
+				toUpsertChan <- token
 			}
 
 			wp.Submit(f)
@@ -235,7 +246,6 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	perUpsert := 2000
 
 	tokens := make([]persist.TokenGallery, perUpsert)
-	contracts := make([]persist.ContractGallery, perUpsert)
 	i := 0
 	j := 0
 	bar := progressbar.Default(int64(perUpsert), "Prepping Upsert")
@@ -248,22 +258,16 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 				if err != nil {
 					return err
 				}
-				err = upsertContracts(pg, dedupeContracts(contracts))
-				if err != nil {
-					return err
-				}
 				if !ok {
 					return nil
 				}
 				tokens = make([]persist.TokenGallery, perUpsert)
-				contracts = make([]persist.ContractGallery, perUpsert)
 				i = 0
 				j++
 				bar = progressbar.Default(int64(perUpsert), fmt.Sprintf("Prepping Upsert"))
 				logrus.Infof("Upserted NFTs %d", j)
 			}
-			tokens[i] = toUpsert.token
-			contracts[i] = toUpsert.contract
+			tokens[i] = toUpsert
 			bar.Add(1)
 			i++
 		case err := <-errChan:
@@ -285,41 +289,7 @@ func splitNFTs(n int, nfts []persist.NFT) [][]persist.NFT {
 	return chunks
 }
 
-func nftsToTokens(pg *sql.DB, ethClient *ethclient.Client, nfts []persist.NFT) ([]persist.TokenGallery, error) {
-	bar := progressbar.Default(int64(len(nfts)), "Converting NFTs to Tokens")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel()
-	block, err := ethClient.BlockNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
-	logrus.Infof("Current block number: %d", block)
-	tokens := make([]persist.TokenGallery, len(nfts))
-	tokensChan := make(chan persist.TokenGallery)
-	errChan := make(chan error)
-	for _, n := range nfts {
-		go func(nft persist.NFT) {
-			token, err := nftToToken(ctx, pg, nft, block)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			tokensChan <- token
-		}(n)
-	}
-	for i := range nfts {
-		select {
-		case err := <-errChan:
-			return nil, err
-		case token := <-tokensChan:
-			tokens[i] = token
-		}
-		bar.Add(1)
-	}
-	return dedupeTokens(tokens), nil
-}
-
-func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) (persist.TokenGallery, error) {
+func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID persist.DBID, block uint64) (persist.TokenGallery, error) {
 	var tokenType persist.TokenType
 	var quantity persist.HexString
 	switch nft.Contract.ContractSchemaName {
@@ -389,7 +359,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, block uint64) 
 		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
 		TokenID:          nft.OpenseaTokenID,
 		OwnerUserID:      ownerUserID,
-		ContractAddress:  persist.Address(nft.Contract.ContractAddress),
+		Contract:         contractID,
 		ExternalURL:      nft.ExternalURL,
 		BlockNumber:      persist.BlockNumber(block),
 		TokenMetadata:    metadata,
@@ -431,7 +401,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 	vals := make([]interface{}, 0, len(tokens)*paramsPerRow)
 	for i, token := range tokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, token.OwnershipHistory, token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, token.OwnershipHistory, token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
@@ -449,7 +419,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
 	seen := map[string]persist.TokenGallery{}
 	for _, token := range pTokens {
-		key := token.ContractAddress.String() + "-" + token.TokenID.String() + "-" + token.OwnerUserID.String()
+		key := token.Contract.String() + "-" + token.TokenID.String() + "-" + token.OwnerUserID.String()
 		if seenToken, ok := seen[key]; ok {
 			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
 				continue

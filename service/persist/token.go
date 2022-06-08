@@ -360,6 +360,16 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }
 
+// NormalizeAddress normalizes an address for the given chain
+func (c Chain) NormalizeAddress(addr Address) string {
+	switch c {
+	case ChainETH:
+		return strings.ToLower(addr.String())
+	default:
+		return addr.String()
+	}
+}
+
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
 	return c, nil

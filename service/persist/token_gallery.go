@@ -34,7 +34,7 @@ type TokenGallery struct {
 	OwnedByWallets   []Wallet         `json:"owned_by_wallets"`
 	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata    `json:"metadata"`
-	ContractAddress  Address          `json:"contract_address"`
+	Contract         DBID             `json:"contract"`
 
 	ExternalURL NullString `json:"external_url"`
 
@@ -132,7 +132,7 @@ func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chai
 }
 
 func (t TokenIdentifiers) String() string {
-	return fmt.Sprintf("%s+%s+%d", t.ContractAddress, t.TokenID, t.Chain)
+	return fmt.Sprintf("%s+%s+%d", t.Chain.NormalizeAddress(t.ContractAddress), t.TokenID, t.Chain)
 }
 
 // Value implements the driver.Valuer interface

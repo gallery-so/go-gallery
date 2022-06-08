@@ -147,29 +147,37 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 }
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	assets, err := FetchAssetsForWallet(ctx, persist.EthereumAddress(address.String()), "", 0, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return assetsToTokens(ctx, address, assets, p.ethClient)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
-func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(address), "", "", 0, nil)
 	if err != nil {
-		return nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	// TODO: Fill in this address or change something else
-	return assetsToTokens(ctx, "", assets, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assets, p.ethClient)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	var contract multichain.ChainAgnosticContract
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	return tokens, contract, nil
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// TODO: Fill in this address or change something else
 	return assetsToTokens(ctx, "", assets, p.ethClient)
@@ -401,12 +409,14 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return response, nil
 }
 
-func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, error) {
+func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]multichain.ChainAgnosticToken, len(openseaNfts))
+	resultTokens := make([]multichain.ChainAgnosticToken, len(openseaNfts))
+	seenContracts := make(map[string]bool)
+	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(openseaNfts))
 	for i, nft := range openseaNfts {
 		var tokenType persist.TokenType
 		switch nft.Contract.ContractSchemaName {
@@ -415,7 +425,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 		case "ERC1155":
 			tokenType = persist.TokenTypeERC1155
 		default:
-			return nil, fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+			return nil, nil, fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
 		}
 
 		metadata := persist.TokenMetadata{
@@ -478,9 +488,20 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 			Media:           med,
 			Quantity:        "1",
 		}
-		result[i] = token
+		resultTokens[i] = token
+
+		if !seenContracts[persist.ChainETH.NormalizeAddress(token.ContractAddress)] {
+			seenContracts[persist.ChainETH.NormalizeAddress(token.ContractAddress)] = true
+			resultContracts = append(resultContracts, multichain.ChainAgnosticContract{
+				Address:        token.ContractAddress,
+				Symbol:         nft.Contract.ContractSymbol.String(),
+				Name:           nft.Contract.ContractName.String(),
+				CreatorAddress: persist.Address(nft.Creator.Address),
+				LatestBlock:    persist.BlockNumber(block),
+			})
+		}
 	}
-	return result, nil
+	return resultTokens, resultContracts, nil
 }
 
 func contractToContract(ctx context.Context, openseaContract Contract, ethClient *ethclient.Client) (multichain.ChainAgnosticContract, error) {
