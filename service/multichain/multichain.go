@@ -224,10 +224,6 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 	return nil
 }
 
-func createUniqueTokenString(chain persist.Chain, tokenID persist.TokenID, contract persist.DBID) string {
-	return fmt.Sprintf("%d-%s-%s", chain, contract, tokenID)
-}
-
 // VerifySignature verifies a signature for a wallet address
 func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainAddress, pWalletType persist.WalletType) (bool, error) {
 	provider, ok := d.Chains[pChainAddress.Chain()]
