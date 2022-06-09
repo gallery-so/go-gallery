@@ -34,7 +34,7 @@ func (u *EarlyAccessRepository) IsAllowedByAddresses(ctx context.Context, addres
 	}
 
 	var allowed bool
-	err := u.existsByAddressesStmt.QueryRowContext(ctx, pq.Array(addresses)).Scan(&allowed)
+	err := u.existsByAddressesStmt.QueryRowContext(ctx, pq.Array(lowerAddresses)).Scan(&allowed)
 	if err != nil {
 		return false, err
 	}
