@@ -263,8 +263,8 @@ func Logout(pCtx context.Context) {
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
+func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPreAuthed bool, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
+	walletRepository persist.WalletRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
 	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
@@ -284,7 +284,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 	}
 
 	if !pPreAuthed {
-		if hasNft, err := HasAllowlistToken(pCtx, []persist.ChainAddress{pChainAddress}, ethClient); !hasNft {
+		if hasAccess, err := HasGalleryAccess(pCtx, []persist.ChainAddress{pChainAddress}, earlyAccessRepo, ethClient); !hasAccess {
 			return "", false, err
 		}
 	}
@@ -304,6 +304,20 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 
 	nonce = NewNoncePrepend + dbNonce.Value.String()
 	return nonce, userExists, nil
+}
+
+func HasGalleryAccess(ctx context.Context, addresses []persist.ChainAddress, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (bool, error) {
+	tokenAccess, tokenErr := HasAllowlistToken(ctx, addresses, ethClient)
+	if tokenErr == nil && tokenAccess {
+		return true, nil
+	}
+
+	eaAccess, eaErr := earlyAccessRepo.IsAllowedByAddresses(ctx, addresses)
+	if eaErr == nil && eaAccess {
+		return true, nil
+	}
+
+	return false, tokenErr
 }
 
 func HasAllowlistToken(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {

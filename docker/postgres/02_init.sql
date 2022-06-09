@@ -249,6 +249,10 @@ CREATE TABLE IF NOT EXISTS follows (
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS early_access (
+    address varchar(255) NOT NULL PRIMARY KEY
+);
+
 CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows (FOLLOWER);
 
 CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (FOLLOWEE);

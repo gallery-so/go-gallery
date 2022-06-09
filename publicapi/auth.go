@@ -41,7 +41,7 @@ func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainA
 	gc := util.GinContextFromContext(ctx)
 	authed := auth.GetUserAuthedFromCtx(gc)
 
-	return auth.GetAuthNonce(ctx, chainAddress, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.WalletRepository, api.ethClient)
+	return auth.GetAuthNonce(ctx, chainAddress, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.WalletRepository, api.repos.EarlyAccessRepository, api.ethClient)
 }
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {

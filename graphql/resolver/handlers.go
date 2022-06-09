@@ -6,15 +6,10 @@ import (
 	"errors"
 	"fmt"
 	gqlgen "github.com/99designs/gqlgen/graphql"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/getsentry/sentry-go"
-	goredis "github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
-	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
@@ -27,7 +22,6 @@ import (
 	"github.com/vektah/gqlparser/v2/validator"
 	"sort"
 	"strings"
-	"time"
 )
 
 const scrubText = "<scrubbed>"
@@ -82,8 +76,7 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 	return res, err
 }
 
-func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-	redisClient := redis.NewCache(redis.RequireNftsDB)
+func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
@@ -122,47 +115,6 @@ func AuthRequiredDirectiveHandler(ethClient *ethclient.Client) func(ctx context.
 		userID := auth.GetUserIDFromCtx(gc)
 		if userID == "" {
 			panic(fmt.Errorf("userID is empty, but no auth error occurred"))
-		}
-
-		if !viper.GetBool("REQUIRE_NFTS") {
-			return next(ctx)
-		}
-
-		// If we've verified this recently, use the cached result. The real check is pretty slow (~hundreds of milliseconds).
-		cachedResult, err := redisClient.Get(ctx, userID.String())
-		if err == nil {
-			if len(cachedResult) > 0 && cachedResult[0] == 1 {
-				return next(ctx)
-			}
-		} else if err != goredis.Nil {
-			sentryutil.ReportError(ctx, err)
-			logger.For(ctx).Warnf("checking REQUIRE_NFTS in cache failed with error: %s", err)
-		}
-
-		span, ctx := tracing.StartSpan(ctx, "gql.directive", "REQUIRE_NFTS")
-		defer tracing.FinishSpan(span)
-
-		wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		addresses := make([]persist.ChainAddress, len(wallets))
-		for i, w := range wallets {
-			addresses[i] = persist.NewChainAddress(w.Address, persist.Chain(w.Chain.Int32))
-		}
-
-		if hasToken, err := auth.HasAllowlistToken(ctx, addresses, ethClient); !hasToken {
-			errorMsg := err.Error()
-			modelErr := model.ErrDoesNotOwnRequiredToken{Message: errorMsg}
-			return makeErrNotAuthorized(errorMsg, modelErr), nil
-		}
-
-		// Cache the REQUIRE_NFTS result for an hour
-		err = redisClient.Set(ctx, userID.String(), []byte{1}, time.Hour)
-		if err != nil {
-			sentryutil.ReportError(ctx, err)
-			logger.For(ctx).Warnf("caching REQUIRE_NFTS result failed with error: %s\n", err)
 		}
 
 		return next(ctx)
