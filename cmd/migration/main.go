@@ -57,18 +57,24 @@ func run() {
 	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
 	// 	panic(err)
 	// }
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	// NFTs migration
+
+	logrus.Info("Creating wallets and addresses in DB and adding them to users... Done")
 
 	var count int
 	pgClient.QueryRow("SELECT COUNT(*) FROM nfts;").Scan(&count)
 	logrus.Infof("Found %d NFTs", count)
 	nftsChan := make(chan persist.NFT)
 
+	allUserIDs, err := getAllUserIDs(pgClient)
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
 		logrus.Info("Getting all NFTs...")
-		if err := getAllNFTs(pgClient, nftsChan); err != nil {
+		if err := getAllNFTs(pgClient, allUserIDs, nftsChan); err != nil {
 			panic(err)
 		}
 		logrus.Info("Getting all NFTs... Done")
@@ -125,6 +131,24 @@ func copyUsersToTempTable(pg *sql.DB) error {
 	return nil
 }
 
+func getAllUserIDs(pg *sql.DB) ([]persist.DBID, error) {
+	rows, err := pg.Query(`SELECT ID FROM users WHERE DELETED = false;`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 func getAllUsersWallets(pg *sql.DB) (map[persist.DBID][]persist.Address, error) {
 
 	rows, err := pg.Query(`SELECT ID,WALLETS FROM temp_users;`)
@@ -171,22 +195,33 @@ func createWalletAndAddresses(pg *sql.DB, idsToAddresses map[persist.DBID][]pers
 	return nil
 }
 
-func getAllNFTs(pg *sql.DB, nftsChan chan<- persist.NFT) error {
-	rows, err := pg.Query(`SELECT ID,DELETED,VERSION,CREATED_AT,LAST_UPDATED,NAME,DESCRIPTION,EXTERNAL_URL,CREATOR_ADDRESS,CREATOR_NAME,OWNER_ADDRESS,MULTIPLE_OWNERS,CONTRACT,OPENSEA_ID,OPENSEA_TOKEN_ID,IMAGE_URL,IMAGE_THUMBNAIL_URL,IMAGE_PREVIEW_URL,IMAGE_ORIGINAL_URL,ANIMATION_URL,ANIMATION_ORIGINAL_URL,TOKEN_COLLECTION_NAME,COLLECTORS_NOTE FROM nfts;`)
-	if err != nil {
-		return err
-	}
-
-	defer rows.Close()
+func getAllNFTs(pg *sql.DB, users []persist.DBID, nftsChan chan<- persist.NFT) error {
 	defer close(nftsChan)
+	for _, user := range users {
+		err := func() error {
+			rows, err := pg.Query(`SELECT n.ID,n.DELETED,n.VERSION,n.CREATED_AT,n.LAST_UPDATED,n.NAME,n.DESCRIPTION,n.EXTERNAL_URL,n.CREATOR_ADDRESS,n.CREATOR_NAME,n.OWNER_ADDRESS,n.MULTIPLE_OWNERS,n.CONTRACT,n.OPENSEA_ID,n.OPENSEA_TOKEN_ID,n.IMAGE_URL,n.IMAGE_THUMBNAIL_URL,n.IMAGE_PREVIEW_URL,n.IMAGE_ORIGINAL_URL,n.ANIMATION_URL,n.ANIMATION_ORIGINAL_URL,n.TOKEN_COLLECTION_NAME,n.COLLECTORS_NOTE FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
+	LEFT JOIN collections c ON c.ID = coll AND c.DELETED = false
+	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM nfts n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
+	WHERE g.OWNER_USER_ID = $1 AND g.DELETED = false ORDER BY coll_ord,n.nft_ord;`, user)
+			if err != nil {
+				return err
+			}
 
-	for rows.Next() {
-		var nft persist.NFT
-		err := rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
+			defer rows.Close()
+
+			for rows.Next() {
+				var nft persist.NFT
+				err := rows.Scan(&nft.ID, &nft.Deleted, &nft.Version, &nft.CreationTime, &nft.LastUpdatedTime, &nft.Name, &nft.Description, &nft.ExternalURL, &nft.CreatorAddress, &nft.CreatorName, &nft.OwnerAddress, &nft.MultipleOwners, &nft.Contract, &nft.OpenseaID, &nft.OpenseaTokenID, &nft.ImageURL, &nft.ImageThumbnailURL, &nft.ImagePreviewURL, &nft.ImageOriginalURL, &nft.AnimationURL, &nft.AnimationOriginalURL, &nft.TokenCollectionName, &nft.CollectorsNote)
+				if err != nil {
+					return err
+				}
+				nftsChan <- nft
+			}
+			return nil
+		}()
 		if err != nil {
 			return err
 		}
-		nftsChan <- nft
 	}
 	return nil
 }
@@ -197,38 +232,45 @@ type tokenContractCombo struct {
 }
 
 func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NFT) error {
+
+	pg.Exec(`TRUNCATE tokens;`)
+
 	ctx := context.Background()
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return err
 	}
-	// communityRepo := postgres.NewCommunityRepository(pg, redis.NewCache(0))
 
 	toUpsertChan := make(chan persist.TokenGallery)
 	errChan := make(chan error)
+	wp := workerpool.New(500)
 	go func() {
 		defer close(toUpsertChan)
-		wp := workerpool.New(1000)
 		contracts := &sync.Map{}
 		for nft := range nfts {
 			n := nft
 			f := func() {
 				normalized := persist.ChainETH.NormalizeAddress(persist.Address(n.Contract.ContractAddress))
-
-				contractID, ok := contracts.Load(normalized)
+				contractID, ok := contracts.LoadOrStore(normalized, "")
 				if !ok {
 					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID)
 					if err != nil {
-						if err == sql.ErrNoRows {
-							contractID = persist.GenerateID()
-							_, err = pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5);`, contractID, normalized, n.Contract.ContractName, n.Contract.ContractSymbol, n.CreatorAddress)
-						}
+						contractID = persist.GenerateID()
+						res, err := pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;`, contractID, normalized, n.Contract.ContractName, n.Contract.ContractSymbol, n.CreatorAddress)
 						if err != nil {
-							errChan <- err
-							return
+							logrus.Errorf("error inserting contract %s: %s", normalized, err)
+						}
+						if aff, err := res.RowsAffected(); aff == 0 && err == nil {
+							if err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID); err != nil {
+								logrus.Errorf("error retrieving contract %s: %s", normalized, err)
+							}
 						}
 					}
 					contracts.Store(normalized, contractID)
+				}
+				asString, ok := contractID.(string)
+				if ok {
+					contractID = persist.DBID(asString)
 				}
 				token, err := nftToToken(ctx, pg, n, contractID.(persist.DBID), block)
 				if err != nil {
@@ -243,7 +285,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		wp.StopWait()
 	}()
 
-	perUpsert := 2000
+	perUpsert := 1000
 
 	tokens := make([]persist.TokenGallery, perUpsert)
 	i := 0
@@ -316,18 +358,18 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 
 	case nft.AnimationOriginalURL != "":
 		med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-		med.MediaType, _ = media.PredictMediaType(ctx, nft.AnimationOriginalURL.String())
+		med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL.String())
 
 	case nft.ImageURL != "":
 		med.MediaURL = persist.NullString(nft.ImageURL)
-		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageURL.String())
+		med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL.String())
 	case nft.ImageOriginalURL != "":
 		med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageOriginalURL.String())
+		med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL.String())
 
 	default:
 		med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-		med.MediaType, _ = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
+		med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL.String())
 	}
 	if err != nil {
 		atomic.AddInt64(&badMedias, 1)
@@ -397,7 +439,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 		tokens = current
 	}
 
-	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
+	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
 	vals := make([]interface{}, 0, len(tokens)*paramsPerRow)
 	for i, token := range tokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
@@ -406,7 +448,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID, CONTRACT_ADDRESS, CHAIN, OWNER_USER_ID) WHERE tokens.DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
+	sqlStr += ` ON CONFLICT DO NOTHING;`
 
 	_, err := pg.ExecContext(ctx, sqlStr, vals...)
 	if err != nil {
@@ -416,6 +458,7 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 	return nil
 
 }
+
 func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
 	seen := map[string]persist.TokenGallery{}
 	for _, token := range pTokens {
@@ -428,9 +471,21 @@ func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
 		}
 		seen[key] = token
 	}
-	result := make([]persist.TokenGallery, 0, len(seen))
+	result := make([]persist.TokenGallery, len(seen))
+	i := 0
 	for _, v := range seen {
-		result = append(result, v)
+		result[i] = v
+		i++
+	}
+	seenIDs := map[persist.DBID]persist.TokenGallery{}
+	for _, token := range result {
+		seenIDs[token.ID] = token
+	}
+	result = make([]persist.TokenGallery, len(seenIDs))
+	i = 0
+	for _, v := range seenIDs {
+		result[i] = v
+		i++
 	}
 	return result
 }
