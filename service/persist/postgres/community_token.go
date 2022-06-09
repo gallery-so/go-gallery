@@ -19,12 +19,10 @@ type CommunityTokenRepository struct {
 	cache memstore.Cache
 	db    *sql.DB
 
-	getInfoStmt                 *sql.Stmt
-	getUserByAddressStmt        *sql.Stmt
-	getUserByWalletIDStmt       *sql.Stmt
-	getContractStmt             *sql.Stmt
-	getWalletByChainAddressStmt *sql.Stmt
-	getPreviewNFTsStmt          *sql.Stmt
+	getInfoStmt           *sql.Stmt
+	getUserByWalletIDStmt *sql.Stmt
+	getContractStmt       *sql.Stmt
+	getPreviewNFTsStmt    *sql.Stmt
 }
 
 // NewCommunityTokenRepository returns a new CommunityRepository
@@ -37,17 +35,17 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
 	LEFT JOIN collections c ON c.ID = coll
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM tokens n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
-	WHERE n.CONTRACT_ADDRESS = $1 AND g.DELETED = false AND c.DELETED = false AND n.DELETED = false ORDER BY coll_ord,n.nft_ord;`,
+	WHERE n.CONTRACT = $1 AND g.DELETED = false AND c.DELETED = false AND n.DELETED = false ORDER BY coll_ord,n.nft_ord;`,
 	)
 	checkNoErr(err)
 
 	getUserByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE WALLETS @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
-	getContractStmt, err := db.PrepareContext(ctx, `SELECT NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
+	getContractStmt, err := db.PrepareContext(ctx, `SELECT ID,NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
 	checkNoErr(err)
 
-	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT_ADDRESS = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
+	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
 	return &CommunityTokenRepository{
@@ -62,8 +60,8 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 
 // GetByAddress returns a community by its address
 func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityAddress persist.ChainAddress, forceRefresh bool) (persist.Community, error) {
-	var community persist.Community
 
+	var community persist.Community
 	if !forceRefresh {
 		bs, err := c.cache.Get(ctx, pCommunityAddress.Address().String())
 		if err == nil && len(bs) > 0 {
@@ -129,7 +127,8 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 		community.Description = ""
 	}
 
-	err = c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&community.Name, &community.CreatorAddress)
+	var contractID persist.DBID
+	err = c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&contractID, &community.Name, &community.CreatorAddress)
 	if err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
 	}
@@ -164,7 +163,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	for _, tokenHolder := range tokenHolders {
 		previewNFTs := make([]persist.NullString, 0, 3)
 
-		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, pCommunityAddress.Address(), pq.Array(tokenHolder.WalletIDs))
+		rows, err = c.getPreviewNFTsStmt.QueryContext(ctx, contractID, pq.Array(tokenHolder.WalletIDs))
 		defer rows.Close()
 
 		if err != nil {

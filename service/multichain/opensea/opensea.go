@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -54,7 +56,7 @@ type Asset struct {
 	Description string `json:"description"`
 
 	ExternalURL      string              `json:"external_link"`
-	TokenMetadataURL string              `json:"token_metadata_url"`
+	TokenMetadataURL string              `json:"token_metadata"`
 	Creator          Account             `json:"creator"`
 	Owner            Account             `json:"owner"`
 	Contract         persist.NFTContract `json:"asset_contract"`
@@ -410,95 +412,121 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 }
 
 func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	resultTokens := make([]multichain.ChainAgnosticToken, len(openseaNfts))
-	seenContracts := make(map[string]bool)
+	resultTokens := make([]multichain.ChainAgnosticToken, 0, len(openseaNfts))
+	seenContracts := &sync.Map{}
 	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(openseaNfts))
-	for i, nft := range openseaNfts {
-		var tokenType persist.TokenType
-		switch nft.Contract.ContractSchemaName {
-		case "ERC721", "CRYPTOPUNKS":
-			tokenType = persist.TokenTypeERC721
-		case "ERC1155":
-			tokenType = persist.TokenTypeERC1155
-		default:
-			return nil, nil, fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
-		}
+	tokensChan := make(chan multichain.ChainAgnosticToken)
+	contractsChan := make(chan multichain.ChainAgnosticContract)
+	errChan := make(chan error)
+	wp := workerpool.New(10)
 
-		metadata := persist.TokenMetadata{
-			"name":          nft.Name,
-			"description":   nft.Description,
-			"image_url":     nft.ImageOriginalURL,
-			"animation_url": nft.AnimationOriginalURL,
-		}
-
-		med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
-		switch {
-		case nft.AnimationURL != "":
-			med.MediaURL = persist.NullString(nft.AnimationURL)
-			med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
-			if err != nil {
-				logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationURL, err)
-			}
-		case nft.AnimationOriginalURL != "":
-			med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-			med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
-
-			if err != nil {
-				logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationOriginalURL, err)
-			}
-		case nft.ImageURL != "":
-			med.MediaURL = persist.NullString(nft.ImageURL)
-			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
-
-			if err != nil {
-				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageURL, err)
-			}
-		case nft.ImageOriginalURL != "":
-			med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
-
-			if err != nil {
-				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageOriginalURL, err)
+	for _, n := range openseaNfts {
+		nft := n
+		wp.Submit(func() {
+			var tokenType persist.TokenType
+			switch nft.Contract.ContractSchemaName {
+			case "ERC721", "CRYPTOPUNKS":
+				tokenType = persist.TokenTypeERC721
+			case "ERC1155":
+				tokenType = persist.TokenTypeERC1155
+			default:
+				errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+				return
 			}
 
-		default:
-			med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-			med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
-
-			if err != nil {
-				logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
+			metadata := persist.TokenMetadata{
+				"name":          nft.Name,
+				"description":   nft.Description,
+				"image_url":     nft.ImageOriginalURL,
+				"animation_url": nft.AnimationOriginalURL,
 			}
-		}
 
-		token := multichain.ChainAgnosticToken{
-			TokenType:       tokenType,
-			Name:            nft.Name,
-			Description:     nft.Description,
-			TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-			TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-			OwnerAddress:    address,
-			ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
-			ExternalURL:     nft.ExternalURL,
-			BlockNumber:     persist.BlockNumber(block),
-			TokenMetadata:   metadata,
-			Media:           med,
-			Quantity:        "1",
-		}
-		resultTokens[i] = token
+			med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
+			switch {
+			case nft.AnimationURL != "":
+				med.MediaURL = persist.NullString(nft.AnimationURL)
+				med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
+				if err != nil {
+					logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationURL, err)
+				}
+			case nft.AnimationOriginalURL != "":
+				med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
+				med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
 
-		if !seenContracts[persist.ChainETH.NormalizeAddress(token.ContractAddress)] {
-			seenContracts[persist.ChainETH.NormalizeAddress(token.ContractAddress)] = true
-			resultContracts = append(resultContracts, multichain.ChainAgnosticContract{
-				Address:        token.ContractAddress,
+				if err != nil {
+					logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationOriginalURL, err)
+				}
+			case nft.ImageURL != "":
+				med.MediaURL = persist.NullString(nft.ImageURL)
+				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
+
+				if err != nil {
+					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageURL, err)
+				}
+			case nft.ImageOriginalURL != "":
+				med.MediaURL = persist.NullString(nft.ImageOriginalURL)
+				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+
+				if err != nil {
+					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageOriginalURL, err)
+				}
+
+			default:
+				med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
+				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+
+				if err != nil {
+					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
+				}
+			}
+
+			contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
+				Address:        persist.Address(nft.Contract.ContractAddress.String()),
 				Symbol:         nft.Contract.ContractSymbol.String(),
 				Name:           nft.Contract.ContractName.String(),
 				CreatorAddress: persist.Address(nft.Creator.Address),
 				LatestBlock:    persist.BlockNumber(block),
 			})
+			if !ok {
+				contractsChan <- contract.(multichain.ChainAgnosticContract)
+			} else {
+				contractsChan <- multichain.ChainAgnosticContract{}
+			}
+
+			tokensChan <- multichain.ChainAgnosticToken{
+				TokenType:       tokenType,
+				Name:            nft.Name,
+				Description:     nft.Description,
+				TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
+				TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
+				OwnerAddress:    address,
+				ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
+				ExternalURL:     nft.ExternalURL,
+				BlockNumber:     persist.BlockNumber(block),
+				TokenMetadata:   metadata,
+				Media:           med,
+				Quantity:        "1",
+			}
+		})
+	}
+
+	for i := 0; i < (len(openseaNfts) * 2); i++ {
+		select {
+		case token := <-tokensChan:
+			resultTokens = append(resultTokens, token)
+		case contract := <-contractsChan:
+			if contract.Address.String() != "" {
+				resultContracts = append(resultContracts, contract)
+			}
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		case err := <-errChan:
+			return nil, nil, err
 		}
 	}
 	return resultTokens, resultContracts, nil

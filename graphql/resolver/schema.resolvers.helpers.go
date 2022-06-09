@@ -31,6 +31,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnToken:          resolveTokenByTokenID,
 	OnWallet:         resolveWalletByAddress,
+	OnContract:       resolveContractByTokenID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -529,27 +530,30 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 
 func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
-
+	metadata, _ := token.TokenMetadata.MarshalJSON()
+	metadataString := string(metadata)
+	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
+	tokenType := model.TokenType(token.TokenType.String)
 	return &model.Token{
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
 		CollectorsNote:   &token.CollectorsNote.String,
 		Media:            getMediaForToken(token),
-		TokenType:        nil, // TODO: later
+		TokenType:        &tokenType,
 		Chain:            &chain,
 		Name:             &token.Name.String,
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
-		TokenURI:         nil, // TODO: later
+		TokenURI:         &token.TokenUri.String,
 		TokenID:          &token.TokenID.String,
-		Quantity:         nil, // TODO: later
+		Quantity:         &token.Quantity.String,
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
-		TokenMetadata:    nil, // TODO: later
+		TokenMetadata:    &metadataString,
 		Contract:         nil, // handled by dedicated resolver
 		ExternalURL:      &token.ExternalUrl.String,
-		BlockNumber:      nil, // TODO: later
+		BlockNumber:      &blockNumber, // TODO: later
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
 		OpenseaCollectionName: nil, // TODO: later

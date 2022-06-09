@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS token_id_contract_chain_idx ON tokens (TOKEN_ID, CONT
 
 CREATE INDEX IF NOT EXISTS owner_user_id_idx ON tokens (OWNER_USER_ID);
 
-CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT_ADDRESS);
+CREATE INDEX IF NOT EXISTS contract_address_idx ON tokens (CONTRACT);
 
 CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 

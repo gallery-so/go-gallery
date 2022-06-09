@@ -3,6 +3,7 @@ package multichain
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
@@ -144,6 +145,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		addresses := a
 		for _, addr := range addresses {
 			go func(addr persist.Address, chain persist.Chain) {
+				start := time.Now()
 				provider, ok := d.Chains[chain]
 				if !ok {
 					errChan <- ErrChainNotFound{Chain: chain}
@@ -157,6 +159,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 
 				incomingTokens <- chainTokens{chain: chain, tokens: tokens}
 				incomingContracts <- chainContracts{chain: chain, contracts: contracts}
+				logrus.Debugf("updated media for user %s wallet %s in %s: tokens %d", user.Username, addr, time.Since(start), len(tokens))
 			}(addr, chain)
 		}
 	}
@@ -177,7 +180,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 	}
 	newContracts, err := contractsToContracts(ctx, allContracts)
 	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
-		return err
+		return fmt.Errorf("error upserting contracts: %s", err)
 	}
 	addressesToContracts := map[string]persist.DBID{}
 	contractsForChain := map[persist.Chain][]persist.Address{}
@@ -199,7 +202,7 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 
 	newTokens, err := tokensToTokens(ctx, allTokens, addressesToContracts, user)
 	if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
-		return err
+		return fmt.Errorf("error upserting tokens: %s", err)
 	}
 
 	// ensure all old tokens are deleted
@@ -234,7 +237,7 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 }
 
 func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
-	res := make([]persist.TokenGallery, len(chaintokens))
+	res := make([]persist.TokenGallery, 0, len(chaintokens))
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
@@ -243,7 +246,7 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
 		addressToWallets[normalizedAddress] = wallet
 	}
-	for i, chainToken := range chaintokens {
+	for _, chainToken := range chaintokens {
 		for _, token := range chainToken.tokens {
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
 			if err != nil {
@@ -262,7 +265,7 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 				seenQuantities[ti] = token.Quantity
 			}
 
-			res[i] = persist.TokenGallery{
+			res = append(res, persist.TokenGallery{
 				Media:            token.Media,
 				TokenType:        token.TokenType,
 				Chain:            chainToken.chain,
@@ -278,7 +281,7 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 				Contract:         contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 				ExternalURL:      persist.NullString(token.ExternalURL),
 				BlockNumber:      token.BlockNumber,
-			}
+			})
 		}
 	}
 	return res, nil

@@ -48,6 +48,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	router := gin.Default()
