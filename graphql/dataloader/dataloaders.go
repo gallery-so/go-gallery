@@ -164,6 +164,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadTokensByUserID(ctx, loaders, q),
 	}
 
+	loaders.ContractByContractId = ContractLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadContractByContractID(ctx, loaders, q),
+	}
+
 	return loaders
 }
 
@@ -690,5 +696,25 @@ func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 		})
 
 		return tokens, errors
+	}
+}
+
+func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Contract, []error) {
+	return func(contractIDs []persist.DBID) ([]sqlc.Contract, []error) {
+		contracts := make([]sqlc.Contract, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractByIDBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, t sqlc.Contract, err error) {
+			contracts[i], errors[i] = t, err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrContractNotFoundByID{ID: contractIDs[i]}
+			}
+		})
+
+		return contracts, errors
 	}
 }

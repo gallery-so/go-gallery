@@ -35,6 +35,14 @@ type ErrContractNotFoundByAddress struct {
 	Address EthereumAddress
 }
 
+type ErrContractNotFoundByID struct {
+	ID DBID
+}
+
 func (e ErrContractNotFoundByAddress) Error() string {
 	return fmt.Sprintf("contract not found by address: %s", e.Address)
+}
+
+func (e ErrContractNotFoundByID) Error() string {
+	return fmt.Sprintf("contract not found by ID: %s", e.ID)
 }

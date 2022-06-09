@@ -69,9 +69,12 @@ type Contract struct {
 	Name           sql.NullString
 	Symbol         sql.NullString
 	Address        persist.Address
-	LatestBlock    sql.NullInt64
 	CreatorAddress persist.Address
 	Chain          sql.NullInt32
+}
+
+type EarlyAccess struct {
+	Address string
 }
 
 type Feature struct {

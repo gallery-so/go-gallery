@@ -77,10 +77,16 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 		ContractAddress: pCommunityAddress.Address(),
 	}
 
+	var contractID persist.DBID
+	err := c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&contractID, &community.Name, &community.CreatorAddress)
+	if err != nil {
+		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
+	}
+
 	hasDescription := true
 	walletIDs := make([]persist.DBID, 0, 20)
 
-	rows, err := c.getInfoStmt.QueryContext(ctx, pCommunityAddress.Address())
+	rows, err := c.getInfoStmt.QueryContext(ctx, contractID)
 	if err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community info: %w", err)
 	}
@@ -125,12 +131,6 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 
 	if !hasDescription {
 		community.Description = ""
-	}
-
-	var contractID persist.DBID
-	err = c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&contractID, &community.Name, &community.CreatorAddress)
-	if err != nil {
-		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
 	}
 
 	tokenHolders := map[persist.DBID]*persist.TokenHolder{}

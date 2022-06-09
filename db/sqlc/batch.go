@@ -128,7 +128,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -167,7 +167,6 @@ func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contra
 			&i.Name,
 			&i.Symbol,
 			&i.Address,
-			&i.LatestBlock,
 			&i.CreatorAddress,
 			&i.Chain,
 		)
@@ -186,7 +185,7 @@ func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 }
 
 const getContractByIDBatch = `-- name: GetContractByIDBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, latest_block, creator_address, chain FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE id = $1 AND deleted = false
 `
 
 type GetContractByIDBatchBatchResults struct {
@@ -219,7 +218,6 @@ func (b *GetContractByIDBatchBatchResults) QueryRow(f func(int, Contract, error)
 			&i.Name,
 			&i.Symbol,
 			&i.Address,
-			&i.LatestBlock,
 			&i.CreatorAddress,
 			&i.Chain,
 		)
