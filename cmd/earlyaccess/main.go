@@ -20,8 +20,8 @@ func main() {
 	args := os.Args
 
 	if len(args) != 3 || args[1] == "help" {
-		fmt.Println("\nThis program adds address entries from a JSON file to the early_access database table.")
-		fmt.Println("It is safe to attempt re-adding addresses that have already been added to the database; they will be ignored.\n")
+		fmt.Print("\nThis program adds address entries from a JSON file to the early_access database table.\n")
+		fmt.Print("It is safe to attempt re-adding addresses that have already been added to the database; they will be ignored.\n\n")
 		fmt.Printf("syntax: %s <sqlConnectionString> <pathToJson>\n", args[0])
 		fmt.Printf("example: %s \"postgres://postgres:<dev db password here>@34.102.59.201:5432/postgres\" \"../snapshots/snapshot.json\"\n", args[0])
 		os.Exit(0)
