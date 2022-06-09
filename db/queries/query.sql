@@ -113,20 +113,24 @@ SELECT u.* FROM follows f
     ORDER BY f.last_updated DESC;
 
 -- name: GetTokensByWalletIds :many
-SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;
+SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+    ORDER BY tokens.created_at DESC;
 
 -- name: GetTokensByWalletIdsBatch :batchmany
-SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false;
+SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+    ORDER BY tokens.created_at DESC;
 
 -- name: GetTokensByUserId :many
 SELECT tokens.* FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
-      AND tokens.deleted = false AND users.deleted = false;
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC;
 
 -- name: GetTokensByUserIdBatch :batchmany
 SELECT tokens.* FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
-      AND tokens.deleted = false AND users.deleted = false;
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC;
 
