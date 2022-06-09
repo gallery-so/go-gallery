@@ -48,7 +48,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 
 func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
-	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler(ethClient)
+	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
 
 	schema := generated.NewExecutableSchema(config)
@@ -107,7 +107,7 @@ func authHandlersInitToken(parent *gin.RouterGroup, repos *persist.Repositories,
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, ethClient))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, repos.EarlyAccessRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.UserRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
 	authGroup.POST("/logout", logout())
@@ -133,7 +133,7 @@ func authHandlersInitNFT(parent *gin.RouterGroup, repos *persist.Repositories, e
 	authGroup := parent.Group("/auth")
 
 	// AUTH
-	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, ethClient))
+	authGroup.GET("/get_preflight", middleware.AuthOptional(), getAuthPreflight(repos.UserRepository, repos.NonceRepository, repos.EarlyAccessRepository, ethClient))
 	authGroup.GET("/jwt_valid", middleware.AuthOptional(), auth.ValidateJWT())
 	authGroup.GET("/is_member", middleware.AuthOptional(), hasNFTs(repos.UserRepository, ethClient, membership.PremiumCards, membership.MembershipTierIDs))
 	authGroup.POST("/logout", logout())

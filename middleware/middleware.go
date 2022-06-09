@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
@@ -61,28 +60,6 @@ func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Cl
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
 			return
-		}
-
-		if viper.GetBool("REQUIRE_NFTS") {
-			user, err := userRepository.GetByID(c, userID)
-			if err != nil {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, util.ErrorResponse{Error: err.Error()})
-				return
-			}
-			has := false
-			for _, addr := range user.Addresses {
-				allowlist := auth.GetAllowlistContracts()
-				for k, v := range allowlist {
-					if res, _ := eth.HasNFTs(c, k, v, addr, ethClient); res {
-						has = true
-						break
-					}
-				}
-			}
-			if !has {
-				c.AbortWithStatusJSON(http.StatusBadRequest, util.ErrorResponse{Error: errUserDoesNotHaveRequiredNFT{addresses: user.Addresses}.Error()})
-				return
-			}
 		}
 
 		auth.SetAuthStateForCtx(c, userID, nil)

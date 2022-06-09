@@ -406,8 +406,8 @@ func VerifySignature(pSignatureStr string,
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
+func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool, userRepo persist.UserRepository,
+	nonceRepo persist.NonceRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
 	user, err := userRepo.GetByAddress(pCtx, pAddress)
 	if err != nil {
@@ -419,7 +419,7 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	if !userExists {
 
 		if !pPreAuthed {
-			if hasNft, err := HasAllowlistNFT(pCtx, []persist.Address{pAddress}, ethClient); !hasNft {
+			if hasAccess, err := HasGalleryAccess(pCtx, []persist.Address{pAddress}, earlyAccessRepo, ethClient); !hasAccess {
 				return "", false, err
 			}
 		}
@@ -450,6 +450,20 @@ func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed boo
 	return nonce, userExists, nil
 }
 
+func HasGalleryAccess(ctx context.Context, addresses []persist.Address, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (bool, error) {
+	nftAccess, nftErr := HasAllowlistNFT(ctx, addresses, ethClient)
+	if nftErr == nil && nftAccess {
+		return true, nil
+	}
+
+	eaAccess, eaErr := earlyAccessRepo.IsAllowedByAddresses(ctx, addresses)
+	if eaErr == nil && eaAccess {
+		return true, nil
+	}
+
+	return false, nftErr
+}
+
 func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
@@ -468,9 +482,9 @@ func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient
 
 // GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
 func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
+	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
 
-	nonce, userExists, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, ethClient)
+	nonce, userExists, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, earlyAccessRepo, ethClient)
 	if err != nil {
 		return nil, err
 	}
