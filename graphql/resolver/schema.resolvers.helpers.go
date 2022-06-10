@@ -31,7 +31,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnMembershipTier: resolveMembershipTierByMembershipId,
 	OnToken:          resolveTokenByTokenID,
 	OnWallet:         resolveWalletByAddress,
-	OnContract:       resolveContractByTokenID,
+	OnContract:       resolveContractByContractID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -286,7 +286,11 @@ func resolveContractByTokenID(ctx context.Context, tokenID persist.DBID) (*model
 		return nil, err
 	}
 
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, token.Contract)
+	return resolveContractByContractID(ctx, token.Contract)
+}
+
+func resolveContractByContractID(ctx context.Context, contractID persist.DBID) (*model.Contract, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 
 	if err != nil {
 		return nil, err
