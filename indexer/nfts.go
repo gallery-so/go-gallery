@@ -426,6 +426,8 @@ func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository pers
 	var err error
 	if input.OwnerAddress != "" {
 		tokens, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
+	} else if input.ContractAddress != "" {
+		tokens, err = tokenRepository.GetByContract(c, input.ContractAddress, -1, -1)
 	} else {
 		return errInvalidUpdateMediaInput
 	}
@@ -515,23 +517,20 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 			return tokenUpdateMedia{}, nil
 		}
 
-		if newURI.Type() == persist.URITypeNone {
-			u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
-			if err != nil {
-				return tokenUpdateMedia{}, fmt.Errorf("failed to get token URI: %v", err)
-			}
-			newURI = u
+		u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
+		if err != nil {
+			return tokenUpdateMedia{}, fmt.Errorf("failed to get token URI: %v", err)
 		}
+		newURI = u
 
 		newURI = newURI.ReplaceID(tokenID)
 
-		if newMetadata == nil || len(newMetadata) == 0 {
-			md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
-			if err != nil {
-				return tokenUpdateMedia{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
-			}
-			newMetadata = md
+		md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
+		if err != nil {
+			return tokenUpdateMedia{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
 		}
+		newMetadata = md
+
 	}
 
 	name, ok := util.GetValueFromMap(newMetadata, "name", util.DefaultSearchDepth).(string)

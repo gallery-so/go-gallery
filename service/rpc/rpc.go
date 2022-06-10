@@ -160,42 +160,20 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		path = strings.ReplaceAll(path, "ipfs/", "")
 		path = strings.Split(path, "?")[0]
 
-		it, err := ipfsClient.Cat(path)
+		bs, err := GetIPFSData(ctx, path)
 		if err != nil {
-			if err == context.Canceled {
-				c, cancel := context.WithTimeout(context.Background(), time.Second*30)
-				defer cancel()
-				ctx = c
-			}
-			bs, nextErr := GetIPFSData(ctx, path)
-			if nextErr == nil {
-				return removeBOM(bs), nil
-			}
-
-			return nil, fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
-		}
-		defer it.Close()
-
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, it, 1024*1024*1024)
-		if err != nil {
-			if err == context.Canceled {
-				c, cancel := context.WithTimeout(context.Background(), time.Second*30)
-				defer cancel()
-				ctx = c
-			}
-			bs, nextErr := GetIPFSData(ctx, path)
-			if nextErr == nil {
-				return removeBOM(bs), nil
-			}
-			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, path)
+			return nil, err
 		}
 
-		return removeBOM(buf.Bytes()), nil
+		return removeBOM(bs), nil
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
-		return GetArweaveData(arweaveClient, path)
+		bs, err := GetArweaveData(arweaveClient, path)
+		if err != nil {
+			return nil, err
+		}
+		return removeBOM(bs), nil
 	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
@@ -222,19 +200,13 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			return nil, err
 		}
-		query := parsedURL.Query().Get("arg")
-		it, err := ipfsClient.Cat(query)
+		path := parsedURL.Query().Get("arg")
+		bs, err := GetIPFSData(ctx, path)
 		if err != nil {
 			return nil, err
 		}
-		defer it.Close()
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, it, 1024*1024*1024)
-		if err != nil {
-			return nil, fmt.Errorf("error getting data from ipfs: %s - cat: %s", err, query)
-		}
 
-		return removeBOM(buf.Bytes()), nil
+		return removeBOM(bs), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
 		idx := strings.IndexByte(asString, '{')
 		if idx == -1 {

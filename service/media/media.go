@@ -69,22 +69,23 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
+
 	logger.For(pCtx).Infof("asURI for %s: %s", name, imgAsURI)
 
+	// use videoURI to check if SVG
 	res, err := preHandleSVG(pCtx, videoAsURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return res, err
 	}
-
 	if res.MediaURL != "" {
 		return res, nil
 	}
 
+	// use imageURI to check if SVG
 	res, err = preHandleSVG(pCtx, imgAsURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return res, err
 	}
-
 	if res.MediaURL != "" {
 		return res, nil
 	}
@@ -414,14 +415,6 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 			return persist.MediaTypeUnknown, err
 		}
 		contentType := resp.Header.Get("Content-Type")
-		if contentType == "" {
-			bs := &bytes.Buffer{}
-			err = util.CopyMax(bs, resp.Body, 1024*1024*1024)
-			if err != nil {
-				return persist.MediaTypeUnknown, err
-			}
-			return GuessMediaType(bs.Bytes()), nil
-		}
 		return persist.MediaFromContentType(contentType), nil
 	case persist.URITypeIPFS:
 		path := strings.TrimPrefix(asURI.String(), "ipfs://")
@@ -430,13 +423,6 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 			return persist.MediaTypeUnknown, err
 		}
 		contentType := headers.Get("Content-Type")
-		if contentType == "" {
-			data, err := rpc.GetIPFSData(pCtx, path)
-			if err != nil {
-				return persist.MediaTypeUnknown, err
-			}
-			return GuessMediaType(data), nil
-		}
 		return persist.MediaFromContentType(contentType), nil
 	}
 	return persist.MediaTypeUnknown, nil
