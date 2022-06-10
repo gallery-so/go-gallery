@@ -699,6 +699,7 @@ SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
       AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC
 `
 
 type GetTokensByUserIdBatchBatchResults struct {
@@ -769,6 +770,7 @@ func (b *GetTokensByUserIdBatchBatchResults) Close() error {
 
 const getTokensByWalletIdsBatch = `-- name: GetTokensByWalletIdsBatch :batchmany
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
+    ORDER BY tokens.created_at DESC
 `
 
 type GetTokensByWalletIdsBatchBatchResults struct {
