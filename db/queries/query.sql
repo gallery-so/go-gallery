@@ -136,3 +136,66 @@ SELECT tokens.* FROM tokens, users
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: CreateEvent :one
+INSERT INTO events (id, actor_id, action, subject_id, data) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: GetEvent :one
+SELECT * FROM events WHERE id = $1 AND deleted = false;
+
+-- name: GetEventsInWindow :many
+SELECT * FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > @timestart AND created_at <= @timeend;
+
+-- name: IsWindowActive :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND deleted = false
+    AND created_at > @timestart AND created_at <= @timeend
+    LIMIT 1
+);
+
+-- name: IsWindowActiveWithSubject :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
+    AND created_at > @timestart AND created_at <= @timeend
+    LIMIT 1
+);
+
+-- name: GetGlobalFeedViewBatch :batchmany
+SELECT * FROM feed_events
+    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
+    AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT $2;
+
+-- name: GetUserFeedViewBatch :batchmany
+SELECT fd.* FROM feed_events fd
+    INNER JOIN follows fl ON fd.owner_id = fl.followee
+    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
+    AND fl.follower = $2 AND fd.deleted = false AND fl.deleted = false
+    ORDER BY fd.event_time DESC
+    LIMIT $3;
+
+-- name: GetEventByIdBatch :batchone
+SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
+
+-- name: CreateFeedEvent :one
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: GetLastFeedEvent :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;
+
+-- name: GetLastFeedEventForToken :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $3::varchar AND event_time < $4 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;
+
+-- name: GetLastFeedEventForCollection :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $3::varchar AND event_time < $4 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;

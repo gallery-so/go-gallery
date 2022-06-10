@@ -1,4 +1,6 @@
-package cloudtask
+// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
+// Everything below can be removed.
+package task
 
 import (
 	"context"

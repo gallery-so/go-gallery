@@ -14,6 +14,9 @@
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
+//go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
+//go:generate go run github.com/vektah/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
 
 package dataloader
 
@@ -57,6 +60,9 @@ type Loaders struct {
 	ContractByChainAddress   ContractLoaderByChainAddress
 	FollowersByUserId        UsersLoaderByID
 	FollowingByUserId        UsersLoaderByID
+	GlobalFeed               GlobalFeedLoader
+	FeedByUserId             UserFeedLoader
+	EventByEventId           EventLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -170,6 +176,24 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadContractByContractID(ctx, loaders, q),
 	}
 
+	loaders.EventByEventId = EventLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadEventById(ctx, loaders, q),
+	}
+
+	loaders.FeedByUserId = UserFeedLoader{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadUserFeed(ctx, loaders, q),
+	}
+
+	loaders.GlobalFeed = GlobalFeedLoader{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadGlobalFeed(ctx, loaders, q),
+	}
+
 	return loaders
 }
 
@@ -184,6 +208,7 @@ func (l *Loaders) ClearAllCaches() {
 	l.ClearFollowCaches()
 	l.ClearWalletCaches()
 	l.ClearContractCaches()
+	l.ClearFeedCaches()
 }
 
 func (l *Loaders) ClearUserCaches() {
@@ -276,6 +301,20 @@ func (l *Loaders) ClearContractCaches() {
 	l.ContractByChainAddress.mu.Lock()
 	l.ContractByChainAddress.cache = nil
 	l.ContractByChainAddress.mu.Unlock()
+}
+
+func (l *Loaders) ClearFeedCaches() {
+	l.EventByEventId.mu.Lock()
+	l.EventByEventId.cache = nil
+	l.EventByEventId.mu.Unlock()
+
+	l.FeedByUserId.mu.Lock()
+	l.FeedByUserId.cache = nil
+	l.FeedByUserId.mu.Unlock()
+
+	l.GlobalFeed.mu.Lock()
+	l.GlobalFeed.cache = nil
+	l.GlobalFeed.mu.Unlock()
 }
 
 func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
@@ -716,5 +755,73 @@ func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Que
 		})
 
 		return contracts, errors
+	}
+}
+
+func loadEventById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.FeedEvent, []error) {
+	return func(eventIds []persist.DBID) ([]sqlc.FeedEvent, []error) {
+		events := make([]sqlc.FeedEvent, len(eventIds))
+		errors := make([]error, len(eventIds))
+
+		b := q.GetEventByIdBatch(ctx, eventIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, p sqlc.FeedEvent, err error) {
+			events[i] = p
+			errors[i] = err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrEventNotFoundByID{ID: eventIds[i]}
+			}
+		})
+
+		return events, errors
+	}
+}
+
+func loadUserFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]sqlc.GetUserFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
+	return func(params []sqlc.GetUserFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
+		events := make([][]sqlc.FeedEvent, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserFeedViewBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, evts []sqlc.FeedEvent, err error) {
+			events[i] = evts
+			errors[i] = err
+
+			// Add results to the EventById loader's cache
+			if errors[i] == nil {
+				for _, p := range evts {
+					loaders.EventByEventId.Prime(p.ID, p)
+				}
+			}
+		})
+
+		return events, errors
+	}
+}
+func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
+	return func(params []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
+		events := make([][]sqlc.FeedEvent, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetGlobalFeedViewBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, evts []sqlc.FeedEvent, err error) {
+			events[i] = evts
+			errors[i] = err
+
+			// Add results to the EventById loader's cache
+			if errors[i] == nil {
+				for _, p := range evts {
+					loaders.EventByEventId.Prime(p.ID, p)
+				}
+			}
+		})
+
+		return events, errors
 	}
 }

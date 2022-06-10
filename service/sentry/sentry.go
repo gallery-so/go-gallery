@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,31 @@ type authContext struct {
 type errorContext struct {
 	Mapped   bool
 	MappedTo string
+}
+
+func InitSentry() {
+	if viper.GetString("ENV") == "local" {
+		logger.For(nil).Info("skipping sentry init")
+		return
+	}
+
+	logger.For(nil).Info("initializing sentry...")
+
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              viper.GetString("SENTRY_DSN"),
+		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		AttachStacktrace: true,
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			event = ScrubEventCookies(event, hint)
+			event = UpdateErrorFingerprints(event, hint)
+			return event
+		},
+	})
+
+	if err != nil {
+		logger.For(nil).Fatalf("failed to start sentry: %s", err)
+	}
 }
 
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {

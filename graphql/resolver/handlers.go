@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -13,6 +14,9 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
+	"sort"
+	"strings"
+
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/segmentio/ksuid"
 	"github.com/sirupsen/logrus"
@@ -20,8 +24,6 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"github.com/vektah/gqlparser/v2/validator"
-	"sort"
-	"strings"
 )
 
 const scrubText = "<scrubbed>"
@@ -70,6 +72,7 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 			sentryutil.ReportRemappedError(ctx, err, remapped)
 			return remapped, nil
 		}
+		logger.For(ctx).Errorf("unmapped error: %s", err)
 	}
 
 	sentryutil.ReportError(ctx, err)

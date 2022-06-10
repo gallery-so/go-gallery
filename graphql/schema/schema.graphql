@@ -365,6 +365,113 @@ union CollectionTokenByIdOrError =
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
+# Input for queries that support pagination
+input Pagination {
+    token: DBID
+    limit: Int
+}
+
+type PageInfo {
+    size: Int
+    hasNextPage: Boolean
+    nextToken: DBID
+}
+
+# Actions a user can take on a resource
+enum Action {
+    UserCreated
+    UserFollowedUsers
+    CollectorsNoteAddedtoToken
+    CollectionCreated
+    CollectorsNoteAddedToCollection
+    TokensAddedToCollection
+}
+
+interface Event implements Node {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser!
+    action: Action!
+}
+
+type FollowInfo {
+    user: GalleryUser @goField(forceResolver: true)
+    followedBack: Boolean
+}
+
+type UserCreatedEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    action: Action!
+}
+
+type UserFollowedUsersEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    action: Action!
+    followed: [FollowInfo]
+}
+
+type CollectorsNoteAddedToTokenEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    action: Action!
+    token: CollectionToken @goField(forceResolver: true)
+    newCollectorsNote: String
+}
+
+type CollectionCreatedEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    action: Action!
+    collection: Collection @goField(forceResolver: true)
+}
+
+type CollectorsNoteAddedToCollectionEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    action: Action!
+    collection: Collection @goField(forceResolver: true)
+    newCollectorsNote: String
+}
+
+type TokensAddedToCollectionEvent implements Node & Event {
+    id: ID!
+    dbid: DBID!
+    eventTime: Time!
+    owner: GalleryUser! @goField(forceResolver: true)
+    collection: Collection @goField(forceResolver: true)
+    action: Action!
+    newTokens: [CollectionToken] @goField(forceResolver: true)
+}
+
+type Feed {
+    events: [Event]
+    pageInfo: PageInfo!
+    viewer: Viewer
+}
+
+type ErrUnknownAction implements Error {
+    message: String!
+}
+
+type ErrEventNotFoundByID implements Error {
+    message: String!
+}
+
+union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrEventNotFoundByID
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -376,6 +483,8 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
+    viewerFeed(page: Pagination): FeedOrError @authRequired
+    globalFeed(page: Pagination): FeedOrError
 }
 
 input CollectionLayoutInput {

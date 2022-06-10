@@ -235,6 +235,57 @@ func (b *GetContractByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getEventByIdBatch = `-- name: GetEventByIdBatch :batchone
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = $1 AND deleted = false
+`
+
+type GetEventByIdBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetEventByIdBatch(ctx context.Context, id []persist.DBID) *GetEventByIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getEventByIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetEventByIdBatchBatchResults{br, 0}
+}
+
+func (b *GetEventByIdBatchBatchResults) QueryRow(f func(int, FeedEvent, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i FeedEvent
+		err := row.Scan(
+			&i.ID,
+			&i.Version,
+			&i.OwnerID,
+			&i.Action,
+			&i.Data,
+			&i.EventTime,
+			&i.EventIds,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetEventByIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
     INNER JOIN users u ON f.follower = u.id
@@ -506,6 +557,75 @@ func (b *GetGalleryByIdBatchBatchResults) QueryRow(f func(int, Gallery, error)) 
 }
 
 func (b *GetGalleryByIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getGlobalFeedViewBatch = `-- name: GetGlobalFeedViewBatch :batchmany
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
+    AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT $2
+`
+
+type GetGlobalFeedViewBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetGlobalFeedViewBatchParams struct {
+	ID    persist.DBID
+	Limit int32
+}
+
+func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFeedViewBatchParams) *GetGlobalFeedViewBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ID,
+			a.Limit,
+		}
+		batch.Queue(getGlobalFeedViewBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetGlobalFeedViewBatchBatchResults{br, 0}
+}
+
+func (b *GetGlobalFeedViewBatchBatchResults) Query(f func(int, []FeedEvent, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []FeedEvent
+		for rows.Next() {
+			var i FeedEvent
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted,
+				&i.LastUpdated,
+				&i.CreatedAt,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetGlobalFeedViewBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -937,6 +1057,78 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 }
 
 func (b *GetUserByUsernameBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
+SELECT fd.id, fd.version, fd.owner_id, fd.action, fd.data, fd.event_time, fd.event_ids, fd.deleted, fd.last_updated, fd.created_at FROM feed_events fd
+    INNER JOIN follows fl ON fd.owner_id = fl.followee
+    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
+    AND fl.follower = $2 AND fd.deleted = false AND fl.deleted = false
+    ORDER BY fd.event_time DESC
+    LIMIT $3
+`
+
+type GetUserFeedViewBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserFeedViewBatchParams struct {
+	ID       persist.DBID
+	Follower persist.DBID
+	Limit    int32
+}
+
+func (q *Queries) GetUserFeedViewBatch(ctx context.Context, arg []GetUserFeedViewBatchParams) *GetUserFeedViewBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ID,
+			a.Follower,
+			a.Limit,
+		}
+		batch.Queue(getUserFeedViewBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserFeedViewBatchBatchResults{br, 0}
+}
+
+func (b *GetUserFeedViewBatchBatchResults) Query(f func(int, []FeedEvent, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []FeedEvent
+		for rows.Next() {
+			var i FeedEvent
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted,
+				&i.LastUpdated,
+				&i.CreatedAt,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserFeedViewBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 

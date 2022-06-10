@@ -10,9 +10,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -148,6 +148,18 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
+	evt := sqlc.Event{
+		ActorID:   userID,
+		Action:    persist.ActionUserCreated,
+		SubjectID: userID,
+		Data:      persist.EventData{UserBio: bio},
+	}
+	err = event.DispatchEventToFeed(ctx, evt)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	userData := persist.UserEvent{Bio: persist.NullString(bio)}
 	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
 
@@ -248,9 +260,30 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 
-	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+	refollowed, err := api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+	if err != nil {
+		return err
+	}
 
 	// Send event
+	followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, userID, curUserID)
+	if err != nil {
+		return err
+	}
+
+	evt := sqlc.Event{
+		ActorID:   curUserID,
+		Action:    persist.ActionUserFollowedUsers,
+		SubjectID: userID,
+		Data:      persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+	}
+
+	err = event.DispatchEventToFeed(ctx, evt)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	userData := persist.UserEvent{FollowedUserID: userID}
 	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
 
@@ -273,6 +306,8 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
 }
 
+// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
+// Everything below can be removed.
 func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
 	gc := util.GinContextFromContext(ctx)
 	userHandlers := event.For(gc).User
@@ -281,6 +316,5 @@ func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID 
 		Code:   eventCode,
 		Data:   userData,
 	}
-
 	userHandlers.Dispatch(ctx, evt)
 }

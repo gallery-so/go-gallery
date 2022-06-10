@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/shurcooL/graphql"
 )
 
@@ -41,7 +41,7 @@ type QueryBuilder struct {
 	gql   *graphql.Client
 }
 
-func (qb *QueryBuilder) NewQuery(ctx context.Context, msg cloudtask.EventMessage) (Query, error) {
+func (qb *QueryBuilder) NewQuery(ctx context.Context, msg task.EventMessage) (Query, error) {
 	switch persist.CategoryFromEventCode(msg.EventCode) {
 	case persist.UserEventCode:
 		return qb.fromUserEvent(ctx, msg)
@@ -54,7 +54,7 @@ func (qb *QueryBuilder) NewQuery(ctx context.Context, msg cloudtask.EventMessage
 	}
 }
 
-func (q *QueryBuilder) fromUserEvent(ctx context.Context, msg cloudtask.EventMessage) (Query, error) {
+func (q *QueryBuilder) fromUserEvent(ctx context.Context, msg task.EventMessage) (Query, error) {
 	event, err := q.repos.UserEventRepository.Get(ctx, msg.ID)
 	if err != nil {
 		return Query{}, err
@@ -95,7 +95,7 @@ func (q *QueryBuilder) fromUserEvent(ctx context.Context, msg cloudtask.EventMes
 	}, nil
 }
 
-func (qb *QueryBuilder) fromNftEvent(ctx context.Context, msg cloudtask.EventMessage) (Query, error) {
+func (qb *QueryBuilder) fromNftEvent(ctx context.Context, msg task.EventMessage) (Query, error) {
 	event, err := qb.repos.NftEventRepository.Get(ctx, msg.ID)
 	if err != nil {
 		return Query{}, err
@@ -131,7 +131,7 @@ func (qb *QueryBuilder) fromNftEvent(ctx context.Context, msg cloudtask.EventMes
 	}, nil
 }
 
-func (qb *QueryBuilder) fromCollectionEvent(ctx context.Context, msg cloudtask.EventMessage) (Query, error) {
+func (qb *QueryBuilder) fromCollectionEvent(ctx context.Context, msg task.EventMessage) (Query, error) {
 	event, err := qb.repos.CollectionEventRepository.Get(ctx, msg.ID)
 	if err != nil {
 		return Query{}, err

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -12,27 +11,27 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/shurcooL/graphql"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 func Init() {
 	setDefaults()
 
-	initSentry()
-	initLogger()
+	sentryutil.InitSentry()
+	logger.InitLogger()
 
 	router := coreInit(postgres.NewClient())
 	http.Handle("/", router)
 }
 
 func coreInit(pqClient *sql.DB) *gin.Engine {
+	logger.For(nil).Info("initializing server...")
+
 	router := gin.Default()
 	router.Use(middleware.ErrLogger(), middleware.Sentry(true), middleware.Tracing())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		log.SetLevel(log.DebugLevel)
 	}
 
 	gql := graphql.NewClient(viper.GetString("GALLERY_API"), http.DefaultClient)
@@ -70,47 +69,5 @@ func setDefaults() {
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
-	}
-}
-
-func initLogger() {
-	logger.SetLoggerOptions(func(logger *log.Logger) {
-		logger.SetReportCaller(true)
-
-		if viper.GetString("ENV") != "production" {
-			logger.SetLevel(log.DebugLevel)
-		}
-
-		if viper.GetString("ENV") == "local" {
-			logger.SetFormatter(&log.TextFormatter{DisableQuote: true})
-		} else {
-			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
-			logger.SetFormatter(&log.JSONFormatter{})
-		}
-	})
-}
-
-func initSentry() {
-	if viper.GetString("ENV") == "local" {
-		log.Info("skipping sentry init")
-		return
-	}
-
-	log.Info("initializing sentry...")
-
-	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		AttachStacktrace: true,
-		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-			event = sentryutil.ScrubEventHeaders(event, hint)
-			event = sentryutil.UpdateErrorFingerprints(event, hint)
-			return event
-		},
-	})
-
-	if err != nil {
-		log.Fatalf("failed to start sentry: %s", err)
 	}
 }

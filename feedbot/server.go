@@ -6,15 +6,15 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/event/cloudtask"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
 )
 
 func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		msg := cloudtask.EventMessage{}
+		msg := task.EventMessage{}
 		if err := c.ShouldBindJSON(&msg); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
@@ -44,7 +44,7 @@ func handleMessage(repos persist.Repositories, gql *graphql.Client) gin.HandlerF
 	}
 }
 
-func markSent(ctx context.Context, repos persist.Repositories, msg cloudtask.EventMessage) error {
+func markSent(ctx context.Context, repos persist.Repositories, msg task.EventMessage) error {
 	switch persist.CategoryFromEventCode(msg.EventCode) {
 	case persist.UserEventCode:
 		return repos.UserEventRepository.MarkSent(ctx, msg.ID)

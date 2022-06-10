@@ -55,21 +55,22 @@ type NullBool bool
 
 // Repositories is the set of all available persistence repositories
 type Repositories struct {
-	UserRepository            UserRepository
-	NonceRepository           NonceRepository
-	LoginRepository           LoginAttemptRepository
-	TokenRepository           TokenGalleryRepository
-	CollectionRepository      CollectionRepository
-	GalleryRepository         GalleryRepository
-	ContractRepository        ContractGalleryRepository
-	BackupRepository          BackupRepository
-	MembershipRepository      MembershipRepository
+	UserRepository        UserRepository
+	NonceRepository       NonceRepository
+	LoginRepository       LoginAttemptRepository
+	TokenRepository       TokenGalleryRepository
+	CollectionRepository  CollectionRepository
+	GalleryRepository     GalleryRepository
+	ContractRepository    ContractGalleryRepository
+	BackupRepository      BackupRepository
+	MembershipRepository  MembershipRepository
+	CommunityRepository   CommunityRepository
+	EarlyAccessRepository EarlyAccessRepository
+	WalletRepository      WalletRepository
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	UserEventRepository       UserEventRepository
 	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
-	CommunityRepository       CommunityRepository
-	WalletRepository          WalletRepository
-	EarlyAccessRepository     EarlyAccessRepository
 }
 
 // GenerateID generates a application-wide unique ID

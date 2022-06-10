@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -107,6 +107,21 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
+	evt := sqlc.Event{
+		ActorID:   userID,
+		Action:    persist.ActionCollectionCreated,
+		SubjectID: collectionID,
+		Data: persist.EventData{
+			CollectionTokenIDs:       createdCollection.Nfts,
+			CollectionCollectorsNote: collectorsNote,
+		},
+	}
+	err = event.DispatchEventToFeed(ctx, evt)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	collectionData := persist.CollectionEvent{NFTs: createdCollection.Nfts, CollectorsNote: persist.NullString(createdCollection.CollectorsNote.String)}
 	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
 
@@ -168,6 +183,18 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
+	evt := sqlc.Event{
+		ActorID:   userID,
+		Action:    persist.ActionCollectorsNoteAddedToCollection,
+		SubjectID: collectionID,
+		Data:      persist.EventData{CollectionCollectorsNote: collectorsNote},
+	}
+	err = event.DispatchEventToFeed(ctx, evt)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
 	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
 
@@ -204,6 +231,18 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
+	evt := sqlc.Event{
+		ActorID:   userID,
+		Action:    persist.ActionTokensAddedToCollection,
+		SubjectID: collectionID,
+		Data:      persist.EventData{CollectionTokenIDs: tokens},
+	}
+	err = event.DispatchEventToFeed(ctx, evt)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
 	collectionData := persist.CollectionEvent{NFTs: tokens}
 	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
 
@@ -235,6 +274,8 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	return nil
 }
 
+// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
+// Everything below can be removed.
 func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
 	gc := util.GinContextFromContext(ctx)
 	collectionHandlers := event.For(gc).Collection

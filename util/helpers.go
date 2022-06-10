@@ -114,6 +114,18 @@ func StringToPointer(str string) *string {
 	return &str
 }
 
+// BoolToPointer returns a pointer to the parameter boolean. Useful for a boolean that would need to be assigned to a variable
+// before becoming addressable.
+func BoolToPointer(b bool) *bool {
+	return &b
+}
+
+// IntToPointer returns a pointer to the parameter integer. Useful for an integer that would need to be assigned to a variable
+// before becoming addressable.
+func IntToPointer(i int) *int {
+	return &i
+}
+
 // GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
 // or panics if no gin.Context can be retrieved (since there's nothing left for the resolver to do if it can't obtain the context).
 func GinContextFromContext(ctx context.Context) *gin.Context {
