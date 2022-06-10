@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"strings"
-	"time"
 
 	// register postgres driver
 	// _ "github.com/lib/pq"
@@ -30,6 +31,8 @@ func getSqlConnectionString() string {
 
 // NewClient creates a new postgres client
 func NewClient() *sql.DB {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 	db, err := sql.Open("pgx", getSqlConnectionString())
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not open database connection")
@@ -38,7 +41,7 @@ func NewClient() *sql.DB {
 
 	db.SetMaxOpenConns(50)
 
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	if err != nil {
 		panic(err)
 	}

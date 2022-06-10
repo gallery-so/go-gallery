@@ -306,6 +306,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 outer:
 	switch mediaType {
 	case persist.MediaTypeVideo, persist.MediaTypeGIF, persist.MediaTypeUnknown:
+		break outer
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:

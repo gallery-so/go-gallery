@@ -10,7 +10,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
@@ -42,7 +41,6 @@ func coreInit() (*gin.Engine, *indexer) {
 	ethClient := rpc.NewEthClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	tq := task.NewQueue()
 
 	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events)
@@ -57,7 +55,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func setDefaults() {

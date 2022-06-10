@@ -87,9 +87,11 @@ type TokenUpdateInfoInput struct {
 type TokenUpdateMediaInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Media    Media         `json:"media"`
-	Metadata TokenMetadata `json:"token_metadata"`
-	TokenURI TokenURI      `json:"token_uri"`
+	Media       Media         `json:"media"`
+	Metadata    TokenMetadata `json:"token_metadata"`
+	TokenURI    TokenURI      `json:"token_uri"`
+	Name        NullString    `json:"name"`
+	Description NullString    `json:"description"`
 }
 
 // TokenGalleryRepository represents a repository for interacting with persisted tokens

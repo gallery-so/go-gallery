@@ -70,13 +70,13 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE ID = $1;`)
 	checkNoErr(err)
 
-	updateMediaUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, LAST_UPDATED = $4 WHERE ID = $5;`)
+	updateMediaUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE ID = $7;`)
 	checkNoErr(err)
 
-	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, LAST_UPDATED = $4 WHERE ID = $5 AND OWNER_ADDRESS = ANY($6);`)
+	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE ID = $7 AND OWNER_ADDRESS = ANY($8);`)
 	checkNoErr(err)
 
-	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, LAST_UPDATED = $4 WHERE TOKEN_ID = $5 AND CONTRACT_ADDRESS = $6;`)
+	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT_ADDRESS = $8;`)
 	checkNoErr(err)
 
 	mostRecentBlockStmt, err := db.PrepareContext(ctx, `SELECT MAX(BLOCK_NUMBER) FROM tokens;`)
@@ -169,7 +169,7 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Eth
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByWalletPaginateStmt.QueryContext(pCtx, pAddress, limit, page)
+		rows, err = t.getByWalletPaginateStmt.QueryContext(pCtx, pAddress, limit, page*limit)
 	} else {
 		rows, err = t.getByWalletStmt.QueryContext(pCtx, pAddress)
 	}
@@ -200,7 +200,7 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, limit, page)
+		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, limit, page*limit)
 	} else {
 		rows, err = t.getByContractStmt.QueryContext(pCtx, pContractAddress)
 	}
@@ -234,7 +234,7 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, limit, page)
+		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, limit, page*limit)
 	} else {
 		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, pContractAddress)
 	}
@@ -268,7 +268,7 @@ func (t *TokenRepository) GetByTokenID(pCtx context.Context, pTokenID persist.To
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page)
+		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page*limit)
 	} else {
 		rows, err = t.getByTokenIDStmt.QueryContext(pCtx, pTokenID)
 	}
@@ -407,7 +407,7 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 	switch pUpdate.(type) {
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID)
+		res, err = t.updateMediaUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -431,7 +431,7 @@ func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenI
 	switch pUpdate.(type) {
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, pContractAddress)
+		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

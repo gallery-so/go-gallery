@@ -454,13 +454,10 @@ func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository pers
 		return nil
 	}
 
-	logrus.Infof("Updating %d tokens", len(tokens))
-
 	updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
 	for i := 0; i < len(tokens); i++ {
 		select {
 		case update := <-updates:
-
 			if err := tokenRepository.UpdateByID(c, update.TokenDBID, update.Update); err != nil {
 				logrus.WithError(err).Error("failed to update token in database")
 				return err
@@ -501,7 +498,6 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 	return updateChan, errChan
 }
 
-// TODO Update description, name, etc.
 func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, mediaType persist.MediaType, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (tokenUpdateMedia, error) {
 	newMetadata := metadata
 	newURI := uri
@@ -538,7 +534,16 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		}
 	}
 
-	newMedia, err := media.MakePreviewsForMetadata(pCtx, metadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient)
+	name, ok := util.GetValueFromMap(newMetadata, "name", util.DefaultSearchDepth).(string)
+	if !ok {
+		name = ""
+	}
+	description, ok := util.GetValueFromMap(newMetadata, "description", util.DefaultSearchDepth).(string)
+	if !ok {
+		description = ""
+	}
+
+	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient)
 	if err != nil {
 		return tokenUpdateMedia{}, fmt.Errorf("failed to make media for token %s-%s: %v", contractAddress, tokenID, err)
 	}
@@ -546,9 +551,11 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		TokenID:         tokenID,
 		ContractAddress: persist.EthereumAddress(contractAddress),
 		Update: persist.TokenUpdateMediaInput{
-			TokenURI: newURI,
-			Metadata: newMetadata,
-			Media:    newMedia,
+			TokenURI:    newURI,
+			Metadata:    newMetadata,
+			Media:       newMedia,
+			Name:        persist.NullString(name),
+			Description: persist.NullString(description),
 		},
 	}
 	return up, nil

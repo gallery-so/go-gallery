@@ -191,7 +191,7 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByUserIDPaginateStmt.QueryContext(pCtx, pUserID, limit, page)
+		rows, err = t.getByUserIDPaginateStmt.QueryContext(pCtx, pUserID, limit, page*limit)
 	} else {
 		rows, err = t.getByUserIDStmt.QueryContext(pCtx, pUserID)
 	}
@@ -222,7 +222,7 @@ func (t *TokenGalleryRepository) GetByContract(pCtx context.Context, pContractAd
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, pChain, limit, page)
+		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, pChain, limit, page*limit)
 	} else {
 		rows, err = t.getByContractStmt.QueryContext(pCtx, pContractAddress, pChain)
 	}
@@ -256,7 +256,7 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, pChain, limit, page)
+		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, pChain, limit, page*limit)
 	} else {
 		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, pContractAddress, pChain)
 	}
@@ -290,7 +290,7 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page)
+		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page*limit)
 	} else {
 		rows, err = t.getByTokenIDStmt.QueryContext(pCtx, pTokenID)
 	}
