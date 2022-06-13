@@ -1,4 +1,3 @@
-DROP INDEX IF EXISTS address_idx;
 DROP INDEX IF EXISTS token_id_contract_address_owner_address_idx;
 DROP INDEX IF EXISTS token_id_contract_address_idx;
 DROP INDEX IF EXISTS owner_address_idx;
