@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/sirupsen/logrus"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -63,14 +64,12 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	logger.For(pCtx).Infof("Making previews for %s", name)
-
 	imgURL, vURL := findInitialURLs(metadata, name, turi)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
 
-	logger.For(pCtx).Infof("asURI for %s: %s", name, imgAsURI)
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": turi, "imgURL": imgURL, "vURL": vURL, "name": name}).Debug("MakePreviewsForMetadata initial")
 
 	// use videoURI to check if SVG
 	res, err := preHandleSVG(pCtx, videoAsURI, ipfsClient, arweaveClient)
@@ -109,7 +108,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 	if vURL != "" {
-		logger.For(pCtx).Infof("video url for %s: %s", name, vURL)
+		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": turi, "imgURL": imgURL, "vURL": vURL, "name": name}).Debug("MakePreviewsForMetadata vURL valid")
 		mediaType, err = downloadAndCache(pCtx, vURL, name, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			switch err.(type) {
@@ -130,7 +129,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 
-	logger.For(pCtx).Infof("media type for %s: %s", name, mediaType)
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": turi, "imgURL": imgURL, "vURL": vURL, "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
@@ -302,7 +301,7 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	mediaType, _ := PredictMediaType(pCtx, url)
 
-	logger.For(pCtx).Infof("predicting media type for %s: %s", name, mediaType)
+	logger.For(pCtx).Infof("predicted media type for %s: %s", url, mediaType)
 
 outer:
 	switch mediaType {
@@ -335,6 +334,7 @@ outer:
 	}
 
 	logger.For(pCtx).Infof("sniffed media type for %s: %s", url, mediaType)
+
 	switch mediaType {
 	case persist.MediaTypeVideo:
 		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
@@ -404,6 +404,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 	}
 	asURI := persist.TokenURI(url)
 	uriType := asURI.Type()
+	logger.For(pCtx).Infof("predicting media type for %s: %s", url, uriType)
 	switch uriType {
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
@@ -413,6 +414,9 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return persist.MediaTypeUnknown, err
+		}
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return persist.MediaTypeUnknown, rpc.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
 		contentType := resp.Header.Get("Content-Type")
 		return persist.MediaFromContentType(contentType), nil
