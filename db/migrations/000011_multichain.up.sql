@@ -35,7 +35,9 @@ CREATE INDEX IF NOT EXISTS token_contract_address_idx ON tokens (CONTRACT_ADDRES
 CREATE INDEX IF NOT EXISTS block_number_idx ON tokens (BLOCK_NUMBER);
 
 ALTER TABLE contracts ADD COLUMN IF NOT EXISTS CHAIN int;
+UPDATE contracts SET CHAIN = 0 WHERE CHAIN IS NULL;
 
+DROP INDEX IF EXISTS address_idx;
 CREATE UNIQUE INDEX IF NOT EXISTS contract_address_chain_idx ON contracts (ADDRESS,CHAIN);
 
 CREATE INDEX IF NOT EXISTS token_owned_by_wallets_idx ON tokens USING GIN (OWNED_BY_WALLETS);
