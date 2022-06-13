@@ -32,6 +32,7 @@ func main() {
 func run() {
 
 	pgClient := postgres.NewClient()
+	pgClient.SetConnMaxLifetime(time.Minute)
 
 	logrus.Info("Full migration...")
 
@@ -226,9 +227,12 @@ func getAllNFTs(pg *sql.DB, users []persist.DBID, nftsChan chan<- persist.NFT) e
 	return nil
 }
 
-type tokenContractCombo struct {
-	contract persist.ContractGallery
-	token    persist.TokenGallery
+type contractUpsert struct {
+	contractAddress string
+	contractName    string
+	contractSymbol  string
+	creatorAddress  string
+	backChan        chan persist.DBID
 }
 
 func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NFT) error {
@@ -242,6 +246,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 	}
 
 	toUpsertChan := make(chan persist.TokenGallery)
+	contractsChan := make(chan contractUpsert)
 	errChan := make(chan error)
 	wp := workerpool.New(500)
 	go func() {
@@ -250,21 +255,26 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		for nft := range nfts {
 			n := nft
 			f := func() {
+				defer func() {
+					if r := recover(); r != nil {
+						errChan <- fmt.Errorf("panic inside goroutine: %v - nft: %s", r, n.ID)
+					}
+				}()
 				normalized := persist.ChainETH.NormalizeAddress(persist.Address(n.Contract.ContractAddress))
 				contractID, ok := contracts.LoadOrStore(normalized, "")
 				if !ok {
 					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID)
 					if err != nil {
-						contractID = persist.GenerateID()
-						res, err := pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;`, contractID, normalized, n.Contract.ContractName, n.Contract.ContractSymbol, n.CreatorAddress)
-						if err != nil {
-							logrus.Errorf("error inserting contract %s: %s", normalized, err)
+						backChan := make(chan persist.DBID)
+						toUpsertContract := contractUpsert{
+							contractAddress: normalized,
+							contractName:    n.Contract.ContractName.String(),
+							contractSymbol:  n.Contract.ContractSymbol.String(),
+							creatorAddress:  n.CreatorAddress.String(),
+							backChan:        backChan,
 						}
-						if aff, err := res.RowsAffected(); aff == 0 && err == nil {
-							if err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID); err != nil {
-								logrus.Errorf("error retrieving contract %s: %s", normalized, err)
-							}
-						}
+						contractsChan <- toUpsertContract
+						contractID = <-backChan
 					}
 					contracts.Store(normalized, contractID)
 				}
@@ -312,6 +322,19 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 			tokens[i] = toUpsert
 			bar.Add(1)
 			i++
+		case contractUpsert := <-contractsChan:
+			func() {
+				defer close(contractUpsert.backChan)
+				_, err := pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;`, persist.GenerateID(), contractUpsert.contractAddress, contractUpsert.contractName, contractUpsert.contractSymbol, contractUpsert.creatorAddress)
+				if err != nil {
+					logrus.Errorf("error inserting contract %s: %s", contractUpsert.contractAddress, err)
+				}
+				var contractID persist.DBID
+				if err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, contractUpsert.contractAddress).Scan(&contractID); err != nil {
+					logrus.Errorf("error retrieving contract %s: %s", contractUpsert.contractAddress, err)
+				}
+				contractUpsert.backChan <- contractID
+			}()
 		case err := <-errChan:
 			return err
 		}
