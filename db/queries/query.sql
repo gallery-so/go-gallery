@@ -57,14 +57,14 @@ SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
+    AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
+    AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
