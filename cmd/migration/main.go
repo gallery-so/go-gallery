@@ -31,8 +31,9 @@ func main() {
 
 func run() {
 
+	start := time.Now()
+
 	pgClient := postgres.NewClient()
-	pgClient.SetConnMaxLifetime(time.Minute)
 
 	logrus.Info("Full migration...")
 
@@ -85,7 +86,7 @@ func run() {
 		panic(err)
 	}
 	logrus.Info("Migrating NFTs... Done")
-	logrus.Info("Full migration... Done")
+	logrus.Infof("Full migration... Done in %s", time.Since(start))
 	logrus.Infof("Found %d bad NFTs", badMedias)
 }
 
@@ -263,7 +264,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 				normalized := persist.ChainETH.NormalizeAddress(persist.Address(n.Contract.ContractAddress))
 				contractID, ok := contracts.LoadOrStore(normalized, "")
 				if !ok {
-					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, normalized).Scan(&contractID)
+					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = 0;`, normalized).Scan(&contractID)
 					if err != nil {
 						backChan := make(chan persist.DBID)
 						toUpsertContract := contractUpsert{
@@ -325,12 +326,12 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		case contractUpsert := <-contractsChan:
 			func() {
 				defer close(contractUpsert.backChan)
-				_, err := pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;`, persist.GenerateID(), contractUpsert.contractAddress, contractUpsert.contractName, contractUpsert.contractSymbol, contractUpsert.creatorAddress)
+				_, err := pg.Exec(`INSERT INTO contracts (ID,ADDRESS,NAME,SYMBOL,CREATOR_ADDRESS,CHAIN) VALUES ($1,$2,$3,$4,$5,0) ON CONFLICT (ADDRESS,CHAIN) DO UPDATE SET NAME = EXCLUDED.NAME, SYMBOL = EXCLUDED.SYMBOL, CREATOR_ADDRESS = EXCLUDED.CREATOR_ADDRESS;`, persist.GenerateID(), contractUpsert.contractAddress, contractUpsert.contractName, contractUpsert.contractSymbol, contractUpsert.creatorAddress)
 				if err != nil {
 					logrus.Errorf("error inserting contract %s: %s", contractUpsert.contractAddress, err)
 				}
 				var contractID persist.DBID
-				if err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1;`, contractUpsert.contractAddress).Scan(&contractID); err != nil {
+				if err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = 0;`, contractUpsert.contractAddress).Scan(&contractID); err != nil {
 					logrus.Errorf("error retrieving contract %s: %s", contractUpsert.contractAddress, err)
 				}
 				contractUpsert.backChan <- contractID
