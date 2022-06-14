@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/event"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/sentry"
@@ -80,6 +81,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 			})
 		}
 
+		mediamapper.AddTo(c)
 		event.AddTo(c, repos)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp)
 		h.ServeHTTP(c.Writer, c.Request)
