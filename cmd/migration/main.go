@@ -373,7 +373,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 		"animation_url": nft.AnimationOriginalURL,
 	}
 
-	med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
+	med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL.String(), nft.ImagePreviewURL.String(), nft.ImageThumbnailURL.String()))}
 	var err error
 	switch {
 	case nft.AnimationURL != "":
@@ -554,4 +554,13 @@ func generateValuesPlaceholders(l, offset int) string {
 		values += fmt.Sprintf("$%d,", i+1+offset)
 	}
 	return values[0:len(values)-1] + ")"
+}
+
+func firstNonEmptyString(strings ...string) string {
+	for _, s := range strings {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
 }

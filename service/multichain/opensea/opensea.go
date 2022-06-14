@@ -446,7 +446,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []
 				"animation_url": nft.AnimationOriginalURL,
 			}
 
-			med := persist.Media{ThumbnailURL: persist.NullString(nft.ImageThumbnailURL)}
+			med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
 			switch {
 			case nft.AnimationURL != "":
 				med.MediaURL = persist.NullString(nft.AnimationURL)
@@ -682,4 +682,13 @@ func (t TokenID) ToBase16() string {
 		panic("failed to convert opensea token id to big int")
 	}
 	return asBig.Text(16)
+}
+
+func firstNonEmptyString(strs ...string) string {
+	for _, str := range strs {
+		if str != "" {
+			return str
+		}
+	}
+	return ""
 }
