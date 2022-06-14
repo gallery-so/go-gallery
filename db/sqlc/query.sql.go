@@ -248,10 +248,11 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract FROM collections c, unnest(c.nfts)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
-    WHERE c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord
+    WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
+    AND c.id = $1 AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord
 `
 
 func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) ([]Token, error) {
