@@ -123,6 +123,11 @@ type Contract struct {
 	Symbol     string                  `json:"symbol"`
 }
 
+type assetsReceieved struct {
+	assets []Asset
+	err    error
+}
+
 type errNoSingleNFTForOpenseaID struct {
 	openseaID int
 }
@@ -150,28 +155,21 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	assetsChan := make(chan []Asset)
-	errChan := make(chan error)
+	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := FetchAssets(ctx, assetsChan, persist.EthereumAddress(address.String()), "", "", "", 0, nil)
-		if err != nil {
-			errChan <- err
-		}
+		FetchAssets(ctx, assetsChan, persist.EthereumAddress(address.String()), "", "", "", 0, nil)
 	}()
+
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
 func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	assetsChan := make(chan []Asset)
-	errChan := make(chan error)
+	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(address), "", "", 0, nil)
-		if err != nil {
-			errChan <- err
-		}
+		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(address), "", "", 0, nil)
 	}()
 	// TODO: Fill in this address or change something else
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
@@ -187,14 +185,10 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
 func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	assetsChan := make(chan []Asset)
-	errChan := make(chan error)
+	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		err := FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
-		if err != nil {
-			errChan <- err
-		}
+		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
 	}()
 	// TODO: Fill in this address or change something else
 	return assetsToTokens(ctx, "", assetsChan, p.ethClient)
@@ -297,7 +291,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumA
 }
 
 // FetchAssets fetches assets by its token identifiers
-func FetchAssets(pCtx context.Context, assetsChan chan<- []Asset, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) error {
+func FetchAssets(pCtx context.Context, assetsChan chan<- assetsReceieved, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -329,34 +323,40 @@ func FetchAssets(pCtx context.Context, assetsChan chan<- []Asset, pWalletAddress
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)
+		assetsChan <- assetsReceieved{err: fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)}
 	}
 	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)
+		assetsChan <- assetsReceieved{err: fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)}
+		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
+				FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
+				return
 			}
-			return fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)
+			assetsChan <- assetsReceieved{err: fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)}
+			return
 		}
 		bs := new(bytes.Buffer)
 		_, err := bs.ReadFrom(resp.Body)
 		if err != nil {
-			return err
+			assetsChan <- assetsReceieved{err: err}
+			return
 		}
-		return fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())
+		assetsChan <- assetsReceieved{err: fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())}
+		return
 	}
 	response := Assets{}
 	err = util.UnmarshallBody(&response, resp.Body)
 	if err != nil {
-		return err
+		assetsChan <- assetsReceieved{err: err}
+		return
 	}
 
 	nextCursor := response.Next
@@ -372,19 +372,19 @@ func FetchAssets(pCtx context.Context, assetsChan chan<- []Asset, pWalletAddress
 		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
 	}
 
-	assetsChan <- result
+	assetsChan <- assetsReceieved{assets: result}
 
 	if doneReceiving {
-		return nil
+		return
 	}
 
 	if len(response.Assets) == 50 {
-		err := FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
+		FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
 		if err != nil {
-			return err
+			assetsChan <- assetsReceieved{err: err}
+			return
 		}
 	}
-	return nil
 }
 
 // FetchContractByAddress fetches a contract by address
@@ -429,7 +429,7 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return response, nil
 }
 
-func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-chan []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
@@ -443,89 +443,102 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 	errChan := make(chan error)
 	wp := workerpool.New(10)
 
-	for n := range assetsChan {
-		nfts := n
-		for _, nft := range nfts {
-			wp.Submit(func() {
-				var tokenType persist.TokenType
-				switch nft.Contract.ContractSchemaName {
-				case "ERC721", "CRYPTOPUNKS":
-					tokenType = persist.TokenTypeERC721
-				case "ERC1155":
-					tokenType = persist.TokenTypeERC1155
-				default:
-					errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
-					return
-				}
+	go func() {
+		defer close(tokensChan)
+		for a := range assetsChan {
+			assetsReceived := a
+			if assetsReceived.err != nil {
+				errChan <- assetsReceived.err
+				return
+			}
+			for _, n := range assetsReceived.assets {
+				nft := n
+				logrus.Info(n.Name)
+				wp.Submit(func() {
+					var tokenType persist.TokenType
+					switch nft.Contract.ContractSchemaName {
+					case "ERC721", "CRYPTOPUNKS":
+						tokenType = persist.TokenTypeERC721
+					case "ERC1155":
+						tokenType = persist.TokenTypeERC1155
+					default:
+						errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+						return
+					}
 
-				metadata := persist.TokenMetadata{
-					"name":          nft.Name,
-					"description":   nft.Description,
-					"image_url":     nft.ImageOriginalURL,
-					"animation_url": nft.AnimationOriginalURL,
-				}
+					metadata := persist.TokenMetadata{
+						"name":          nft.Name,
+						"description":   nft.Description,
+						"image_url":     nft.ImageOriginalURL,
+						"animation_url": nft.AnimationOriginalURL,
+					}
 
-				med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
-				switch {
-				case nft.AnimationURL != "":
-					med.MediaURL = persist.NullString(nft.AnimationURL)
-					med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
+					med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
+					switch {
+					case nft.AnimationURL != "":
+						med.MediaURL = persist.NullString(nft.AnimationURL)
+						med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
 
-				case nft.AnimationOriginalURL != "":
-					med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-					med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
+					case nft.AnimationOriginalURL != "":
+						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
+						med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
 
-				case nft.ImageURL != "":
-					med.MediaURL = persist.NullString(nft.ImageURL)
-					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
+					case nft.ImageURL != "":
+						med.MediaURL = persist.NullString(nft.ImageURL)
+						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
 
-				case nft.ImageOriginalURL != "":
-					med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+					case nft.ImageOriginalURL != "":
+						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
+						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
 
-				default:
-					med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
-				}
+					default:
+						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
+						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+					}
 
-				if err != nil {
-					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
-				}
+					if err != nil {
+						logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
+					}
 
-				contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
-					Address:        persist.Address(nft.Contract.ContractAddress.String()),
-					Symbol:         nft.Contract.ContractSymbol.String(),
-					Name:           nft.Contract.ContractName.String(),
-					CreatorAddress: persist.Address(nft.Creator.Address),
-					LatestBlock:    persist.BlockNumber(block),
+					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
+						Address:        persist.Address(nft.Contract.ContractAddress.String()),
+						Symbol:         nft.Contract.ContractSymbol.String(),
+						Name:           nft.Contract.ContractName.String(),
+						CreatorAddress: persist.Address(nft.Creator.Address),
+						LatestBlock:    persist.BlockNumber(block),
+					})
+					if !ok {
+						contractsChan <- contract.(multichain.ChainAgnosticContract)
+					} else {
+						contractsChan <- multichain.ChainAgnosticContract{}
+					}
+
+					tokensChan <- multichain.ChainAgnosticToken{
+						TokenType:       tokenType,
+						Name:            nft.Name,
+						Description:     nft.Description,
+						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
+						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
+						OwnerAddress:    address,
+						ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
+						ExternalURL:     nft.ExternalURL,
+						BlockNumber:     persist.BlockNumber(block),
+						TokenMetadata:   metadata,
+						Media:           med,
+						Quantity:        "1",
+					}
 				})
-				if !ok {
-					contractsChan <- contract.(multichain.ChainAgnosticContract)
-				} else {
-					contractsChan <- multichain.ChainAgnosticContract{}
-				}
-
-				tokensChan <- multichain.ChainAgnosticToken{
-					TokenType:       tokenType,
-					Name:            nft.Name,
-					Description:     nft.Description,
-					TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-					TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-					OwnerAddress:    address,
-					ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
-					ExternalURL:     nft.ExternalURL,
-					BlockNumber:     persist.BlockNumber(block),
-					TokenMetadata:   metadata,
-					Media:           med,
-					Quantity:        "1",
-				}
-			})
+			}
 		}
-	}
+		wp.StopWait()
+	}()
 
-	for i := 0; i < (len(assetsChan) * 2); i++ {
+	for {
 		select {
-		case token := <-tokensChan:
+		case token, ok := <-tokensChan:
+			if !ok {
+				return resultTokens, resultContracts, nil
+			}
 			resultTokens = append(resultTokens, token)
 		case contract := <-contractsChan:
 			if contract.Address.String() != "" {
@@ -537,7 +550,6 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 			return nil, nil, err
 		}
 	}
-	return resultTokens, resultContracts, nil
 }
 
 func contractToContract(ctx context.Context, openseaContract Contract, ethClient *ethclient.Client) (multichain.ChainAgnosticContract, error) {
