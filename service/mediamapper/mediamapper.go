@@ -11,16 +11,15 @@ import (
 
 const contextKey = "mediamapper.instance"
 
-// Our custom asset domain (not currently working)
-//const assetDomain = "assets.gallery.so"
-const assetDomain = "gallerylabs.imgix.net"
+const assetDomain = "assets.gallery.so"
 
 type MediaMapper struct {
-	urlBuilder      imgix.URLBuilder
-	smallUrlParams  []imgix.IxParam
-	mediumUrlParams []imgix.IxParam
-	largeUrlParams  []imgix.IxParam
-	srcSetParams    []imgix.IxParam
+	urlBuilder         imgix.URLBuilder
+	thumbnailUrlParams []imgix.IxParam
+	smallUrlParams     []imgix.IxParam
+	mediumUrlParams    []imgix.IxParam
+	largeUrlParams     []imgix.IxParam
+	srcSetParams       []imgix.IxParam
 }
 
 func AddTo(c *gin.Context) {
@@ -40,34 +39,45 @@ func NewMediaMapper() *MediaMapper {
 
 	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
 
-	// TODO: Decide on ideal parameters for all permutations below
+	defaultAutoParam := imgix.Param("auto", "format", "compress")
+
+	thumbnailUrlParams := []imgix.IxParam{
+		imgix.Param("w", "64"),
+		defaultAutoParam,
+	}
 
 	smallUrlParams := []imgix.IxParam{
-		imgix.Param("w", "100"),
-		imgix.Param("auto", "format", "compress"),
+		imgix.Param("w", "204"),
+		defaultAutoParam,
 	}
 
 	mediumUrlParams := []imgix.IxParam{
-		imgix.Param("w", "500"),
-		imgix.Param("auto", "format", "compress"),
+		imgix.Param("w", "340"),
+		defaultAutoParam,
 	}
 
 	largeUrlParams := []imgix.IxParam{
-		imgix.Param("w", "1000"),
-		imgix.Param("auto", "format", "compress"),
+		imgix.Param("w", "1024"),
+		defaultAutoParam,
 	}
 
 	srcSetParams := []imgix.IxParam{
-		imgix.Param("auto", "format", "compress"),
+		imgix.Param("w", "204"),
+		defaultAutoParam,
 	}
 
 	return &MediaMapper{
-		urlBuilder:      urlBuilder,
-		smallUrlParams:  smallUrlParams,
-		mediumUrlParams: mediumUrlParams,
-		largeUrlParams:  largeUrlParams,
-		srcSetParams:    srcSetParams,
+		urlBuilder:         urlBuilder,
+		thumbnailUrlParams: thumbnailUrlParams,
+		smallUrlParams:     smallUrlParams,
+		mediumUrlParams:    mediumUrlParams,
+		largeUrlParams:     largeUrlParams,
+		srcSetParams:       srcSetParams,
 	}
+}
+
+func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string) string {
+	return u.urlBuilder.CreateURL(sourceUrl, u.thumbnailUrlParams...)
 }
 
 func (u *MediaMapper) GetSmallImageUrl(sourceUrl string) string {

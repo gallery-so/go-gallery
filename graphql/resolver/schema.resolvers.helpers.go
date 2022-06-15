@@ -631,31 +631,23 @@ func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLS
 	mm := mediamapper.For(ctx)
 
 	return &model.PreviewURLSet{
-		Raw:    &preview,
-		Small:  util.StringToPointer(mm.GetSmallImageUrl(preview)),
-		Medium: util.StringToPointer(mm.GetMediumImageUrl(preview)),
-		Large:  util.StringToPointer(mm.GetLargeImageUrl(preview)),
-		SrcSet: util.StringToPointer(mm.GetSrcSet(preview)),
+		Raw:       &preview,
+		Thumbnail: util.StringToPointer(mm.GetThumbnailImageUrl(preview)),
+		Small:     util.StringToPointer(mm.GetSmallImageUrl(preview)),
+		Medium:    util.StringToPointer(mm.GetMediumImageUrl(preview)),
+		Large:     util.StringToPointer(mm.GetLargeImageUrl(preview)),
+		SrcSet:    util.StringToPointer(mm.GetSrcSet(preview)),
 	}
 }
 
 func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
-	mm := mediamapper.For(ctx)
-
-	imageUrls := model.ImageURLSet{
-		Raw:    &url,
-		Small:  util.StringToPointer(mm.GetSmallImageUrl(url)),
-		Medium: util.StringToPointer(mm.GetMediumImageUrl(url)),
-		Large:  util.StringToPointer(mm.GetLargeImageUrl(url)),
-		SrcSet: util.StringToPointer(mm.GetSrcSet(url)),
-	}
 
 	return model.ImageMedia{
-		PreviewURLs:       getPreviewUrls(ctx, media),
-		MediaURL:          util.StringToPointer(media.MediaURL.String()),
-		MediaType:         (*string)(&media.MediaType),
-		ContentRenderURLs: &imageUrls,
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: &url,
 	}
 }
 
