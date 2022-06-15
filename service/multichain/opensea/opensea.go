@@ -150,21 +150,31 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address
 func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	assets, err := FetchAssetsForWallet(ctx, persist.EthereumAddress(address.String()), "", 0, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	return assetsToTokens(ctx, address, assets, p.ethClient)
+	assetsChan := make(chan []Asset)
+	errChan := make(chan error)
+	go func() {
+		defer close(assetsChan)
+		err := FetchAssets(ctx, assetsChan, persist.EthereumAddress(address.String()), "", "", "", 0, nil)
+		if err != nil {
+			errChan <- err
+		}
+	}()
+	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
 func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(address), "", "", 0, nil)
-	if err != nil {
-		return nil, multichain.ChainAgnosticContract{}, err
-	}
+	assetsChan := make(chan []Asset)
+	errChan := make(chan error)
+	go func() {
+		defer close(assetsChan)
+		err := FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(address), "", "", 0, nil)
+		if err != nil {
+			errChan <- err
+		}
+	}()
 	// TODO: Fill in this address or change something else
-	tokens, contracts, err := assetsToTokens(ctx, "", assets, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -177,12 +187,17 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
 func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	assets, err := FetchAssets(ctx, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	assetsChan := make(chan []Asset)
+	errChan := make(chan error)
+	go func() {
+		defer close(assetsChan)
+		err := FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
+		if err != nil {
+			errChan <- err
+		}
+	}()
 	// TODO: Fill in this address or change something else
-	return assetsToTokens(ctx, "", assets, p.ethClient)
+	return assetsToTokens(ctx, "", assetsChan, p.ethClient)
 }
 
 // GetContractByAddress returns a contract for a contract address
@@ -282,7 +297,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumA
 }
 
 // FetchAssets fetches assets by its token identifiers
-func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
+func FetchAssets(pCtx context.Context, assetsChan chan<- []Asset, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) error {
 
 	if alreadyReceived == nil {
 		alreadyReceived = make(map[int]string)
@@ -314,34 +329,34 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)
+		return fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)
 	}
 	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)
+		return fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 {
 			if retry < 3 {
 				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
+				return FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
 			}
-			return nil, fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)
+			return fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)
 		}
 		bs := new(bytes.Buffer)
 		_, err := bs.ReadFrom(resp.Body)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return nil, fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())
+		return fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())
 	}
 	response := Assets{}
 	err = util.UnmarshallBody(&response, resp.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	nextCursor := response.Next
@@ -356,17 +371,20 @@ func FetchAssets(pCtx context.Context, pWalletAddress, pContractAddress persist.
 		result = append(result, asset)
 		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
 	}
+
+	assetsChan <- result
+
 	if doneReceiving {
-		return result, nil
+		return nil
 	}
+
 	if len(response.Assets) == 50 {
-		next, err := FetchAssets(pCtx, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
+		err := FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		result = append(result, next...)
 	}
-	return result, nil
+	return nil
 }
 
 // FetchContractByAddress fetches a contract by address
@@ -411,111 +429,101 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return response, nil
 }
 
-func assetsToTokens(ctx context.Context, address persist.Address, openseaNfts []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-chan []Asset, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	resultTokens := make([]multichain.ChainAgnosticToken, 0, len(openseaNfts))
+	resultTokens := make([]multichain.ChainAgnosticToken, 0, len(assetsChan))
 	seenContracts := &sync.Map{}
-	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(openseaNfts))
+	resultContracts := make([]multichain.ChainAgnosticContract, 0, len(assetsChan))
 	tokensChan := make(chan multichain.ChainAgnosticToken)
 	contractsChan := make(chan multichain.ChainAgnosticContract)
 	errChan := make(chan error)
 	wp := workerpool.New(10)
 
-	for _, n := range openseaNfts {
-		nft := n
-		wp.Submit(func() {
-			var tokenType persist.TokenType
-			switch nft.Contract.ContractSchemaName {
-			case "ERC721", "CRYPTOPUNKS":
-				tokenType = persist.TokenTypeERC721
-			case "ERC1155":
-				tokenType = persist.TokenTypeERC1155
-			default:
-				errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
-				return
-			}
-
-			metadata := persist.TokenMetadata{
-				"name":          nft.Name,
-				"description":   nft.Description,
-				"image_url":     nft.ImageOriginalURL,
-				"animation_url": nft.AnimationOriginalURL,
-			}
-
-			med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
-			switch {
-			case nft.AnimationURL != "":
-				med.MediaURL = persist.NullString(nft.AnimationURL)
-				med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
-				if err != nil {
-					logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationURL, err)
-				}
-			case nft.AnimationOriginalURL != "":
-				med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-				med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
-
-				if err != nil {
-					logrus.Errorf("failed to predict media type for %s: %s", nft.AnimationOriginalURL, err)
-				}
-			case nft.ImageURL != "":
-				med.MediaURL = persist.NullString(nft.ImageURL)
-				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
-
-				if err != nil {
-					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageURL, err)
-				}
-			case nft.ImageOriginalURL != "":
-				med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
-
-				if err != nil {
-					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageOriginalURL, err)
+	for n := range assetsChan {
+		nfts := n
+		for _, nft := range nfts {
+			wp.Submit(func() {
+				var tokenType persist.TokenType
+				switch nft.Contract.ContractSchemaName {
+				case "ERC721", "CRYPTOPUNKS":
+					tokenType = persist.TokenTypeERC721
+				case "ERC1155":
+					tokenType = persist.TokenTypeERC1155
+				default:
+					errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+					return
 				}
 
-			default:
-				med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-				med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+				metadata := persist.TokenMetadata{
+					"name":          nft.Name,
+					"description":   nft.Description,
+					"image_url":     nft.ImageOriginalURL,
+					"animation_url": nft.AnimationOriginalURL,
+				}
+
+				med := persist.Media{ThumbnailURL: persist.NullString(firstNonEmptyString(nft.ImageURL, nft.ImagePreviewURL, nft.ImageThumbnailURL))}
+				switch {
+				case nft.AnimationURL != "":
+					med.MediaURL = persist.NullString(nft.AnimationURL)
+					med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
+
+				case nft.AnimationOriginalURL != "":
+					med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
+					med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
+
+				case nft.ImageURL != "":
+					med.MediaURL = persist.NullString(nft.ImageURL)
+					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
+
+				case nft.ImageOriginalURL != "":
+					med.MediaURL = persist.NullString(nft.ImageOriginalURL)
+					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+
+				default:
+					med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
+					med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+				}
 
 				if err != nil {
 					logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
 				}
-			}
 
-			contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
-				Address:        persist.Address(nft.Contract.ContractAddress.String()),
-				Symbol:         nft.Contract.ContractSymbol.String(),
-				Name:           nft.Contract.ContractName.String(),
-				CreatorAddress: persist.Address(nft.Creator.Address),
-				LatestBlock:    persist.BlockNumber(block),
+				contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
+					Address:        persist.Address(nft.Contract.ContractAddress.String()),
+					Symbol:         nft.Contract.ContractSymbol.String(),
+					Name:           nft.Contract.ContractName.String(),
+					CreatorAddress: persist.Address(nft.Creator.Address),
+					LatestBlock:    persist.BlockNumber(block),
+				})
+				if !ok {
+					contractsChan <- contract.(multichain.ChainAgnosticContract)
+				} else {
+					contractsChan <- multichain.ChainAgnosticContract{}
+				}
+
+				tokensChan <- multichain.ChainAgnosticToken{
+					TokenType:       tokenType,
+					Name:            nft.Name,
+					Description:     nft.Description,
+					TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
+					TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
+					OwnerAddress:    address,
+					ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
+					ExternalURL:     nft.ExternalURL,
+					BlockNumber:     persist.BlockNumber(block),
+					TokenMetadata:   metadata,
+					Media:           med,
+					Quantity:        "1",
+				}
 			})
-			if !ok {
-				contractsChan <- contract.(multichain.ChainAgnosticContract)
-			} else {
-				contractsChan <- multichain.ChainAgnosticContract{}
-			}
-
-			tokensChan <- multichain.ChainAgnosticToken{
-				TokenType:       tokenType,
-				Name:            nft.Name,
-				Description:     nft.Description,
-				TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
-				TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-				OwnerAddress:    address,
-				ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
-				ExternalURL:     nft.ExternalURL,
-				BlockNumber:     persist.BlockNumber(block),
-				TokenMetadata:   metadata,
-				Media:           med,
-				Quantity:        "1",
-			}
-		})
+		}
 	}
 
-	for i := 0; i < (len(openseaNfts) * 2); i++ {
+	for i := 0; i < (len(assetsChan) * 2); i++ {
 		select {
 		case token := <-tokensChan:
 			resultTokens = append(resultTokens, token)
@@ -547,7 +555,7 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
-func (d *Provider) VerifySignature(pCtx context.Context,
+func (p *Provider) VerifySignature(pCtx context.Context,
 	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
@@ -555,25 +563,25 @@ func (d *Provider) VerifySignature(pCtx context.Context,
 	validBool, err := verifySignature(pSignatureStr,
 		nonce,
 		pAddressStr.String(), pWalletType,
-		true, d.ethClient)
+		true, p.ethClient)
 
 	if !validBool || err != nil {
 		// eth_sign
 		validBool, err = verifySignature(pSignatureStr,
 			nonce,
 			pAddressStr.String(), pWalletType,
-			false, d.ethClient)
+			false, p.ethClient)
 		if err != nil || !validBool {
 			nonce = auth.NoncePrepend + pNonce
 			validBool, err = verifySignature(pSignatureStr,
 				nonce,
 				pAddressStr.String(), pWalletType,
-				true, d.ethClient)
+				true, p.ethClient)
 			if err != nil || !validBool {
 				validBool, err = verifySignature(pSignatureStr,
 					nonce,
 					pAddressStr.String(), pWalletType,
-					false, d.ethClient)
+					false, p.ethClient)
 			}
 		}
 	}
