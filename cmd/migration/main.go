@@ -256,15 +256,18 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		for nft := range nfts {
 			n := nft
 			f := func() {
+				innerCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+				defer cancel()
 				defer func() {
 					if r := recover(); r != nil {
 						errChan <- fmt.Errorf("panic inside goroutine: %v - nft: %s", r, n.ID)
 					}
 				}()
-				normalized := persist.ChainETH.NormalizeAddress(persist.Address(n.Contract.ContractAddress))
-				contractID, ok := contracts.LoadOrStore(normalized, "")
+				normalized := n.Contract.ContractAddress.String()
+				contractID, ok := contracts.Load(normalized)
 				if !ok {
-					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = 0;`, normalized).Scan(&contractID)
+					var newContractID persist.DBID
+					err := pg.QueryRow(`SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = 0;`, normalized).Scan(&newContractID)
 					if err != nil {
 						backChan := make(chan persist.DBID)
 						toUpsertContract := contractUpsert{
@@ -277,13 +280,11 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 						contractsChan <- toUpsertContract
 						contractID = <-backChan
 					}
+					contractID = newContractID
 					contracts.Store(normalized, contractID)
 				}
-				asString, ok := contractID.(string)
-				if ok {
-					contractID = persist.DBID(asString)
-				}
-				token, err := nftToToken(ctx, pg, n, contractID.(persist.DBID), block)
+
+				token, err := nftToToken(innerCtx, pg, n, contractID.(persist.DBID), block)
 				if err != nil {
 					errChan <- err
 					return
@@ -307,7 +308,8 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 		select {
 		case toUpsert, ok := <-toUpsertChan:
 			if i == perUpsert || !ok {
-				err = upsertTokens(pg, dedupeTokens(tokens))
+				deduped := dedupeTokens(tokens)
+				err = upsertTokens(pg, deduped)
 				if err != nil {
 					return err
 				}
@@ -357,11 +359,9 @@ func splitNFTs(n int, nfts []persist.NFT) [][]persist.NFT {
 
 func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID persist.DBID, block uint64) (persist.TokenGallery, error) {
 	var tokenType persist.TokenType
-	var quantity persist.HexString
 	switch nft.Contract.ContractSchemaName {
 	case "ERC1155":
 		tokenType = persist.TokenTypeERC1155
-		quantity = "1"
 	default:
 		tokenType = persist.TokenTypeERC721
 	}
@@ -397,6 +397,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 	}
 	if err != nil {
 		atomic.AddInt64(&badMedias, 1)
+		// logrus.Errorf("error predicting media type for %s: %s", med.MediaURL, err)
 	}
 
 	var walletID persist.DBID
@@ -417,7 +418,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 		Name:             nft.Name,
 		Description:      nft.Description,
 		Version:          0,
-		Quantity:         quantity,
+		Quantity:         "1",
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
@@ -483,32 +484,34 @@ func upsertTokens(pg *sql.DB, tokens []persist.TokenGallery) error {
 
 }
 
+type tokenUniqueIdentifiers struct {
+	TokenID     persist.TokenID
+	Chain       persist.Chain
+	Contract    persist.DBID
+	OwnerUserID persist.DBID
+}
+
 func dedupeTokens(pTokens []persist.TokenGallery) []persist.TokenGallery {
-	seen := map[string]persist.TokenGallery{}
+	seen := map[tokenUniqueIdentifiers]persist.TokenGallery{}
 	for _, token := range pTokens {
-		key := token.Contract.String() + "-" + token.TokenID.String() + "-" + token.OwnerUserID.String()
+		key := tokenUniqueIdentifiers{TokenID: token.TokenID, Chain: token.Chain, Contract: token.Contract, OwnerUserID: token.OwnerUserID}
 		if seenToken, ok := seen[key]; ok {
 			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
 				continue
 			}
 			seen[key] = token
+		} else {
+			seen[key] = token
 		}
-		seen[key] = token
 	}
-	result := make([]persist.TokenGallery, len(seen))
+	seenIDs := map[persist.DBID]bool{}
+	result := []persist.TokenGallery{}
 	i := 0
 	for _, v := range seen {
-		result[i] = v
-		i++
-	}
-	seenIDs := map[persist.DBID]persist.TokenGallery{}
-	for _, token := range result {
-		seenIDs[token.ID] = token
-	}
-	result = make([]persist.TokenGallery, len(seenIDs))
-	i = 0
-	for _, v := range seenIDs {
-		result[i] = v
+		if _, ok := seenIDs[v.ID]; !ok {
+			seenIDs[v.ID] = true
+			result = append(result, v)
+		}
 		i++
 	}
 	return result

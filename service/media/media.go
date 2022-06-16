@@ -394,8 +394,7 @@ outer:
 
 // PredictMediaType guesses the media type of the given URL.
 func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, error) {
-	ctx, cancel := context.WithTimeout(pCtx, time.Second*10)
-	defer cancel()
+
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
@@ -406,10 +405,10 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 	}
 	asURI := persist.TokenURI(url)
 	uriType := asURI.Type()
-	logger.For(ctx).Debugf("predicting media type for %s: %s", url, uriType)
+	logger.For(pCtx).Debugf("predicting media type for %s: %s", url, uriType)
 	switch uriType {
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
 			return persist.MediaTypeUnknown, err
 		}
@@ -424,7 +423,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 		return persist.MediaFromContentType(contentType), nil
 	case persist.URITypeIPFS:
 		path := strings.TrimPrefix(asURI.String(), "ipfs://")
-		headers, err := rpc.GetIPFSHeaders(ctx, path)
+		headers, err := rpc.GetIPFSHeaders(pCtx, path)
 		if err != nil {
 			return persist.MediaTypeUnknown, err
 		}

@@ -455,6 +455,8 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 				nft := n
 				logrus.Info(n.Name)
 				wp.Submit(func() {
+					innerCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+					defer cancel()
 					var tokenType persist.TokenType
 					switch nft.Contract.ContractSchemaName {
 					case "ERC721", "CRYPTOPUNKS":
@@ -477,23 +479,23 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 					switch {
 					case nft.AnimationURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationURL)
-						med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationURL)
+						med.MediaType, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
 
 					case nft.AnimationOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-						med.MediaType, err = media.PredictMediaType(ctx, nft.AnimationOriginalURL)
+						med.MediaType, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
 
 					case nft.ImageURL != "":
 						med.MediaURL = persist.NullString(nft.ImageURL)
-						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageURL)
+						med.MediaType, err = media.PredictMediaType(innerCtx, nft.ImageURL)
 
 					case nft.ImageOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageOriginalURL)
+						med.MediaType, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
 
 					default:
 						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-						med.MediaType, err = media.PredictMediaType(ctx, nft.ImageThumbnailURL)
+						med.MediaType, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
 					}
 
 					if err != nil {

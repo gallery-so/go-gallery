@@ -260,6 +260,18 @@ type NFTContract struct {
 	ContractTotalSupply  NullString      `json:"total_supply"`
 }
 
+// OldOpenseaNFTContract represents how we used to store contracts
+type OldOpenseaNFTContract struct {
+	ContractAddress      EthereumAddress `json:"contract_address"`
+	ContractName         NullString      `json:"contract_name"`
+	ContractImage        NullString      `json:"contract_image_url"`
+	ContractDescription  NullString      `json:"contract_description"`
+	ContractExternalLink NullString      `json:"contract_external_link"`
+	ContractSchemaName   NullString      `json:"contract_schema_name"`
+	ContractSymbol       NullString      `json:"contract_symbol"`
+	ContractTotalSupply  NullString      `json:"contract_total_supply"`
+}
+
 // ContractCollectionNFT represents a contract within a collection nft
 type ContractCollectionNFT struct {
 	ContractName  NullString `json:"name"`
@@ -745,7 +757,26 @@ func (c *NFTContract) Scan(src interface{}) error {
 	if src == nil {
 		return nil
 	}
-	return json.Unmarshal(src.([]uint8), &c)
+	err := json.Unmarshal(src.([]uint8), &c)
+	if err != nil {
+		return err
+	}
+	if c.ContractAddress == "" {
+		old := OldOpenseaNFTContract{}
+		err := json.Unmarshal(src.([]uint8), &old)
+		if err != nil {
+			return err
+		}
+		c.ContractAddress = old.ContractAddress
+		c.ContractDescription = old.ContractDescription
+		c.ContractExternalLink = old.ContractExternalLink
+		c.ContractImage = old.ContractImage
+		c.ContractName = old.ContractName
+		c.ContractSchemaName = old.ContractSchemaName
+		c.ContractSymbol = old.ContractSymbol
+		c.ContractTotalSupply = old.ContractTotalSupply
+	}
+	return nil
 }
 
 // NewEthereumTokenIdentifiers creates a new token identifiers
