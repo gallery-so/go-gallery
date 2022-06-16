@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
 	"time"
 
@@ -119,12 +121,29 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
+	if viper.GetString("ENV") == "local" {
+		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+		path, err := util.FindFile("_internal/app-local-backend.yaml", 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+		}
+	}
+
 	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
 		panic("ADMIN_PASS must be set")
 	}
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
+	}
+
+	if viper.GetString("IMGIX_SECRET") == "" {
+		panic("IMGIX_SECRET must be set")
 	}
 }
 

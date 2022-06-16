@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -150,5 +151,5 @@ func FindFile(f string, searchDepth int) (string, error) {
 		}
 	}
 
-	return "", errors.New("could not find file in path")
+	return "", fmt.Errorf("could not find file '%s' in path", f)
 }

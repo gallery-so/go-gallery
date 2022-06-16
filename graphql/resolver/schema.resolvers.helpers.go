@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -543,7 +544,7 @@ func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 		CreationTime:     &token.CreatedAt,
 		LastUpdated:      &token.LastUpdated,
 		CollectorsNote:   &token.CollectorsNote.String,
-		Media:            getMediaForToken(token),
+		Media:            getMediaForToken(ctx, token),
 		TokenType:        &tokenType,
 		Chain:            &chain,
 		Name:             &token.Name.String,
@@ -597,85 +598,70 @@ func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func getMediaForToken(token sqlc.Token) model.MediaSubtype {
+func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype {
 	var med persist.Media
 	err := token.Media.AssignTo(&med)
 	if err != nil {
-		return getInvalidMedia(med)
+		return getInvalidMedia(ctx, med)
 	}
 
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeGIF:
-		return getImageMedia(med)
+		return getImageMedia(ctx, med)
 	case persist.MediaTypeVideo:
-		return getVideoMedia(med)
+		return getVideoMedia(ctx, med)
 	case persist.MediaTypeAudio:
-		return getAudioMedia(med)
+		return getAudioMedia(ctx, med)
 	case persist.MediaTypeHTML:
-		return getHtmlMedia(med)
+		return getHtmlMedia(ctx, med)
 	case persist.MediaTypeAnimation:
-		return getGltfMedia(med)
+		return getGltfMedia(ctx, med)
 	case persist.MediaTypeJSON, persist.MediaTypeBase64JSON:
-		return getJsonMedia(med)
+		return getJsonMedia(ctx, med)
 	case persist.MediaTypeSVG, persist.MediaTypeText, persist.MediaTypeBase64SVG, persist.MediaTypeBase64Text:
-		return getTextMedia(med)
+		return getTextMedia(ctx, med)
 	default:
-		return getUnknownMedia(med)
+		return getUnknownMedia(ctx, med)
 	}
 
 }
 
-func getFirstNonEmptyString(strings ...string) *string {
-	for _, str := range strings {
-		if str != "" {
-			return &str
-		}
-	}
-
-	empty := ""
-	return &empty
-}
-
-func getPreviewUrls(media persist.Media) *model.PreviewURLSet {
-	thumnail := media.ThumbnailURL.String()
+func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
+	preview := remapLargeImageUrls(media.ThumbnailURL.String())
+	mm := mediamapper.For(ctx)
 
 	return &model.PreviewURLSet{
-		Raw:    remapLargeImageUrls(&thumnail),
-		Small:  remapLargeImageUrls(&thumnail),
-		Medium: remapLargeImageUrls(&thumnail),
-		Large:  remapLargeImageUrls(&thumnail),
+		Raw:       &preview,
+		Thumbnail: util.StringToPointer(mm.GetThumbnailImageUrl(preview)),
+		Small:     util.StringToPointer(mm.GetSmallImageUrl(preview)),
+		Medium:    util.StringToPointer(mm.GetMediumImageUrl(preview)),
+		Large:     util.StringToPointer(mm.GetLargeImageUrl(preview)),
+		SrcSet:    util.StringToPointer(mm.GetSrcSet(preview)),
 	}
 }
 
-func getImageMedia(media persist.Media) model.ImageMedia {
-	url := remapLargeImageUrls(getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()))
-	imageUrls := model.ImageURLSet{
-		Raw:    url,
-		Small:  url,
-		Medium: url,
-		Large:  url,
-	}
+func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
+	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.ImageMedia{
-		PreviewURLs:       getPreviewUrls(media),
-		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
-		MediaType:         (*string)(&media.MediaType),
-		ContentRenderURLs: &imageUrls,
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: &url,
 	}
 }
 
 // Temporary method for handling the large "dead ringers" NFT image. This remapping
 // step should actually happen as part of generating resized images with imgix.
-func remapLargeImageUrls(url *string) *string {
-	if url == nil || (*url != "https://storage.opensea.io/files/33ab86c2a565430af5e7fb8399876960.png" && *url != "https://openseauserdata.com/files/33ab86c2a565430af5e7fb8399876960.png") {
-		return url
+func remapLargeImageUrls(url string) string {
+	if url == "https://storage.opensea.io/files/33ab86c2a565430af5e7fb8399876960.png" || url == "https://openseauserdata.com/files/33ab86c2a565430af5e7fb8399876960.png" {
+		return "https://lh3.googleusercontent.com/pw/AM-JKLVsudnwN97ULF-DgJC1J_AZ8i-1pMjLCVUqswF1_WShId30uP_p_jSRkmVx-XNgKNIGFSglgRojZQrsLOoCM2pVNJwgx5_E4yeYRsMvDQALFKbJk0_6wj64tjLhSIINwGpdNw0MhtWNehKCipDKNeE"
 	}
 
-	remapped := "https://lh3.googleusercontent.com/pw/AM-JKLVsudnwN97ULF-DgJC1J_AZ8i-1pMjLCVUqswF1_WShId30uP_p_jSRkmVx-XNgKNIGFSglgRojZQrsLOoCM2pVNJwgx5_E4yeYRsMvDQALFKbJk0_6wj64tjLhSIINwGpdNw0MhtWNehKCipDKNeE"
-	return &remapped
+	return url
 }
 
-func getVideoMedia(media persist.Media) model.VideoMedia {
+func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
 	asString := media.MediaURL.String()
 	videoUrls := model.VideoURLSet{
 		Raw:    &asString,
@@ -685,71 +671,71 @@ func getVideoMedia(media persist.Media) model.VideoMedia {
 	}
 
 	return model.VideoMedia{
-		PreviewURLs:       getPreviewUrls(media),
-		MediaURL:          getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:       getPreviewUrls(ctx, media),
+		MediaURL:          util.StringToPointer(media.MediaURL.String()),
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
 	}
 }
 
-func getAudioMedia(media persist.Media) model.AudioMedia {
+func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
 	return model.AudioMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getTextMedia(media persist.Media) model.TextMedia {
+func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
 	return model.TextMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getHtmlMedia(media persist.Media) model.HTMLMedia {
+func getHtmlMedia(ctx context.Context, media persist.Media) model.HTMLMedia {
 	return model.HTMLMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getJsonMedia(media persist.Media) model.JSONMedia {
+func getJsonMedia(ctx context.Context, media persist.Media) model.JSONMedia {
 	return model.JSONMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getGltfMedia(media persist.Media) model.GltfMedia {
+func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 	return model.GltfMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getUnknownMedia(media persist.Media) model.UnknownMedia {
+func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
 }
 
-func getInvalidMedia(media persist.Media) model.InvalidMedia {
+func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedia {
 	return model.InvalidMedia{
-		PreviewURLs:      getPreviewUrls(media),
-		MediaURL:         getFirstNonEmptyString(media.MediaURL.String(), media.ThumbnailURL.String()),
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
