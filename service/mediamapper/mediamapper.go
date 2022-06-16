@@ -99,24 +99,29 @@ func setGoogleWidthParams(sourceUrl string, width int) string {
 	return sourceUrl
 }
 
+func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params []imgix.IxParam) string {
+	if sourceUrl == "" {
+		return sourceUrl
+	}
+
+	sourceUrl = setGoogleWidthParams(sourceUrl, width)
+	return u.urlBuilder.CreateURL(sourceUrl, params...)
+}
+
 func (u *MediaMapper) GetThumbnailImageUrl(sourceUrl string) string {
-	sourceUrl = setGoogleWidthParams(sourceUrl, thumbnailWidth)
-	return u.urlBuilder.CreateURL(sourceUrl, u.thumbnailUrlParams...)
+	return u.buildPreviewImageUrl(sourceUrl, thumbnailWidth, u.thumbnailUrlParams)
 }
 
 func (u *MediaMapper) GetSmallImageUrl(sourceUrl string) string {
-	sourceUrl = setGoogleWidthParams(sourceUrl, smallWidth)
-	return u.urlBuilder.CreateURL(sourceUrl, u.smallUrlParams...)
+	return u.buildPreviewImageUrl(sourceUrl, smallWidth, u.smallUrlParams)
 }
 
 func (u *MediaMapper) GetMediumImageUrl(sourceUrl string) string {
-	sourceUrl = setGoogleWidthParams(sourceUrl, mediumWidth)
-	return u.urlBuilder.CreateURL(sourceUrl, u.mediumUrlParams...)
+	return u.buildPreviewImageUrl(sourceUrl, mediumWidth, u.mediumUrlParams)
 }
 
 func (u *MediaMapper) GetLargeImageUrl(sourceUrl string) string {
-	sourceUrl = setGoogleWidthParams(sourceUrl, largeWidth)
-	return u.urlBuilder.CreateURL(sourceUrl, u.largeUrlParams...)
+	return u.buildPreviewImageUrl(sourceUrl, largeWidth, u.largeUrlParams)
 }
 
 func (u *MediaMapper) GetSrcSet(sourceUrl string) string {
