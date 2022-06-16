@@ -102,16 +102,11 @@ union MediaSubtype =
 
 type PreviewURLSet {
     raw: String
+    thumbnail: String
     small: String
     medium: String
     large: String
-}
-
-type ImageURLSet {
-    raw: String
-    small: String
-    medium: String
-    large: String
+    srcSet: String
 }
 
 type VideoURLSet {
@@ -141,7 +136,7 @@ type ImageMedia implements Media {
     mediaURL: String
     mediaType: String
 
-    contentRenderURLs: ImageURLSet
+    contentRenderURL: String
 }
 
 type VideoMedia implements Media {

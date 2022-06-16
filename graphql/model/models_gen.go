@@ -450,21 +450,14 @@ func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
 
 type ImageMedia struct {
-	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
-	MediaURL          *string        `json:"mediaURL"`
-	MediaType         *string        `json:"mediaType"`
-	ContentRenderURLs *ImageURLSet   `json:"contentRenderURLs"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
 func (ImageMedia) IsMedia()        {}
-
-type ImageURLSet struct {
-	Raw    *string `json:"raw"`
-	Small  *string `json:"small"`
-	Medium *string `json:"medium"`
-	Large  *string `json:"large"`
-}
 
 type InvalidMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -513,10 +506,12 @@ type OwnerAtBlock struct {
 }
 
 type PreviewURLSet struct {
-	Raw    *string `json:"raw"`
-	Small  *string `json:"small"`
-	Medium *string `json:"medium"`
-	Large  *string `json:"large"`
+	Raw       *string `json:"raw"`
+	Thumbnail *string `json:"thumbnail"`
+	Small     *string `json:"small"`
+	Medium    *string `json:"medium"`
+	Large     *string `json:"large"`
+	SrcSet    *string `json:"srcSet"`
 }
 
 type RefreshTokensPayload struct {
