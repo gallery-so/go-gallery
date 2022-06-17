@@ -2,10 +2,11 @@ package validate
 
 import (
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/microcosm-cc/bluemonday"
@@ -48,6 +49,9 @@ var bannedUsernames = map[string]bool{
 	"feed":          true,
 	"feeds":         true,
 	"membership":    true,
+	"careers":       true,
+	"maintenance":   true,
+	"home":          true,
 }
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
