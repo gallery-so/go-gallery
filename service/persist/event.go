@@ -4,9 +4,13 @@ import (
 	"fmt"
 )
 
+type ResourceType int
 type Action string
 
 const (
+	ResourceTypeUser ResourceType = iota
+	ResourceTypeToken
+	ResourceTypeCollection
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
@@ -52,6 +56,14 @@ type ErrUnknownAction struct {
 
 func (e ErrUnknownAction) Error() string {
 	return fmt.Sprintf("unknown action: %s", e.Action)
+}
+
+type ErrUnknownResourceType struct {
+	ResourceType ResourceType
+}
+
+func (e ErrUnknownResourceType) Error() string {
+	return fmt.Sprintf("unknown resource type: %v", e.ResourceType)
 }
 
 // TODO: Remove when the feedbot uses the feed API instead of creating its own posts.

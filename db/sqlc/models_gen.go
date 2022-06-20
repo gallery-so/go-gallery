@@ -78,15 +78,19 @@ type EarlyAccess struct {
 }
 
 type Event struct {
-	ID          persist.DBID
-	Version     int32
-	ActorID     persist.DBID
-	SubjectID   persist.DBID
-	Action      persist.Action
-	Data        persist.EventData
-	Deleted     bool
-	LastUpdated time.Time
-	CreatedAt   time.Time
+	ID           persist.DBID
+	Version      int32
+	ActorID      persist.DBID
+	ResourceID   persist.ResourceType
+	SubjectID    persist.DBID
+	UserID       persist.DBID
+	TokenID      persist.DBID
+	CollectionID persist.DBID
+	Action       persist.Action
+	Data         persist.EventData
+	Deleted      bool
+	LastUpdated  time.Time
+	CreatedAt    time.Time
 }
 
 type Feature struct {
@@ -185,6 +189,14 @@ type Nonce struct {
 	Address     sql.NullString
 	Value       sql.NullString
 	Chain       sql.NullInt32
+}
+
+type ResourceType struct {
+	ID           persist.DBID
+	ResourceName sql.NullString
+	Deleted      bool
+	LastUpdated  time.Time
+	CreatedAt    time.Time
 }
 
 type Token struct {

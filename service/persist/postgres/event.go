@@ -16,14 +16,56 @@ func (r *EventRepository) Get(ctx context.Context, eventID persist.DBID) (sqlc.E
 	return r.Queries.GetEvent(ctx, eventID)
 }
 
-func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (sqlc.Event, error) {
-	return r.Queries.CreateEvent(ctx, sqlc.CreateEventParams{
-		ID:        persist.GenerateID(),
-		ActorID:   event.ActorID,
-		Action:    event.Action,
-		SubjectID: event.SubjectID,
-		Data:      event.Data,
+func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+	switch event.ResourceID {
+	case persist.ResourceTypeUser:
+		return r.AddUserEvent(ctx, event)
+	case persist.ResourceTypeToken:
+		return r.AddTokenEvent(ctx, event)
+	case persist.ResourceTypeCollection:
+		return r.AddCollectionEvent(ctx, event)
+	default:
+		return nil, persist.ErrUnknownResourceType{ResourceType: event.ResourceID}
+	}
+}
+
+func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+	event, err := r.Queries.CreateUserEvent(ctx, sqlc.CreateUserEventParams{
+		ID:         persist.GenerateID(),
+		ActorID:    event.ActorID,
+		Action:     event.Action,
+		ResourceID: event.ResourceID,
+		UserID:     event.UserID,
+		SubjectID:  event.SubjectID,
+		Data:       event.Data,
 	})
+	return &event, err
+}
+
+func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+	event, err := r.Queries.CreateTokenEvent(ctx, sqlc.CreateTokenEventParams{
+		ID:         persist.GenerateID(),
+		ActorID:    event.ActorID,
+		Action:     event.Action,
+		ResourceID: event.ResourceID,
+		TokenID:    event.TokenID,
+		SubjectID:  event.SubjectID,
+		Data:       event.Data,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+	event, err := r.Queries.CreateCollectionEvent(ctx, sqlc.CreateCollectionEventParams{
+		ID:           persist.GenerateID(),
+		ActorID:      event.ActorID,
+		Action:       event.Action,
+		ResourceID:   event.ResourceID,
+		CollectionID: event.CollectionID,
+		SubjectID:    event.SubjectID,
+		Data:         event.Data,
+	})
+	return &event, err
 }
 
 // WindowActive checks if there are more recent events with an action that matches the provided event.

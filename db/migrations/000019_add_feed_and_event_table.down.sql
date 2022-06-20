@@ -1,2 +1,3 @@
 DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS resource_types;
 DROP TABLE IF EXISTS feed_events;

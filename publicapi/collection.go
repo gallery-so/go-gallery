@@ -108,9 +108,11 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	// Send event
 	evt := sqlc.Event{
-		ActorID:   userID,
-		Action:    persist.ActionCollectionCreated,
-		SubjectID: collectionID,
+		ActorID:      userID,
+		Action:       persist.ActionCollectionCreated,
+		ResourceID:   persist.ResourceTypeCollection,
+		CollectionID: collectionID,
+		SubjectID:    collectionID,
 		Data: persist.EventData{
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
@@ -184,10 +186,12 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 
 	// Send event
 	evt := sqlc.Event{
-		ActorID:   userID,
-		Action:    persist.ActionCollectorsNoteAddedToCollection,
-		SubjectID: collectionID,
-		Data:      persist.EventData{CollectionCollectorsNote: collectorsNote},
+		ActorID:      userID,
+		Action:       persist.ActionCollectorsNoteAddedToCollection,
+		ResourceID:   persist.ResourceTypeCollection,
+		CollectionID: collectionID,
+		SubjectID:    collectionID,
+		Data:         persist.EventData{CollectionCollectorsNote: collectorsNote},
 	}
 	err = event.DispatchEventToFeed(ctx, evt)
 	if err != nil {
@@ -232,10 +236,12 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 	// Send event
 	evt := sqlc.Event{
-		ActorID:   userID,
-		Action:    persist.ActionTokensAddedToCollection,
-		SubjectID: collectionID,
-		Data:      persist.EventData{CollectionTokenIDs: tokens},
+		ActorID:      userID,
+		Action:       persist.ActionTokensAddedToCollection,
+		ResourceID:   persist.ResourceTypeCollection,
+		CollectionID: collectionID,
+		SubjectID:    collectionID,
+		Data:         persist.EventData{CollectionTokenIDs: tokens},
 	}
 	err = event.DispatchEventToFeed(ctx, evt)
 	if err != nil {

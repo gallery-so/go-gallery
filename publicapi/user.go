@@ -149,10 +149,12 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 
 	// Send event
 	evt := sqlc.Event{
-		ActorID:   userID,
-		Action:    persist.ActionUserCreated,
-		SubjectID: userID,
-		Data:      persist.EventData{UserBio: bio},
+		ActorID:    userID,
+		Action:     persist.ActionUserCreated,
+		ResourceID: persist.ResourceTypeUser,
+		UserID:     userID,
+		SubjectID:  userID,
+		Data:       persist.EventData{UserBio: bio},
 	}
 	err = event.DispatchEventToFeed(ctx, evt)
 	if err != nil {
@@ -272,10 +274,12 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	evt := sqlc.Event{
-		ActorID:   curUserID,
-		Action:    persist.ActionUserFollowedUsers,
-		SubjectID: userID,
-		Data:      persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+		ActorID:    curUserID,
+		Action:     persist.ActionUserFollowedUsers,
+		ResourceID: persist.ResourceTypeUser,
+		UserID:     userID,
+		SubjectID:  userID,
+		Data:       persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
 	}
 
 	err = event.DispatchEventToFeed(ctx, evt)
