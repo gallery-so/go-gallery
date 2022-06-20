@@ -1,21 +1,25 @@
 //go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Gallery
 //go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Gallery
 //go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Collection
 //go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Collection
-//go:generate go run github.com/vektah/dataloaden NftLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Nft
-//go:generate go run github.com/vektah/dataloaden NftsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Nft
-//go:generate go run github.com/vektah/dataloaden NftsLoaderByAddress github.com/mikeydub/go-gallery/service/persist.Address []github.com/mikeydub/go-gallery/db/sqlc.Nft
 //go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Membership
-//go:generate go run github.com/vektah/dataloaden FollowersLoaderById github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden FollowingLoaderById github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletsLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
 
 package dataloader
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -36,18 +40,23 @@ type Loaders struct {
 
 	UserByUserId             UserLoaderByID
 	UserByUsername           UserLoaderByString
-	UserByAddress            UserLoaderByAddress
 	GalleryByGalleryId       GalleryLoaderByID
 	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
 	CollectionByCollectionId CollectionLoaderByID
 	CollectionsByGalleryId   CollectionsLoaderByID
-	NftByNftId               NftLoaderByID
-	NftsByOwnerAddress       NftsLoaderByAddress
-	NftsByCollectionId       NftsLoaderByID
 	MembershipByMembershipId MembershipLoaderById
-	FollowersByUserId        FollowersLoaderById
-	FollowingByUserId        FollowingLoaderById
+	WalletByWalletId         WalletLoaderById
+	WalletsByUserID          WalletsLoaderByUserID
+	WalletByChainAddress     WalletLoaderByChainAddress
+	TokenByTokenID           TokenLoaderByID
+	TokensByCollectionID     TokensLoaderByID
+	TokensByWalletID         TokensLoaderByID
+	TokensByUserID           TokensLoaderByID
+	ContractByContractId     ContractLoaderByID
+	ContractByChainAddress   ContractLoaderByChainAddress
+	FollowersByUserId        UsersLoaderByID
+	FollowingByUserId        UsersLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -63,12 +72,6 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUsername(ctx, loaders, q),
-	}
-
-	loaders.UserByAddress = UserLoaderByAddress{
-		maxBatch: defaultMaxBatchOne,
-		wait:     defaultWaitTime,
-		fetch:    loadUserByAddress(ctx, loaders, q),
 	}
 
 	loaders.GalleryByGalleryId = GalleryLoaderByID{
@@ -101,40 +104,70 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadCollectionsByGalleryId(ctx, loaders, q),
 	}
 
-	loaders.NftByNftId = NftLoaderByID{
-		maxBatch: defaultMaxBatchOne,
-		wait:     defaultWaitTime,
-		fetch:    loadNftByNftId(ctx, loaders, q),
-	}
-
-	loaders.NftsByOwnerAddress = NftsLoaderByAddress{
-		maxBatch: defaultMaxBatchMany,
-		wait:     defaultWaitTime,
-		fetch:    loadNftsByOwnerAddress(ctx, loaders, q),
-	}
-
-	loaders.NftsByCollectionId = NftsLoaderByID{
-		maxBatch: defaultMaxBatchMany,
-		wait:     defaultWaitTime,
-		fetch:    loadNftsByCollectionId(ctx, loaders, q),
-	}
-
 	loaders.MembershipByMembershipId = MembershipLoaderById{
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadMembershipByMembershipId(ctx, loaders, q),
 	}
 
-	loaders.FollowersByUserId = FollowersLoaderById{
+	loaders.WalletByWalletId = WalletLoaderById{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletByWalletId(ctx, loaders, q),
+	}
+
+	loaders.WalletsByUserID = WalletsLoaderByUserID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletsByUserId(ctx, loaders, q),
+	}
+
+	loaders.WalletByChainAddress = WalletLoaderByChainAddress{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadWalletByChainAddress(ctx, loaders, q),
+	}
+
+	loaders.FollowersByUserId = UsersLoaderByID{
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadFollowersByUserId(ctx, loaders, q),
 	}
 
-	loaders.FollowingByUserId = FollowingLoaderById{
+	loaders.FollowingByUserId = UsersLoaderByID{
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadFollowingByUserId(ctx, loaders, q),
+	}
+
+	loaders.TokenByTokenID = TokenLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadTokenByTokenID(ctx, loaders, q),
+	}
+
+	loaders.TokensByCollectionID = TokensLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByCollectionID(ctx, loaders, q),
+	}
+
+	loaders.TokensByWalletID = TokensLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByWalletID(ctx, loaders, q),
+	}
+
+	loaders.TokensByUserID = TokensLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByUserID(ctx, loaders, q),
+	}
+
+	loaders.ContractByContractId = ContractLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadContractByContractID(ctx, loaders, q),
 	}
 
 	return loaders
@@ -146,19 +179,17 @@ func (l *Loaders) ClearAllCaches() {
 	l.ClearUserCaches()
 	l.ClearGalleryCaches()
 	l.ClearCollectionCaches()
-	l.ClearNftCaches()
+	l.ClearTokenCaches()
 	l.ClearMembershipCaches()
 	l.ClearFollowCaches()
+	l.ClearWalletCaches()
+	l.ClearContractCaches()
 }
 
 func (l *Loaders) ClearUserCaches() {
 	l.UserByUserId.mu.Lock()
 	l.UserByUserId.cache = nil
 	l.UserByUserId.mu.Unlock()
-
-	l.UserByAddress.mu.Lock()
-	l.UserByAddress.cache = nil
-	l.UserByAddress.mu.Unlock()
 
 	l.UserByUsername.mu.Lock()
 	l.UserByUsername.cache = nil
@@ -189,18 +220,22 @@ func (l *Loaders) ClearCollectionCaches() {
 	l.CollectionsByGalleryId.mu.Unlock()
 }
 
-func (l *Loaders) ClearNftCaches() {
-	l.NftByNftId.mu.Lock()
-	l.NftByNftId.cache = nil
-	l.NftByNftId.mu.Unlock()
+func (l *Loaders) ClearTokenCaches() {
+	l.TokenByTokenID.mu.Lock()
+	l.TokenByTokenID.cache = nil
+	l.TokenByTokenID.mu.Unlock()
 
-	l.NftsByOwnerAddress.mu.Lock()
-	l.NftsByOwnerAddress.cache = nil
-	l.NftsByOwnerAddress.mu.Unlock()
+	l.TokensByCollectionID.mu.Lock()
+	l.TokensByCollectionID.cache = nil
+	l.TokensByCollectionID.mu.Unlock()
 
-	l.NftsByCollectionId.mu.Lock()
-	l.NftsByCollectionId.cache = nil
-	l.NftsByCollectionId.mu.Unlock()
+	l.TokensByWalletID.mu.Lock()
+	l.TokensByWalletID.cache = nil
+	l.TokensByWalletID.mu.Unlock()
+
+	l.TokensByUserID.mu.Lock()
+	l.TokensByUserID.cache = nil
+	l.TokensByUserID.mu.Unlock()
 }
 
 func (l *Loaders) ClearMembershipCaches() {
@@ -219,6 +254,30 @@ func (l *Loaders) ClearFollowCaches() {
 	l.FollowingByUserId.mu.Unlock()
 }
 
+func (l *Loaders) ClearWalletCaches() {
+	l.WalletByWalletId.mu.Lock()
+	l.WalletByWalletId.cache = nil
+	l.WalletByWalletId.mu.Unlock()
+
+	l.WalletByChainAddress.mu.Lock()
+	l.WalletByChainAddress.cache = nil
+	l.WalletByChainAddress.mu.Unlock()
+
+	l.WalletsByUserID.mu.Lock()
+	l.WalletsByUserID.cache = nil
+	l.WalletsByUserID.mu.Unlock()
+}
+
+func (l *Loaders) ClearContractCaches() {
+	l.ContractByContractId.mu.Lock()
+	l.ContractByContractId.cache = nil
+	l.ContractByContractId.mu.Unlock()
+
+	l.ContractByChainAddress.mu.Lock()
+	l.ContractByChainAddress.cache = nil
+	l.ContractByChainAddress.mu.Unlock()
+}
+
 func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
 	return func(userIds []persist.DBID) ([]sqlc.User, []error) {
 		users := make([]sqlc.User, len(userIds))
@@ -235,9 +294,6 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.UserByUsername.Prime(user.Username.String, user)
-				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address, user)
-				}
 			}
 
 			users[i], errors[i] = user, err
@@ -263,40 +319,6 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			// Add results to other loaders' caches
 			if err == nil {
 				loaders.UserByUserId.Prime(user.ID, user)
-				for _, address := range user.Addresses {
-					loaders.UserByAddress.Prime(address, user)
-				}
-			}
-
-			users[i], errors[i] = user, err
-		})
-
-		return users, errors
-	}
-}
-
-func loadUserByAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.Address) ([]sqlc.User, []error) {
-	return func(addresses []persist.Address) ([]sqlc.User, []error) {
-		users := make([]sqlc.User, len(addresses))
-		errors := make([]error, len(addresses))
-
-		addressStrings := make([]string, len(addresses))
-		for i, address := range addresses {
-			addressStrings[i] = address.String()
-		}
-
-		b := q.GetUserByAddressBatch(ctx, addressStrings)
-		defer b.Close()
-
-		b.QueryRow(func(i int, user sqlc.User, err error) {
-			if err == pgx.ErrNoRows {
-				err = persist.ErrUserNotFound{Address: addresses[i]}
-			}
-
-			// Add results to other loaders' caches
-			if err == nil {
-				loaders.UserByUserId.Prime(user.ID, user)
-				loaders.UserByUsername.Prime(user.Username.String, user)
 			}
 
 			users[i], errors[i] = user, err
@@ -432,75 +454,6 @@ func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Q
 	}
 }
 
-func loadNftByNftId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Nft, []error) {
-	return func(nftIds []persist.DBID) ([]sqlc.Nft, []error) {
-		nfts := make([]sqlc.Nft, len(nftIds))
-		errors := make([]error, len(nftIds))
-
-		b := q.GetNftByIdBatch(ctx, nftIds)
-		defer b.Close()
-
-		b.QueryRow(func(i int, n sqlc.Nft, err error) {
-			nfts[i] = n
-			errors[i] = err
-
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrNFTNotFoundByID{ID: nftIds[i]}
-			}
-		})
-
-		return nfts, errors
-	}
-}
-
-func loadNftsByOwnerAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.Address) ([][]sqlc.Nft, []error) {
-	return func(addresses []persist.Address) ([][]sqlc.Nft, []error) {
-		nfts := make([][]sqlc.Nft, len(addresses))
-		errors := make([]error, len(addresses))
-
-		b := q.GetNftsByOwnerAddressBatch(ctx, addresses)
-		defer b.Close()
-
-		b.Query(func(i int, n []sqlc.Nft, err error) {
-			nfts[i] = n
-			errors[i] = err
-
-			// Add results to the NftByNftId loader's cache
-			if errors[i] == nil {
-				for _, nft := range nfts[i] {
-					loaders.NftByNftId.Prime(nft.ID, nft)
-				}
-			}
-		})
-
-		return nfts, errors
-	}
-}
-
-func loadNftsByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Nft, []error) {
-	return func(collectionIds []persist.DBID) ([][]sqlc.Nft, []error) {
-		nfts := make([][]sqlc.Nft, len(collectionIds))
-		errors := make([]error, len(collectionIds))
-
-		b := q.GetNftsByCollectionIdBatch(ctx, collectionIds)
-		defer b.Close()
-
-		b.Query(func(i int, n []sqlc.Nft, err error) {
-			nfts[i] = n
-			errors[i] = err
-
-			// Add results to the NftByNftId loader's cache
-			if errors[i] == nil {
-				for _, nft := range nfts[i] {
-					loaders.NftByNftId.Prime(nft.ID, nft)
-				}
-			}
-		})
-
-		return nfts, errors
-	}
-}
-
 func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Membership, []error) {
 	return func(membershipIds []persist.DBID) ([]sqlc.Membership, []error) {
 		memberships := make([]sqlc.Membership, len(membershipIds))
@@ -519,6 +472,86 @@ func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc
 		})
 
 		return memberships, errors
+	}
+}
+func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Wallet, []error) {
+	return func(walletIds []persist.DBID) ([]sqlc.Wallet, []error) {
+		wallets := make([]sqlc.Wallet, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		b := q.GetWalletByIDBatch(ctx, walletIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+			// TODO err for not found by ID
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByChainAddress.Prime(persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)), wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Wallet, []error) {
+	return func(userIds []persist.DBID) ([][]sqlc.Wallet, []error) {
+		wallets := make([][]sqlc.Wallet, len(userIds))
+		errors := make([]error, len(userIds))
+
+		b := q.GetWalletsByUserIDBatch(ctx, userIds)
+		defer b.Close()
+
+		b.Query(func(i int, w []sqlc.Wallet, err error) {
+			// TODO err for not found by user ID
+			wallets[i], errors[i] = w, err
+
+			// Add results to other loaders' caches
+			if errors[i] == nil {
+				for _, wallet := range wallets[i] {
+					loaders.WalletByWalletId.Prime(wallet.ID, wallet)
+					loaders.WalletByChainAddress.Prime(persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)), wallet)
+				}
+			}
+		})
+
+		return wallets, errors
+	}
+}
+
+func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.ChainAddress) ([]sqlc.Wallet, []error) {
+	return func(chainAddresses []persist.ChainAddress) ([]sqlc.Wallet, []error) {
+		wallets := make([]sqlc.Wallet, len(chainAddresses))
+		errors := make([]error, len(chainAddresses))
+
+		sqlChainAddress := make([]sqlc.GetWalletByChainAddressBatchParams, len(chainAddresses))
+		for i, chainAddress := range chainAddresses {
+			sqlChainAddress[i] = sqlc.GetWalletByChainAddressBatchParams{
+				Address: chainAddress.Address(),
+				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
+			}
+		}
+
+		b := q.GetWalletByChainAddressBatch(ctx, sqlChainAddress)
+		defer b.Close()
+
+		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrWalletNotFound{ChainAddress: chainAddresses[i]}
+			}
+
+			// Add results to other loaders' caches
+			if err == nil {
+				loaders.WalletByWalletId.Prime(wallet.ID, wallet)
+			}
+
+			wallets[i], errors[i] = wallet, err
+		})
+
+		return wallets, errors
 	}
 }
 
@@ -569,5 +602,119 @@ func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		})
 
 		return following, errors
+	}
+}
+
+func loadTokenByTokenID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Token, []error) {
+	return func(tokenIDs []persist.DBID) ([]sqlc.Token, []error) {
+		tokens := make([]sqlc.Token, len(tokenIDs))
+		errors := make([]error, len(tokenIDs))
+
+		b := q.GetTokenByIdBatch(ctx, tokenIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, t sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrTokenNotFoundByID{ID: tokenIDs[i]}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByCollectionID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(collectionIDs []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(collectionIDs))
+		errors := make([]error, len(collectionIDs))
+
+		b := q.GetTokensByCollectionIdBatch(ctx, collectionIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(walletIds []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(walletIds))
+		errors := make([]error, len(walletIds))
+
+		convertedIds := make([]persist.DBIDList, len(walletIds))
+		for i, id := range walletIds {
+			convertedIds[i] = persist.DBIDList{id}
+		}
+
+		b := q.GetTokensByWalletIdsBatch(ctx, convertedIds)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
+	return func(userIDs []persist.DBID) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(userIDs))
+		errors := make([]error, len(userIDs))
+
+		b := q.GetTokensByUserIdBatch(ctx, userIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Contract, []error) {
+	return func(contractIDs []persist.DBID) ([]sqlc.Contract, []error) {
+		contracts := make([]sqlc.Contract, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractByIDBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, t sqlc.Contract, err error) {
+			contracts[i], errors[i] = t, err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrContractNotFoundByID{ID: contractIDs[i]}
+			}
+		})
+
+		return contracts, errors
 	}
 }

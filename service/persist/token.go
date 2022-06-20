@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -58,13 +59,17 @@ const (
 
 const (
 	// ChainETH represents the Ethereum blockchain
-	ChainETH Chain = "ETH"
+	ChainETH Chain = iota
 	// ChainArbitrum represents the Arbitrum blockchain
-	ChainArbitrum Chain = "Arbitrum"
+	ChainArbitrum
 	// ChainPolygon represents the Polygon/Matic blockchain
-	ChainPolygon Chain = "Polygon"
+	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
-	ChainOptimism Chain = "Optimism"
+	ChainOptimism
+
+	// MaxChainValue is the highest valid chain value, and should always be updated to
+	// point to the most recently added chain type.
+	MaxChainValue = ChainOptimism
 )
 
 const (
@@ -109,20 +114,20 @@ const (
 const InvalidTokenURI TokenURI = "INVALID"
 
 // ZeroAddress is the all-zero Ethereum address
-const ZeroAddress Address = "0x0000000000000000000000000000000000000000"
+const ZeroAddress EthereumAddress = "0x0000000000000000000000000000000000000000"
 
-// Address represents an Ethereum address
-type Address string
+// EthereumAddress represents an Ethereum address
+type EthereumAddress string
 
-// AddressList is a slice of Addresses, used to implement scanner/valuer interfaces
-type AddressList []Address
+// EthereumAddressList is a slice of Addresses, used to implement scanner/valuer interfaces
+type EthereumAddressList []EthereumAddress
 
-func (l AddressList) Value() (driver.Value, error) {
+func (l EthereumAddressList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
 
 // Scan implements the Scanner interface for the AddressList type
-func (l *AddressList) Scan(value interface{}) error {
+func (l *EthereumAddressList) Scan(value interface{}) error {
 	return pq.Array(l).Scan(value)
 }
 
@@ -142,7 +147,7 @@ type URIType string
 type TokenCountType string
 
 // Chain represents which blockchain a token is on
-type Chain string
+type Chain int
 
 // TokenID represents the ID of an Ethereum token
 type TokenID string
@@ -156,11 +161,14 @@ type TokenMetadata map[string]interface{}
 // HexString represents a hex number of any size
 type HexString string
 
-// AddressAtBlock is an address connected to a block number
-type AddressAtBlock struct {
-	Address Address     `json:"address"`
-	Block   BlockNumber `json:"block"`
+// EthereumAddressAtBlock is an address connected to a block number
+type EthereumAddressAtBlock struct {
+	Address EthereumAddress `json:"address"`
+	Block   BlockNumber     `json:"block"`
 }
+
+// EthereumTokenIdentifiers represents a unique identifier for a token on the Ethereum Blockchain
+type EthereumTokenIdentifiers string
 
 // Token represents an individual Token token
 type Token struct {
@@ -170,8 +178,7 @@ type Token struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	CollectorsNote NullString `json:"collectors_note"`
-	Media          Media      `json:"media"`
+	Media Media `json:"media"`
 
 	TokenType TokenType `json:"token_type"`
 
@@ -180,13 +187,13 @@ type Token struct {
 	Name        NullString `json:"name"`
 	Description NullString `json:"description"`
 
-	TokenURI         TokenURI         `json:"token_uri"`
-	TokenID          TokenID          `json:"token_id"`
-	Quantity         HexString        `json:"quantity"`
-	OwnerAddress     Address          `json:"owner_address"`
-	OwnershipHistory []AddressAtBlock `json:"previous_owners"`
-	TokenMetadata    TokenMetadata    `json:"metadata"`
-	ContractAddress  Address          `json:"contract_address"`
+	TokenURI         TokenURI                 `json:"token_uri"`
+	TokenID          TokenID                  `json:"token_id"`
+	Quantity         HexString                `json:"quantity"`
+	OwnerAddress     EthereumAddress          `json:"owner_address"`
+	OwnershipHistory []EthereumAddressAtBlock `json:"previous_owners"`
+	TokenMetadata    TokenMetadata            `json:"metadata"`
+	ContractAddress  EthereumAddress          `json:"contract_address"`
 
 	ExternalURL NullString `json:"external_url"`
 
@@ -200,59 +207,90 @@ type Media struct {
 	MediaType    MediaType  `json:"media_type"`
 }
 
-// TokenInCollection represents a token within a collection
-type TokenInCollection struct {
-	ID           DBID         `json:"id" binding:"required"`
-	CreationTime CreationTime `json:"created_at"`
-
-	ContractAddress Address `json:"contract_address"`
-
-	Chain Chain `json:"chain"`
-
-	Name        NullString `json:"name"`
-	Description NullString `json:"description"`
-
-	TokenType TokenType `json:"token_type"`
-
-	TokenURI     TokenURI `json:"token_uri"`
-	TokenID      TokenID  `json:"token_id"`
-	OwnerAddress Address  `json:"owner_address"`
-
-	Media         Media         `json:"media"`
-	TokenMetadata TokenMetadata `json:"metadata"`
-}
-
-// TokenUpdateInfoInput represents a token update to update the token's user inputted info
-type TokenUpdateInfoInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+// NFT represents an old nft throughout the application
+type NFT struct {
+	Version         NullInt32       `json:"version"` // schema version for this model
+	ID              DBID            `json:"id" binding:"required"`
+	CreationTime    CreationTime    `json:"created_at"`
+	Deleted         NullBool        `json:"-"`
+	LastUpdatedTime LastUpdatedTime `json:"last_updated"`
 
 	CollectorsNote NullString `json:"collectors_note"`
+
+	// OwnerUsers     []*User  `bson:"owner_users" json:"owner_users"`
+	OwnerAddress EthereumAddress `json:"owner_address"`
+
+	MultipleOwners NullBool `json:"multiple_owners"`
+
+	Name                NullString      `json:"name"`
+	Description         NullString      `json:"description"`
+	ExternalURL         NullString      `json:"external_url"`
+	TokenMetadataURL    NullString      `json:"token_metadata_url"`
+	CreatorAddress      EthereumAddress `json:"creator_address"`
+	CreatorName         NullString      `json:"creator_name"`
+	Contract            NFTContract     `json:"asset_contract"`
+	TokenCollectionName NullString      `json:"token_collection_name"`
+
+	OpenseaID NullInt64 `json:"opensea_id"`
+	// OPEN_SEA_TOKEN_ID
+	// https://api.opensea.io/api/v1/asset/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/26000331
+	// (/asset/:contract_address/:token_id)
+	OpenseaTokenID TokenID `json:"opensea_token_id"`
+
+	// IMAGES - OPENSEA
+	ImageURL             NullString `json:"image_url"`
+	ImageThumbnailURL    NullString `json:"image_thumbnail_url"`
+	ImagePreviewURL      NullString `json:"image_preview_url"`
+	ImageOriginalURL     NullString `json:"image_original_url"`
+	AnimationURL         NullString `json:"animation_url"`
+	AnimationOriginalURL NullString `json:"animation_original_url"`
+
+	AcquisitionDateStr NullString `json:"acquisition_date"`
 }
 
-// TokenUpdateMediaInput represents an update to a tokens image properties
-type TokenUpdateMediaInput struct {
-	LastUpdated LastUpdatedTime `json:"last_updated"`
+// NFTContract represents a smart contract's information for a given NFT
+type NFTContract struct {
+	ContractAddress      EthereumAddress `json:"address"`
+	ContractName         NullString      `json:"name"`
+	ContractImage        NullString      `json:"image_url"`
+	ContractDescription  NullString      `json:"description"`
+	ContractExternalLink NullString      `json:"external_link"`
+	ContractSchemaName   NullString      `json:"schema_name"`
+	ContractSymbol       NullString      `json:"symbol"`
+	ContractTotalSupply  NullString      `json:"total_supply"`
+}
 
-	Media    Media         `json:"media"`
-	Metadata TokenMetadata `json:"token_metadata"`
-	TokenURI TokenURI      `json:"token_uri"`
+// OldOpenseaNFTContract represents how we used to store contracts
+type OldOpenseaNFTContract struct {
+	ContractAddress      EthereumAddress `json:"contract_address"`
+	ContractName         NullString      `json:"contract_name"`
+	ContractImage        NullString      `json:"contract_image_url"`
+	ContractDescription  NullString      `json:"contract_description"`
+	ContractExternalLink NullString      `json:"contract_external_link"`
+	ContractSchemaName   NullString      `json:"contract_schema_name"`
+	ContractSymbol       NullString      `json:"contract_symbol"`
+	ContractTotalSupply  NullString      `json:"contract_total_supply"`
+}
+
+// ContractCollectionNFT represents a contract within a collection nft
+type ContractCollectionNFT struct {
+	ContractName  NullString `json:"name"`
+	ContractImage NullString `json:"image_url"`
 }
 
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
 	CreateBulk(context.Context, []Token) ([]DBID, error)
 	Create(context.Context, Token) (DBID, error)
-	GetByWallet(context.Context, Address, int64, int64) ([]Token, error)
-	GetByUserID(context.Context, DBID, int64, int64) ([]Token, error)
-	GetByContract(context.Context, Address, int64, int64) ([]Token, error)
-	GetByTokenIdentifiers(context.Context, TokenID, Address, int64, int64) ([]Token, error)
+	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, error)
+	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
+	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
-	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
-	UpdateByID(context.Context, DBID, DBID, interface{}) error
-	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, interface{}) error
+	UpdateByID(context.Context, DBID, interface{}) error
+	UpdateByTokenIdentifiers(context.Context, TokenID, EthereumAddress, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 }
@@ -260,7 +298,7 @@ type TokenRepository interface {
 // ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
 type ErrTokenNotFoundByIdentifiers struct {
 	TokenID         TokenID
-	ContractAddress Address
+	ContractAddress EthereumAddress
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -273,7 +311,7 @@ type ErrTokensNotFoundByTokenID struct {
 }
 
 type ErrTokensNotFoundByContract struct {
-	ContractAddress Address
+	ContractAddress EthereumAddress
 }
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
@@ -285,6 +323,7 @@ func SniffMediaType(buf []byte) MediaType {
 
 // MediaFromContentType will attempt to convert a content type to a media type
 func MediaFromContentType(contentType string) MediaType {
+	contentType = strings.TrimSpace(contentType)
 	whereCharset := strings.IndexByte(contentType, ';')
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
@@ -333,18 +372,28 @@ func (e ErrTokenNotFoundByIdentifiers) Error() string {
 	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
 }
 
+// NormalizeAddress normalizes an address for the given chain
+func (c Chain) NormalizeAddress(addr Address) string {
+	switch c {
+	case ChainETH:
+		return strings.ToLower(addr.String())
+	default:
+		return addr.String()
+	}
+}
+
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
-	return string(c), nil
+	return c, nil
 }
 
 // Scan implements the sql.Scanner interface for the Chain type
 func (c *Chain) Scan(src interface{}) error {
 	if src == nil {
-		*c = Chain("")
+		*c = Chain(0)
 		return nil
 	}
-	*c = Chain(src.(string))
+	*c = Chain(src.(int64))
 	return nil
 }
 
@@ -357,7 +406,10 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		*c = Chain(asString)
+		switch strings.ToLower(asString) {
+		case "ethereum":
+			*c = ChainETH
+		}
 		return nil
 	}
 	switch s {
@@ -365,6 +417,28 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 		*c = ChainETH
 	}
 	return nil
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (c *Chain) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("Chain must be an string")
+	}
+
+	switch strings.ToLower(n) {
+	case "ethereum":
+		*c = ChainETH
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (c Chain) MarshalGQL(w io.Writer) {
+	switch c {
+	case ChainETH:
+		w.Write([]byte(`"Ethereum"`))
+	}
 }
 
 // URL turns a token's URI into a URL
@@ -517,6 +591,12 @@ func (hex HexString) BigInt() *big.Int {
 	return it
 }
 
+// Add adds the given hex string to the current hex string
+func (hex HexString) Add(new HexString) HexString {
+	asInt := hex.BigInt()
+	return HexString(asInt.Add(asInt, new.BigInt()).Text(16))
+}
+
 // Value implements the driver.Valuer interface for media
 func (m Media) Value() (driver.Value, error) {
 	return json.Marshal(m)
@@ -531,46 +611,46 @@ func (m *Media) Scan(src interface{}) error {
 	return json.Unmarshal(src.([]uint8), &m)
 }
 
-func (a Address) String() string {
+func (a EthereumAddress) String() string {
 	return normalizeAddress(strings.ToLower(string(a)))
 }
 
 // Address returns the ethereum address byte array
-func (a Address) Address() common.Address {
+func (a EthereumAddress) Address() common.Address {
 	return common.HexToAddress(a.String())
 }
 
 // Value implements the database/sql/driver Valuer interface for the address type
-func (a Address) Value() (driver.Value, error) {
+func (a EthereumAddress) Value() (driver.Value, error) {
 	return a.String(), nil
 }
 
 // MarshallJSON implements the json.Marshaller interface for the address type
-func (a Address) MarshallJSON() ([]byte, error) {
+func (a EthereumAddress) MarshallJSON() ([]byte, error) {
 	return json.Marshal(a.String())
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface for the address type
-func (a *Address) UnmarshalJSON(b []byte) error {
+func (a *EthereumAddress) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	*a = Address(normalizeAddress(strings.ToLower(s)))
+	*a = EthereumAddress(normalizeAddress(strings.ToLower(s)))
 	return nil
 }
 
 // Scan implements the database/sql Scanner interface
-func (a *Address) Scan(i interface{}) error {
+func (a *EthereumAddress) Scan(i interface{}) error {
 	if i == nil {
-		*a = Address("")
+		*a = EthereumAddress("")
 		return nil
 	}
 	if it, ok := i.(string); ok {
-		*a = Address(it)
+		*a = EthereumAddress(it)
 		return nil
 	}
-	*a = Address(i.([]uint8))
+	*a = EthereumAddress(i.([]uint8))
 	return nil
 }
 
@@ -628,16 +708,16 @@ func (m TokenMetadata) Value() (driver.Value, error) {
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type
-func (a *AddressAtBlock) Scan(src interface{}) error {
+func (a *EthereumAddressAtBlock) Scan(src interface{}) error {
 	if src == nil {
-		*a = AddressAtBlock{}
+		*a = EthereumAddressAtBlock{}
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), a)
 }
 
 // Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
-func (a AddressAtBlock) Value() (driver.Value, error) {
+func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 	return json.Marshal(a)
 }
 
@@ -673,10 +753,81 @@ func (t *TokenType) Scan(src interface{}) error {
 	return nil
 }
 
+func (c *NFTContract) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	err := json.Unmarshal(src.([]uint8), &c)
+	if err != nil {
+		return err
+	}
+	if c.ContractAddress == "" {
+		old := OldOpenseaNFTContract{}
+		err := json.Unmarshal(src.([]uint8), &old)
+		if err != nil {
+			return err
+		}
+		c.ContractAddress = old.ContractAddress
+		c.ContractDescription = old.ContractDescription
+		c.ContractExternalLink = old.ContractExternalLink
+		c.ContractImage = old.ContractImage
+		c.ContractName = old.ContractName
+		c.ContractSchemaName = old.ContractSchemaName
+		c.ContractSymbol = old.ContractSymbol
+		c.ContractTotalSupply = old.ContractTotalSupply
+	}
+	return nil
+}
+
+// NewEthereumTokenIdentifiers creates a new token identifiers
+func NewEthereumTokenIdentifiers(pContractAddress EthereumAddress, pTokenID TokenID) EthereumTokenIdentifiers {
+	return EthereumTokenIdentifiers(fmt.Sprintf("%s+%s", pContractAddress, pTokenID))
+}
+
+func (t EthereumTokenIdentifiers) String() string {
+	return string(t)
+}
+
+// GetParts returns the parts of the token identifiers
+func (t EthereumTokenIdentifiers) GetParts() (EthereumAddress, TokenID, error) {
+	parts := strings.Split(t.String(), "+")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid token identifiers: %s", t)
+	}
+	return EthereumAddress(EthereumAddress(parts[0]).String()), TokenID(TokenID(parts[1]).String()), nil
+}
+
+// Value implements the driver.Valuer interface
+func (t EthereumTokenIdentifiers) Value() (driver.Value, error) {
+	return t.String(), nil
+}
+
+// Scan implements the database/sql Scanner interface for the TokenIdentifiers type
+func (t *EthereumTokenIdentifiers) Scan(i interface{}) error {
+	if i == nil {
+		*t = ""
+		return nil
+	}
+	res := strings.Split(i.(string), "+")
+	if len(res) != 2 {
+		return fmt.Errorf("invalid token identifiers: %v - %T", i, i)
+	}
+	*t = EthereumTokenIdentifiers(fmt.Sprintf("%s+%s", res[0], res[1]))
+	return nil
+}
+
 func normalizeAddress(address string) string {
 	withoutPrefix := strings.TrimPrefix(address, "0x")
 	if len(withoutPrefix) < 40 {
 		return ""
 	}
 	return "0x" + withoutPrefix[len(withoutPrefix)-40:]
+}
+
+func WalletsToEthereumAddresses(pWallets []Wallet) []EthereumAddress {
+	result := make([]EthereumAddress, len(pWallets))
+	for i, wallet := range pWallets {
+		result[i] = EthereumAddress(wallet.Address)
+	}
+	return result
 }

@@ -11,6 +11,7 @@ type Community struct {
 
 	ContractAddress Address    `json:"contract_address"`
 	CreatorAddress  Address    `json:"creator_address"`
+	Chain           Chain      `json:"chain"`
 	Name            NullString `json:"name"`
 	Description     NullString `json:"description"`
 	PreviewImage    NullString `json:"preview_image"`
@@ -20,12 +21,12 @@ type Community struct {
 
 // ErrCommunityNotFound is returned when a community is not found
 type ErrCommunityNotFound struct {
-	CommunityAddress Address
+	CommunityAddress ChainAddress
 }
 
 // CommunityRepository represents a repository for interacting with persisted communities
 type CommunityRepository interface {
-	GetByAddress(context.Context, Address, bool) (Community, error)
+	GetByAddress(context.Context, ChainAddress, bool) (Community, error)
 }
 
 func (e ErrCommunityNotFound) Error() string {

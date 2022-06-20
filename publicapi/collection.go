@@ -14,7 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const maxNftsPerCollection = 1000
+const maxTokensPerCollection = 1000
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
@@ -56,18 +56,18 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, nfts []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
-		"nfts":           {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
+		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return nil, err
 	}
 
-	layout, err := persist.ValidateLayout(layout, nfts)
+	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	collection := persist.CollectionDB{
 		OwnerUserID:    userID,
-		NFTs:           nfts,
+		Tokens:         tokens,
 		Layout:         layout,
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
@@ -174,16 +174,16 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	return nil
 }
 
-func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID persist.DBID, nfts []persist.DBID, layout persist.TokenLayout) error {
+func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
-		"nfts":         {nfts, fmt.Sprintf("required,unique,max=%d", maxNftsPerCollection)},
+		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 	}); err != nil {
 		return err
 	}
 
-	layout, err := persist.ValidateLayout(layout, nfts)
+	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
 		return err
 	}
@@ -193,9 +193,9 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 		return err
 	}
 
-	update := persist.CollectionUpdateNftsInput{NFTs: nfts, Layout: layout}
+	update := persist.CollectionUpdateTokensInput{Tokens: tokens, Layout: layout}
 
-	err = api.repos.CollectionRepository.UpdateNFTs(ctx, collectionID, userID, update)
+	err = api.repos.CollectionRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (api CollectionAPI) UpdateCollectionNfts(ctx context.Context, collectionID 
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	collectionData := persist.CollectionEvent{NFTs: nfts}
+	collectionData := persist.CollectionEvent{NFTs: tokens}
 	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
 
 	return nil

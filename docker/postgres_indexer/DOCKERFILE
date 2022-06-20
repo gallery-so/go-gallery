@@ -1,0 +1,14 @@
+FROM postgres:14
+
+ENV POSTGRES_HOST_AUTH_METHOD trust
+ENV POSTGRES_USER postgres
+ENV POSTGRES_DB postgres
+ARG PGHOST="localhost"
+ARG PGPORT=5432
+ARG PGUSER=postgres
+ARG PGPASSWORD=""
+ARG PGDATABASE=postgres
+ARG PGTESTUSER=benny
+ARG PGDATABASE=postgres
+COPY docker/postgres_indexer/01_init.sql /docker-entrypoint-initdb.d/01_init.sql
+COPY docker/postgres_indexer/02_init.sql /docker-entrypoint-initdb.d/02_init.sql

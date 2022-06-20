@@ -3,7 +3,10 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"github.com/mikeydub/go-gallery/util"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -16,6 +19,8 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -45,6 +50,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	router := gin.Default()
@@ -58,7 +64,13 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	if err := redis.ClearCache(redis.GalleriesDB); err != nil {
 		panic(err)
 	}
-	return handlersInit(router, newRepos(pqClient), sqlc.New(pgx), newEthClient(), rpc.NewIPFSShell(), rpc.NewArweaveClient(), newStorageClient())
+
+	repos := newRepos(pqClient)
+	ethClient := newEthClient()
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
+	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient))
 }
 
 func newStorageClient() *storage.Client {
@@ -109,6 +121,19 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
+	if viper.GetString("ENV") == "local" {
+		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+		path, err := util.FindFile("_internal/app-local-backend.yaml", 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+		}
+	}
+
 	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
 		panic("ADMIN_PASS must be set")
 	}
@@ -116,31 +141,31 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
 	}
+
+	if viper.GetString("IMGIX_SECRET") == "" {
+		panic("IMGIX_SECRET must be set")
+	}
 }
 
 func newRepos(db *sql.DB) *persist.Repositories {
-	galleriesCache := redis.NewCache(0)
 	galleriesCacheToken := redis.NewCache(1)
-	galleryRepo := postgres.NewGalleryRepository(db, galleriesCache)
 	galleryTokenRepo := postgres.NewGalleryTokenRepository(db, galleriesCacheToken)
 
 	return &persist.Repositories{
 		UserRepository:            postgres.NewUserRepository(db),
 		NonceRepository:           postgres.NewNonceRepository(db),
 		LoginRepository:           postgres.NewLoginRepository(db),
-		NftRepository:             postgres.NewNFTRepository(db, galleryRepo),
-		TokenRepository:           postgres.NewTokenRepository(db, galleryTokenRepo),
-		CollectionRepository:      postgres.NewCollectionRepository(db, galleryRepo),
-		CollectionTokenRepository: postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:         galleryRepo,
-		GalleryTokenRepository:    galleryTokenRepo,
-		ContractRepository:        postgres.NewContractRepository(db),
+		TokenRepository:           postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
+		CollectionRepository:      postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		GalleryRepository:         galleryTokenRepo,
+		ContractRepository:        postgres.NewContractGalleryRepository(db),
 		BackupRepository:          postgres.NewBackupRepository(db),
 		MembershipRepository:      postgres.NewMembershipRepository(db),
 		UserEventRepository:       postgres.NewUserEventRepository(db),
 		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
 		NftEventRepository:        postgres.NewNftEventRepository(db),
-		CommunityRepository:       postgres.NewCommunityRepository(db, redis.NewCache(2)),
+		CommunityRepository:       postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
+		WalletRepository:          postgres.NewWalletRepository(db),
 		EarlyAccessRepository:     postgres.NewEarlyAccessRepository(db),
 	}
 }
@@ -193,4 +218,8 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
+}
+
+func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, opensea.NewProvider(ethClient, httpClient))
 }

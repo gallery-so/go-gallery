@@ -18,9 +18,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type uniqueMetadataHandler func(persist.TokenURI, persist.Address, persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error)
+type uniqueMetadataHandler func(persist.TokenURI, persist.EthereumAddress, persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error)
 
-type uniqueMetadatas map[persist.Address]uniqueMetadataHandler
+type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
 /**
  * The drawing instructions for the nine different symbols are as follows:
@@ -36,7 +36,7 @@ type uniqueMetadatas map[persist.Address]uniqueMetadataHandler
  *   #  Fill in the cell completely.
  *
  */
-func autoglyphs(turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func autoglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
 	width := 80
 	height := 80
 	buf := &bytes.Buffer{}
@@ -132,7 +132,7 @@ func autoglyphs(turi persist.TokenURI, addr persist.Address, tid persist.TokenID
 * scheme 9 = greenest address color on reddest address color
 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
  */
-func colorglyphs(turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func colorglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
 	spl := strings.Split(string(turi), " ")
 	if len(spl) != 3 {
 		panic("invalid colorglyphs tokenURI")
@@ -286,7 +286,7 @@ type graphResponse struct {
 	Data ensDomains `json:"data"`
 }
 
-func ens(turi persist.TokenURI, addr persist.Address, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

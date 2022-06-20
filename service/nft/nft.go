@@ -3,10 +3,6 @@ package nft
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
-
-	"github.com/mikeydub/go-gallery/service/opensea"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -53,8 +49,8 @@ func GetPreviewsForUser(pCtx context.Context, galleryRepo persist.GalleryReposit
 }
 
 // GetPreviewsForUserToken returns a slice of 3 preview URLs from a user's collections
-func GetPreviewsForUserToken(pCtx context.Context, galleryRepo persist.GalleryTokenRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
-	var galleries []persist.GalleryToken
+func GetPreviewsForUserToken(pCtx context.Context, galleryRepo persist.GalleryRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
+	var galleries []persist.Gallery
 	var err error
 	if u.UserID != "" {
 		galleries, err = galleryRepo.GetByUserID(pCtx, u.UserID)
@@ -92,8 +88,8 @@ func GetPreviewsFromCollections(pColls []persist.Collection) []persist.NullStrin
 outer:
 	for _, c := range pColls {
 		for _, n := range c.NFTs {
-			if n.ImageThumbnailURL != "" {
-				result = append(result, n.ImageThumbnailURL)
+			if n.Media.ThumbnailURL != "" {
+				result = append(result, n.Media.ThumbnailURL)
 			}
 			if len(result) > 2 {
 				break outer
@@ -108,7 +104,7 @@ outer:
 }
 
 // GetPreviewsFromCollectionsToken returns a slice of 3 preview URLs from a slice of CollectionTokens
-func GetPreviewsFromCollectionsToken(pColls []persist.CollectionToken) []persist.NullString {
+func GetPreviewsFromCollectionsToken(pColls []persist.Collection) []persist.NullString {
 	result := make([]persist.NullString, 0, 3)
 
 outer:
@@ -129,82 +125,25 @@ outer:
 
 }
 
-func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
+// TODO this should be in multichain
+// func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
 
-	var addresses []persist.Address
-	if walletAddresses != "" {
-		addressStrings := strings.Split(walletAddresses, ",")
-		for _, address := range addressStrings {
-			addresses = append(addresses, persist.Address(address))
-		}
-		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
-		if err != nil {
-			return err
-		}
+// 	addresses := []persist.Wallet{}
+// 	if walletAddress != "" {
+// 		addresses = []persist.Wallet{}
+// 		addressesStrings := strings.Split(walletAddress, ",")
+// 		for _, address := range addressesStrings {
+// 			addresses = append(addresses, persist.Wallet{Address: persist.Address(address), Chain: persist.ChainETH})
+// 		}
+// 		ownsWallet, err := user.DoesUserOwnWallets(ctx, userID, addresses, userRepo)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		if !ownsWallet {
-			return ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
-		}
-	}
+// 		if !ownsWallet {
+// 			return user.ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
+// 		}
+// 	}
 
-	return nil
-}
-
-func GetOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddresses string, nftRepo persist.NFTRepository, userRepo persist.UserRepository,
-	collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
-
-	var addresses []persist.Address
-	if walletAddresses != "" {
-		addressStrings := strings.Split(walletAddresses, ",")
-		for _, address := range addressStrings {
-			addresses = append(addresses, persist.Address(address))
-		}
-		ownsWallet, err := DoesUserOwnWallets(ctx, userID, addresses, userRepo)
-		if err != nil {
-			return err
-		}
-
-		if !ownsWallet {
-			return ErrDoesNotOwnWallets{ID: userID, Addresses: addresses}
-		}
-	}
-
-	err := opensea.UpdateAssetsForAcc(ctx, userID, addresses, nftRepo, userRepo, collRepo, galleryRepo, backupRepo)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.Address, userRepo persist.UserRepository) (bool, error) {
-	user, err := userRepo.GetByID(pCtx, userID)
-	if err != nil {
-		return false, err
-	}
-	for _, walletAddress := range walletAddresses {
-		if !ContainsWalletAddresses(user.Addresses, walletAddress) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func ContainsWalletAddresses(a []persist.Address, b persist.Address) bool {
-	for _, v := range a {
-		if v == b {
-			return true
-		}
-	}
-
-	return false
-}
-
-type ErrDoesNotOwnWallets struct {
-	ID        persist.DBID
-	Addresses []persist.Address
-}
-
-func (e ErrDoesNotOwnWallets) Error() string {
-	return fmt.Sprintf("user with ID %s does not own all wallets: %+v", e.ID, e.Addresses)
-}
+// 	return nil
+// }

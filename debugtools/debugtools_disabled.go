@@ -10,6 +10,7 @@ package debugtools
 import (
 	"context"
 	"errors"
+
 	"github.com/mikeydub/go-gallery/service/auth"
 )
 

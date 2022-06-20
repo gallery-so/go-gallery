@@ -10,7 +10,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
@@ -24,11 +23,11 @@ func Init() {
 	http.Handle("/", router)
 }
 
-func coreInit() (*gin.Engine, *Indexer) {
+func coreInit() (*gin.Engine, *indexer) {
 
 	setDefaults()
 
-	tokenRepo, contractRepo, userRepo, collRepo := newRepos()
+	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -42,10 +41,9 @@ func coreInit() (*gin.Engine, *Indexer) {
 	ethClient := rpc.NewEthClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	tq := task.NewQueue()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash, foundationMintedEventHash, foundationTransferEventHash}
-	i := NewIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, userRepo, collRepo, persist.Chain(viper.GetString("CHAIN")), events)
+	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events)
 
 	router := gin.Default()
 
@@ -57,18 +55,18 @@ func coreInit() (*gin.Engine, *Indexer) {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInit(router, i, tokenRepo, contractRepo, userRepo, tq, ethClient, ipfsClient, arweaveClient, s), i
+	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
 func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://ipfs.io")
-	viper.SetDefault("CHAIN", "ETH")
+	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
-	viper.SetDefault("POSTGRES_PORT", 5432)
+	viper.SetDefault("POSTGRES_PORT", 5433)
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
@@ -77,8 +75,7 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository, persist.UserRepository, persist.CollectionTokenRepository) {
+func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 	pgClient := postgres.NewClient()
-	galleryRepo := postgres.NewGalleryTokenRepository(pgClient, nil)
-	return postgres.NewTokenRepository(pgClient, galleryRepo), postgres.NewContractRepository(pgClient), postgres.NewUserRepository(pgClient), postgres.NewCollectionTokenRepository(pgClient, galleryRepo)
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
 }

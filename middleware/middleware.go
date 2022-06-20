@@ -29,7 +29,7 @@ var ErrRateLimited = errors.New("rate limited")
 var mixpanelDistinctIDs = map[string]string{}
 
 type errUserDoesNotHaveRequiredNFT struct {
-	addresses []persist.Address
+	addresses []persist.Wallet
 }
 
 // AuthRequired is a middleware that checks if the user is authenticated

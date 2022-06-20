@@ -11,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 )
 
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
@@ -23,21 +24,21 @@ func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection)
 	return galleryToModel(ctx, *gallery), nil
 }
 
-func (r *collectionResolver) Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByCollectionId(ctx, obj.Dbid)
+func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]*model.CollectionNft, len(nfts))
-	for i, nft := range nfts {
-		output[i] = &model.CollectionNft{
-			HelperCollectionNftData: model.HelperCollectionNftData{
-				NftId:        nft.ID,
+	output := make([]*model.CollectionToken, len(tokens))
+	for i, token := range tokens {
+		output[i] = &model.CollectionToken{
+			HelperCollectionTokenData: model.HelperCollectionTokenData{
+				TokenId:      token.ID,
 				CollectionId: obj.Dbid,
 			},
-			Nft:        nftToModel(ctx, nft),
+			Token:      tokenToModel(ctx, token),
 			Collection: obj,
 		}
 	}
@@ -63,6 +64,14 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
+	return resolveTokensByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
+	return resolveWalletsByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
@@ -75,7 +84,7 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
-func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error) {
+func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
@@ -83,27 +92,27 @@ func (r *mutationResolver) AddUserAddress(ctx context.Context, address persist.A
 		return nil, err
 	}
 
-	err = api.User.AddUserAddress(ctx, address, authenticator)
+	err = api.User.AddWalletToUser(ctx, chainAddress, authenticator)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.AddUserAddressPayload{
+	output := &model.AddUserWalletPayload{
 		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error) {
+func (r *mutationResolver) RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.User.RemoveUserAddresses(ctx, addresses)
+	err := api.User.RemoveWalletsFromUser(ctx, walletIds)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.RemoveUserAddressesPayload{
+	output := &model.RemoveUserWalletsPayload{
 		Viewer: resolveViewer(ctx),
 	}
 
@@ -153,7 +162,7 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		Whitespace: input.Layout.Whitespace,
 	}
 
-	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Nfts, layout)
+	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout)
 
 	if err != nil {
 		return nil, err
@@ -216,7 +225,7 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error) {
+func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	layout := persist.TokenLayout{
@@ -224,7 +233,7 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 		Whitespace: input.Layout.Whitespace,
 	}
 
-	err := api.Collection.UpdateCollectionNfts(ctx, input.CollectionID, input.Nfts, layout)
+	err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +243,7 @@ func (r *mutationResolver) UpdateCollectionNfts(ctx context.Context, input model
 		return nil, err
 	}
 
-	output := &model.UpdateCollectionNftsPayload{
+	output := &model.UpdateCollectionTokensPayload{
 		Collection: collectionToModel(ctx, *collection),
 	}
 
@@ -261,7 +270,7 @@ func (r *mutationResolver) UpdateCollectionHidden(ctx context.Context, input mod
 	return output, nil
 }
 
-func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error) {
+func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	collectionID := persist.DBID("")
@@ -269,45 +278,43 @@ func (r *mutationResolver) UpdateNftInfo(ctx context.Context, input model.Update
 		collectionID = *input.CollectionID
 	}
 
-	err := api.Nft.UpdateNftInfo(ctx, input.NftID, collectionID, input.CollectorsNote)
+	err := api.Token.UpdateTokenInfo(ctx, input.TokenID, collectionID, input.CollectorsNote)
 	if err != nil {
 		return nil, err
 	}
 
-	nft, err := api.Nft.GetNftById(ctx, input.NftID)
+	token, err := api.Token.GetTokenById(ctx, input.TokenID)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.UpdateNftInfoPayload{
-		Nft: nftToModel(ctx, *nft),
+	output := &model.UpdateTokenInfoPayload{
+		Token: tokenToModel(ctx, *token),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshOpenSeaNfts(ctx context.Context, addresses *string) (model.RefreshOpenSeaNftsPayloadOrError, error) {
+func (r *mutationResolver) RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	addressList := ""
-	if addresses != nil {
-		addressList = *addresses
-	}
-
-	err := api.Nft.RefreshOpenSeaNfts(ctx, addressList)
+	err := api.Token.RefreshTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.RefreshOpenSeaNftsPayload{
+	output := &model.RefreshTokensPayload{
 		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil
 }
 
-func (r *mutationResolver) GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error) {
-	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, address)
+func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {
+	nonce, userExists, err := publicapi.For(ctx).Auth.GetAuthNonce(ctx, chainAddress)
+	if err != nil {
+		return nil, err
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -402,11 +409,7 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 	return output, err
 }
 
-func (r *nftResolver) Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error) {
-	return resolveNftOwnerByNftID(ctx, obj.Dbid)
-}
-
-func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error) {
+func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -451,25 +454,62 @@ func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (mo
 	return resolveCollectionByCollectionID(ctx, id)
 }
 
-func (r *queryResolver) NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error) {
-	return resolveNftByNftID(ctx, id)
+func (r *queryResolver) TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error) {
+	return resolveTokenByTokenID(ctx, id)
 }
 
-func (r *queryResolver) CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error) {
-	return resolveCollectionNftByIDs(ctx, nftID, collectionID)
+func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error) {
+	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, contractAddress persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
 	refresh := false
 	if forceRefresh != nil {
 		refresh = *forceRefresh
 	}
 
-	return resolveCommunityByContractAddress(ctx, contractAddress, refresh)
+	return resolveCommunityByContractAddress(ctx, communityAddress, refresh)
 }
 
-func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]persist.Address, error) {
-	return publicapi.For(ctx).Misc.GetGeneralAllowlist(ctx)
+func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
+	return resolveGeneralAllowlist(ctx)
+}
+
+func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
+	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
+}
+
+func (r *tokenResolver) OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error) {
+	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	wallets := make([]*model.Wallet, len(token.OwnedByWallets))
+	for i, walletID := range token.OwnedByWallets {
+		wallets[i], err = resolveWalletByWalletID(ctx, walletID)
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}
+
+	return wallets, nil
+}
+
+func (r *tokenResolver) Contract(ctx context.Context, obj *model.Token) (*model.Contract, error) {
+	return resolveContractByTokenID(ctx, obj.Dbid)
+}
+
+func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error) {
+	wallets := make([]*model.Wallet, 0, len(obj.WalletIds))
+	for _, id := range obj.WalletIds {
+		wallet, err := resolveWalletByWalletID(ctx, id)
+		if err == nil {
+			wallets = append(wallets, wallet)
+		}
+	}
+
+	return wallets, nil
 }
 
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
@@ -503,19 +543,16 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
-func (r *walletResolver) Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error) {
-	nfts, err := publicapi.For(ctx).Nft.GetNftsByOwnerAddress(ctx, *obj.Address)
+func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
+	return resolveTokensByWalletID(ctx, obj.Dbid)
+}
 
-	if err != nil {
-		return nil, err
-	}
+func (r *chainAddressInputResolver) Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error {
+	return obj.GQLSetAddressFromResolver(data)
+}
 
-	output := make([]*model.Nft, len(nfts))
-	for i, nft := range nfts {
-		output[i] = nftToModel(ctx, nft)
-	}
-
-	return output, nil
+func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error {
+	return obj.GQLSetChainFromResolver(data)
 }
 
 // Collection returns generated.CollectionResolver implementation.
@@ -535,14 +572,14 @@ func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &gallery
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
-// Nft returns generated.NftResolver implementation.
-func (r *Resolver) Nft() generated.NftResolver { return &nftResolver{r} }
-
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+// Token returns generated.TokenResolver implementation.
+func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
@@ -558,15 +595,21 @@ func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r}
 // Wallet returns generated.WalletResolver implementation.
 func (r *Resolver) Wallet() generated.WalletResolver { return &walletResolver{r} }
 
+// ChainAddressInput returns generated.ChainAddressInputResolver implementation.
+func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
+	return &chainAddressInputResolver{r}
+}
+
 type collectionResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
-type nftResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
+type chainAddressInputResolver struct{ *Resolver }

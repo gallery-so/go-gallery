@@ -14,6 +14,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -30,14 +31,15 @@ type PublicAPI struct {
 	Collection *CollectionAPI
 	Gallery    *GalleryAPI
 	User       *UserAPI
-	Nft        *NftAPI
+	Token      *TokenAPI
+	Contract   *ContractAPI
+	Wallet     *WalletAPI
 	Misc       *MiscAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider) {
 	// Use the request context so dataloaders will add their traces to the request span
 	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries)
-
 	validator := newValidator()
 
 	api := &PublicAPI{
@@ -45,11 +47,13 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries,
 		queries:    queries,
 		loaders:    loaders,
 		validator:  validator,
-		Auth:       &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Auth:       &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
 		Collection: &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:    &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:       &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Nft:        &NftAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Contract:   &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Token:      &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
+		Wallet:     &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:       &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 	}
 

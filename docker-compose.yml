@@ -21,6 +21,23 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
+  postgres_indexer:
+    build:
+      context: "."
+      dockerfile: "docker/postgres_indexer/DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
   cloudtasks:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     command: -host 0.0.0.0 -port 8123 -queue "projects/gallery-local/locations/here/queues/feed-event"

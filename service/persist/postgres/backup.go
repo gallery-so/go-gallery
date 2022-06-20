@@ -20,9 +20,9 @@ type BackupRepository struct {
 	deleteBackupStmt      *sql.Stmt
 	insertBackupStmt      *sql.Stmt
 
-	getUserAddressesStmt *sql.Stmt
-	ownsNFTStmt          *sql.Stmt
-	undeleteNFTStmt      *sql.Stmt
+	getUserWalletsStmt *sql.Stmt
+	ownsNFTStmt        *sql.Stmt
+	undeleteNFTStmt    *sql.Stmt
 
 	updateCollectionNFTsStmt *sql.Stmt
 	updateGalleryStmt        *sql.Stmt
@@ -53,10 +53,10 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	insertBackupStmt, err := db.PrepareContext(ctx, `INSERT INTO backups (ID, GALLERY_ID, VERSION, GALLERY, CREATED_AT) VALUES ($1, $2, $3, $4, $5);`)
 	checkNoErr(err)
 
-	getUserAddressesStmt, err := db.PrepareContext(ctx, `SELECT ADDRESSES FROM users WHERE ID = $1;`)
+	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT WALLETS FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM nfts WHERE OWNER_ADDRESS = ANY($1) AND ID = $2 AND DELETED = false);`)
+	ownsNFTStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE OWNED_BY_WALLETS && $1 AND ID = $2 AND DELETED = false);`)
 	checkNoErr(err)
 
 	updateCollectionNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $2 WHERE ID = $1;`)
@@ -65,7 +65,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 	updateGalleryStmt, err := db.PrepareContext(ctx, `UPDATE galleries SET COLLECTIONS = $2 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	undeleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE nfts SET DELETED = false WHERE ID = $1;`)
+	undeleteNFTStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = false WHERE ID = $1;`)
 	checkNoErr(err)
 
 	return &BackupRepository{
@@ -77,9 +77,9 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 		getBackupsStmt:        getBackupsStmt,
 		getBackupByIDStmt:     getBackupByIDStmt,
 
-		getUserAddressesStmt: getUserAddressesStmt,
-		ownsNFTStmt:          ownsNFTStmt,
-		undeleteNFTStmt:      undeleteNFTStmt,
+		getUserWalletsStmt: getUserWalletsStmt,
+		ownsNFTStmt:        ownsNFTStmt,
+		undeleteNFTStmt:    undeleteNFTStmt,
 
 		updateCollectionNFTsStmt: updateCollectionNFTsStmt,
 		updateGalleryStmt:        updateGalleryStmt,
@@ -219,8 +219,8 @@ func (b *BackupRepository) Restore(pCtx context.Context, pBackupID, pUserID pers
 		return fmt.Errorf("could not get backup %s: %w", pBackupID, err)
 	}
 
-	var addresses []persist.Address
-	err = b.getUserAddressesStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
+	var addresses []persist.EthereumAddress
+	err = b.getUserWalletsStmt.QueryRowContext(pCtx, pUserID).Scan(pq.Array(&addresses))
 	if err != nil {
 		return fmt.Errorf("could not get user addresses for user %s: %w", pUserID, err)
 	}

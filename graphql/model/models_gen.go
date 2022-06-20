@@ -11,8 +11,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type AddUserAddressPayloadOrError interface {
-	IsAddUserAddressPayloadOrError()
+type AddUserWalletPayloadOrError interface {
+	IsAddUserWalletPayloadOrError()
 }
 
 type AuthorizationError interface {
@@ -23,8 +23,8 @@ type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
 
-type CollectionNftByIDOrError interface {
-	IsCollectionNftByIDOrError()
+type CollectionTokenByIDOrError interface {
+	IsCollectionTokenByIDOrError()
 }
 
 type CommunityByAddressOrError interface {
@@ -51,6 +51,10 @@ type FollowUserPayloadOrError interface {
 	IsFollowUserPayloadOrError()
 }
 
+type GalleryUserOrAddress interface {
+	IsGalleryUserOrAddress()
+}
+
 type GalleryUserOrWallet interface {
 	IsGalleryUserOrWallet()
 }
@@ -71,20 +75,20 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
-type NftByIDOrError interface {
-	IsNftByIDOrError()
-}
-
 type Node interface {
 	IsNode()
 }
 
-type RefreshOpenSeaNftsPayloadOrError interface {
-	IsRefreshOpenSeaNftsPayloadOrError()
+type RefreshTokensPayloadOrError interface {
+	IsRefreshTokensPayloadOrError()
 }
 
-type RemoveUserAddressesPayloadOrError interface {
-	IsRemoveUserAddressesPayloadOrError()
+type RemoveUserWalletsPayloadOrError interface {
+	IsRemoveUserWalletsPayloadOrError()
+}
+
+type TokenByIDOrError interface {
+	IsTokenByIDOrError()
 }
 
 type UnfollowUserPayloadOrError interface {
@@ -99,16 +103,16 @@ type UpdateCollectionInfoPayloadOrError interface {
 	IsUpdateCollectionInfoPayloadOrError()
 }
 
-type UpdateCollectionNftsPayloadOrError interface {
-	IsUpdateCollectionNftsPayloadOrError()
+type UpdateCollectionTokensPayloadOrError interface {
+	IsUpdateCollectionTokensPayloadOrError()
 }
 
 type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
 }
 
-type UpdateNftInfoPayloadOrError interface {
-	IsUpdateNftInfoPayloadOrError()
+type UpdateTokenInfoPayloadOrError interface {
+	IsUpdateTokenInfoPayloadOrError()
 }
 
 type UpdateUserInfoPayloadOrError interface {
@@ -127,11 +131,11 @@ type ViewerOrError interface {
 	IsViewerOrError()
 }
 
-type AddUserAddressPayload struct {
+type AddUserWalletPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (AddUserAddressPayload) IsAddUserAddressPayloadOrError() {}
+func (AddUserWalletPayload) IsAddUserWalletPayloadOrError() {}
 
 type AudioMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -144,9 +148,9 @@ func (AudioMedia) IsMediaSubtype() {}
 func (AudioMedia) IsMedia()        {}
 
 type AuthMechanism struct {
-	DebugAuth   *DebugAuth       `json:"debugAuth"`
-	EthereumEoa *EthereumEoaAuth `json:"ethereumEoa"`
-	GnosisSafe  *GnosisSafeAuth  `json:"gnosisSafe"`
+	Eoa        *EoaAuth        `json:"eoa"`
+	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
+	Debug      *DebugAuth      `json:"debug"`
 }
 
 type AuthNonce struct {
@@ -157,14 +161,14 @@ type AuthNonce struct {
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
 type Collection struct {
-	Dbid           persist.DBID      `json:"dbid"`
-	Version        *int              `json:"version"`
-	Name           *string           `json:"name"`
-	CollectorsNote *string           `json:"collectorsNote"`
-	Gallery        *Gallery          `json:"gallery"`
-	Layout         *CollectionLayout `json:"layout"`
-	Hidden         *bool             `json:"hidden"`
-	Nfts           []*CollectionNft  `json:"nfts"`
+	Dbid           persist.DBID       `json:"dbid"`
+	Version        *int               `json:"version"`
+	Name           *string            `json:"name"`
+	CollectorsNote *string            `json:"collectorsNote"`
+	Gallery        *Gallery           `json:"gallery"`
+	Layout         *CollectionLayout  `json:"layout"`
+	Hidden         *bool              `json:"hidden"`
+	Tokens         []*CollectionToken `json:"tokens"`
 }
 
 func (Collection) IsNode()                  {}
@@ -180,33 +184,45 @@ type CollectionLayoutInput struct {
 	Whitespace []int `json:"whitespace"`
 }
 
-type CollectionNft struct {
-	HelperCollectionNftData
-	Nft        *Nft        `json:"nft"`
+type CollectionToken struct {
+	HelperCollectionTokenData
+	Token      *Token      `json:"token"`
 	Collection *Collection `json:"collection"`
 }
 
-func (CollectionNft) IsNode()                     {}
-func (CollectionNft) IsCollectionNftByIDOrError() {}
+func (CollectionToken) IsNode()                       {}
+func (CollectionToken) IsCollectionTokenByIDOrError() {}
 
 type Community struct {
-	LastUpdated     *time.Time       `json:"lastUpdated"`
-	ContractAddress *persist.Address `json:"contractAddress"`
-	CreatorAddress  *persist.Address `json:"creatorAddress"`
-	Name            *string          `json:"name"`
-	Description     *string          `json:"description"`
-	PreviewImage    *string          `json:"previewImage"`
-	Owners          []*TokenHolder   `json:"owners"`
+	LastUpdated     *time.Time            `json:"lastUpdated"`
+	ContractAddress *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
+	Chain           *persist.Chain        `json:"chain"`
+	Name            *string               `json:"name"`
+	Description     *string               `json:"description"`
+	PreviewImage    *string               `json:"previewImage"`
+	Owners          []*TokenHolder        `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type Contract struct {
+	Dbid            persist.DBID          `json:"dbid"`
+	LastUpdated     *time.Time            `json:"lastUpdated"`
+	ContractAddress *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
+	Chain           *persist.Chain        `json:"chain"`
+	Name            *string               `json:"name"`
+}
+
+func (Contract) IsNode() {}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID           `json:"galleryId"`
 	Name           string                 `json:"name"`
 	CollectorsNote string                 `json:"collectorsNote"`
-	Nfts           []persist.DBID         `json:"nfts"`
+	Tokens         []persist.DBID         `json:"tokens"`
 	Layout         *CollectionLayoutInput `json:"layout"`
 }
 
@@ -225,8 +241,8 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
-	UserID    *persist.DBID     `json:"userId"`
-	Addresses []persist.Address `json:"addresses"`
+	UserID         *persist.DBID           `json:"userId"`
+	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
 }
 
 type DeleteCollectionPayload struct {
@@ -235,16 +251,29 @@ type DeleteCollectionPayload struct {
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
+type EoaAuth struct {
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Nonce        string                `json:"nonce"`
+	Signature    string                `json:"signature"`
+}
+
+type ErrAddressOwnedByUser struct {
+	Message string `json:"message"`
+}
+
+func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
+func (ErrAddressOwnedByUser) IsError()                       {}
+
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrAuthenticationFailed) IsAddUserAddressPayloadOrError() {}
-func (ErrAuthenticationFailed) IsError()                        {}
-func (ErrAuthenticationFailed) IsLoginPayloadOrError()          {}
-func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()     {}
-func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()     {}
-func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()   {}
+func (ErrAuthenticationFailed) IsAddUserWalletPayloadOrError() {}
+func (ErrAuthenticationFailed) IsError()                       {}
+func (ErrAuthenticationFailed) IsLoginPayloadOrError()         {}
+func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()    {}
+func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()    {}
+func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()  {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -252,7 +281,7 @@ type ErrCollectionNotFound struct {
 
 func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
-func (ErrCollectionNotFound) IsCollectionNftByIDOrError()       {}
+func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
 
 type ErrCommunityNotFound struct {
@@ -262,15 +291,15 @@ type ErrCommunityNotFound struct {
 func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
 func (ErrCommunityNotFound) IsError()                     {}
 
-type ErrDoesNotOwnRequiredNft struct {
+type ErrDoesNotOwnRequiredToken struct {
 	Message string `json:"message"`
 }
 
-func (ErrDoesNotOwnRequiredNft) IsGetAuthNoncePayloadOrError() {}
-func (ErrDoesNotOwnRequiredNft) IsAuthorizationError()         {}
-func (ErrDoesNotOwnRequiredNft) IsError()                      {}
-func (ErrDoesNotOwnRequiredNft) IsLoginPayloadOrError()        {}
-func (ErrDoesNotOwnRequiredNft) IsCreateUserPayloadOrError()   {}
+func (ErrDoesNotOwnRequiredToken) IsGetAuthNoncePayloadOrError() {}
+func (ErrDoesNotOwnRequiredToken) IsAuthorizationError()         {}
+func (ErrDoesNotOwnRequiredToken) IsError()                      {}
+func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()        {}
+func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError()   {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -280,15 +309,16 @@ type ErrInvalidInput struct {
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
 func (ErrInvalidInput) IsUserByIDOrError()                        {}
+func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
-func (ErrInvalidInput) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
-func (ErrInvalidInput) IsUpdateNftInfoPayloadOrError()            {}
-func (ErrInvalidInput) IsAddUserAddressPayloadOrError()           {}
-func (ErrInvalidInput) IsRemoveUserAddressesPayloadOrError()      {}
+func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
+func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
+func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
@@ -300,14 +330,6 @@ type ErrInvalidToken struct {
 
 func (ErrInvalidToken) IsAuthorizationError() {}
 func (ErrInvalidToken) IsError()              {}
-
-type ErrNftNotFound struct {
-	Message string `json:"message"`
-}
-
-func (ErrNftNotFound) IsNftByIDOrError()           {}
-func (ErrNftNotFound) IsError()                    {}
-func (ErrNftNotFound) IsCollectionNftByIDOrError() {}
 
 type ErrNoCookie struct {
 	Message string `json:"message"`
@@ -325,22 +347,30 @@ func (ErrNotAuthorized) IsViewerOrError()                          {}
 func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
-func (ErrNotAuthorized) IsUpdateCollectionNftsPayloadOrError()     {}
+func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
-func (ErrNotAuthorized) IsUpdateNftInfoPayloadOrError()            {}
-func (ErrNotAuthorized) IsAddUserAddressPayloadOrError()           {}
-func (ErrNotAuthorized) IsRemoveUserAddressesPayloadOrError()      {}
+func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
+func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
+func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
-func (ErrNotAuthorized) IsRefreshOpenSeaNftsPayloadOrError()       {}
+func (ErrNotAuthorized) IsRefreshTokensPayloadOrError()            {}
 func (ErrNotAuthorized) IsError()                                  {}
 
 type ErrOpenSeaRefreshFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrOpenSeaRefreshFailed) IsRefreshOpenSeaNftsPayloadOrError() {}
-func (ErrOpenSeaRefreshFailed) IsError()                            {}
+func (ErrOpenSeaRefreshFailed) IsRefreshTokensPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                       {}
+
+type ErrTokenNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrTokenNotFound) IsTokenByIDOrError()           {}
+func (ErrTokenNotFound) IsError()                      {}
+func (ErrTokenNotFound) IsCollectionTokenByIDOrError() {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -361,12 +391,6 @@ func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
-type EthereumEoaAuth struct {
-	Address   persist.Address `json:"address"`
-	Nonce     string          `json:"nonce"`
-	Signature string          `json:"signature"`
-}
-
 type FollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
 	User   *GalleryUser `json:"user"`
@@ -386,6 +410,7 @@ type GalleryUser struct {
 	Dbid                persist.DBID   `json:"dbid"`
 	Username            *string        `json:"username"`
 	Bio                 *string        `json:"bio"`
+	Tokens              []*Token       `json:"tokens"`
 	Wallets             []*Wallet      `json:"wallets"`
 	Galleries           []*Gallery     `json:"galleries"`
 	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
@@ -395,6 +420,7 @@ type GalleryUser struct {
 
 func (GalleryUser) IsNode()                  {}
 func (GalleryUser) IsGalleryUserOrWallet()   {}
+func (GalleryUser) IsGalleryUserOrAddress()  {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 func (GalleryUser) IsUserByIDOrError()       {}
 
@@ -424,21 +450,14 @@ func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
 
 type ImageMedia struct {
-	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
-	MediaURL          *string        `json:"mediaURL"`
-	MediaType         *string        `json:"mediaType"`
-	ContentRenderURLs *ImageURLSet   `json:"contentRenderURLs"`
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
 func (ImageMedia) IsMedia()        {}
-
-type ImageURLSet struct {
-	Raw    *string `json:"raw"`
-	Small  *string `json:"small"`
-	Medium *string `json:"medium"`
-	Large  *string `json:"large"`
-}
 
 type InvalidMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -481,56 +500,31 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
-type Nft struct {
-	Dbid                  persist.DBID        `json:"dbid"`
-	CreationTime          *time.Time          `json:"creationTime"`
-	LastUpdated           *time.Time          `json:"lastUpdated"`
-	CollectorsNote        *string             `json:"collectorsNote"`
-	Media                 MediaSubtype        `json:"media"`
-	TokenType             *TokenType          `json:"tokenType"`
-	Chain                 *Chain              `json:"chain"`
-	Name                  *string             `json:"name"`
-	Description           *string             `json:"description"`
-	TokenURI              *string             `json:"tokenUri"`
-	TokenID               *string             `json:"tokenId"`
-	Quantity              *string             `json:"quantity"`
-	Owner                 GalleryUserOrWallet `json:"owner"`
-	OwnershipHistory      []*OwnerAtBlock     `json:"ownershipHistory"`
-	TokenMetadata         *string             `json:"tokenMetadata"`
-	ContractAddress       *persist.Address    `json:"contractAddress"`
-	ExternalURL           *string             `json:"externalUrl"`
-	BlockNumber           *string             `json:"blockNumber"`
-	CreatorAddress        *persist.Address    `json:"creatorAddress"`
-	OpenseaCollectionName *string             `json:"openseaCollectionName"`
-	OpenseaID             *int                `json:"openseaId"`
-}
-
-func (Nft) IsNode()           {}
-func (Nft) IsNftByIDOrError() {}
-
 type OwnerAtBlock struct {
-	Owner       GalleryUserOrWallet `json:"owner"`
-	BlockNumber *string             `json:"blockNumber"`
+	Owner       GalleryUserOrAddress `json:"owner"`
+	BlockNumber *string              `json:"blockNumber"`
 }
 
 type PreviewURLSet struct {
-	Raw    *string `json:"raw"`
-	Small  *string `json:"small"`
-	Medium *string `json:"medium"`
-	Large  *string `json:"large"`
+	Raw       *string `json:"raw"`
+	Thumbnail *string `json:"thumbnail"`
+	Small     *string `json:"small"`
+	Medium    *string `json:"medium"`
+	Large     *string `json:"large"`
+	SrcSet    *string `json:"srcSet"`
 }
 
-type RefreshOpenSeaNftsPayload struct {
+type RefreshTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (RefreshOpenSeaNftsPayload) IsRefreshOpenSeaNftsPayloadOrError() {}
+func (RefreshTokensPayload) IsRefreshTokensPayloadOrError() {}
 
-type RemoveUserAddressesPayload struct {
+type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
-func (RemoveUserAddressesPayload) IsRemoveUserAddressesPayloadOrError() {}
+func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
 
 type TextMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -542,11 +536,39 @@ type TextMedia struct {
 func (TextMedia) IsMediaSubtype() {}
 func (TextMedia) IsMedia()        {}
 
+type Token struct {
+	Dbid                  persist.DBID          `json:"dbid"`
+	CreationTime          *time.Time            `json:"creationTime"`
+	LastUpdated           *time.Time            `json:"lastUpdated"`
+	CollectorsNote        *string               `json:"collectorsNote"`
+	Media                 MediaSubtype          `json:"media"`
+	TokenType             *TokenType            `json:"tokenType"`
+	Chain                 *persist.Chain        `json:"chain"`
+	Name                  *string               `json:"name"`
+	Description           *string               `json:"description"`
+	TokenURI              *string               `json:"tokenUri"`
+	TokenID               *string               `json:"tokenId"`
+	Quantity              *string               `json:"quantity"`
+	Owner                 *GalleryUser          `json:"owner"`
+	OwnedByWallets        []*Wallet             `json:"ownedByWallets"`
+	OwnershipHistory      []*OwnerAtBlock       `json:"ownershipHistory"`
+	TokenMetadata         *string               `json:"tokenMetadata"`
+	Contract              *Contract             `json:"contract"`
+	ExternalURL           *string               `json:"externalUrl"`
+	BlockNumber           *string               `json:"blockNumber"`
+	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
+	OpenseaCollectionName *string               `json:"openseaCollectionName"`
+	OpenseaID             *int                  `json:"openseaId"`
+}
+
+func (Token) IsNode()             {}
+func (Token) IsTokenByIDOrError() {}
+
 type TokenHolder struct {
 	HelperTokenHolderData
-	Addresses   []*persist.Address `json:"addresses"`
-	User        *GalleryUser       `json:"user"`
-	PreviewNfts []*string          `json:"previewNfts"`
+	Wallets       []*Wallet    `json:"wallets"`
+	User          *GalleryUser `json:"user"`
+	PreviewTokens []*string    `json:"previewTokens"`
 }
 
 type UnfollowUserPayload struct {
@@ -589,17 +611,17 @@ type UpdateCollectionInfoPayload struct {
 
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
-type UpdateCollectionNftsInput struct {
+type UpdateCollectionTokensInput struct {
 	CollectionID persist.DBID           `json:"collectionId"`
-	Nfts         []persist.DBID         `json:"nfts"`
+	Tokens       []persist.DBID         `json:"tokens"`
 	Layout       *CollectionLayoutInput `json:"layout"`
 }
 
-type UpdateCollectionNftsPayload struct {
+type UpdateCollectionTokensPayload struct {
 	Collection *Collection `json:"collection"`
 }
 
-func (UpdateCollectionNftsPayload) IsUpdateCollectionNftsPayloadOrError() {}
+func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 
 type UpdateGalleryCollectionsInput struct {
 	GalleryID   persist.DBID   `json:"galleryId"`
@@ -612,17 +634,17 @@ type UpdateGalleryCollectionsPayload struct {
 
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
 
-type UpdateNftInfoInput struct {
-	NftID          persist.DBID  `json:"nftId"`
+type UpdateTokenInfoInput struct {
+	TokenID        persist.DBID  `json:"tokenId"`
 	CollectorsNote string        `json:"collectorsNote"`
 	CollectionID   *persist.DBID `json:"collectionId"`
 }
 
-type UpdateNftInfoPayload struct {
-	Nft *Nft `json:"nft"`
+type UpdateTokenInfoPayload struct {
+	Token *Token `json:"token"`
 }
 
-func (UpdateNftInfoPayload) IsUpdateNftInfoPayloadOrError() {}
+func (UpdateTokenInfoPayload) IsUpdateTokenInfoPayloadOrError() {}
 
 type UpdateUserInfoInput struct {
 	Username string `json:"username"`
@@ -664,57 +686,15 @@ type ViewerGallery struct {
 }
 
 type Wallet struct {
-	Address *persist.Address `json:"address"`
-	Nfts    []*Nft           `json:"nfts"`
+	Dbid         persist.DBID          `json:"dbid"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	Chain        *persist.Chain        `json:"chain"`
+	WalletType   *persist.WalletType   `json:"walletType"`
+	Tokens       []*Token              `json:"tokens"`
 }
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
-
-type Chain string
-
-const (
-	ChainEthereum Chain = "Ethereum"
-	ChainArbitrum Chain = "Arbitrum"
-	ChainPolygon  Chain = "Polygon"
-	ChainOptimism Chain = "Optimism"
-)
-
-var AllChain = []Chain{
-	ChainEthereum,
-	ChainArbitrum,
-	ChainPolygon,
-	ChainOptimism,
-}
-
-func (e Chain) IsValid() bool {
-	switch e {
-	case ChainEthereum, ChainArbitrum, ChainPolygon, ChainOptimism:
-		return true
-	}
-	return false
-}
-
-func (e Chain) String() string {
-	return string(e)
-}
-
-func (e *Chain) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = Chain(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Chain", str)
-	}
-	return nil
-}
-
-func (e Chain) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
 
 type TokenType string
 

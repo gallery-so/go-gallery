@@ -10,6 +10,7 @@ import (
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 )
 
 type alchemyGetOwnersForTokensResponse struct {
@@ -93,7 +94,7 @@ type indexerTokenResponse struct {
 // 	return response.Metadata, nil
 // }
 
-func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.Address) ([]persist.Address, error) {
+func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
 	url := fmt.Sprintf("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/get?token_id=%s&contract_address=%s", tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -112,7 +113,7 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 		return nil, err
 	}
 
-	owners := make([]persist.Address, 0, len(response.NFTs))
+	owners := make([]persist.EthereumAddress, 0, len(response.NFTs))
 	for _, nft := range response.NFTs {
 		if nft.OwnerAddress == "" {
 			continue
@@ -122,8 +123,8 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 	return owners, nil
 }
 
-func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
-	url := fmt.Sprintf("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/get?token_id=%s&contract_address=%s&limit=1&page=1", tid, contractAddress)
+func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
+	url := fmt.Sprintf("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/get?token_id=%s&contract_address=%s&limit=1", tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -147,8 +148,14 @@ func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress 
 
 	token := response.NFTs[0]
 
+	val, _ := token.TokenMetadata.Value()
+	logrus.Infof("%s", val)
+	name, ok := token.TokenMetadata["name"].(string)
+	if !ok {
+		name = ""
+	}
 	return alchemyNFTMetadata{
-		Name:  token.TokenMetadata["name"].(string),
+		Name:  name,
 		Image: token.Media.ThumbnailURL.String(),
 	}, nil
 

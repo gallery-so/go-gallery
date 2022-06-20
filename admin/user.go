@@ -18,19 +18,19 @@ var errMustProvideUserIdentifier = fmt.Errorf("must provide either ID or usernam
 var errNoGalleries = errors.New("no galleries found for first user")
 
 type getUserInput struct {
-	ID       persist.DBID    `form:"id"`
-	Username string          `form:"username"`
-	Address  persist.Address `form:"address"`
+	ID       persist.DBID            `form:"id"`
+	Username string                  `form:"username"`
+	Address  persist.EthereumAddress `form:"address"`
 }
 type deleteUserInput struct {
 	ID persist.DBID `json:"id" binding:"required"`
 }
 
 type updateUserInput struct {
-	ID        persist.DBID      `json:"id" binding:"required"`
-	Username  string            `json:"username" binding:"required"`
-	Bio       string            `json:"bio"`
-	Addresses []persist.Address `json:"addresses" binding:"required"`
+	ID        persist.DBID              `json:"id" binding:"required"`
+	Username  string                    `json:"username" binding:"required"`
+	Bio       string                    `json:"bio"`
+	Addresses []persist.EthereumAddress `json:"addresses" binding:"required"`
 }
 
 type mergeUserInput struct {
@@ -39,9 +39,9 @@ type mergeUserInput struct {
 }
 
 type createUserInput struct {
-	Addresses []persist.Address `json:"addresses" binding:"required"`
-	Username  string            `json:"username" binding:"required"`
-	Bio       string            `json:"bio"`
+	Addresses []persist.EthereumAddress `json:"addresses" binding:"required"`
+	Username  string                    `json:"username" binding:"required"`
+	Bio       string                    `json:"bio"`
 }
 
 type createUserOutput struct {
@@ -61,11 +61,11 @@ func getUser(getUserByIDStmt, getUserByUsername, getUserByAddress *sql.Stmt) gin
 		var user persist.User
 		var err error
 		if input.ID != "" {
-			err = getUserByIDStmt.QueryRowContext(c, input.ID).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
+			err = getUserByIDStmt.QueryRowContext(c, input.ID).Scan(&user.ID, pq.Array(&user.Wallets), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
 		} else if input.Username != "" {
-			err = getUserByUsername.QueryRowContext(c, input.Username).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
+			err = getUserByUsername.QueryRowContext(c, input.Username).Scan(&user.ID, pq.Array(&user.Wallets), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
 		} else if input.Address != "" {
-			err = getUserByAddress.QueryRowContext(c, input.Address).Scan(&user.ID, pq.Array(&user.Addresses), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
+			err = getUserByAddress.QueryRowContext(c, input.Address).Scan(&user.ID, pq.Array(&user.Wallets), &user.Bio, &user.Username, &user.UsernameIdempotent, &user.LastUpdated, &user.CreationTime)
 		} else {
 			util.ErrResponse(c, http.StatusBadRequest, errMustProvideUserIdentifier)
 			return
@@ -213,18 +213,18 @@ func mergeUser(db *sql.DB, getUserByIDStmt, updateUserStmt, deleteUserStmt, getG
 		}
 
 		var firstUser persist.User
-		if err := getUserByIDStmt.QueryRowContext(c, input.FirstUserID).Scan(&firstUser.ID, pq.Array(&firstUser.Addresses), &firstUser.Bio, &firstUser.Username, &firstUser.UsernameIdempotent, &firstUser.LastUpdated, &firstUser.CreationTime); err != nil {
+		if err := getUserByIDStmt.QueryRowContext(c, input.FirstUserID).Scan(&firstUser.ID, pq.Array(&firstUser.Wallets), &firstUser.Bio, &firstUser.Username, &firstUser.UsernameIdempotent, &firstUser.LastUpdated, &firstUser.CreationTime); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
 
 		var secondUser persist.User
-		if err := getUserByIDStmt.QueryRowContext(c, input.SecondUserID).Scan(&secondUser.ID, pq.Array(&secondUser.Addresses), &secondUser.Bio, &secondUser.Username, &secondUser.UsernameIdempotent, &secondUser.LastUpdated, &secondUser.CreationTime); err != nil {
+		if err := getUserByIDStmt.QueryRowContext(c, input.SecondUserID).Scan(&secondUser.ID, pq.Array(&secondUser.Wallets), &secondUser.Bio, &secondUser.Username, &secondUser.UsernameIdempotent, &secondUser.LastUpdated, &secondUser.CreationTime); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}
 
-		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Addresses, secondUser.Addresses...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, persist.LastUpdatedTime{}, firstUser.ID); err != nil {
+		if _, err := tx.StmtContext(c, updateUserStmt).ExecContext(c, pq.Array(append(firstUser.Wallets, secondUser.Wallets...)), firstUser.Bio, firstUser.Username, firstUser.UsernameIdempotent, persist.LastUpdatedTime{}, firstUser.ID); err != nil {
 			rollbackWithErr(c, tx, http.StatusInternalServerError, err)
 			return
 		}

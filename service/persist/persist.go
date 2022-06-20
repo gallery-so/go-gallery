@@ -58,19 +58,17 @@ type Repositories struct {
 	UserRepository            UserRepository
 	NonceRepository           NonceRepository
 	LoginRepository           LoginAttemptRepository
-	NftRepository             NFTRepository
-	TokenRepository           TokenRepository
+	TokenRepository           TokenGalleryRepository
 	CollectionRepository      CollectionRepository
-	CollectionTokenRepository CollectionTokenRepository
 	GalleryRepository         GalleryRepository
-	GalleryTokenRepository    GalleryTokenRepository
-	ContractRepository        ContractRepository
+	ContractRepository        ContractGalleryRepository
 	BackupRepository          BackupRepository
 	MembershipRepository      MembershipRepository
 	UserEventRepository       UserEventRepository
 	NftEventRepository        NftEventRepository
 	CollectionEventRepository CollectionEventRepository
 	CommunityRepository       CommunityRepository
+	WalletRepository          WalletRepository
 	EarlyAccessRepository     EarlyAccessRepository
 }
 
@@ -313,9 +311,9 @@ func RemoveDuplicateDBIDs(a []DBID) []DBID {
 }
 
 // RemoveDuplicateAddresses ensures that an array of addresses has no repeat items
-func RemoveDuplicateAddresses(a []Address) []Address {
-	result := make([]Address, 0, len(a))
-	m := map[Address]bool{}
+func RemoveDuplicateAddresses(a []EthereumAddress) []EthereumAddress {
+	result := make([]EthereumAddress, 0, len(a))
+	m := map[EthereumAddress]bool{}
 
 	for _, val := range a {
 		if _, ok := m[val]; !ok {
@@ -325,4 +323,13 @@ func RemoveDuplicateAddresses(a []Address) []Address {
 	}
 
 	return result
+}
+
+func ContainsDBID(pSrc []DBID, pID DBID) bool {
+	for _, v := range pSrc {
+		if v == pID {
+			return true
+		}
+	}
+	return false
 }

@@ -5,22 +5,23 @@ package debugtools
 
 import (
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type DebugAuthenticator struct {
-	UserID    persist.DBID
-	Addresses []persist.Address
+	UserID         persist.DBID
+	ChainAddresses []persist.ChainAddress
 }
 
 func (d DebugAuthenticator) GetDescription() string {
-	return fmt.Sprintf("DebugAuthenticator(userId: %s, addresses: %v)", d.UserID, d.Addresses)
+	return fmt.Sprintf("DebugAuthenticator(userId: %s, addresses: %v)", d.UserID, d.ChainAddresses)
 }
 
-func NewDebugAuthenticator(userID persist.DBID, addresses []persist.Address) auth.Authenticator {
+func NewDebugAuthenticator(userID persist.DBID, chainAddresses []persist.ChainAddress) auth.Authenticator {
 	return DebugAuthenticator{
-		UserID:    userID,
-		Addresses: addresses,
+		UserID:         userID,
+		ChainAddresses: chainAddresses,
 	}
 }

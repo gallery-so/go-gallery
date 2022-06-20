@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// User represents a user in the datase and throughout the application
+// User represents a user with all of their addresses
 type User struct {
 	Version            NullInt32       `json:"version"` // schema version for this model
 	ID                 DBID            `json:"id" binding:"required"`
@@ -14,7 +14,7 @@ type User struct {
 	LastUpdated        LastUpdatedTime `json:"last_updated"`
 	Username           NullString      `json:"username"` // mutable
 	UsernameIdempotent NullString      `json:"username_idempotent"`
-	Addresses          []Address       `json:"addresses"` // IMPORTANT!! - users can have multiple addresses associated with their account
+	Wallets            []Wallet        `json:"wallets"`
 	Bio                NullString      `json:"bio"`
 }
 
@@ -26,17 +26,22 @@ type UserUpdateInfoInput struct {
 	Bio                NullString      `json:"bio"`
 }
 
+type CreateUserInput struct {
+	ChainAddress ChainAddress
+	WalletType   WalletType
+}
+
 // UserRepository represents the interface for interacting with the persisted state of users
 type UserRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
-	ExistsByAddress(context.Context, Address) (bool, error)
-	Create(context.Context, User) (DBID, error)
+	Create(context.Context, CreateUserInput) (DBID, error)
+	AddWallet(context.Context, DBID, ChainAddress, WalletType) error
+	RemoveWallet(context.Context, DBID, DBID) error
 	GetByID(context.Context, DBID) (User, error)
-	GetByAddress(context.Context, Address) (User, error)
+	GetByWalletID(context.Context, DBID) (User, error)
+	GetByChainAddress(context.Context, ChainAddress) (User, error)
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
-	AddAddresses(context.Context, DBID, []Address) error
-	RemoveAddresses(context.Context, DBID, []Address) error
 	MergeUsers(context.Context, DBID, DBID) error
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) error
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
@@ -45,21 +50,40 @@ type UserRepository interface {
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
 	UserID        DBID
-	Address       Address
+	WalletID      DBID
+	ChainAddress  ChainAddress
 	Username      string
 	Authenticator string
 }
 
 func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, username: %s, authenticator: %s", e.Address, e.UserID, e.Username, e.Authenticator)
+	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s, username: %s, authenticator: %s", e.ChainAddress, e.UserID, e.WalletID, e.Username, e.Authenticator)
 }
 
 type ErrUserAlreadyExists struct {
-	Address       Address
+	ChainAddress  ChainAddress
 	Authenticator string
 	Username      string
 }
 
 func (e ErrUserAlreadyExists) Error() string {
-	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.Address, e.Authenticator)
+	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.ChainAddress, e.Authenticator)
+}
+
+type ErrAddressOwnedByUser struct {
+	ChainAddress ChainAddress
+	OwnerID      DBID
+}
+
+func (e ErrAddressOwnedByUser) Error() string {
+	return fmt.Sprintf("address is owned by user: address: %s, ownerID: %s", e.ChainAddress, e.OwnerID)
+}
+
+type ErrAddressNotOwnedByUser struct {
+	ChainAddress ChainAddress
+	UserID       DBID
+}
+
+func (e ErrAddressNotOwnedByUser) Error() string {
+	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
 }

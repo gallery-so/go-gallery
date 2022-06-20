@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"strings"
 	"time"
 )
 
@@ -27,14 +26,14 @@ func NewEarlyAccessRepository(db *sql.DB) *EarlyAccessRepository {
 	}
 }
 
-func (u *EarlyAccessRepository) IsAllowedByAddresses(ctx context.Context, addresses []persist.Address) (bool, error) {
-	lowerAddresses := make([]string, len(addresses))
-	for i, address := range addresses {
-		lowerAddresses[i] = strings.ToLower(address.String())
+func (u *EarlyAccessRepository) IsAllowedByAddresses(ctx context.Context, chainAddresses []persist.ChainAddress) (bool, error) {
+	addresses := make([]string, len(chainAddresses))
+	for i, chainAddress := range chainAddresses {
+		addresses[i] = chainAddress.Address().String()
 	}
 
 	var allowed bool
-	err := u.existsByAddressesStmt.QueryRowContext(ctx, pq.Array(lowerAddresses)).Scan(&allowed)
+	err := u.existsByAddressesStmt.QueryRowContext(ctx, pq.Array(addresses)).Scan(&allowed)
 	if err != nil {
 		return false, err
 	}

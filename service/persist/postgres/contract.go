@@ -24,14 +24,14 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6;`)
+	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6,CREATOR_ADDRESS = $7;`)
 	checkNoErr(err)
 
 	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt}
 }
 
 // GetByAddress returns the contract with the given address
-func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist.Address) (persist.Contract, error) {
+func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist.EthereumAddress) (persist.Contract, error) {
 	contract := persist.Contract{}
 	err := c.getByAddressStmt.QueryRowContext(pCtx, pAddress).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress)
 	if err != nil {
@@ -42,7 +42,7 @@ func (c *ContractRepository) GetByAddress(pCtx context.Context, pAddress persist
 }
 
 // UpsertByAddress upserts the contract with the given address
-func (c *ContractRepository) UpsertByAddress(pCtx context.Context, pAddress persist.Address, pContract persist.Contract) error {
+func (c *ContractRepository) UpsertByAddress(pCtx context.Context, pAddress persist.EthereumAddress, pContract persist.Contract) error {
 	_, err := c.upsertByAddressStmt.ExecContext(pCtx, persist.GenerateID(), pContract.Version, pContract.Address, pContract.Symbol, pContract.Name, pContract.LatestBlock, pContract.CreatorAddress)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 	if len(pContracts) == 0 {
 		return nil
 	}
-	pContracts = removeDuplicates(pContracts)
+	pContracts = removeDuplicateContracts(pContracts)
 	sqlStr := `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES `
 	vals := make([]interface{}, 0, len(pContracts)*7)
 	for i, contract := range pContracts {
@@ -74,11 +74,11 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 	return nil
 }
 
-func removeDuplicates(pContracts []persist.Contract) []persist.Contract {
+func removeDuplicateContracts(pContracts []persist.Contract) []persist.Contract {
 	if len(pContracts) == 0 {
 		return pContracts
 	}
-	unique := map[persist.Address]bool{}
+	unique := map[persist.EthereumAddress]bool{}
 	result := make([]persist.Contract, 0, len(pContracts))
 	for _, v := range pContracts {
 		if unique[v.Address] {

@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"io"
 	"math/big"
 	"net"
@@ -16,6 +14,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -46,12 +47,12 @@ var client = &http.Client{
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
 	BlockNumber     persist.BlockNumber
-	From            persist.Address
-	To              persist.Address
+	From            persist.EthereumAddress
+	To              persist.EthereumAddress
 	TokenID         persist.TokenID
 	TokenType       persist.TokenType
 	Amount          uint64
-	ContractAddress persist.Address
+	ContractAddress persist.EthereumAddress
 }
 
 // TokenContractMetadata represents a token contract's metadata
@@ -85,7 +86,7 @@ func NewEthClient() *ethclient.Client {
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
 	sh := shell.NewShell(viper.GetString("IPFS_URL"))
-	sh.SetTimeout(time.Second * 10)
+	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
 
@@ -95,7 +96,7 @@ func NewArweaveClient() *goar.Client {
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func GetTokenContractMetadata(address persist.Address, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
+func GetTokenContractMetadata(address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	contract := address.Address()
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
@@ -159,28 +160,20 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		path = strings.ReplaceAll(path, "ipfs/", "")
 		path = strings.Split(path, "?")[0]
 
-		it, err := ipfsClient.Cat(path)
-		if err != nil {
-			bs, nextErr := getIPFSPI(ctx, path)
-			if nextErr == nil {
-				return bs, nil
-			}
-
-			return nil, fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
-		}
-		defer it.Close()
-
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, it, 1024*1024*1024)
+		bs, err := GetIPFSData(ctx, path)
 		if err != nil {
 			return nil, err
 		}
 
-		return removeBOM(buf.Bytes()), nil
+		return removeBOM(bs), nil
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
-		return getArweaveData(arweaveClient, path)
+		bs, err := GetArweaveData(arweaveClient, path)
+		if err != nil {
+			return nil, err
+		}
+		return removeBOM(bs), nil
 	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
@@ -198,7 +191,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		buf := &bytes.Buffer{}
 		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting data from http: %s - %s", err, asString)
 		}
 
 		return removeBOM(buf.Bytes()), nil
@@ -207,19 +200,13 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			return nil, err
 		}
-		query := parsedURL.Query().Get("arg")
-		it, err := ipfsClient.Cat(query)
-		if err != nil {
-			return nil, err
-		}
-		defer it.Close()
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, it, 1024*1024*1024)
+		path := parsedURL.Query().Get("arg")
+		bs, err := GetIPFSData(ctx, path)
 		if err != nil {
 			return nil, err
 		}
 
-		return removeBOM(buf.Bytes()), nil
+		return removeBOM(bs), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
 		idx := strings.IndexByte(asString, '{')
 		if idx == -1 {
@@ -228,7 +215,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		return removeBOM([]byte(asString[idx:])), nil
 
 	default:
-		return nil, fmt.Errorf("unknown token URI type: %s", turi.Type())
+		return nil, fmt.Errorf("unknown token URI type: %s - %s", turi.Type(), turi)
 	}
 
 }
@@ -267,7 +254,12 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 
 		it, err := ipfsClient.Cat(path)
 		if err != nil {
-			bs, nextErr := getIPFSPI(ctx, path)
+			if err == context.Canceled {
+				c, cancel := context.WithTimeout(context.Background(), time.Second*10)
+				defer cancel()
+				ctx = c
+			}
+			bs, nextErr := GetIPFSData(ctx, path)
 			if nextErr == nil {
 				return json.Unmarshal(bs, into)
 			}
@@ -279,7 +271,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
-		result, err := getArweaveData(arweaveClient, path)
+		result, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
 			return err
 		}
@@ -331,8 +323,8 @@ func removeBOM(bs []byte) []byte {
 	return bs
 }
 
-func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
-	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", hash)
+func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
+	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
@@ -356,8 +348,28 @@ func getIPFSPI(pCtx context.Context, hash string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// GetIPFSHeaders returns the headers for the given IPFS hash
+func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
+	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+
+	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %s", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data from http: %s", err)
+	}
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+	}
+	defer resp.Body.Close()
+
+	return resp.Header, nil
+}
+
 // GetTokenURI returns metadata URI for a given token address.
-func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
+func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -404,7 +416,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 }
 
 // GetBalanceOfERC1155Token returns the balance of an ERC1155 token
-func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
@@ -425,7 +437,7 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.Address, p
 }
 
 // GetContractCreator returns the address of the contract creator
-func GetContractCreator(ctx context.Context, contractAddress persist.Address, ethClient *ethclient.Client) (persist.Address, error) {
+func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
 	highestBlock, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting highest block: %s", err.Error())
@@ -467,13 +479,14 @@ func GetContractCreator(ctx context.Context, contractAddress persist.Address, et
 			if err != nil {
 				return "", fmt.Errorf("error getting message: %s", err.Error())
 			}
-			return persist.Address(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
+			return persist.EthereumAddress(fmt.Sprintf("0x%s", strings.ToLower(msg.From().String()))), nil
 		}
 	}
 	return "", fmt.Errorf("could not find contract creator")
 }
 
-func getArweaveData(client *goar.Client, id string) ([]byte, error) {
+// GetArweaveData returns the data from an Arweave transaction
+func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
 	tx, err := client.GetTransactionByID(id)
 	if err != nil {
 		return nil, err
@@ -513,6 +526,29 @@ func getArweaveData(client *goar.Client, id string) ([]byte, error) {
 		}
 	}
 	return removeBOM(data), nil
+}
+
+// GetArweaveContentType returns the content-type from an Arweave transaction
+func GetArweaveContentType(client *goar.Client, id string) (string, error) {
+	data, err := client.GetTransactionTags(id)
+	if err != nil {
+		return "", err
+	}
+
+	for _, tag := range data {
+		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
+		if err != nil {
+			return "", err
+		}
+		if strings.EqualFold(string(decodedName), "Content-Encoding") || strings.EqualFold(string(decodedName), "Content-Type") {
+			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
+			if err != nil {
+				return "", err
+			}
+			return string(decodedValue), nil
+		}
+	}
+	return "", nil
 }
 
 func padHex(pHex string, pLength int) string {

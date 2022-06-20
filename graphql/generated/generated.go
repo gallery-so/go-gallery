@@ -43,13 +43,14 @@ type ResolverRoot interface {
 	Gallery() GalleryResolver
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
-	Nft() NftResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
+	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
+	ChainAddressInput() ChainAddressInputResolver
 }
 
 type DirectiveRoot struct {
@@ -58,7 +59,7 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
-	AddUserAddressPayload struct {
+	AddUserWalletPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -74,6 +75,11 @@ type ComplexityRoot struct {
 		UserExists func(childComplexity int) int
 	}
 
+	ChainAddress struct {
+		Address func(childComplexity int) int
+		Chain   func(childComplexity int) int
+	}
+
 	Collection struct {
 		CollectorsNote func(childComplexity int) int
 		Dbid           func(childComplexity int) int
@@ -82,7 +88,7 @@ type ComplexityRoot struct {
 		ID             func(childComplexity int) int
 		Layout         func(childComplexity int) int
 		Name           func(childComplexity int) int
-		Nfts           func(childComplexity int) int
+		Tokens         func(childComplexity int) int
 		Version        func(childComplexity int) int
 	}
 
@@ -91,13 +97,14 @@ type ComplexityRoot struct {
 		Whitespace func(childComplexity int) int
 	}
 
-	CollectionNft struct {
+	CollectionToken struct {
 		Collection func(childComplexity int) int
 		ID         func(childComplexity int) int
-		Nft        func(childComplexity int) int
+		Token      func(childComplexity int) int
 	}
 
 	Community struct {
+		Chain           func(childComplexity int) int
 		ContractAddress func(childComplexity int) int
 		CreatorAddress  func(childComplexity int) int
 		Description     func(childComplexity int) int
@@ -106,6 +113,16 @@ type ComplexityRoot struct {
 		Name            func(childComplexity int) int
 		Owners          func(childComplexity int) int
 		PreviewImage    func(childComplexity int) int
+	}
+
+	Contract struct {
+		Chain           func(childComplexity int) int
+		ContractAddress func(childComplexity int) int
+		CreatorAddress  func(childComplexity int) int
+		Dbid            func(childComplexity int) int
+		ID              func(childComplexity int) int
+		LastUpdated     func(childComplexity int) int
+		Name            func(childComplexity int) int
 	}
 
 	CreateCollectionPayload struct {
@@ -122,6 +139,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	ErrAddressOwnedByUser struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrAuthenticationFailed struct {
 		Message func(childComplexity int) int
 	}
@@ -134,7 +155,7 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrDoesNotOwnRequiredNFT struct {
+	ErrDoesNotOwnRequiredToken struct {
 		Message func(childComplexity int) int
 	}
 
@@ -148,10 +169,6 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrNftNotFound struct {
-		Message func(childComplexity int) int
-	}
-
 	ErrNoCookie struct {
 		Message func(childComplexity int) int
 	}
@@ -162,6 +179,10 @@ type ComplexityRoot struct {
 	}
 
 	ErrOpenSeaRefreshFailed struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrTokenNotFound struct {
 		Message func(childComplexity int) int
 	}
 
@@ -193,6 +214,7 @@ type ComplexityRoot struct {
 		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
+		Tokens              func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
 	}
@@ -212,17 +234,10 @@ type ComplexityRoot struct {
 	}
 
 	ImageMedia struct {
-		ContentRenderURLs func(childComplexity int) int
-		MediaType         func(childComplexity int) int
-		MediaURL          func(childComplexity int) int
-		PreviewURLs       func(childComplexity int) int
-	}
-
-	ImageURLSet struct {
-		Large  func(childComplexity int) int
-		Medium func(childComplexity int) int
-		Raw    func(childComplexity int) int
-		Small  func(childComplexity int) int
+		ContentRenderURL func(childComplexity int) int
+		MediaType        func(childComplexity int) int
+		MediaURL         func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
 	}
 
 	InvalidMedia struct {
@@ -258,30 +273,72 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserAddress           func(childComplexity int, address persist.Address, authMechanism model.AuthMechanism) int
+		AddUserWallet            func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		FollowUser               func(childComplexity int, userID persist.DBID) int
-		GetAuthNonce             func(childComplexity int, address persist.Address) int
+		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
-		RefreshOpenSeaNfts       func(childComplexity int, addresses *string) int
-		RemoveUserAddresses      func(childComplexity int, addresses []persist.Address) int
+		RefreshTokens            func(childComplexity int) int
+		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
-		UpdateCollectionNfts     func(childComplexity int, input model.UpdateCollectionNftsInput) int
+		UpdateCollectionTokens   func(childComplexity int, input model.UpdateCollectionTokensInput) int
 		UpdateGalleryCollections func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
-		UpdateNftInfo            func(childComplexity int, input model.UpdateNftInfoInput) int
+		UpdateTokenInfo          func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo           func(childComplexity int, input model.UpdateUserInfoInput) int
 	}
 
-	Nft struct {
+	OwnerAtBlock struct {
+		BlockNumber func(childComplexity int) int
+		Owner       func(childComplexity int) int
+	}
+
+	PreviewURLSet struct {
+		Large     func(childComplexity int) int
+		Medium    func(childComplexity int) int
+		Raw       func(childComplexity int) int
+		Small     func(childComplexity int) int
+		SrcSet    func(childComplexity int) int
+		Thumbnail func(childComplexity int) int
+	}
+
+	Query struct {
+		CollectionByID      func(childComplexity int, id persist.DBID) int
+		CollectionTokenByID func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		CommunityByAddress  func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		GeneralAllowlist    func(childComplexity int) int
+		MembershipTiers     func(childComplexity int, forceRefresh *bool) int
+		Node                func(childComplexity int, id model.GqlID) int
+		TokenByID           func(childComplexity int, id persist.DBID) int
+		UserByID            func(childComplexity int, id persist.DBID) int
+		UserByUsername      func(childComplexity int, username string) int
+		Viewer              func(childComplexity int) int
+	}
+
+	RefreshTokensPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
+	RemoveUserWalletsPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
+	TextMedia struct {
+		ContentRenderURL func(childComplexity int) int
+		MediaType        func(childComplexity int) int
+		MediaURL         func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
+	}
+
+	Token struct {
 		BlockNumber           func(childComplexity int) int
 		Chain                 func(childComplexity int) int
 		CollectorsNote        func(childComplexity int) int
-		ContractAddress       func(childComplexity int) int
+		Contract              func(childComplexity int) int
 		CreationTime          func(childComplexity int) int
 		CreatorAddress        func(childComplexity int) int
 		Dbid                  func(childComplexity int) int
@@ -293,6 +350,7 @@ type ComplexityRoot struct {
 		Name                  func(childComplexity int) int
 		OpenseaCollectionName func(childComplexity int) int
 		OpenseaID             func(childComplexity int) int
+		OwnedByWallets        func(childComplexity int) int
 		Owner                 func(childComplexity int) int
 		OwnershipHistory      func(childComplexity int) int
 		Quantity              func(childComplexity int) int
@@ -302,50 +360,10 @@ type ComplexityRoot struct {
 		TokenURI              func(childComplexity int) int
 	}
 
-	OwnerAtBlock struct {
-		BlockNumber func(childComplexity int) int
-		Owner       func(childComplexity int) int
-	}
-
-	PreviewURLSet struct {
-		Large  func(childComplexity int) int
-		Medium func(childComplexity int) int
-		Raw    func(childComplexity int) int
-		Small  func(childComplexity int) int
-	}
-
-	Query struct {
-		CollectionByID     func(childComplexity int, id persist.DBID) int
-		CollectionNftByID  func(childComplexity int, nftID persist.DBID, collectionID persist.DBID) int
-		CommunityByAddress func(childComplexity int, contractAddress persist.Address, forceRefresh *bool) int
-		GeneralAllowlist   func(childComplexity int) int
-		MembershipTiers    func(childComplexity int, forceRefresh *bool) int
-		NftByID            func(childComplexity int, id persist.DBID) int
-		Node               func(childComplexity int, id model.GqlID) int
-		UserByID           func(childComplexity int, id persist.DBID) int
-		UserByUsername     func(childComplexity int, username string) int
-		Viewer             func(childComplexity int) int
-	}
-
-	RefreshOpenSeaNftsPayload struct {
-		Viewer func(childComplexity int) int
-	}
-
-	RemoveUserAddressesPayload struct {
-		Viewer func(childComplexity int) int
-	}
-
-	TextMedia struct {
-		ContentRenderURL func(childComplexity int) int
-		MediaType        func(childComplexity int) int
-		MediaURL         func(childComplexity int) int
-		PreviewURLs      func(childComplexity int) int
-	}
-
 	TokenHolder struct {
-		Addresses   func(childComplexity int) int
-		PreviewNfts func(childComplexity int) int
-		User        func(childComplexity int) int
+		PreviewTokens func(childComplexity int) int
+		User          func(childComplexity int) int
+		Wallets       func(childComplexity int) int
 	}
 
 	UnfollowUserPayload struct {
@@ -368,7 +386,7 @@ type ComplexityRoot struct {
 		Collection func(childComplexity int) int
 	}
 
-	UpdateCollectionNftsPayload struct {
+	UpdateCollectionTokensPayload struct {
 		Collection func(childComplexity int) int
 	}
 
@@ -376,8 +394,8 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
-	UpdateNftInfoPayload struct {
-		Nft func(childComplexity int) int
+	UpdateTokenInfoPayload struct {
+		Token func(childComplexity int) int
 	}
 
 	UpdateUserInfoPayload struct {
@@ -408,16 +426,19 @@ type ComplexityRoot struct {
 	}
 
 	Wallet struct {
-		Address func(childComplexity int) int
-		ID      func(childComplexity int) int
-		Nfts    func(childComplexity int) int
+		Chain        func(childComplexity int) int
+		ChainAddress func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Tokens       func(childComplexity int) int
+		WalletType   func(childComplexity int) int
 	}
 }
 
 type CollectionResolver interface {
 	Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error)
 
-	Nfts(ctx context.Context, obj *model.Collection) ([]*model.CollectionNft, error)
+	Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error)
 }
 type FollowUserPayloadResolver interface {
 	User(ctx context.Context, obj *model.FollowUserPayload) (*model.GalleryUser, error)
@@ -427,35 +448,34 @@ type GalleryResolver interface {
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
 }
 type GalleryUserResolver interface {
+	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
+	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 }
 type MutationResolver interface {
-	AddUserAddress(ctx context.Context, address persist.Address, authMechanism model.AuthMechanism) (model.AddUserAddressPayloadOrError, error)
-	RemoveUserAddresses(ctx context.Context, addresses []persist.Address) (model.RemoveUserAddressesPayloadOrError, error)
+	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
+	RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error)
 	UpdateUserInfo(ctx context.Context, input model.UpdateUserInfoInput) (model.UpdateUserInfoPayloadOrError, error)
 	UpdateGalleryCollections(ctx context.Context, input model.UpdateGalleryCollectionsInput) (model.UpdateGalleryCollectionsPayloadOrError, error)
 	CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error)
 	DeleteCollection(ctx context.Context, collectionID persist.DBID) (model.DeleteCollectionPayloadOrError, error)
 	UpdateCollectionInfo(ctx context.Context, input model.UpdateCollectionInfoInput) (model.UpdateCollectionInfoPayloadOrError, error)
-	UpdateCollectionNfts(ctx context.Context, input model.UpdateCollectionNftsInput) (model.UpdateCollectionNftsPayloadOrError, error)
+	UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error)
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
-	UpdateNftInfo(ctx context.Context, input model.UpdateNftInfoInput) (model.UpdateNftInfoPayloadOrError, error)
-	RefreshOpenSeaNfts(ctx context.Context, addresses *string) (model.RefreshOpenSeaNftsPayloadOrError, error)
-	GetAuthNonce(ctx context.Context, address persist.Address) (model.GetAuthNoncePayloadOrError, error)
+	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
+	RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error)
+	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 }
-type NftResolver interface {
-	Owner(ctx context.Context, obj *model.Nft) (model.GalleryUserOrWallet, error)
-}
 type OwnerAtBlockResolver interface {
-	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrWallet, error)
+	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
 }
 type QueryResolver interface {
 	Node(ctx context.Context, id model.GqlID) (model.Node, error)
@@ -464,12 +484,19 @@ type QueryResolver interface {
 	UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
-	NftByID(ctx context.Context, id persist.DBID) (model.NftByIDOrError, error)
-	CollectionNftByID(ctx context.Context, nftID persist.DBID, collectionID persist.DBID) (model.CollectionNftByIDOrError, error)
-	CommunityByAddress(ctx context.Context, contractAddress persist.Address, forceRefresh *bool) (model.CommunityByAddressOrError, error)
-	GeneralAllowlist(ctx context.Context) ([]persist.Address, error)
+	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
+	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
+	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
+	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
+}
+type TokenResolver interface {
+	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
+	OwnedByWallets(ctx context.Context, obj *model.Token) ([]*model.Wallet, error)
+
+	Contract(ctx context.Context, obj *model.Token) (*model.Contract, error)
 }
 type TokenHolderResolver interface {
+	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
 }
 type UnfollowUserPayloadResolver interface {
@@ -480,7 +507,12 @@ type ViewerResolver interface {
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
 }
 type WalletResolver interface {
-	Nfts(ctx context.Context, obj *model.Wallet) ([]*model.Nft, error)
+	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
+}
+
+type ChainAddressInputResolver interface {
+	Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error
+	Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error
 }
 
 type executableSchema struct {
@@ -498,12 +530,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
-	case "AddUserAddressPayload.viewer":
-		if e.complexity.AddUserAddressPayload.Viewer == nil {
+	case "AddUserWalletPayload.viewer":
+		if e.complexity.AddUserWalletPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.AddUserAddressPayload.Viewer(childComplexity), true
+		return e.complexity.AddUserWalletPayload.Viewer(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -546,6 +578,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
+
+	case "ChainAddress.address":
+		if e.complexity.ChainAddress.Address == nil {
+			break
+		}
+
+		return e.complexity.ChainAddress.Address(childComplexity), true
+
+	case "ChainAddress.chain":
+		if e.complexity.ChainAddress.Chain == nil {
+			break
+		}
+
+		return e.complexity.ChainAddress.Chain(childComplexity), true
 
 	case "Collection.collectorsNote":
 		if e.complexity.Collection.CollectorsNote == nil {
@@ -596,12 +642,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Collection.Name(childComplexity), true
 
-	case "Collection.nfts":
-		if e.complexity.Collection.Nfts == nil {
+	case "Collection.tokens":
+		if e.complexity.Collection.Tokens == nil {
 			break
 		}
 
-		return e.complexity.Collection.Nfts(childComplexity), true
+		return e.complexity.Collection.Tokens(childComplexity), true
 
 	case "Collection.version":
 		if e.complexity.Collection.Version == nil {
@@ -624,26 +670,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectionLayout.Whitespace(childComplexity), true
 
-	case "CollectionNft.collection":
-		if e.complexity.CollectionNft.Collection == nil {
+	case "CollectionToken.collection":
+		if e.complexity.CollectionToken.Collection == nil {
 			break
 		}
 
-		return e.complexity.CollectionNft.Collection(childComplexity), true
+		return e.complexity.CollectionToken.Collection(childComplexity), true
 
-	case "CollectionNft.id":
-		if e.complexity.CollectionNft.ID == nil {
+	case "CollectionToken.id":
+		if e.complexity.CollectionToken.ID == nil {
 			break
 		}
 
-		return e.complexity.CollectionNft.ID(childComplexity), true
+		return e.complexity.CollectionToken.ID(childComplexity), true
 
-	case "CollectionNft.nft":
-		if e.complexity.CollectionNft.Nft == nil {
+	case "CollectionToken.token":
+		if e.complexity.CollectionToken.Token == nil {
 			break
 		}
 
-		return e.complexity.CollectionNft.Nft(childComplexity), true
+		return e.complexity.CollectionToken.Token(childComplexity), true
+
+	case "Community.chain":
+		if e.complexity.Community.Chain == nil {
+			break
+		}
+
+		return e.complexity.Community.Chain(childComplexity), true
 
 	case "Community.contractAddress":
 		if e.complexity.Community.ContractAddress == nil {
@@ -701,6 +754,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.PreviewImage(childComplexity), true
 
+	case "Contract.chain":
+		if e.complexity.Contract.Chain == nil {
+			break
+		}
+
+		return e.complexity.Contract.Chain(childComplexity), true
+
+	case "Contract.contractAddress":
+		if e.complexity.Contract.ContractAddress == nil {
+			break
+		}
+
+		return e.complexity.Contract.ContractAddress(childComplexity), true
+
+	case "Contract.creatorAddress":
+		if e.complexity.Contract.CreatorAddress == nil {
+			break
+		}
+
+		return e.complexity.Contract.CreatorAddress(childComplexity), true
+
+	case "Contract.dbid":
+		if e.complexity.Contract.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Contract.Dbid(childComplexity), true
+
+	case "Contract.id":
+		if e.complexity.Contract.ID == nil {
+			break
+		}
+
+		return e.complexity.Contract.ID(childComplexity), true
+
+	case "Contract.lastUpdated":
+		if e.complexity.Contract.LastUpdated == nil {
+			break
+		}
+
+		return e.complexity.Contract.LastUpdated(childComplexity), true
+
+	case "Contract.name":
+		if e.complexity.Contract.Name == nil {
+			break
+		}
+
+		return e.complexity.Contract.Name(childComplexity), true
+
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
 			break
@@ -736,6 +838,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeleteCollectionPayload.Gallery(childComplexity), true
 
+	case "ErrAddressOwnedByUser.message":
+		if e.complexity.ErrAddressOwnedByUser.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAddressOwnedByUser.Message(childComplexity), true
+
 	case "ErrAuthenticationFailed.message":
 		if e.complexity.ErrAuthenticationFailed.Message == nil {
 			break
@@ -757,12 +866,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrCommunityNotFound.Message(childComplexity), true
 
-	case "ErrDoesNotOwnRequiredNFT.message":
-		if e.complexity.ErrDoesNotOwnRequiredNFT.Message == nil {
+	case "ErrDoesNotOwnRequiredToken.message":
+		if e.complexity.ErrDoesNotOwnRequiredToken.Message == nil {
 			break
 		}
 
-		return e.complexity.ErrDoesNotOwnRequiredNFT.Message(childComplexity), true
+		return e.complexity.ErrDoesNotOwnRequiredToken.Message(childComplexity), true
 
 	case "ErrInvalidInput.message":
 		if e.complexity.ErrInvalidInput.Message == nil {
@@ -792,13 +901,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrInvalidToken.Message(childComplexity), true
 
-	case "ErrNftNotFound.message":
-		if e.complexity.ErrNftNotFound.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrNftNotFound.Message(childComplexity), true
-
 	case "ErrNoCookie.message":
 		if e.complexity.ErrNoCookie.Message == nil {
 			break
@@ -826,6 +928,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrOpenSeaRefreshFailed.Message(childComplexity), true
+
+	case "ErrTokenNotFound.message":
+		if e.complexity.ErrTokenNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrTokenNotFound.Message(childComplexity), true
 
 	case "ErrUserAlreadyExists.message":
 		if e.complexity.ErrUserAlreadyExists.Message == nil {
@@ -932,6 +1041,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.IsAuthenticatedUser(childComplexity), true
 
+	case "GalleryUser.tokens":
+		if e.complexity.GalleryUser.Tokens == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Tokens(childComplexity), true
+
 	case "GalleryUser.username":
 		if e.complexity.GalleryUser.Username == nil {
 			break
@@ -1002,12 +1118,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HtmlMedia.PreviewURLs(childComplexity), true
 
-	case "ImageMedia.contentRenderURLs":
-		if e.complexity.ImageMedia.ContentRenderURLs == nil {
+	case "ImageMedia.contentRenderURL":
+		if e.complexity.ImageMedia.ContentRenderURL == nil {
 			break
 		}
 
-		return e.complexity.ImageMedia.ContentRenderURLs(childComplexity), true
+		return e.complexity.ImageMedia.ContentRenderURL(childComplexity), true
 
 	case "ImageMedia.mediaType":
 		if e.complexity.ImageMedia.MediaType == nil {
@@ -1029,34 +1145,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ImageMedia.PreviewURLs(childComplexity), true
-
-	case "ImageURLSet.large":
-		if e.complexity.ImageURLSet.Large == nil {
-			break
-		}
-
-		return e.complexity.ImageURLSet.Large(childComplexity), true
-
-	case "ImageURLSet.medium":
-		if e.complexity.ImageURLSet.Medium == nil {
-			break
-		}
-
-		return e.complexity.ImageURLSet.Medium(childComplexity), true
-
-	case "ImageURLSet.raw":
-		if e.complexity.ImageURLSet.Raw == nil {
-			break
-		}
-
-		return e.complexity.ImageURLSet.Raw(childComplexity), true
-
-	case "ImageURLSet.small":
-		if e.complexity.ImageURLSet.Small == nil {
-			break
-		}
-
-		return e.complexity.ImageURLSet.Small(childComplexity), true
 
 	case "InvalidMedia.contentRenderURL":
 		if e.complexity.InvalidMedia.ContentRenderURL == nil {
@@ -1177,17 +1265,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MembershipTier.TokenID(childComplexity), true
 
-	case "Mutation.addUserAddress":
-		if e.complexity.Mutation.AddUserAddress == nil {
+	case "Mutation.addUserWallet":
+		if e.complexity.Mutation.AddUserWallet == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_addUserAddress_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_addUserWallet_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddUserAddress(childComplexity, args["address"].(persist.Address), args["authMechanism"].(model.AuthMechanism)), true
+		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
 
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
@@ -1247,7 +1335,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["address"].(persist.Address)), true
+		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -1268,29 +1356,24 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Logout(childComplexity), true
 
-	case "Mutation.refreshOpenSeaNfts":
-		if e.complexity.Mutation.RefreshOpenSeaNfts == nil {
+	case "Mutation.refreshTokens":
+		if e.complexity.Mutation.RefreshTokens == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_refreshOpenSeaNfts_args(context.TODO(), rawArgs)
+		return e.complexity.Mutation.RefreshTokens(childComplexity), true
+
+	case "Mutation.removeUserWallets":
+		if e.complexity.Mutation.RemoveUserWallets == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removeUserWallets_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RefreshOpenSeaNfts(childComplexity, args["addresses"].(*string)), true
-
-	case "Mutation.removeUserAddresses":
-		if e.complexity.Mutation.RemoveUserAddresses == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_removeUserAddresses_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.RemoveUserAddresses(childComplexity, args["addresses"].([]persist.Address)), true
+		return e.complexity.Mutation.RemoveUserWallets(childComplexity, args["walletIds"].([]persist.DBID)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -1328,17 +1411,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateCollectionInfo(childComplexity, args["input"].(model.UpdateCollectionInfoInput)), true
 
-	case "Mutation.updateCollectionNfts":
-		if e.complexity.Mutation.UpdateCollectionNfts == nil {
+	case "Mutation.updateCollectionTokens":
+		if e.complexity.Mutation.UpdateCollectionTokens == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_updateCollectionNfts_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateCollectionTokens_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateCollectionNfts(childComplexity, args["input"].(model.UpdateCollectionNftsInput)), true
+		return e.complexity.Mutation.UpdateCollectionTokens(childComplexity, args["input"].(model.UpdateCollectionTokensInput)), true
 
 	case "Mutation.updateGalleryCollections":
 		if e.complexity.Mutation.UpdateGalleryCollections == nil {
@@ -1352,17 +1435,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateGalleryCollections(childComplexity, args["input"].(model.UpdateGalleryCollectionsInput)), true
 
-	case "Mutation.updateNftInfo":
-		if e.complexity.Mutation.UpdateNftInfo == nil {
+	case "Mutation.updateTokenInfo":
+		if e.complexity.Mutation.UpdateTokenInfo == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_updateNftInfo_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateTokenInfo_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateNftInfo(childComplexity, args["input"].(model.UpdateNftInfoInput)), true
+		return e.complexity.Mutation.UpdateTokenInfo(childComplexity, args["input"].(model.UpdateTokenInfoInput)), true
 
 	case "Mutation.updateUserInfo":
 		if e.complexity.Mutation.UpdateUserInfo == nil {
@@ -1375,160 +1458,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateUserInfo(childComplexity, args["input"].(model.UpdateUserInfoInput)), true
-
-	case "Nft.blockNumber":
-		if e.complexity.Nft.BlockNumber == nil {
-			break
-		}
-
-		return e.complexity.Nft.BlockNumber(childComplexity), true
-
-	case "Nft.chain":
-		if e.complexity.Nft.Chain == nil {
-			break
-		}
-
-		return e.complexity.Nft.Chain(childComplexity), true
-
-	case "Nft.collectorsNote":
-		if e.complexity.Nft.CollectorsNote == nil {
-			break
-		}
-
-		return e.complexity.Nft.CollectorsNote(childComplexity), true
-
-	case "Nft.contractAddress":
-		if e.complexity.Nft.ContractAddress == nil {
-			break
-		}
-
-		return e.complexity.Nft.ContractAddress(childComplexity), true
-
-	case "Nft.creationTime":
-		if e.complexity.Nft.CreationTime == nil {
-			break
-		}
-
-		return e.complexity.Nft.CreationTime(childComplexity), true
-
-	case "Nft.creatorAddress":
-		if e.complexity.Nft.CreatorAddress == nil {
-			break
-		}
-
-		return e.complexity.Nft.CreatorAddress(childComplexity), true
-
-	case "Nft.dbid":
-		if e.complexity.Nft.Dbid == nil {
-			break
-		}
-
-		return e.complexity.Nft.Dbid(childComplexity), true
-
-	case "Nft.description":
-		if e.complexity.Nft.Description == nil {
-			break
-		}
-
-		return e.complexity.Nft.Description(childComplexity), true
-
-	case "Nft.externalUrl":
-		if e.complexity.Nft.ExternalURL == nil {
-			break
-		}
-
-		return e.complexity.Nft.ExternalURL(childComplexity), true
-
-	case "Nft.id":
-		if e.complexity.Nft.ID == nil {
-			break
-		}
-
-		return e.complexity.Nft.ID(childComplexity), true
-
-	case "Nft.lastUpdated":
-		if e.complexity.Nft.LastUpdated == nil {
-			break
-		}
-
-		return e.complexity.Nft.LastUpdated(childComplexity), true
-
-	case "Nft.media":
-		if e.complexity.Nft.Media == nil {
-			break
-		}
-
-		return e.complexity.Nft.Media(childComplexity), true
-
-	case "Nft.name":
-		if e.complexity.Nft.Name == nil {
-			break
-		}
-
-		return e.complexity.Nft.Name(childComplexity), true
-
-	case "Nft.openseaCollectionName":
-		if e.complexity.Nft.OpenseaCollectionName == nil {
-			break
-		}
-
-		return e.complexity.Nft.OpenseaCollectionName(childComplexity), true
-
-	case "Nft.openseaId":
-		if e.complexity.Nft.OpenseaID == nil {
-			break
-		}
-
-		return e.complexity.Nft.OpenseaID(childComplexity), true
-
-	case "Nft.owner":
-		if e.complexity.Nft.Owner == nil {
-			break
-		}
-
-		return e.complexity.Nft.Owner(childComplexity), true
-
-	case "Nft.ownershipHistory":
-		if e.complexity.Nft.OwnershipHistory == nil {
-			break
-		}
-
-		return e.complexity.Nft.OwnershipHistory(childComplexity), true
-
-	case "Nft.quantity":
-		if e.complexity.Nft.Quantity == nil {
-			break
-		}
-
-		return e.complexity.Nft.Quantity(childComplexity), true
-
-	case "Nft.tokenId":
-		if e.complexity.Nft.TokenID == nil {
-			break
-		}
-
-		return e.complexity.Nft.TokenID(childComplexity), true
-
-	case "Nft.tokenMetadata":
-		if e.complexity.Nft.TokenMetadata == nil {
-			break
-		}
-
-		return e.complexity.Nft.TokenMetadata(childComplexity), true
-
-	case "Nft.tokenType":
-		if e.complexity.Nft.TokenType == nil {
-			break
-		}
-
-		return e.complexity.Nft.TokenType(childComplexity), true
-
-	case "Nft.tokenUri":
-		if e.complexity.Nft.TokenURI == nil {
-			break
-		}
-
-		return e.complexity.Nft.TokenURI(childComplexity), true
 
 	case "OwnerAtBlock.blockNumber":
 		if e.complexity.OwnerAtBlock.BlockNumber == nil {
@@ -1572,6 +1501,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreviewURLSet.Small(childComplexity), true
 
+	case "PreviewURLSet.srcSet":
+		if e.complexity.PreviewURLSet.SrcSet == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.SrcSet(childComplexity), true
+
+	case "PreviewURLSet.thumbnail":
+		if e.complexity.PreviewURLSet.Thumbnail == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.Thumbnail(childComplexity), true
+
 	case "Query.collectionById":
 		if e.complexity.Query.CollectionByID == nil {
 			break
@@ -1584,17 +1527,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CollectionByID(childComplexity, args["id"].(persist.DBID)), true
 
-	case "Query.collectionNftById":
-		if e.complexity.Query.CollectionNftByID == nil {
+	case "Query.collectionTokenById":
+		if e.complexity.Query.CollectionTokenByID == nil {
 			break
 		}
 
-		args, err := ec.field_Query_collectionNftById_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_collectionTokenById_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Query.CollectionNftByID(childComplexity, args["nftId"].(persist.DBID), args["collectionId"].(persist.DBID)), true
+		return e.complexity.Query.CollectionTokenByID(childComplexity, args["tokenId"].(persist.DBID), args["collectionId"].(persist.DBID)), true
 
 	case "Query.communityByAddress":
 		if e.complexity.Query.CommunityByAddress == nil {
@@ -1606,7 +1549,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["contractAddress"].(persist.Address), args["forceRefresh"].(*bool)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
 	case "Query.generalAllowlist":
 		if e.complexity.Query.GeneralAllowlist == nil {
@@ -1627,18 +1570,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.MembershipTiers(childComplexity, args["forceRefresh"].(*bool)), true
 
-	case "Query.nftById":
-		if e.complexity.Query.NftByID == nil {
-			break
-		}
-
-		args, err := ec.field_Query_nftById_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.NftByID(childComplexity, args["id"].(persist.DBID)), true
-
 	case "Query.node":
 		if e.complexity.Query.Node == nil {
 			break
@@ -1650,6 +1581,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Node(childComplexity, args["id"].(model.GqlID)), true
+
+	case "Query.tokenById":
+		if e.complexity.Query.TokenByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_tokenById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
 	case "Query.userById":
 		if e.complexity.Query.UserByID == nil {
@@ -1682,19 +1625,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Viewer(childComplexity), true
 
-	case "RefreshOpenSeaNftsPayload.viewer":
-		if e.complexity.RefreshOpenSeaNftsPayload.Viewer == nil {
+	case "RefreshTokensPayload.viewer":
+		if e.complexity.RefreshTokensPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.RefreshOpenSeaNftsPayload.Viewer(childComplexity), true
+		return e.complexity.RefreshTokensPayload.Viewer(childComplexity), true
 
-	case "RemoveUserAddressesPayload.viewer":
-		if e.complexity.RemoveUserAddressesPayload.Viewer == nil {
+	case "RemoveUserWalletsPayload.viewer":
+		if e.complexity.RemoveUserWalletsPayload.Viewer == nil {
 			break
 		}
 
-		return e.complexity.RemoveUserAddressesPayload.Viewer(childComplexity), true
+		return e.complexity.RemoveUserWalletsPayload.Viewer(childComplexity), true
 
 	case "TextMedia.contentRenderURL":
 		if e.complexity.TextMedia.ContentRenderURL == nil {
@@ -1724,19 +1667,173 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TextMedia.PreviewURLs(childComplexity), true
 
-	case "TokenHolder.addresses":
-		if e.complexity.TokenHolder.Addresses == nil {
+	case "Token.blockNumber":
+		if e.complexity.Token.BlockNumber == nil {
 			break
 		}
 
-		return e.complexity.TokenHolder.Addresses(childComplexity), true
+		return e.complexity.Token.BlockNumber(childComplexity), true
 
-	case "TokenHolder.previewNfts":
-		if e.complexity.TokenHolder.PreviewNfts == nil {
+	case "Token.chain":
+		if e.complexity.Token.Chain == nil {
 			break
 		}
 
-		return e.complexity.TokenHolder.PreviewNfts(childComplexity), true
+		return e.complexity.Token.Chain(childComplexity), true
+
+	case "Token.collectorsNote":
+		if e.complexity.Token.CollectorsNote == nil {
+			break
+		}
+
+		return e.complexity.Token.CollectorsNote(childComplexity), true
+
+	case "Token.contract":
+		if e.complexity.Token.Contract == nil {
+			break
+		}
+
+		return e.complexity.Token.Contract(childComplexity), true
+
+	case "Token.creationTime":
+		if e.complexity.Token.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.Token.CreationTime(childComplexity), true
+
+	case "Token.creatorAddress":
+		if e.complexity.Token.CreatorAddress == nil {
+			break
+		}
+
+		return e.complexity.Token.CreatorAddress(childComplexity), true
+
+	case "Token.dbid":
+		if e.complexity.Token.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Token.Dbid(childComplexity), true
+
+	case "Token.description":
+		if e.complexity.Token.Description == nil {
+			break
+		}
+
+		return e.complexity.Token.Description(childComplexity), true
+
+	case "Token.externalUrl":
+		if e.complexity.Token.ExternalURL == nil {
+			break
+		}
+
+		return e.complexity.Token.ExternalURL(childComplexity), true
+
+	case "Token.id":
+		if e.complexity.Token.ID == nil {
+			break
+		}
+
+		return e.complexity.Token.ID(childComplexity), true
+
+	case "Token.lastUpdated":
+		if e.complexity.Token.LastUpdated == nil {
+			break
+		}
+
+		return e.complexity.Token.LastUpdated(childComplexity), true
+
+	case "Token.media":
+		if e.complexity.Token.Media == nil {
+			break
+		}
+
+		return e.complexity.Token.Media(childComplexity), true
+
+	case "Token.name":
+		if e.complexity.Token.Name == nil {
+			break
+		}
+
+		return e.complexity.Token.Name(childComplexity), true
+
+	case "Token.openseaCollectionName":
+		if e.complexity.Token.OpenseaCollectionName == nil {
+			break
+		}
+
+		return e.complexity.Token.OpenseaCollectionName(childComplexity), true
+
+	case "Token.openseaId":
+		if e.complexity.Token.OpenseaID == nil {
+			break
+		}
+
+		return e.complexity.Token.OpenseaID(childComplexity), true
+
+	case "Token.ownedByWallets":
+		if e.complexity.Token.OwnedByWallets == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnedByWallets(childComplexity), true
+
+	case "Token.owner":
+		if e.complexity.Token.Owner == nil {
+			break
+		}
+
+		return e.complexity.Token.Owner(childComplexity), true
+
+	case "Token.ownershipHistory":
+		if e.complexity.Token.OwnershipHistory == nil {
+			break
+		}
+
+		return e.complexity.Token.OwnershipHistory(childComplexity), true
+
+	case "Token.quantity":
+		if e.complexity.Token.Quantity == nil {
+			break
+		}
+
+		return e.complexity.Token.Quantity(childComplexity), true
+
+	case "Token.tokenId":
+		if e.complexity.Token.TokenID == nil {
+			break
+		}
+
+		return e.complexity.Token.TokenID(childComplexity), true
+
+	case "Token.tokenMetadata":
+		if e.complexity.Token.TokenMetadata == nil {
+			break
+		}
+
+		return e.complexity.Token.TokenMetadata(childComplexity), true
+
+	case "Token.tokenType":
+		if e.complexity.Token.TokenType == nil {
+			break
+		}
+
+		return e.complexity.Token.TokenType(childComplexity), true
+
+	case "Token.tokenUri":
+		if e.complexity.Token.TokenURI == nil {
+			break
+		}
+
+		return e.complexity.Token.TokenURI(childComplexity), true
+
+	case "TokenHolder.previewTokens":
+		if e.complexity.TokenHolder.PreviewTokens == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.PreviewTokens(childComplexity), true
 
 	case "TokenHolder.user":
 		if e.complexity.TokenHolder.User == nil {
@@ -1744,6 +1841,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokenHolder.User(childComplexity), true
+
+	case "TokenHolder.wallets":
+		if e.complexity.TokenHolder.Wallets == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.Wallets(childComplexity), true
 
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
@@ -1801,12 +1905,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateCollectionInfoPayload.Collection(childComplexity), true
 
-	case "UpdateCollectionNftsPayload.collection":
-		if e.complexity.UpdateCollectionNftsPayload.Collection == nil {
+	case "UpdateCollectionTokensPayload.collection":
+		if e.complexity.UpdateCollectionTokensPayload.Collection == nil {
 			break
 		}
 
-		return e.complexity.UpdateCollectionNftsPayload.Collection(childComplexity), true
+		return e.complexity.UpdateCollectionTokensPayload.Collection(childComplexity), true
 
 	case "UpdateGalleryCollectionsPayload.gallery":
 		if e.complexity.UpdateGalleryCollectionsPayload.Gallery == nil {
@@ -1815,12 +1919,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateGalleryCollectionsPayload.Gallery(childComplexity), true
 
-	case "UpdateNftInfoPayload.nft":
-		if e.complexity.UpdateNftInfoPayload.Nft == nil {
+	case "UpdateTokenInfoPayload.token":
+		if e.complexity.UpdateTokenInfoPayload.Token == nil {
 			break
 		}
 
-		return e.complexity.UpdateNftInfoPayload.Nft(childComplexity), true
+		return e.complexity.UpdateTokenInfoPayload.Token(childComplexity), true
 
 	case "UpdateUserInfoPayload.viewer":
 		if e.complexity.UpdateUserInfoPayload.Viewer == nil {
@@ -1906,12 +2010,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ViewerGallery.Gallery(childComplexity), true
 
-	case "Wallet.address":
-		if e.complexity.Wallet.Address == nil {
+	case "Wallet.chain":
+		if e.complexity.Wallet.Chain == nil {
 			break
 		}
 
-		return e.complexity.Wallet.Address(childComplexity), true
+		return e.complexity.Wallet.Chain(childComplexity), true
+
+	case "Wallet.chainAddress":
+		if e.complexity.Wallet.ChainAddress == nil {
+			break
+		}
+
+		return e.complexity.Wallet.ChainAddress(childComplexity), true
+
+	case "Wallet.dbid":
+		if e.complexity.Wallet.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Wallet.Dbid(childComplexity), true
 
 	case "Wallet.id":
 		if e.complexity.Wallet.ID == nil {
@@ -1920,12 +2038,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Wallet.ID(childComplexity), true
 
-	case "Wallet.nfts":
-		if e.complexity.Wallet.Nfts == nil {
+	case "Wallet.tokens":
+		if e.complexity.Wallet.Tokens == nil {
 			break
 		}
 
-		return e.complexity.Wallet.Nfts(childComplexity), true
+		return e.complexity.Wallet.Tokens(childComplexity), true
+
+	case "Wallet.walletType":
+		if e.complexity.Wallet.WalletType == nil {
+			break
+		}
+
+		return e.complexity.Wallet.WalletType(childComplexity), true
 
 	}
 	return 0, false
@@ -2022,7 +2147,7 @@ directive @restrictEnvironment(allowed:[String!]!) on INPUT_FIELD_DEFINITION | I
 # state the fields that will be used to generate the ID. If a named field exists on the object and is
 # a string-based type, that field will be used as part of the ID automatically. Otherwise, a manual
 # getter method will need to be implemented to retrieve that component of the GqlID.
-directive @goGqlId(fields:[String!]!) on OBJECT
+directive @goGqlId(fields: [String!]!) on OBJECT
 
 # Injects a "Helper<TypeName>Data" struct embed into a generated type. Useful for adding backend-only
 # helper data necessary to resolve queries, while keeping that data out of the schema and invisible
@@ -2046,21 +2171,41 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
-    wallets: [Wallet]
+
+    # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
+    # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
+    # that appears in more than one of the user's wallets.
+    tokens: [Token] @goField(forceResolver: true)
+
+    wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
 }
 
-type Wallet implements Node @goGqlId(fields: ["address"]) {
+type Wallet implements Node {
     id: ID!
+    dbid: DBID!
+    chainAddress: ChainAddress
+    chain: Chain
+    walletType: WalletType
+    tokens: [Token] @goField(forceResolver: true)
+}
+
+type ChainAddress {
     address: Address
-    # TODO: Do we paginate these currently?
-    nfts: [Nft] @goField(forceResolver: true)
+    chain: Chain
+}
+
+input ChainAddressInput {
+    address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
+
+union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
@@ -2075,16 +2220,11 @@ union MediaSubtype =
 
 type PreviewURLSet {
     raw: String
+    thumbnail: String
     small: String
     medium: String
     large: String
-}
-
-type ImageURLSet {
-    raw: String
-    small: String
-    medium: String
-    large: String
+    srcSet: String
 }
 
 type VideoURLSet {
@@ -2114,7 +2254,7 @@ type ImageMedia implements Media {
     mediaURL: String
     mediaType: String
 
-    contentRenderURLs: ImageURLSet
+    contentRenderURL: String
 }
 
 type VideoMedia implements Media {
@@ -2193,8 +2333,12 @@ enum Chain {
     Polygon
     Optimism
 }
+enum WalletType {
+    EOA
+    GnosisSafe
+}
 
-type Nft implements Node {
+type Token implements Node {
     id: ID!
     dbid: DBID!
     creationTime: Time
@@ -2208,16 +2352,16 @@ type Nft implements Node {
     tokenUri: String
     tokenId: String
     quantity: String # source is a hex string
-    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    owner: GalleryUser @goField(forceResolver: true)
+    ownedByWallets: [Wallet] @goField(forceResolver: true)
     ownershipHistory: [OwnerAtBlock]
     tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-    contractAddress: Address
+    contract: Contract @goField(forceResolver: true)
     externalUrl: String
     blockNumber: String # source is uint64
-
     # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
     # struct and may ultimately end up elsewhere
-    creatorAddress: Address
+    creatorAddress: ChainAddress
     openseaCollectionName: String
 
     # temporary field while we're dependent on opensea
@@ -2226,13 +2370,15 @@ type Nft implements Node {
 
 type OwnerAtBlock {
     # TODO: will need to store addresses to make this resolver work
-    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    owner: GalleryUserOrAddress @goField(forceResolver: true)
     blockNumber: String # source is uint64
 }
 
-type CollectionNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
+type CollectionToken implements Node
+@goEmbedHelper
+@goGqlId(fields: ["tokenId", "collectionId"]) {
     id: ID!
-    nft: Nft
+    token: Token
     collection: Collection
 }
 
@@ -2250,7 +2396,7 @@ type Collection implements Node {
     gallery: Gallery @goField(forceResolver: true)
     layout: CollectionLayout
     hidden: Boolean
-    nfts: [CollectionNft] @goField(forceResolver: true)
+    tokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
@@ -2261,9 +2407,9 @@ type Gallery implements Node {
 }
 
 type TokenHolder @goEmbedHelper {
-    addresses: [Address]
+    wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
-    previewNfts: [String]
+    previewTokens: [String]
 }
 
 type MembershipTier implements Node {
@@ -2275,18 +2421,31 @@ type MembershipTier implements Node {
     owners: [TokenHolder]
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress"]) {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
     id: ID!
 
     lastUpdated: Time
 
-    contractAddress: Address
-    creatorAddress: Address
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
     name: String
     description: String
     previewImage: String
 
     owners: [TokenHolder]
+}
+
+type Contract implements Node {
+    id: ID!
+    dbid: DBID!
+
+    lastUpdated: Time
+
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
+    name: String
 }
 
 # We have this extra type in case we need to stick authed data
@@ -2309,17 +2468,20 @@ type ErrCollectionNotFound implements Error {
     message: String!
 }
 
-union NftByIdOrError = Nft | ErrNftNotFound
+union TokenByIdOrError = Token | ErrTokenNotFound
 
-type ErrNftNotFound implements Error {
+type ErrTokenNotFound implements Error {
     message: String!
 }
 
 union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
-union CollectionNftByIdOrError = CollectionNft | ErrCollectionNotFound | ErrNftNotFound
+union CollectionTokenByIdOrError =
+    CollectionToken
+    | ErrCollectionNotFound
+    | ErrTokenNotFound
 
-union CommunityByAddressOrError = Community | ErrCommunityNotFound
+union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 type Query {
     node(id: ID!): Node
@@ -2328,10 +2490,10 @@ type Query {
     userById(id: DBID!): UserByIdOrError
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
-    nftById(id: DBID!): NftByIdOrError
-    collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-    communityByAddress(contractAddress: Address!, forceRefresh: Boolean): CommunityByAddressOrError
-    generalAllowlist: [Address!]
+    tokenById(id: DBID!): TokenByIdOrError
+    collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
+    generalAllowlist: [ChainAddress!]
 }
 
 input CollectionLayoutInput {
@@ -2343,7 +2505,7 @@ input CreateCollectionInput {
     galleryId: DBID!
     name: String!
     collectorsNote: String!
-    nfts: [DBID!]!
+    tokens: [DBID!]!
     layout: CollectionLayoutInput!
 }
 
@@ -2381,18 +2543,18 @@ type UpdateCollectionInfoPayload {
     collection: Collection
 }
 
-input UpdateCollectionNftsInput {
+input UpdateCollectionTokensInput {
     collectionId: DBID!
-    nfts: [DBID!]!
+    tokens: [DBID!]!
     layout: CollectionLayoutInput!
 }
 
-union UpdateCollectionNftsPayloadOrError =
-    UpdateCollectionNftsPayload
+union UpdateCollectionTokensPayloadOrError =
+    UpdateCollectionTokensPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateCollectionNftsPayload {
+type UpdateCollectionTokensPayload {
     collection: Collection
 }
 
@@ -2424,40 +2586,41 @@ type UpdateGalleryCollectionsPayload {
     gallery: Gallery
 }
 
-input UpdateNftInfoInput {
-    nftId: DBID!
+input UpdateTokenInfoInput {
+    tokenId: DBID!
     collectorsNote: String!
 
-    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Optional (for now). Lets the backend know what collection the token was being edited in.
     # Currently used to generate feedbot URLs.
     collectionId: DBID
 }
 
-union UpdateNftInfoPayloadOrError =
-    UpdateNftInfoPayload
+union UpdateTokenInfoPayloadOrError =
+    UpdateTokenInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateNftInfoPayload {
-    nft: Nft
+type UpdateTokenInfoPayload {
+    token: Token
 }
 
-union AddUserAddressPayloadOrError =
-    AddUserAddressPayload
+union AddUserWalletPayloadOrError =
+    AddUserWalletPayload
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrAddressOwnedByUser
 
-type AddUserAddressPayload {
+type AddUserWalletPayload {
     viewer: Viewer
 }
 
-union RemoveUserAddressesPayloadOrError =
-    RemoveUserAddressesPayload
+union RemoveUserWalletsPayloadOrError =
+    RemoveUserWalletsPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type RemoveUserAddressesPayload {
+type RemoveUserWalletsPayload {
     viewer: Viewer
 }
 
@@ -2476,12 +2639,12 @@ type UpdateUserInfoPayload {
     viewer: Viewer
 }
 
-union RefreshOpenSeaNftsPayloadOrError =
-    RefreshOpenSeaNftsPayload
+union RefreshTokensPayloadOrError =
+    RefreshTokensPayload
     | ErrNotAuthorized
     | ErrOpenSeaRefreshFailed
 
-type RefreshOpenSeaNftsPayload {
+type RefreshTokensPayload {
     viewer: Viewer
 }
 
@@ -2490,13 +2653,17 @@ type AuthNonce {
     userExists: Boolean
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredNFT
+union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
 
 type ErrAuthenticationFailed implements Error {
     message: String!
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrAddressOwnedByUser implements Error {
     message: String!
 }
 
@@ -2511,7 +2678,7 @@ type ErrCommunityNotFound implements Error {
 union AuthorizationError =
     ErrNoCookie
     | ErrInvalidToken
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
     message: String!
@@ -2532,7 +2699,7 @@ type ErrInvalidToken implements Error {
     message: String!
 }
 
-type ErrDoesNotOwnRequiredNFT implements Error {
+type ErrDoesNotOwnRequiredToken implements Error {
     message: String!
 }
 
@@ -2541,22 +2708,22 @@ type ErrOpenSeaRefreshFailed implements Error {
 }
 
 input AuthMechanism {
-    debugAuth: DebugAuth
-    ethereumEoa: EthereumEoaAuth
+    eoa: EoaAuth
     gnosisSafe: GnosisSafeAuth
+    debug: DebugAuth
+}
+
+input EoaAuth {
+    chainAddress: ChainAddressInput!
+    nonce: String!
+    signature: String! @scrub
 }
 
 # DebugAuth always succeeds and returns the supplied userId and addresses.
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
-}
-
-input EthereumEoaAuth {
-    address: Address!
-    nonce: String!
-    signature: String! @scrub
+    chainAddresses:[ChainAddressInput!]!
 }
 
 input GnosisSafeAuth {
@@ -2568,7 +2735,7 @@ union LoginPayloadOrError =
     LoginPayload
     | ErrUserNotFound
     | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
     # TODO: Remove userId in favor of viewer
@@ -2584,7 +2751,7 @@ union CreateUserPayloadOrError =
     CreateUserPayload
     | ErrUserAlreadyExists
     | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type CreateUserPayload {
     userId: DBID
@@ -2617,8 +2784,8 @@ type UnfollowUserPayload {
 
 type Mutation {
     # User Mutations
-    addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
-    removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayloadOrError @authRequired
+    addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
+    removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
     updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
     # Gallery Mutations
@@ -2628,16 +2795,15 @@ type Mutation {
     createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
     deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
     updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
-    updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+    updateCollectionTokens(input: UpdateCollectionTokensInput!): UpdateCollectionTokensPayloadOrError @authRequired
     updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
 
-    # Nft Mutations
-    updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
+    # Token Mutations
+    updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-    # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-    refreshOpenSeaNfts(addresses: String): RefreshOpenSeaNftsPayloadOrError @authRequired
+    refreshTokens: RefreshTokensPayloadOrError @authRequired
 
-    getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
+    getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
@@ -2669,18 +2835,18 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_addUserAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
+	args["chainAddress"] = arg0
 	var arg1 model.AuthMechanism
 	if tmp, ok := rawArgs["authMechanism"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authMechanism"))
@@ -2756,15 +2922,15 @@ func (ec *executionContext) field_Mutation_followUser_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
-	if tmp, ok := rawArgs["address"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["address"] = arg0
+	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -2783,33 +2949,18 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_refreshOpenSeaNfts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
-	if tmp, ok := rawArgs["addresses"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+	var arg0 []persist.DBID
+	if tmp, ok := rawArgs["walletIds"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletIds"))
+		arg0, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["addresses"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_removeUserAddresses_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 []persist.Address
-	if tmp, ok := rawArgs["addresses"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
-		arg0, err = ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["addresses"] = arg0
+	args["walletIds"] = arg0
 	return args, nil
 }
 
@@ -2858,13 +3009,13 @@ func (ec *executionContext) field_Mutation_updateCollectionInfo_args(ctx context
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_updateCollectionNfts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_updateCollectionTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.UpdateCollectionNftsInput
+	var arg0 model.UpdateCollectionTokensInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNUpdateCollectionNftsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsInput(ctx, tmp)
+		arg0, err = ec.unmarshalNUpdateCollectionTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionTokensInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -2888,13 +3039,13 @@ func (ec *executionContext) field_Mutation_updateGalleryCollections_args(ctx con
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_updateNftInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_updateTokenInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.UpdateNftInfoInput
+	var arg0 model.UpdateTokenInfoInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNUpdateNftInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoInput(ctx, tmp)
+		arg0, err = ec.unmarshalNUpdateTokenInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -2948,18 +3099,18 @@ func (ec *executionContext) field_Query_collectionById_args(ctx context.Context,
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_collectionNftById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_collectionTokenById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["nftId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nftId"))
+	if tmp, ok := rawArgs["tokenId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["nftId"] = arg0
+	args["tokenId"] = arg0
 	var arg1 persist.DBID
 	if tmp, ok := rawArgs["collectionId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collectionId"))
@@ -2975,15 +3126,15 @@ func (ec *executionContext) field_Query_collectionNftById_args(ctx context.Conte
 func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Address
-	if tmp, ok := rawArgs["contractAddress"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contractAddress"))
-		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["communityAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("communityAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["contractAddress"] = arg0
+	args["communityAddress"] = arg0
 	var arg1 *bool
 	if tmp, ok := rawArgs["forceRefresh"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceRefresh"))
@@ -3011,13 +3162,13 @@ func (ec *executionContext) field_Query_membershipTiers_args(ctx context.Context
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_nftById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
+	var arg0 model.GqlID
 	if tmp, ok := rawArgs["id"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		arg0, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -3026,13 +3177,13 @@ func (ec *executionContext) field_Query_nftById_args(ctx context.Context, rawArg
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.GqlID
+	var arg0 persist.DBID
 	if tmp, ok := rawArgs["id"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, tmp)
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -3109,7 +3260,7 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AddUserAddressPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _AddUserWalletPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AddUserWalletPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3117,7 +3268,7 @@ func (ec *executionContext) _AddUserAddressPayload_viewer(ctx context.Context, f
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "AddUserAddressPayload",
+		Object:     "AddUserWalletPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3331,6 +3482,70 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	res := resTmp.(*bool)
 	fc.Result = res
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainAddress_address(ctx context.Context, field graphql.CollectedField, obj *persist.ChainAddress) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainAddress",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Address(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(persist.Address)
+	fc.Result = res
+	return ec.marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainAddress_chain(ctx context.Context, field graphql.CollectedField, obj *persist.ChainAddress) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainAddress",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Collection_id(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
@@ -3595,7 +3810,7 @@ func (ec *executionContext) _Collection_hidden(ctx context.Context, field graphq
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Collection_nfts(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
+func (ec *executionContext) _Collection_tokens(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3613,7 +3828,7 @@ func (ec *executionContext) _Collection_nfts(ctx context.Context, field graphql.
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Collection().Nfts(rctx, obj)
+		return ec.resolvers.Collection().Tokens(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3622,9 +3837,9 @@ func (ec *executionContext) _Collection_nfts(ctx context.Context, field graphql.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.CollectionNft)
+	res := resTmp.([]*model.CollectionToken)
 	fc.Result = res
-	return ec.marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx, field.Selections, res)
+	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
@@ -3691,7 +3906,7 @@ func (ec *executionContext) _CollectionLayout_whitespace(ctx context.Context, fi
 	return ec.marshalOInt2ᚕᚖint(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionNft_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionToken_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectionToken) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3699,7 +3914,7 @@ func (ec *executionContext) _CollectionNft_id(ctx context.Context, field graphql
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionNft",
+		Object:     "CollectionToken",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -3726,7 +3941,7 @@ func (ec *executionContext) _CollectionNft_id(ctx context.Context, field graphql
 	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionNft_nft(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionToken_token(ctx context.Context, field graphql.CollectedField, obj *model.CollectionToken) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3734,7 +3949,7 @@ func (ec *executionContext) _CollectionNft_nft(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionNft",
+		Object:     "CollectionToken",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3744,7 +3959,7 @@ func (ec *executionContext) _CollectionNft_nft(ctx context.Context, field graphq
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Nft, nil
+		return obj.Token, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3753,12 +3968,12 @@ func (ec *executionContext) _CollectionNft_nft(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Nft)
+	res := resTmp.(*model.Token)
 	fc.Result = res
-	return ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionNft_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionNft) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionToken_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionToken) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -3766,7 +3981,7 @@ func (ec *executionContext) _CollectionNft_collection(ctx context.Context, field
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionNft",
+		Object:     "CollectionToken",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -3884,9 +4099,9 @@ func (ec *executionContext) _Community_contractAddress(ctx context.Context, fiel
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.Address)
+	res := resTmp.(*persist.ChainAddress)
 	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Community_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
@@ -3916,9 +4131,41 @@ func (ec *executionContext) _Community_creatorAddress(ctx context.Context, field
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.Address)
+	res := resTmp.(*persist.ChainAddress)
 	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Community_chain(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Community_name(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
@@ -4047,6 +4294,236 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	res := resTmp.([]*model.TokenHolder)
 	fc.Result = res
 	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_id(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastUpdated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_contractAddress(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContractAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatorAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_chain(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_name(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateCollectionPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.CreateCollectionPayload) (ret graphql.Marshaler) {
@@ -4209,6 +4686,41 @@ func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressOwnedByUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAddressOwnedByUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ErrAuthenticationFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAuthenticationFailed) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4314,7 +4826,7 @@ func (ec *executionContext) _ErrCommunityNotFound_message(ctx context.Context, f
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrDoesNotOwnRequiredNFT_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDoesNotOwnRequiredNft) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrDoesNotOwnRequiredToken_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDoesNotOwnRequiredToken) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4322,7 +4834,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT_message(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrDoesNotOwnRequiredNFT",
+		Object:     "ErrDoesNotOwnRequiredToken",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4489,41 +5001,6 @@ func (ec *executionContext) _ErrInvalidToken_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrNftNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNftNotFound) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ErrNftNotFound",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _ErrNoCookie_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNoCookie) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4638,6 +5115,41 @@ func (ec *executionContext) _ErrOpenSeaRefreshFailed_message(ctx context.Context
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrOpenSeaRefreshFailed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrTokenNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrTokenNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrTokenNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5066,6 +5578,38 @@ func (ec *executionContext) _GalleryUser_bio(ctx context.Context, field graphql.
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().Tokens(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5077,14 +5621,14 @@ func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field grap
 		Object:     "GalleryUser",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Wallets, nil
+		return ec.resolvers.GalleryUser().Wallets(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5578,7 +6122,7 @@ func (ec *executionContext) _ImageMedia_mediaType(ctx context.Context, field gra
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ImageMedia_contentRenderURLs(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImageMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5596,135 +6140,7 @@ func (ec *executionContext) _ImageMedia_contentRenderURLs(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ContentRenderURLs, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.ImageURLSet)
-	fc.Result = res
-	return ec.marshalOImageURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ImageURLSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ImageURLSet",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Raw, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ImageURLSet_small(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ImageURLSet",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Small, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ImageURLSet_medium(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ImageURLSet",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Medium, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ImageURLSet_large(ctx context.Context, field graphql.CollectedField, obj *model.ImageURLSet) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ImageURLSet",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Large, nil
+		return obj.ContentRenderURL, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6288,7 +6704,7 @@ func (ec *executionContext) _MembershipTier_owners(ctx context.Context, field gr
 	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_addUserWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6305,7 +6721,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_addUserAddress_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_addUserWallet_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6314,7 +6730,7 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserAddress(rctx, args["address"].(persist.Address), args["authMechanism"].(model.AuthMechanism))
+			return ec.resolvers.Mutation().AddUserWallet(rctx, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6330,10 +6746,10 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.AddUserAddressPayloadOrError); ok {
+		if data, ok := tmp.(model.AddUserWalletPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserAddressPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddUserWalletPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6342,12 +6758,12 @@ func (ec *executionContext) _Mutation_addUserAddress(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.AddUserAddressPayloadOrError)
+	res := resTmp.(model.AddUserWalletPayloadOrError)
 	fc.Result = res
-	return ec.marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOAddUserWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserWalletPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_removeUserWallets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6364,7 +6780,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_removeUserAddresses_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_removeUserWallets_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6373,7 +6789,7 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserAddresses(rctx, args["addresses"].([]persist.Address))
+			return ec.resolvers.Mutation().RemoveUserWallets(rctx, args["walletIds"].([]persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6389,10 +6805,10 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.RemoveUserAddressesPayloadOrError); ok {
+		if data, ok := tmp.(model.RemoveUserWalletsPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserAddressesPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveUserWalletsPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6401,9 +6817,9 @@ func (ec *executionContext) _Mutation_removeUserAddresses(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.RemoveUserAddressesPayloadOrError)
+	res := resTmp.(model.RemoveUserWalletsPayloadOrError)
 	fc.Result = res
-	return ec.marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalORemoveUserWalletsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserWalletsPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_updateUserInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6701,7 +7117,7 @@ func (ec *executionContext) _Mutation_updateCollectionInfo(ctx context.Context, 
 	return ec.marshalOUpdateCollectionInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInfoPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateCollectionTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6718,7 +7134,7 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_updateCollectionNfts_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateCollectionTokens_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6727,7 +7143,7 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateCollectionNfts(rctx, args["input"].(model.UpdateCollectionNftsInput))
+			return ec.resolvers.Mutation().UpdateCollectionTokens(rctx, args["input"].(model.UpdateCollectionTokensInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6743,10 +7159,10 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.UpdateCollectionNftsPayloadOrError); ok {
+		if data, ok := tmp.(model.UpdateCollectionTokensPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateCollectionNftsPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateCollectionTokensPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6755,9 +7171,9 @@ func (ec *executionContext) _Mutation_updateCollectionNfts(ctx context.Context, 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.UpdateCollectionNftsPayloadOrError)
+	res := resTmp.(model.UpdateCollectionTokensPayloadOrError)
 	fc.Result = res
-	return ec.marshalOUpdateCollectionNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOUpdateCollectionTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionTokensPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_updateCollectionHidden(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6819,7 +7235,7 @@ func (ec *executionContext) _Mutation_updateCollectionHidden(ctx context.Context
 	return ec.marshalOUpdateCollectionHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateTokenInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6836,7 +7252,7 @@ func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field g
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_updateNftInfo_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateTokenInfo_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -6845,7 +7261,7 @@ func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field g
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateNftInfo(rctx, args["input"].(model.UpdateNftInfoInput))
+			return ec.resolvers.Mutation().UpdateTokenInfo(rctx, args["input"].(model.UpdateTokenInfoInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6861,10 +7277,10 @@ func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field g
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.UpdateNftInfoPayloadOrError); ok {
+		if data, ok := tmp.(model.UpdateTokenInfoPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateNftInfoPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateTokenInfoPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6873,12 +7289,12 @@ func (ec *executionContext) _Mutation_updateNftInfo(ctx context.Context, field g
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.UpdateNftInfoPayloadOrError)
+	res := resTmp.(model.UpdateTokenInfoPayloadOrError)
 	fc.Result = res
-	return ec.marshalOUpdateNftInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_refreshTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6894,17 +7310,10 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_refreshOpenSeaNfts_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RefreshOpenSeaNfts(rctx, args["addresses"].(*string))
+			return ec.resolvers.Mutation().RefreshTokens(rctx)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -6920,10 +7329,10 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.RefreshOpenSeaNftsPayloadOrError); ok {
+		if data, ok := tmp.(model.RefreshTokensPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RefreshOpenSeaNftsPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RefreshTokensPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6932,9 +7341,9 @@ func (ec *executionContext) _Mutation_refreshOpenSeaNfts(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.RefreshOpenSeaNftsPayloadOrError)
+	res := resTmp.(model.RefreshTokensPayloadOrError)
 	fc.Result = res
-	return ec.marshalORefreshOpenSeaNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshOpenSeaNftsPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6962,7 +7371,7 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["address"].(persist.Address))
+		return ec.resolvers.Mutation().GetAuthNonce(rctx, args["chainAddress"].(persist.ChainAddress))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7204,716 +7613,6 @@ func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field gr
 	return ec.marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Nft_id(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CreationTime, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.LastUpdated, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_collectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CollectorsNote, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_media(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Media, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.MediaSubtype)
-	fc.Result = res
-	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_tokenType(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenType, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.TokenType)
-	fc.Result = res
-	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_chain(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Chain, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Chain)
-	fc.Result = res
-	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_name(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_description(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Description, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_tokenUri(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenURI, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_quantity(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Quantity, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_owner(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Nft().Owner(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(model.GalleryUserOrWallet)
-	fc.Result = res
-	return ec.marshalOGalleryUserOrWallet2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrWallet(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_ownershipHistory(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OwnershipHistory, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*model.OwnerAtBlock)
-	fc.Result = res
-	return ec.marshalOOwnerAtBlock2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOwnerAtBlock(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenMetadata, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_contractAddress(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ContractAddress, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Address)
-	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_externalUrl(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ExternalURL, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_blockNumber(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.BlockNumber, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CreatorAddress, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*persist.Address)
-	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_openseaCollectionName(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OpenseaCollectionName, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Nft_openseaId(ctx context.Context, field graphql.CollectedField, obj *model.Nft) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Nft",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OpenseaID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _OwnerAtBlock_owner(ctx context.Context, field graphql.CollectedField, obj *model.OwnerAtBlock) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -7941,9 +7640,9 @@ func (ec *executionContext) _OwnerAtBlock_owner(ctx context.Context, field graph
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.GalleryUserOrWallet)
+	res := resTmp.(model.GalleryUserOrAddress)
 	fc.Result = res
-	return ec.marshalOGalleryUserOrWallet2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrWallet(ctx, field.Selections, res)
+	return ec.marshalOGalleryUserOrAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OwnerAtBlock_blockNumber(ctx context.Context, field graphql.CollectedField, obj *model.OwnerAtBlock) (ret graphql.Marshaler) {
@@ -7997,6 +7696,38 @@ func (ec *executionContext) _PreviewURLSet_raw(ctx context.Context, field graphq
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Raw, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PreviewURLSet_thumbnail(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Thumbnail, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8093,6 +7824,38 @@ func (ec *executionContext) _PreviewURLSet_large(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Large, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PreviewURLSet_srcSet(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SrcSet, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8353,7 +8116,7 @@ func (ec *executionContext) _Query_collectionById(ctx context.Context, field gra
 	return ec.marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_nftById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_tokenById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8370,7 +8133,7 @@ func (ec *executionContext) _Query_nftById(ctx context.Context, field graphql.Co
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_nftById_args(ctx, rawArgs)
+	args, err := ec.field_Query_tokenById_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -8378,7 +8141,7 @@ func (ec *executionContext) _Query_nftById(ctx context.Context, field graphql.Co
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().NftByID(rctx, args["id"].(persist.DBID))
+		return ec.resolvers.Query().TokenByID(rctx, args["id"].(persist.DBID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8387,12 +8150,12 @@ func (ec *executionContext) _Query_nftById(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.NftByIDOrError)
+	res := resTmp.(model.TokenByIDOrError)
 	fc.Result = res
-	return ec.marshalONftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNftByIDOrError(ctx, field.Selections, res)
+	return ec.marshalOTokenByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenByIDOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_collectionNftById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_collectionTokenById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8409,7 +8172,7 @@ func (ec *executionContext) _Query_collectionNftById(ctx context.Context, field 
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_collectionNftById_args(ctx, rawArgs)
+	args, err := ec.field_Query_collectionTokenById_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -8417,7 +8180,7 @@ func (ec *executionContext) _Query_collectionNftById(ctx context.Context, field 
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CollectionNftByID(rctx, args["nftId"].(persist.DBID), args["collectionId"].(persist.DBID))
+		return ec.resolvers.Query().CollectionTokenByID(rctx, args["tokenId"].(persist.DBID), args["collectionId"].(persist.DBID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8426,9 +8189,9 @@ func (ec *executionContext) _Query_collectionNftById(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.CollectionNftByIDOrError)
+	res := resTmp.(model.CollectionTokenByIDOrError)
 	fc.Result = res
-	return ec.marshalOCollectionNftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNftByIDOrError(ctx, field.Selections, res)
+	return ec.marshalOCollectionTokenByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenByIDOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -8456,7 +8219,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, args["contractAddress"].(persist.Address), args["forceRefresh"].(*bool))
+		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8497,9 +8260,9 @@ func (ec *executionContext) _Query_generalAllowlist(ctx context.Context, field g
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]persist.Address)
+	res := resTmp.([]*persist.ChainAddress)
 	fc.Result = res
-	return ec.marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, field.Selections, res)
+	return ec.marshalOChainAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -8573,7 +8336,7 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 	return ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RefreshOpenSeaNftsPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _RefreshTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RefreshTokensPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8581,7 +8344,7 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayload_viewer(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "RefreshOpenSeaNftsPayload",
+		Object:     "RefreshTokensPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -8605,7 +8368,7 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayload_viewer(ctx context.Contex
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _RemoveUserAddressesPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveUserAddressesPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _RemoveUserWalletsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveUserWalletsPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8613,7 +8376,7 @@ func (ec *executionContext) _RemoveUserAddressesPayload_viewer(ctx context.Conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "RemoveUserAddressesPayload",
+		Object:     "RemoveUserWalletsPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -8765,7 +8528,749 @@ func (ec *executionContext) _TextMedia_contentRenderURL(ctx context.Context, fie
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokenHolder_addresses(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+func (ec *executionContext) _Token_id(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastUpdated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_collectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CollectorsNote, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_media(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Media, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.MediaSubtype)
+	fc.Result = res
+	return ec.marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_tokenType(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenType)
+	fc.Result = res
+	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_chain(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_name(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_description(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_tokenUri(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenURI, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_quantity(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Quantity, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_owner(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Owner(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_ownedByWallets(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().OwnedByWallets(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Wallet)
+	fc.Result = res
+	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_ownershipHistory(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OwnershipHistory, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.OwnerAtBlock)
+	fc.Result = res
+	return ec.marshalOOwnerAtBlock2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐOwnerAtBlock(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_tokenMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenMetadata, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_contract(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Token().Contract(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_externalUrl(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExternalURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_blockNumber(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BlockNumber, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatorAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.ChainAddress)
+	fc.Result = res
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_openseaCollectionName(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OpenseaCollectionName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_openseaId(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OpenseaID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolder_wallets(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8776,14 +9281,14 @@ func (ec *executionContext) _TokenHolder_addresses(ctx context.Context, field gr
 		Object:     "TokenHolder",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Addresses, nil
+		return ec.resolvers.TokenHolder().Wallets(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8792,9 +9297,9 @@ func (ec *executionContext) _TokenHolder_addresses(ctx context.Context, field gr
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*persist.Address)
+	res := resTmp.([]*model.Wallet)
 	fc.Result = res
-	return ec.marshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TokenHolder_user(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
@@ -8829,7 +9334,7 @@ func (ec *executionContext) _TokenHolder_user(ctx context.Context, field graphql
 	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokenHolder_previewNfts(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8847,7 +9352,7 @@ func (ec *executionContext) _TokenHolder_previewNfts(ctx context.Context, field 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PreviewNfts, nil
+		return obj.PreviewTokens, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9117,7 +9622,7 @@ func (ec *executionContext) _UpdateCollectionInfoPayload_collection(ctx context.
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UpdateCollectionNftsPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionNftsPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _UpdateCollectionTokensPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionTokensPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9125,7 +9630,7 @@ func (ec *executionContext) _UpdateCollectionNftsPayload_collection(ctx context.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UpdateCollectionNftsPayload",
+		Object:     "UpdateCollectionTokensPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -9181,7 +9686,7 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UpdateNftInfoPayload_nft(ctx context.Context, field graphql.CollectedField, obj *model.UpdateNftInfoPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _UpdateTokenInfoPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.UpdateTokenInfoPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9189,7 +9694,7 @@ func (ec *executionContext) _UpdateNftInfoPayload_nft(ctx context.Context, field
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UpdateNftInfoPayload",
+		Object:     "UpdateTokenInfoPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -9199,7 +9704,7 @@ func (ec *executionContext) _UpdateNftInfoPayload_nft(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Nft, nil
+		return obj.Token, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9208,9 +9713,9 @@ func (ec *executionContext) _UpdateNftInfoPayload_nft(ctx context.Context, field
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Nft)
+	res := resTmp.(*model.Token)
 	fc.Result = res
-	return ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateUserInfoPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateUserInfoPayload) (ret graphql.Marshaler) {
@@ -9632,7 +10137,7 @@ func (ec *executionContext) _Wallet_id(ctx context.Context, field graphql.Collec
 	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Wallet_address(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
+func (ec *executionContext) _Wallet_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9650,7 +10155,42 @@ func (ec *executionContext) _Wallet_address(ctx context.Context, field graphql.C
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Address, nil
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Wallet_chainAddress(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Wallet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ChainAddress, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9659,12 +10199,76 @@ func (ec *executionContext) _Wallet_address(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.Address)
+	res := resTmp.(*persist.ChainAddress)
 	fc.Result = res
-	return ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, field.Selections, res)
+	return ec.marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Wallet_nfts(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
+func (ec *executionContext) _Wallet_chain(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Wallet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Wallet_walletType(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Wallet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.WalletType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.WalletType)
+	fc.Result = res
+	return ec.marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Wallet_tokens(ctx context.Context, field graphql.CollectedField, obj *model.Wallet) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9682,7 +10286,7 @@ func (ec *executionContext) _Wallet_nfts(ctx context.Context, field graphql.Coll
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Wallet().Nfts(rctx, obj)
+		return ec.resolvers.Wallet().Tokens(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9691,9 +10295,9 @@ func (ec *executionContext) _Wallet_nfts(ctx context.Context, field graphql.Coll
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Nft)
+	res := resTmp.([]*model.Token)
 	fc.Result = res
-	return ec.marshalONft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, field.Selections, res)
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -10891,10 +11495,26 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
-		case "debugAuth":
+		case "eoa":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugAuth"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("eoa"))
+			it.Eoa, err = ec.unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "gnosisSafe":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gnosisSafe"))
+			it.GnosisSafe, err = ec.unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGnosisSafeAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "debug":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debug"))
 			directive0 := func(ctx context.Context) (interface{}, error) {
 				return ec.unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugAuth(ctx, v)
 			}
@@ -10914,27 +11534,48 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
 			if data, ok := tmp.(*model.DebugAuth); ok {
-				it.DebugAuth = data
+				it.Debug = data
 			} else if tmp == nil {
-				it.DebugAuth = nil
+				it.Debug = nil
 			} else {
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugAuth`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
-		case "ethereumEoa":
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context, obj interface{}) (persist.ChainAddress, error) {
+	var it persist.ChainAddress
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "address":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ethereumEoa"))
-			it.EthereumEoa, err = ec.unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+			data, err := ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "gnosisSafe":
+			if err = ec.resolvers.ChainAddressInput().Address(ctx, &it, data); err != nil {
+				return it, err
+			}
+		case "chain":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gnosisSafe"))
-			it.GnosisSafe, err = ec.unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGnosisSafeAuth(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+			data, err := ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
 			if err != nil {
+				return it, err
+			}
+			if err = ec.resolvers.ChainAddressInput().Chain(ctx, &it, data); err != nil {
 				return it, err
 			}
 		}
@@ -11007,11 +11648,11 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			if err != nil {
 				return it, err
 			}
-		case "nfts":
+		case "tokens":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nfts"))
-			it.Nfts, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
+			it.Tokens, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11068,12 +11709,12 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/service/persist.DBID`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
-		case "addresses":
+		case "chainAddresses":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addresses"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
 			directive0 := func(ctx context.Context) (interface{}, error) {
-				return ec.unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx, v)
+				return ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
 				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
@@ -11090,12 +11731,12 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 			if err != nil {
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
-			if data, ok := tmp.([]persist.Address); ok {
-				it.Addresses = data
+			if data, ok := tmp.([]*persist.ChainAddress); ok {
+				it.ChainAddresses = data
 			} else if tmp == nil {
-				it.Addresses = nil
+				it.ChainAddresses = nil
 			} else {
-				err := fmt.Errorf(`unexpected type %T from directive, should be []github.com/mikeydub/go-gallery/service/persist.Address`, tmp)
+				err := fmt.Errorf(`unexpected type %T from directive, should be []*github.com/mikeydub/go-gallery/service/persist.ChainAddress`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
 		}
@@ -11104,8 +11745,8 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, obj interface{}) (model.EthereumEoaAuth, error) {
-	var it model.EthereumEoaAuth
+func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj interface{}) (model.EoaAuth, error) {
+	var it model.EoaAuth
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -11113,11 +11754,11 @@ func (ec *executionContext) unmarshalInputEthereumEoaAuth(ctx context.Context, o
 
 	for k, v := range asMap {
 		switch k {
-		case "address":
+		case "chainAddress":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-			it.Address, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			it.ChainAddress, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11244,8 +11885,8 @@ func (ec *executionContext) unmarshalInputUpdateCollectionInfoInput(ctx context.
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputUpdateCollectionNftsInput(ctx context.Context, obj interface{}) (model.UpdateCollectionNftsInput, error) {
-	var it model.UpdateCollectionNftsInput
+func (ec *executionContext) unmarshalInputUpdateCollectionTokensInput(ctx context.Context, obj interface{}) (model.UpdateCollectionTokensInput, error) {
+	var it model.UpdateCollectionTokensInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -11261,11 +11902,11 @@ func (ec *executionContext) unmarshalInputUpdateCollectionNftsInput(ctx context.
 			if err != nil {
 				return it, err
 			}
-		case "nfts":
+		case "tokens":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nfts"))
-			it.Nfts, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
+			it.Tokens, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11314,8 +11955,8 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputUpdateNftInfoInput(ctx context.Context, obj interface{}) (model.UpdateNftInfoInput, error) {
-	var it model.UpdateNftInfoInput
+func (ec *executionContext) unmarshalInputUpdateTokenInfoInput(ctx context.Context, obj interface{}) (model.UpdateTokenInfoInput, error) {
+	var it model.UpdateTokenInfoInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -11323,11 +11964,11 @@ func (ec *executionContext) unmarshalInputUpdateNftInfoInput(ctx context.Context
 
 	for k, v := range asMap {
 		switch k {
-		case "nftId":
+		case "tokenId":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nftId"))
-			it.NftID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
+			it.TokenID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11388,17 +12029,17 @@ func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Contex
 
 // region    ************************** interface.gotpl ***************************
 
-func (ec *executionContext) _AddUserAddressPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddUserAddressPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.AddUserAddressPayload:
-		return ec._AddUserAddressPayload(ctx, sel, &obj)
-	case *model.AddUserAddressPayload:
+	case model.AddUserWalletPayload:
+		return ec._AddUserWalletPayload(ctx, sel, &obj)
+	case *model.AddUserWalletPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._AddUserAddressPayload(ctx, sel, obj)
+		return ec._AddUserWalletPayload(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -11420,6 +12061,13 @@ func (ec *executionContext) _AddUserAddressPayloadOrError(ctx context.Context, s
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11443,13 +12091,13 @@ func (ec *executionContext) _AuthorizationError(ctx context.Context, sel ast.Sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidToken(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
+	case model.ErrDoesNotOwnRequiredToken:
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
+	case *model.ErrDoesNotOwnRequiredToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11478,17 +12126,17 @@ func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.
 	}
 }
 
-func (ec *executionContext) _CollectionNftByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.CollectionNftByIDOrError) graphql.Marshaler {
+func (ec *executionContext) _CollectionTokenByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.CollectionTokenByIDOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.CollectionNft:
-		return ec._CollectionNft(ctx, sel, &obj)
-	case *model.CollectionNft:
+	case model.CollectionToken:
+		return ec._CollectionToken(ctx, sel, &obj)
+	case *model.CollectionToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CollectionNft(ctx, sel, obj)
+		return ec._CollectionToken(ctx, sel, obj)
 	case model.ErrCollectionNotFound:
 		return ec._ErrCollectionNotFound(ctx, sel, &obj)
 	case *model.ErrCollectionNotFound:
@@ -11496,13 +12144,13 @@ func (ec *executionContext) _CollectionNftByIdOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
-	case model.ErrNftNotFound:
-		return ec._ErrNftNotFound(ctx, sel, &obj)
-	case *model.ErrNftNotFound:
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrNftNotFound(ctx, sel, obj)
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11526,6 +12174,13 @@ func (ec *executionContext) _CommunityByAddressOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrCommunityNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11586,13 +12241,13 @@ func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
+	case model.ErrDoesNotOwnRequiredToken:
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
+	case *model.ErrDoesNotOwnRequiredToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11646,13 +12301,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
-	case model.ErrNftNotFound:
-		return ec._ErrNftNotFound(ctx, sel, &obj)
-	case *model.ErrNftNotFound:
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrNftNotFound(ctx, sel, obj)
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -11667,6 +12322,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrUserAlreadyExists(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
 	case model.ErrUserNotFound:
 		return ec._ErrUserNotFound(ctx, sel, &obj)
 	case *model.ErrUserNotFound:
@@ -11709,13 +12371,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrInvalidToken(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
+	case model.ErrDoesNotOwnRequiredToken:
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
+	case *model.ErrDoesNotOwnRequiredToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	case model.ErrOpenSeaRefreshFailed:
 		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
 	case *model.ErrOpenSeaRefreshFailed:
@@ -11765,6 +12427,27 @@ func (ec *executionContext) _FollowUserPayloadOrError(ctx context.Context, sel a
 	}
 }
 
+func (ec *executionContext) _GalleryUserOrAddress(ctx context.Context, sel ast.SelectionSet, obj model.GalleryUserOrAddress) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case *persist.ChainAddress:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ChainAddress(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _GalleryUserOrWallet(ctx context.Context, sel ast.SelectionSet, obj model.GalleryUserOrWallet) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -11799,13 +12482,13 @@ func (ec *executionContext) _GetAuthNoncePayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._AuthNonce(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
+	case model.ErrDoesNotOwnRequiredToken:
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
+	case *model.ErrDoesNotOwnRequiredToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11836,13 +12519,13 @@ func (ec *executionContext) _LoginPayloadOrError(ctx context.Context, sel ast.Se
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
-	case model.ErrDoesNotOwnRequiredNft:
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, &obj)
-	case *model.ErrDoesNotOwnRequiredNft:
+	case model.ErrDoesNotOwnRequiredToken:
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
+	case *model.ErrDoesNotOwnRequiredToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrDoesNotOwnRequiredNFT(ctx, sel, obj)
+		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -11992,29 +12675,6 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 	}
 }
 
-func (ec *executionContext) _NftByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.NftByIDOrError) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.Nft:
-		return ec._Nft(ctx, sel, &obj)
-	case *model.Nft:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._Nft(ctx, sel, obj)
-	case model.ErrNftNotFound:
-		return ec._ErrNftNotFound(ctx, sel, &obj)
-	case *model.ErrNftNotFound:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNftNotFound(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
 func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj model.Node) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -12033,20 +12693,20 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Wallet(ctx, sel, obj)
-	case model.Nft:
-		return ec._Nft(ctx, sel, &obj)
-	case *model.Nft:
+	case model.Token:
+		return ec._Token(ctx, sel, &obj)
+	case *model.Token:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._Nft(ctx, sel, obj)
-	case model.CollectionNft:
-		return ec._CollectionNft(ctx, sel, &obj)
-	case *model.CollectionNft:
+		return ec._Token(ctx, sel, obj)
+	case model.CollectionToken:
+		return ec._CollectionToken(ctx, sel, &obj)
+	case *model.CollectionToken:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CollectionNft(ctx, sel, obj)
+		return ec._CollectionToken(ctx, sel, obj)
 	case model.Collection:
 		return ec._Collection(ctx, sel, &obj)
 	case *model.Collection:
@@ -12075,22 +12735,29 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Community(ctx, sel, obj)
+	case model.Contract:
+		return ec._Contract(ctx, sel, &obj)
+	case *model.Contract:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Contract(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
 }
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshOpenSeaNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _RefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshTokensPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.RefreshOpenSeaNftsPayload:
-		return ec._RefreshOpenSeaNftsPayload(ctx, sel, &obj)
-	case *model.RefreshOpenSeaNftsPayload:
+	case model.RefreshTokensPayload:
+		return ec._RefreshTokensPayload(ctx, sel, &obj)
+	case *model.RefreshTokensPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._RefreshOpenSeaNftsPayload(ctx, sel, obj)
+		return ec._RefreshTokensPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -12110,17 +12777,17 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayloadOrError(ctx context.Contex
 	}
 }
 
-func (ec *executionContext) _RemoveUserAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveUserAddressesPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _RemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.RemoveUserAddressesPayload:
-		return ec._RemoveUserAddressesPayload(ctx, sel, &obj)
-	case *model.RemoveUserAddressesPayload:
+	case model.RemoveUserWalletsPayload:
+		return ec._RemoveUserWalletsPayload(ctx, sel, &obj)
+	case *model.RemoveUserWalletsPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._RemoveUserAddressesPayload(ctx, sel, obj)
+		return ec._RemoveUserWalletsPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -12135,6 +12802,29 @@ func (ec *executionContext) _RemoveUserAddressesPayloadOrError(ctx context.Conte
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _TokenByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.TokenByIDOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.Token:
+		return ec._Token(ctx, sel, &obj)
+	case *model.Token:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Token(ctx, sel, obj)
+	case model.ErrTokenNotFound:
+		return ec._ErrTokenNotFound(ctx, sel, &obj)
+	case *model.ErrTokenNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrTokenNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -12237,17 +12927,17 @@ func (ec *executionContext) _UpdateCollectionInfoPayloadOrError(ctx context.Cont
 	}
 }
 
-func (ec *executionContext) _UpdateCollectionNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateCollectionNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _UpdateCollectionTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateCollectionTokensPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.UpdateCollectionNftsPayload:
-		return ec._UpdateCollectionNftsPayload(ctx, sel, &obj)
-	case *model.UpdateCollectionNftsPayload:
+	case model.UpdateCollectionTokensPayload:
+		return ec._UpdateCollectionTokensPayload(ctx, sel, &obj)
+	case *model.UpdateCollectionTokensPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UpdateCollectionNftsPayload(ctx, sel, obj)
+		return ec._UpdateCollectionTokensPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -12297,17 +12987,17 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayloadOrError(ctx context.
 	}
 }
 
-func (ec *executionContext) _UpdateNftInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateNftInfoPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _UpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.UpdateNftInfoPayload:
-		return ec._UpdateNftInfoPayload(ctx, sel, &obj)
-	case *model.UpdateNftInfoPayload:
+	case model.UpdateTokenInfoPayload:
+		return ec._UpdateTokenInfoPayload(ctx, sel, &obj)
+	case *model.UpdateTokenInfoPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UpdateNftInfoPayload(ctx, sel, obj)
+		return ec._UpdateTokenInfoPayload(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -12451,19 +13141,19 @@ func (ec *executionContext) _ViewerOrError(ctx context.Context, sel ast.Selectio
 
 // region    **************************** object.gotpl ****************************
 
-var addUserAddressPayloadImplementors = []string{"AddUserAddressPayload", "AddUserAddressPayloadOrError"}
+var addUserWalletPayloadImplementors = []string{"AddUserWalletPayload", "AddUserWalletPayloadOrError"}
 
-func (ec *executionContext) _AddUserAddressPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AddUserAddressPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, addUserAddressPayloadImplementors)
+func (ec *executionContext) _AddUserWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AddUserWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, addUserWalletPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AddUserAddressPayload")
+			out.Values[i] = graphql.MarshalString("AddUserWalletPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._AddUserAddressPayload_viewer(ctx, field, obj)
+				return ec._AddUserWalletPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12563,6 +13253,41 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var chainAddressImplementors = []string{"ChainAddress", "GalleryUserOrAddress"}
+
+func (ec *executionContext) _ChainAddress(ctx context.Context, sel ast.SelectionSet, obj *persist.ChainAddress) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainAddressImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainAddress")
+		case "address":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainAddress_address(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainAddress_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var collectionImplementors = []string{"Collection", "Node", "CollectionByIdOrError"}
 
 func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSet, obj *model.Collection) graphql.Marshaler {
@@ -12645,7 +13370,7 @@ func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "nfts":
+		case "tokens":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -12654,7 +13379,7 @@ func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSe
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Collection_nfts(ctx, field, obj)
+				res = ec._Collection_tokens(ctx, field, obj)
 				return res
 			}
 
@@ -12708,19 +13433,19 @@ func (ec *executionContext) _CollectionLayout(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var collectionNftImplementors = []string{"CollectionNft", "Node", "CollectionNftByIdOrError"}
+var collectionTokenImplementors = []string{"CollectionToken", "Node", "CollectionTokenByIdOrError"}
 
-func (ec *executionContext) _CollectionNft(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionNft) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, collectionNftImplementors)
+func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionToken) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionTokenImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("CollectionNft")
+			out.Values[i] = graphql.MarshalString("CollectionToken")
 		case "id":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionNft_id(ctx, field, obj)
+				return ec._CollectionToken_id(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12728,16 +13453,16 @@ func (ec *executionContext) _CollectionNft(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "nft":
+		case "token":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionNft_nft(ctx, field, obj)
+				return ec._CollectionToken_token(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "collection":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionNft_collection(ctx, field, obj)
+				return ec._CollectionToken_collection(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12794,6 +13519,13 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Community_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "name":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Community_name(ctx, field, obj)
@@ -12818,6 +13550,82 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 		case "owners":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Community_owners(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var contractImplementors = []string{"Contract", "Node"}
+
+func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet, obj *model.Contract) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, contractImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Contract")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "lastUpdated":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_lastUpdated(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "contractAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_contractAddress(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "creatorAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_creatorAddress(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_name(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -12931,7 +13739,38 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserAddressPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error"}
+
+func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressOwnedByUserImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAddressOwnedByUser")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAddressOwnedByUser_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -12962,7 +13801,7 @@ func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel as
 	return out
 }
 
-var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionNftByIdOrError", "DeleteCollectionPayloadOrError"}
+var errCollectionNotFoundImplementors = []string{"ErrCollectionNotFound", "Error", "CollectionByIdOrError", "CollectionTokenByIdOrError", "DeleteCollectionPayloadOrError"}
 
 func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCollectionNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errCollectionNotFoundImplementors)
@@ -13024,19 +13863,19 @@ func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errDoesNotOwnRequiredNFTImplementors = []string{"ErrDoesNotOwnRequiredNFT", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
+var errDoesNotOwnRequiredTokenImplementors = []string{"ErrDoesNotOwnRequiredToken", "GetAuthNoncePayloadOrError", "AuthorizationError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError"}
 
-func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredNft) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errDoesNotOwnRequiredNFTImplementors)
+func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDoesNotOwnRequiredToken) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errDoesNotOwnRequiredTokenImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrDoesNotOwnRequiredNFT")
+			out.Values[i] = graphql.MarshalString("ErrDoesNotOwnRequiredToken")
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrDoesNotOwnRequiredNFT_message(ctx, field, obj)
+				return ec._ErrDoesNotOwnRequiredToken_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -13055,7 +13894,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredNFT(ctx context.Context, sel a
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -13137,37 +13976,6 @@ func (ec *executionContext) _ErrInvalidToken(ctx context.Context, sel ast.Select
 	return out
 }
 
-var errNftNotFoundImplementors = []string{"ErrNftNotFound", "NftByIdOrError", "Error", "CollectionNftByIdOrError"}
-
-func (ec *executionContext) _ErrNftNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNftNotFound) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errNftNotFoundImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrNftNotFound")
-		case "message":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrNftNotFound_message(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var errNoCookieImplementors = []string{"ErrNoCookie", "AuthorizationError", "Error"}
 
 func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNoCookie) graphql.Marshaler {
@@ -13199,7 +14007,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionNftsPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateNftInfoPayloadOrError", "AddUserAddressPayloadOrError", "RemoveUserAddressesPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -13240,7 +14048,7 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshOpenSeaNftsPayloadOrError", "Error"}
+var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrOpenSeaRefreshFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errOpenSeaRefreshFailedImplementors)
@@ -13253,6 +14061,37 @@ func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel as
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrOpenSeaRefreshFailed_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errTokenNotFoundImplementors = []string{"ErrTokenNotFound", "TokenByIdOrError", "Error", "CollectionTokenByIdOrError"}
+
+func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrTokenNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errTokenNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrTokenNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrTokenNotFound_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -13453,7 +14292,7 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "UserByUsernameOrError", "UserByIdOrError"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -13497,13 +14336,40 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "wallets":
+		case "tokens":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryUser_wallets(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_tokens(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
+		case "wallets":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_wallets(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "galleries":
 			field := field
 
@@ -13702,58 +14568,9 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "contentRenderURLs":
+		case "contentRenderURL":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageMedia_contentRenderURLs(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var imageURLSetImplementors = []string{"ImageURLSet"}
-
-func (ec *executionContext) _ImageURLSet(ctx context.Context, sel ast.SelectionSet, obj *model.ImageURLSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, imageURLSetImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ImageURLSet")
-		case "raw":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageURLSet_raw(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "small":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageURLSet_small(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "medium":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageURLSet_medium(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "large":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ImageURLSet_large(ctx, field, obj)
+				return ec._ImageMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14018,16 +14835,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "addUserAddress":
+		case "addUserWallet":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_addUserAddress(ctx, field)
+				return ec._Mutation_addUserWallet(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "removeUserAddresses":
+		case "removeUserWallets":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_removeUserAddresses(ctx, field)
+				return ec._Mutation_removeUserWallets(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -14067,9 +14884,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "updateCollectionNfts":
+		case "updateCollectionTokens":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateCollectionNfts(ctx, field)
+				return ec._Mutation_updateCollectionTokens(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -14081,16 +14898,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "updateNftInfo":
+		case "updateTokenInfo":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateNftInfo(ctx, field)
+				return ec._Mutation_updateTokenInfo(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "refreshOpenSeaNfts":
+		case "refreshTokens":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_refreshOpenSeaNfts(ctx, field)
+				return ec._Mutation_refreshTokens(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -14136,197 +14953,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var nftImplementors = []string{"Nft", "Node", "NftByIdOrError"}
-
-func (ec *executionContext) _Nft(ctx context.Context, sel ast.SelectionSet, obj *model.Nft) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, nftImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Nft")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "creationTime":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_creationTime(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "lastUpdated":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_lastUpdated(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "collectorsNote":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_collectorsNote(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "media":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_media(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "tokenType":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_tokenType(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "chain":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_chain(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "name":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_name(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "description":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_description(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "tokenUri":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_tokenUri(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "tokenId":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_tokenId(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "quantity":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_quantity(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "owner":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Nft_owner(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "ownershipHistory":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_ownershipHistory(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "tokenMetadata":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_tokenMetadata(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "contractAddress":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_contractAddress(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "externalUrl":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_externalUrl(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "blockNumber":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_blockNumber(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "creatorAddress":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_creatorAddress(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "openseaCollectionName":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_openseaCollectionName(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "openseaId":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Nft_openseaId(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -14401,6 +15027,13 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "thumbnail":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PreviewURLSet_thumbnail(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "small":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._PreviewURLSet_small(ctx, field, obj)
@@ -14418,6 +15051,13 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 		case "large":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._PreviewURLSet_large(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "srcSet":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PreviewURLSet_srcSet(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14572,7 +15212,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "nftById":
+		case "tokenById":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -14581,7 +15221,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_nftById(ctx, field)
+				res = ec._Query_tokenById(ctx, field)
 				return res
 			}
 
@@ -14592,7 +15232,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "collectionNftById":
+		case "collectionTokenById":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -14601,7 +15241,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_collectionNftById(ctx, field)
+				res = ec._Query_collectionTokenById(ctx, field)
 				return res
 			}
 
@@ -14677,19 +15317,19 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	return out
 }
 
-var refreshOpenSeaNftsPayloadImplementors = []string{"RefreshOpenSeaNftsPayload", "RefreshOpenSeaNftsPayloadOrError"}
+var refreshTokensPayloadImplementors = []string{"RefreshTokensPayload", "RefreshTokensPayloadOrError"}
 
-func (ec *executionContext) _RefreshOpenSeaNftsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshOpenSeaNftsPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, refreshOpenSeaNftsPayloadImplementors)
+func (ec *executionContext) _RefreshTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshTokensPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, refreshTokensPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("RefreshOpenSeaNftsPayload")
+			out.Values[i] = graphql.MarshalString("RefreshTokensPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._RefreshOpenSeaNftsPayload_viewer(ctx, field, obj)
+				return ec._RefreshTokensPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14705,19 +15345,19 @@ func (ec *executionContext) _RefreshOpenSeaNftsPayload(ctx context.Context, sel 
 	return out
 }
 
-var removeUserAddressesPayloadImplementors = []string{"RemoveUserAddressesPayload", "RemoveUserAddressesPayloadOrError"}
+var removeUserWalletsPayloadImplementors = []string{"RemoveUserWalletsPayload", "RemoveUserWalletsPayloadOrError"}
 
-func (ec *executionContext) _RemoveUserAddressesPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveUserAddressesPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, removeUserAddressesPayloadImplementors)
+func (ec *executionContext) _RemoveUserWalletsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveUserWalletsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, removeUserWalletsPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("RemoveUserAddressesPayload")
+			out.Values[i] = graphql.MarshalString("RemoveUserWalletsPayload")
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._RemoveUserAddressesPayload_viewer(ctx, field, obj)
+				return ec._RemoveUserWalletsPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14782,6 +15422,224 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var tokenImplementors = []string{"Token", "Node", "TokenByIdOrError"}
+
+func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, obj *model.Token) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Token")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "creationTime":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_creationTime(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "lastUpdated":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_lastUpdated(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "collectorsNote":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_collectorsNote(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "media":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_media(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_tokenType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "description":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_description(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenUri":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_tokenUri(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_tokenId(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "quantity":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_quantity(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "owner":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_owner(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "ownedByWallets":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_ownedByWallets(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "ownershipHistory":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_ownershipHistory(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenMetadata":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_tokenMetadata(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "contract":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Token_contract(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "externalUrl":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_externalUrl(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "blockNumber":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_blockNumber(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "creatorAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_creatorAddress(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "openseaCollectionName":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_openseaCollectionName(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "openseaId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_openseaId(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var tokenHolderImplementors = []string{"TokenHolder"}
 
 func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionSet, obj *model.TokenHolder) graphql.Marshaler {
@@ -14792,13 +15650,23 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("TokenHolder")
-		case "addresses":
+		case "wallets":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokenHolder_addresses(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenHolder_wallets(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "user":
 			field := field
 
@@ -14816,9 +15684,9 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
-		case "previewNfts":
+		case "previewTokens":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokenHolder_previewNfts(ctx, field, obj)
+				return ec._TokenHolder_previewTokens(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -14984,19 +15852,19 @@ func (ec *executionContext) _UpdateCollectionInfoPayload(ctx context.Context, se
 	return out
 }
 
-var updateCollectionNftsPayloadImplementors = []string{"UpdateCollectionNftsPayload", "UpdateCollectionNftsPayloadOrError"}
+var updateCollectionTokensPayloadImplementors = []string{"UpdateCollectionTokensPayload", "UpdateCollectionTokensPayloadOrError"}
 
-func (ec *executionContext) _UpdateCollectionNftsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateCollectionNftsPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, updateCollectionNftsPayloadImplementors)
+func (ec *executionContext) _UpdateCollectionTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateCollectionTokensPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateCollectionTokensPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("UpdateCollectionNftsPayload")
+			out.Values[i] = graphql.MarshalString("UpdateCollectionTokensPayload")
 		case "collection":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UpdateCollectionNftsPayload_collection(ctx, field, obj)
+				return ec._UpdateCollectionTokensPayload_collection(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15040,19 +15908,19 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload(ctx context.Context
 	return out
 }
 
-var updateNftInfoPayloadImplementors = []string{"UpdateNftInfoPayload", "UpdateNftInfoPayloadOrError"}
+var updateTokenInfoPayloadImplementors = []string{"UpdateTokenInfoPayload", "UpdateTokenInfoPayloadOrError"}
 
-func (ec *executionContext) _UpdateNftInfoPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateNftInfoPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, updateNftInfoPayloadImplementors)
+func (ec *executionContext) _UpdateTokenInfoPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateTokenInfoPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateTokenInfoPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("UpdateNftInfoPayload")
-		case "nft":
+			out.Values[i] = graphql.MarshalString("UpdateTokenInfoPayload")
+		case "token":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UpdateNftInfoPayload_nft(ctx, field, obj)
+				return ec._UpdateTokenInfoPayload_token(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -15297,14 +16165,38 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "address":
+		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Wallet_address(ctx, field, obj)
+				return ec._Wallet_dbid(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "nfts":
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "chainAddress":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Wallet_chainAddress(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Wallet_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "walletType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Wallet_walletType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokens":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -15313,7 +16205,7 @@ func (ec *executionContext) _Wallet(ctx context.Context, sel ast.SelectionSet, o
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Wallet_nfts(ctx, field, obj)
+				res = ec._Wallet_tokens(ctx, field, obj)
 				return res
 			}
 
@@ -15771,38 +16663,6 @@ func (ec *executionContext) marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
-func (ec *executionContext) unmarshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, v interface{}) ([]persist.Address, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]persist.Address, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Address) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -15831,6 +16691,53 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (persist.Chain, error) {
+	var res persist.Chain
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v persist.Chain) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, sel ast.SelectionSet, v *persist.ChainAddress) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._ChainAddress(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (persist.ChainAddress, error) {
+	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, v interface{}) ([]*persist.ChainAddress, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.ChainAddress, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (*persist.ChainAddress, error) {
+	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
@@ -16011,8 +16918,8 @@ func (ec *executionContext) unmarshalNUpdateCollectionInfoInput2githubᚗcomᚋm
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNUpdateCollectionNftsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsInput(ctx context.Context, v interface{}) (model.UpdateCollectionNftsInput, error) {
-	res, err := ec.unmarshalInputUpdateCollectionNftsInput(ctx, v)
+func (ec *executionContext) unmarshalNUpdateCollectionTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionTokensInput(ctx context.Context, v interface{}) (model.UpdateCollectionTokensInput, error) {
+	res, err := ec.unmarshalInputUpdateCollectionTokensInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -16021,8 +16928,8 @@ func (ec *executionContext) unmarshalNUpdateGalleryCollectionsInput2githubᚗcom
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNUpdateNftInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoInput(ctx context.Context, v interface{}) (model.UpdateNftInfoInput, error) {
-	res, err := ec.unmarshalInputUpdateNftInfoInput(ctx, v)
+func (ec *executionContext) unmarshalNUpdateTokenInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoInput(ctx context.Context, v interface{}) (model.UpdateTokenInfoInput, error) {
+	res, err := ec.unmarshalInputUpdateTokenInfoInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -16284,97 +17191,21 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) marshalOAddUserAddressPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserAddressPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddUserAddressPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOAddUserWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._AddUserAddressPayloadOrError(ctx, sel, v)
+	return ec._AddUserWalletPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, v interface{}) ([]persist.Address, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]persist.Address, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOAddress2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddressᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Address) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) unmarshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) ([]*persist.Address, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]*persist.Address, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v []*persist.Address) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, sel, v[i])
-	}
-
-	return ret
-}
-
-func (ec *executionContext) unmarshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (*persist.Address, error) {
-	if v == nil {
-		return nil, nil
-	}
+func (ec *executionContext) unmarshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (persist.Address, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.Address(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v *persist.Address) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	res := graphql.MarshalString(string(*v))
+func (ec *executionContext) marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v persist.Address) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
 	return res
 }
 
@@ -16404,20 +17235,84 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx context.Context, v interface{}) (*model.Chain, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var res = new(model.Chain)
+func (ec *executionContext) unmarshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (persist.Chain, error) {
+	var res persist.Chain
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChain(ctx context.Context, sel ast.SelectionSet, v *model.Chain) graphql.Marshaler {
+func (ec *executionContext) marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v persist.Chain) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (*persist.Chain, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.Chain)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v *persist.Chain) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOChainAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, sel ast.SelectionSet, v []*persist.ChainAddress) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, sel ast.SelectionSet, v *persist.ChainAddress) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ChainAddress(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {
@@ -16482,7 +17377,7 @@ func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydub�
 	return ec._CollectionLayout(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionNft) graphql.Marshaler {
+func (ec *executionContext) marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionToken) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -16509,7 +17404,7 @@ func (ec *executionContext) marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydub�
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalOCollectionNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx, sel, v[i])
+			ret[i] = ec.marshalOCollectionToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -16523,18 +17418,18 @@ func (ec *executionContext) marshalOCollectionNft2ᚕᚖgithubᚗcomᚋmikeydub�
 	return ret
 }
 
-func (ec *executionContext) marshalOCollectionNft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNft(ctx context.Context, sel ast.SelectionSet, v *model.CollectionNft) graphql.Marshaler {
+func (ec *executionContext) marshalOCollectionToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx context.Context, sel ast.SelectionSet, v *model.CollectionToken) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._CollectionNft(ctx, sel, v)
+	return ec._CollectionToken(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCollectionNftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionNftByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.CollectionNftByIDOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOCollectionTokenByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.CollectionTokenByIDOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._CollectionNftByIdOrError(ctx, sel, v)
+	return ec._CollectionTokenByIdOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByAddressOrError) graphql.Marshaler {
@@ -16542,6 +17437,13 @@ func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._CommunityByAddressOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx context.Context, sel ast.SelectionSet, v *model.Contract) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Contract(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCreateCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateCollectionPayloadOrError) graphql.Marshaler {
@@ -16590,11 +17492,11 @@ func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcom�
 	return ec._DeleteCollectionPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOEthereumEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEthereumEoaAuth(ctx context.Context, v interface{}) (*model.EthereumEoaAuth, error) {
+func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx context.Context, v interface{}) (*model.EoaAuth, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := ec.unmarshalInputEthereumEoaAuth(ctx, v)
+	res, err := ec.unmarshalInputEoaAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -16701,11 +17603,11 @@ func (ec *executionContext) marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgo�
 	return ec._GalleryUser(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOGalleryUserOrWallet2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrWallet(ctx context.Context, sel ast.SelectionSet, v model.GalleryUserOrWallet) graphql.Marshaler {
+func (ec *executionContext) marshalOGalleryUserOrAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserOrAddress(ctx context.Context, sel ast.SelectionSet, v model.GalleryUserOrAddress) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._GalleryUserOrWallet(ctx, sel, v)
+	return ec._GalleryUserOrAddress(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGetAuthNoncePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGetAuthNoncePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GetAuthNoncePayloadOrError) graphql.Marshaler {
@@ -16721,13 +17623,6 @@ func (ec *executionContext) unmarshalOGnosisSafeAuth2ᚖgithubᚗcomᚋmikeydub�
 	}
 	res, err := ec.unmarshalInputGnosisSafeAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOImageURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐImageURLSet(ctx context.Context, sel ast.SelectionSet, v *model.ImageURLSet) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ImageURLSet(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚕᚖint(ctx context.Context, v interface{}) ([]*int, error) {
@@ -16847,61 +17742,6 @@ func (ec *executionContext) marshalOMembershipTier2ᚖgithubᚗcomᚋmikeydubᚋ
 	return ec._MembershipTier(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalONft2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx context.Context, sel ast.SelectionSet, v []*model.Nft) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalONft2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNft(ctx context.Context, sel ast.SelectionSet, v *model.Nft) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Nft(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalONftByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNftByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.NftByIDOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._NftByIdOrError(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalONode2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -16964,18 +17804,18 @@ func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._PreviewURLSet(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalORefreshOpenSeaNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshOpenSeaNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshOpenSeaNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshTokensPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._RefreshOpenSeaNftsPayloadOrError(ctx, sel, v)
+	return ec._RefreshTokensPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalORemoveUserAddressesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserAddressesPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserAddressesPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalORemoveUserWalletsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._RemoveUserAddressesPayloadOrError(ctx, sel, v)
+	return ec._RemoveUserWalletsPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕᚖstring(ctx context.Context, v interface{}) ([]*string, error) {
@@ -17040,6 +17880,61 @@ func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel
 	}
 	res := graphql.MarshalTime(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx context.Context, sel ast.SelectionSet, v []*model.Token) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx context.Context, sel ast.SelectionSet, v *model.Token) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Token(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTokenByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.TokenByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenByIdOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx context.Context, sel ast.SelectionSet, v []*model.TokenHolder) graphql.Marshaler {
@@ -17127,11 +18022,11 @@ func (ec *executionContext) marshalOUpdateCollectionInfoPayloadOrError2githubᚗ
 	return ec._UpdateCollectionInfoPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOUpdateCollectionNftsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionNftsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionNftsPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOUpdateCollectionTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionTokensPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._UpdateCollectionNftsPayloadOrError(ctx, sel, v)
+	return ec._UpdateCollectionTokensPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateGalleryCollectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryCollectionsPayloadOrError) graphql.Marshaler {
@@ -17141,11 +18036,11 @@ func (ec *executionContext) marshalOUpdateGalleryCollectionsPayloadOrError2githu
 	return ec._UpdateGalleryCollectionsPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOUpdateNftInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateNftInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateNftInfoPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._UpdateNftInfoPayloadOrError(ctx, sel, v)
+	return ec._UpdateTokenInfoPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateUserInfoPayloadOrError) graphql.Marshaler {
@@ -17284,6 +18179,22 @@ func (ec *executionContext) marshalOWallet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgal
 		return graphql.Null
 	}
 	return ec._Wallet(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx context.Context, v interface{}) (*persist.WalletType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.WalletType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOWalletType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx context.Context, sel ast.SelectionSet, v *persist.WalletType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

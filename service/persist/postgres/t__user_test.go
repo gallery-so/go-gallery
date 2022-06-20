@@ -17,8 +17,11 @@ func TestUserCreate_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Wallets: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 
@@ -36,8 +39,11 @@ func TestUserGetByID_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Wallets: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 
@@ -47,7 +53,7 @@ func TestUserGetByID_Success(t *testing.T) {
 	user2, err := userRepo.GetByID(context.Background(), id)
 	a.NoError(err)
 	a.Equal(id, user2.ID)
-	a.Equal(user.Addresses, user2.Addresses)
+	a.Equal(user.Wallets, user2.Wallets)
 	a.Equal(user.Username, user2.Username)
 }
 
@@ -61,17 +67,20 @@ func TestUserGetByAddress_Success(t *testing.T) {
 		Version:            1,
 		Username:           "username",
 		UsernameIdempotent: "username-idempotent",
-		Addresses: []persist.Address{
-			"0x8914496dc01efcc49a2fa340331fb90969b6f1d2",
+		Wallets: []persist.Wallet{
+			persist.Wallet{
+				Address: persist.NullString("0x8914496dc01efcc49a2fa340331fb90969b6f1d2"),
+				Chain:   persist.ChainETH,
+			},
 		},
 	}
 
 	id, err := userRepo.Create(context.Background(), user)
 	a.NoError(err)
 
-	user2, err := userRepo.GetByAddress(context.Background(), user.Addresses[0])
+	user2, err := userRepo.GetByAddress(context.Background(), user.Wallets[0])
 	a.NoError(err)
 	a.Equal(id, user2.ID)
-	a.Equal(user.Addresses, user2.Addresses)
+	a.Equal(user.Wallets, user2.Wallets)
 	a.Equal(user.Username, user2.Username)
 }

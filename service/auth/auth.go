@@ -5,33 +5,39 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"log"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/eth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
-// WalletType is the type of wallet used to sign a message
-type WalletType int
+// TODO: ExternalWallet? Something to denote "wallet, but not part of our ecosystem"
+// Or do we call it something like "AccountInfo" or "AddressInfo" or something?
+// Would also be nice to have a method on AuthResult that searches by ChainAddress
+// for a result. Maybe instead of a map from address+chain+type to existing wallets
+// (where they exist), we just have a wallet pointer field on our results that points
+// to a user's wallet if one exists? OwnedWallet? WalletInput? RawWallet?
 
-const (
-	// WalletTypeEOA represents an externally owned account (regular wallet address)
-	WalletTypeEOA WalletType = iota
-	// WalletTypeGnosis represents a smart contract gnosis safe
-	WalletTypeGnosis
-)
+// AuthenticatedAddress contains address information that has been successfully verified
+// by an authenticator.
+type AuthenticatedAddress struct {
+	// A ChainAddress that has had its ownership successfully verified by an authenticator
+	ChainAddress persist.ChainAddress
+
+	// The WalletType of the verified ChainAddress
+	WalletType persist.WalletType
+
+	// The ID of an existing Wallet entity in our database, or an empty string if the wallet is not in the database
+	WalletID persist.DBID
+}
 
 const (
 	// Context keys for auth data
@@ -53,7 +59,8 @@ const NewNoncePrepend = "Gallery uses this cryptographic signature in place of a
 // JWTCookieKey is the key used to store the JWT token in the cookie
 const JWTCookieKey = "GLRY_JWT"
 
-var errAddressSignatureMismatch = errors.New("address does not match signature")
+// ErrAddressSignatureMismatch is returned when the address signature does not match the address cryptographically
+var ErrAddressSignatureMismatch = errors.New("address does not match signature")
 
 // ErrNonceMismatch is returned when the nonce does not match the expected nonce
 var ErrNonceMismatch = errors.New("incorrect nonce input")
@@ -70,14 +77,13 @@ var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
 
-var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
-
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
-	Signature  string          `json:"signature" binding:"signature"`
-	Address    persist.Address `json:"address"   binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
-	WalletType WalletType      `json:"wallet_type"`
-	Nonce      string          `json:"nonce"`
+	Signature  string             `json:"signature" binding:"signature"`
+	Address    persist.Address    `json:"address"   binding:"required"`
+	Chain      persist.Chain      `json:"chain"`
+	WalletType persist.WalletType `json:"wallet_type"`
+	Nonce      string             `json:"nonce"`
 }
 
 // LoginOutput is the output of the login pipeline
@@ -88,7 +94,8 @@ type LoginOutput struct {
 
 // GetPreflightInput is the input to the preflight pipeline
 type GetPreflightInput struct {
-	Address persist.Address `json:"address" form:"address" binding:"required,eth_addr"` // len=42"` // standard ETH "0x"-prefixed address
+	Address persist.Address `json:"address" form:"address" binding:"required"`
+	Chain   persist.Chain
 }
 
 // GetPreflightOutput is the output of the preflight pipeline
@@ -108,7 +115,17 @@ type Authenticator interface {
 
 type AuthResult struct {
 	UserID    persist.DBID
-	Addresses []persist.Address
+	Addresses []AuthenticatedAddress
+}
+
+func (a *AuthResult) GetAuthenticatedAddress(chainAddress persist.ChainAddress) (AuthenticatedAddress, bool) {
+	for _, address := range a.Addresses {
+		if address.ChainAddress == chainAddress {
+			return address, true
+		}
+	}
+
+	return AuthenticatedAddress{}, false
 }
 
 type ErrAuthenticationFailed struct {
@@ -136,7 +153,7 @@ func (e ErrSignatureVerificationFailed) Error() string {
 }
 
 type ErrDoesNotOwnRequiredNFT struct {
-	addresses []persist.Address
+	addresses []persist.ChainAddress
 }
 
 func (e ErrDoesNotOwnRequiredNFT) Error() string {
@@ -144,11 +161,11 @@ func (e ErrDoesNotOwnRequiredNFT) Error() string {
 }
 
 type ErrNonceNotFound struct {
-	Address persist.Address
+	ChainAddress persist.ChainAddress
 }
 
 func (e ErrNonceNotFound) Error() string {
-	return fmt.Sprintf("nonce not found for address: %s", e.Address)
+	return fmt.Sprintf("nonce not found for address: %s", e.ChainAddress)
 }
 
 // GenerateNonce generates a random nonce to be signed by a wallet
@@ -159,35 +176,35 @@ func GenerateNonce() string {
 	return nonceStr
 }
 
-type EthereumNonceAuthenticator struct {
-	Address    persist.Address
-	Nonce      string
-	Signature  string
-	WalletType WalletType
-	UserRepo   persist.UserRepository
-	NonceRepo  persist.NonceRepository
-	EthClient  *ethclient.Client
+type NonceAuthenticator struct {
+	ChainAddress       persist.ChainAddress
+	Nonce              string
+	Signature          string
+	WalletType         persist.WalletType
+	UserRepo           persist.UserRepository
+	NonceRepo          persist.NonceRepository
+	WalletRepo         persist.WalletRepository
+	EthClient          *ethclient.Client
+	MultichainProvider *multichain.Provider
 }
 
-func (e EthereumNonceAuthenticator) GetDescription() string {
-	return fmt.Sprintf("EthereumNonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.Address, e.Nonce, e.Signature, e.WalletType)
+func (e NonceAuthenticator) GetDescription() string {
+	return fmt.Sprintf("NonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.ChainAddress, e.Nonce, e.Signature, e.WalletType)
 }
 
-func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
-
-	address := e.Address
-	nonce, userID, _ := GetUserWithNonce(pCtx, address, e.UserRepo, e.NonceRepo)
+func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
+	nonce, userID, _ := GetUserWithNonce(pCtx, e.ChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
-		return nil, ErrNonceNotFound{Address: address}
+		return nil, ErrNonceNotFound{ChainAddress: e.ChainAddress}
 	}
 
-	if e.WalletType != WalletTypeEOA {
+	if e.WalletType != persist.WalletTypeEOA {
 		if NewNoncePrepend+nonce != e.Nonce && NoncePrepend+nonce != e.Nonce {
 			return nil, ErrNonceMismatch
 		}
 	}
 
-	sigValid, err := VerifySignatureAllMethods(e.Signature, nonce, address, e.WalletType, e.EthClient)
+	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.ChainAddress, e.WalletType)
 	if err != nil {
 		return nil, ErrSignatureVerificationFailed{err}
 	}
@@ -196,65 +213,23 @@ func (e EthereumNonceAuthenticator) Authenticate(pCtx context.Context) (*AuthRes
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, address, userID, e.NonceRepo)
+	err = NonceRotate(pCtx, e.ChainAddress, userID, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
-	// All authenticated addresses for the user, including the one they just authenticated with
-	var addresses []persist.Address
-
-	if userID != "" {
-		user, err := e.UserRepo.GetByID(pCtx, userID)
-		if err != nil {
-			return nil, err
-		}
-
-		addresses = make([]persist.Address, len(user.Addresses), len(user.Addresses)+1)
-		copy(addresses, user.Addresses)
-
-		if !containsAddress(addresses, address) {
-			addresses = addresses[:cap(addresses)]
-			addresses[cap(addresses)-1] = address
-		}
-	} else {
-		addresses = []persist.Address{address}
+	walletID := persist.DBID("")
+	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, e.ChainAddress)
+	if err != nil {
+		walletID = wallet.ID
 	}
 
 	authResult := AuthResult{
-		Addresses: addresses,
+		Addresses: []AuthenticatedAddress{{ChainAddress: e.ChainAddress, WalletType: e.WalletType, WalletID: walletID}},
 		UserID:    userID,
 	}
 
 	return &authResult, nil
-}
-
-// LoginREST will run the login pipeline and memorize the result
-func LoginREST(pCtx context.Context, pInput LoginInput,
-	pReq *http.Request, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	loginRepo persist.LoginAttemptRepository, ec *ethclient.Client) (LoginOutput, error) {
-
-	authenticator := EthereumNonceAuthenticator{
-		Address:    pInput.Address,
-		Nonce:      pInput.Nonce,
-		Signature:  pInput.Signature,
-		WalletType: pInput.WalletType,
-		UserRepo:   userRepo,
-		NonceRepo:  nonceRepo,
-		EthClient:  ec,
-	}
-
-	userID, err := Login(pCtx, authenticator)
-	if err != nil {
-		return LoginOutput{}, err
-	}
-
-	output := LoginOutput{
-		SignatureValid: true,
-		UserID:         userID,
-	}
-
-	return output, nil
 }
 
 // Login logs in a user with a given authentication scheme
@@ -287,172 +262,53 @@ func Logout(pCtx context.Context) {
 	SetJWTCookie(gc, "")
 }
 
-// VerifySignatureAllMethods will verify a signature using all available methods (eth_sign and personal_sign)
-func VerifySignatureAllMethods(pSignatureStr string,
-	pNonce string,
-	pAddressStr persist.Address, pWalletType WalletType, ec *ethclient.Client) (bool, error) {
-
-	nonce := NewNoncePrepend + pNonce
-	// personal_sign
-	validBool, err := VerifySignature(pSignatureStr,
-		nonce,
-		pAddressStr, pWalletType,
-		true, ec)
-
-	if !validBool || err != nil {
-		// eth_sign
-		validBool, err = VerifySignature(pSignatureStr,
-			nonce,
-			pAddressStr, pWalletType,
-			false, ec)
-		if err != nil || !validBool {
-			nonce = NoncePrepend + pNonce
-			validBool, err = VerifySignature(pSignatureStr,
-				nonce,
-				pAddressStr, pWalletType,
-				true, ec)
-			if err != nil || !validBool {
-				validBool, err = VerifySignature(pSignatureStr,
-					nonce,
-					pAddressStr, pWalletType,
-					false, ec)
-			}
-		}
-	}
-
-	if err != nil {
-		return false, err
-	}
-
-	return validBool, nil
-}
-
-// VerifySignature will verify a signature using either personal_sign or eth_sign
-func VerifySignature(pSignatureStr string,
-	pData string,
-	pAddress persist.Address, pWalletType WalletType,
-	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
-
-	// eth_sign:
-	// - https://goethereumbook.org/signature-verify/
-	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
-	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
-
-	var data string
-	if pUseDataHeaderBool {
-		data = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(pData), pData)
-	} else {
-		data = pData
-	}
-
-	switch pWalletType {
-	case WalletTypeEOA:
-		dataHash := crypto.Keccak256Hash([]byte(data))
-
-		sig, err := hexutil.Decode(pSignatureStr)
-		if err != nil {
-			return false, err
-		}
-		// Ledger-produced signatures have v = 0 or 1
-		if sig[64] == 0 || sig[64] == 1 {
-			sig[64] += 27
-		}
-		v := sig[64]
-		if v != 27 && v != 28 {
-			return false, errors.New("invalid signature (V is not 27 or 28)")
-		}
-		sig[64] -= 27
-
-		sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), sig)
-		if err != nil {
-			return false, err
-		}
-
-		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
-		log.Println("pAddress:", pAddress)
-		if !strings.EqualFold(pubkeyAddressHexStr, pAddress.String()) {
-			return false, errAddressSignatureMismatch
-		}
-
-		publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
-
-		signatureNoRecoverID := sig[:len(sig)-1]
-
-		return crypto.VerifySignature(publicKeyBytes, dataHash.Bytes(), signatureNoRecoverID), nil
-	case WalletTypeGnosis:
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		sigValidator, err := contracts.NewISignatureValidator(pAddress.Address(), ec)
-		if err != nil {
-			return false, err
-		}
-
-		hashedData := crypto.Keccak256([]byte(data))
-		var input [32]byte
-		copy(input[:], hashedData)
-
-		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("IsValidSignature")
-			return false, nil
-		}
-
-		return result == eip1271MagicValue, nil
-	default:
-		return false, errors.New("wallet type not supported")
-	}
-
-}
-
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pAddress persist.Address, pPreAuthed bool, userRepo persist.UserRepository,
-	nonceRepo persist.NonceRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
+func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPreAuthed bool, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
+	walletRepository persist.WalletRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress)
+	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
 		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
 	userExists = user.ID != ""
 
-	if !userExists {
-
-		if !pPreAuthed {
-			if hasAccess, err := HasGalleryAccess(pCtx, []persist.Address{pAddress}, earlyAccessRepo, ethClient); !hasAccess {
-				return "", false, err
-			}
-		}
-
-		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
-		if err != nil || dbNonce.ID == "" {
-			dbNonce = persist.UserNonce{
-				Address: pAddress,
-				Value:   persist.NullString(GenerateNonce()),
-			}
-
-			err = nonceRepo.Create(pCtx, dbNonce)
-			if err != nil {
-				return "", false, err
-			}
-		}
-
-		nonce = NewNoncePrepend + dbNonce.Value.String()
-
-	} else {
-		dbNonce, err := nonceRepo.Get(pCtx, pAddress)
+	if userExists {
+		dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)
 		if err != nil {
 			return "", false, err
 		}
+
 		nonce = NewNoncePrepend + dbNonce.Value.String()
+		return nonce, userExists, nil
 	}
 
+	if !pPreAuthed {
+		if hasAccess, err := HasGalleryAccess(pCtx, []persist.ChainAddress{pChainAddress}, earlyAccessRepo, ethClient); !hasAccess {
+			return "", false, err
+		}
+	}
+
+	dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)
+	if err != nil || dbNonce.ID == "" {
+		err = nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
+		if err != nil {
+			return "", false, err
+		}
+
+		dbNonce, err = nonceRepo.Get(pCtx, pChainAddress)
+		if err != nil {
+			return "", false, err
+		}
+	}
+
+	nonce = NewNoncePrepend + dbNonce.Value.String()
 	return nonce, userExists, nil
 }
 
-func HasGalleryAccess(ctx context.Context, addresses []persist.Address, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (bool, error) {
-	nftAccess, nftErr := HasAllowlistNFT(ctx, addresses, ethClient)
-	if nftErr == nil && nftAccess {
+func HasGalleryAccess(ctx context.Context, addresses []persist.ChainAddress, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (bool, error) {
+	tokenAccess, tokenErr := HasAllowlistToken(ctx, addresses, ethClient)
+	if tokenErr == nil && tokenAccess {
 		return true, nil
 	}
 
@@ -461,14 +317,17 @@ func HasGalleryAccess(ctx context.Context, addresses []persist.Address, earlyAcc
 		return true, nil
 	}
 
-	return false, nftErr
+	return false, tokenErr
 }
 
-func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient *ethclient.Client) (bool, error) {
+func HasAllowlistToken(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
 	allowlist := GetAllowlistContracts()
 	for _, addr := range addresses {
+		if addr.Chain() != persist.ChainETH {
+			continue
+		}
 		for k, v := range allowlist {
-			found, err := eth.HasNFTs(ctx, k, v, addr, ethClient)
+			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.Address()), ethClient)
 			if found {
 				return true, nil
 			} else if err != nil {
@@ -480,32 +339,9 @@ func HasAllowlistNFT(ctx context.Context, addresses []persist.Address, ethClient
 	return false, ErrDoesNotOwnRequiredNFT{addresses: addresses}
 }
 
-// GetAuthNonceREST will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonceREST(pCtx context.Context, pInput GetPreflightInput, pPreAuthed bool,
-	userRepo persist.UserRepository, nonceRepo persist.NonceRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (*GetPreflightOutput, error) {
-
-	nonce, userExists, err := GetAuthNonce(pCtx, pInput.Address, pPreAuthed, userRepo, nonceRepo, earlyAccessRepo, ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	output := GetPreflightOutput{
-		Nonce:      nonce,
-		UserExists: userExists,
-	}
-
-	return &output, nil
-}
-
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pAddress persist.Address, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
-
-	newNonce := persist.UserNonce{
-		Value:   persist.NullString(GenerateNonce()),
-		Address: pAddress,
-	}
-
-	err := nonceRepo.Create(pCtx, newNonce)
+func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+	err := nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
 	if err != nil {
 		return err
 	}
@@ -515,23 +351,22 @@ func NonceRotate(pCtx context.Context, pAddress persist.Address, pUserID persist
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pAddress persist.Address, userRepo persist.UserRepository, nonceRepo persist.NonceRepository) (nonceValue string, userID persist.DBID, err error) {
-
-	nonce, err := nonceRepo.Get(pCtx, pAddress)
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
 
 	nonceValue = nonce.Value.String()
 
-	user, err := userRepo.GetByAddress(pCtx, pAddress)
+	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
 		return nonceValue, userID, err
 	}
 	if user.ID != "" {
 		userID = user.ID
 	} else {
-		return nonceValue, userID, persist.ErrUserNotFound{Address: pAddress}
+		return nonceValue, userID, persist.ErrUserNotFound{ChainAddress: pChainAddress}
 	}
 
 	return nonceValue, userID, nil
@@ -564,11 +399,11 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 }
 
 // GetAllowlistContracts returns the list of addresses we allowlist against
-func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
+func GetAllowlistContracts() map[persist.EthereumAddress][]persist.TokenID {
 	addrs := viper.GetString("CONTRACT_ADDRESSES")
 	spl := strings.Split(addrs, "|")
 	logger.For(nil).Info("contract addresses:", spl)
-	res := make(map[persist.Address][]persist.TokenID)
+	res := make(map[persist.EthereumAddress][]persist.TokenID)
 	for _, addr := range spl {
 		nextSpl := strings.Split(addr, "=")
 		if len(nextSpl) != 2 {
@@ -581,23 +416,12 @@ func GetAllowlistContracts() map[persist.Address][]persist.TokenID {
 		logger.For(nil).Info("token_ids:", tokens)
 		tokenIDs := strings.Split(tokens, ",")
 		logger.For(nil).Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
-		res[persist.Address(addr)] = make([]persist.TokenID, len(tokenIDs))
+		res[persist.EthereumAddress(addr)] = make([]persist.TokenID, len(tokenIDs))
 		for i, tokenID := range tokenIDs {
-			res[persist.Address(addr)][i] = persist.TokenID(tokenID)
+			res[persist.EthereumAddress(addr)][i] = persist.TokenID(tokenID)
 		}
 	}
 	return res
-}
-
-// containsAddress checks whether an address exists in a slice
-func containsAddress(a []persist.Address, b persist.Address) bool {
-	for _, v := range a {
-		if v == b {
-			return true
-		}
-	}
-
-	return false
 }
 
 // SetJWTCookie sets the cookie for auth on the response
@@ -625,4 +449,25 @@ func SetJWTCookie(c *gin.Context, token string) {
 		SameSite: mode,
 		Domain:   domain,
 	})
+}
+
+func toAuthWallets(pWallets []persist.Wallet) []AuthenticatedAddress {
+	res := make([]AuthenticatedAddress, len(pWallets))
+	for i, w := range pWallets {
+		res[i] = AuthenticatedAddress{
+			ChainAddress: persist.NewChainAddress(w.Address, w.Chain),
+			WalletType:   w.WalletType,
+		}
+	}
+	return res
+}
+
+// ContainsAuthWallet checks whether an auth.Wallet is in a slice of perist.Wallet
+func ContainsWallet(pWallets []AuthenticatedAddress, pWallet AuthenticatedAddress) bool {
+	for _, w := range pWallets {
+		if w.ChainAddress == pWallet.ChainAddress {
+			return true
+		}
+	}
+	return false
 }

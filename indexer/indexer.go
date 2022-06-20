@@ -31,7 +31,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5000000
+// var defaultStartingBlock persist.BlockNumber = 5000000
+var defaultStartingBlock persist.BlockNumber = 13768584
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -53,28 +54,28 @@ const (
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
-	// foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
-	foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
-	//foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
-	foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
+	// // foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
+	// foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
+	// //foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
+	// foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
 )
 
 type tokenMetadata struct {
-	ti persist.TokenIdentifiers
+	ti persist.EthereumTokenIdentifiers
 	md persist.TokenMetadata
 }
 
 type tokenBalances struct {
-	ti      persist.TokenIdentifiers
-	from    persist.Address
-	to      persist.Address
+	ti      persist.EthereumTokenIdentifiers
+	from    persist.EthereumAddress
+	to      persist.EthereumAddress
 	fromAmt *big.Int
 	toAmt   *big.Int
 	block   persist.BlockNumber
 }
 
 type tokenURI struct {
-	ti  persist.TokenIdentifiers
+	ti  persist.EthereumTokenIdentifiers
 	uri persist.TokenURI
 }
 
@@ -84,33 +85,31 @@ type transfersAtBlock struct {
 }
 
 type ownerAtBlock struct {
-	ti    persist.TokenIdentifiers
-	owner persist.Address
+	ti    persist.EthereumTokenIdentifiers
+	owner persist.EthereumAddress
 	block persist.BlockNumber
 }
 
 type balanceAtBlock struct {
-	ti    persist.TokenIdentifiers
+	ti    persist.EthereumTokenIdentifiers
 	block persist.BlockNumber
 	amnt  *big.Int
 }
 
 type tokenMedia struct {
-	ti    persist.TokenIdentifiers
+	ti    persist.EthereumTokenIdentifiers
 	media persist.Media
 }
 
-// Indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
+// indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
-type Indexer struct {
+type indexer struct {
 	ethClient     *ethclient.Client
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
 	storageClient *storage.Client
 	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
-	collRepo      persist.CollectionTokenRepository
-	userRepo      persist.UserRepository
 	contractDBMu  *sync.Mutex
 	tokenDBMu     *sync.Mutex
 
@@ -126,14 +125,14 @@ type Indexer struct {
 	uniqueMetadatas uniqueMetadatas
 }
 
-// NewIndexer sets up an indexer for retrieving the specified events that will process tokens
-func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, userRepo persist.UserRepository, collRepo persist.CollectionTokenRepository, pChain persist.Chain, pEvents []eventHash) *Indexer {
+// newIndexer sets up an indexer for retrieving the specified events that will process tokens
+func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash) *indexer {
 	mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
 	if err != nil {
 		panic(err)
 	}
 
-	return &Indexer{
+	return &indexer{
 
 		ethClient:     ethClient,
 		ipfsClient:    ipfsClient,
@@ -141,8 +140,6 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		storageClient: storageClient,
 		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
-		collRepo:      collRepo,
-		userRepo:      userRepo,
 		contractDBMu:  &sync.Mutex{},
 		tokenDBMu:     &sync.Mutex{},
 
@@ -157,7 +154,7 @@ func NewIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 // INITIALIZATION FUNCS ---------------------------------------------------------
 
 // Start begins indexing events from the blockchain
-func (i *Indexer) Start() {
+func (i *indexer) Start() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	lastSyncedBlock := defaultStartingBlock
 	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
@@ -198,7 +195,7 @@ func (i *Indexer) Start() {
 	i.startNewBlocksPipeline(lastSyncedBlock, topics)
 }
 
-func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	startTime := time.Now()
 	i.isListening = false
 	uris := make(chan tokenURI)
@@ -215,7 +212,7 @@ func (i *Indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	}
 	logrus.Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
-func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
 	i.isListening = true
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
@@ -230,7 +227,7 @@ func (i *Indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]c
 	i.processNewTokens(uris, metadatas, owners, previousOwners, balances, medias)
 }
 
-func (i *Indexer) listenForNewBlocks() {
+func (i *indexer) listenForNewBlocks() {
 	for {
 		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
 		if err != nil {
@@ -244,7 +241,7 @@ func (i *Indexer) listenForNewBlocks() {
 
 // LOGS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
 	defer close(transfersChan)
 
 	curBlock := startingBlock.BigInt()
@@ -271,7 +268,7 @@ func (i *Indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		}
 	}
 	if len(logsTo) == 0 {
-		logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -343,50 +340,50 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			}
 
 			result = append(result, rpc.Transfer{
-				From:            persist.Address(pLog.Topics[1].Hex()),
-				To:              persist.Address(pLog.Topics[2].Hex()),
+				From:            persist.EthereumAddress(pLog.Topics[1].Hex()),
+				To:              persist.EthereumAddress(pLog.Topics[2].Hex()),
 				TokenID:         persist.TokenID(pLog.Topics[3].Hex()),
 				Amount:          1,
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.Address(pLog.Address.Hex()),
+				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC721,
 			})
 
 			logrus.Debugf("Processed transfer event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
+		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
 
-			if len(pLog.Topics) < 4 {
-				continue
-			}
+		// 	if len(pLog.Topics) < 4 {
+		// 		continue
+		// 	}
 
-			result = append(result, rpc.Transfer{
-				From:            persist.ZeroAddress,
-				To:              persist.Address(pLog.Topics[1].Hex()),
-				TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
-				Amount:          1,
-				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.Address(pLog.Address.Hex()),
-				TokenType:       persist.TokenTypeERC721,
-			})
+		// 	result = append(result, rpc.Transfer{
+		// 		From:            persist.ZeroAddress,
+		// 		To:              persist.EthereumAddress(pLog.Topics[1].Hex()),
+		// 		TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
+		// 		Amount:          1,
+		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
+		// 		TokenType:       persist.TokenTypeERC721,
+		// 	})
 
-			logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
+		// 	logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
+		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
 
-			if len(pLog.Topics) < 4 {
-				continue
-			}
+		// 	if len(pLog.Topics) < 4 {
+		// 		continue
+		// 	}
 
-			result = append(result, rpc.Transfer{
-				From:            persist.Address(pLog.Topics[2].Hex()),
-				To:              persist.Address(pLog.Topics[3].Hex()),
-				TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
-				Amount:          1,
-				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.Address(pLog.Address.Hex()),
-				TokenType:       persist.TokenTypeERC721,
-			})
+		// 	result = append(result, rpc.Transfer{
+		// 		From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
+		// 		To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
+		// 		TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
+		// 		Amount:          1,
+		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
+		// 		TokenType:       persist.TokenTypeERC721,
+		// 	})
 
-			logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
+		// 	logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
@@ -410,12 +407,12 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			}
 
 			result = append(result, rpc.Transfer{
-				From:            persist.Address(pLog.Topics[2].Hex()),
-				To:              persist.Address(pLog.Topics[3].Hex()),
+				From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
+				To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
 				TokenID:         persist.TokenID(id.Text(16)),
 				Amount:          value.Uint64(),
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-				ContractAddress: persist.Address(pLog.Address.Hex()),
+				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC1155,
 			})
 			logrus.Debugf("Processed single transfer event in %s", time.Since(initial))
@@ -444,11 +441,11 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			for j := 0; j < len(ids); j++ {
 
 				result = append(result, rpc.Transfer{
-					From:            persist.Address(pLog.Topics[2].Hex()),
-					To:              persist.Address(pLog.Topics[3].Hex()),
+					From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
+					To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
 					TokenID:         persist.TokenID(ids[j].Text(16)),
 					Amount:          values[j].Uint64(),
-					ContractAddress: persist.Address(pLog.Address.Hex()),
+					ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 					TokenType:       persist.TokenTypeERC1155,
 					BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				})
@@ -461,7 +458,7 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 	return result
 }
 
-func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
+func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfers)
 
@@ -487,7 +484,7 @@ func (i *Indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
 	defer close(uris)
 	defer close(owners)
 	defer close(previousOwners)
@@ -504,7 +501,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 		logrus.Debugf("Processing %d transfers", len(transfers))
 		submit := transfers
 		wp.Submit(func() {
-			processTransfers(i, submit, uris, nil, owners, previousOwners, balances, nil, false, false)
+			processTransfers(i, submit, uris, nil, owners, previousOwners, balances, nil, false)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -512,7 +509,7 @@ func (i *Indexer) processTransfers(incomingTransfers <-chan []transfersAtBlock, 
 	logrus.Info("Closing field channels...")
 }
 
-func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia) {
+func (i *indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia) {
 	defer close(uris)
 	defer close(metadatas)
 	defer close(owners)
@@ -531,7 +528,7 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 		logrus.Debugf("Processing %d transfers", len(transfers))
 		submit := transfers
 		wp.Submit(func() {
-			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, medias, true, true)
+			processTransfers(i, submit, uris, metadatas, owners, previousOwners, balances, medias, true)
 		})
 	}
 	logrus.Info("Waiting for transfers to finish...")
@@ -539,22 +536,22 @@ func (i *Indexer) processNewTransfers(incomingTransfers <-chan []transfersAtBloc
 	logrus.Info("Closing field channels...")
 }
 
-func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
+func processTransfers(i *indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields bool) {
 
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
 			initial := time.Now()
 			func() {
 
-				contractAddress := persist.Address(transfer.ContractAddress.String())
+				contractAddress := persist.EthereumAddress(transfer.ContractAddress.String())
 				from := transfer.From
 				to := transfer.To
 				tokenID := transfer.TokenID
 
-				key := persist.NewTokenIdentifiers(contractAddress, tokenID)
+				key := persist.NewEthereumTokenIdentifiers(contractAddress, tokenID)
 				// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-				findFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields, sideEffects)
+				findFields(i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields)
 
 				logrus.WithFields(logrus.Fields{"duration": time.Since(initial)}).Debugf("Processed transfer %s to %s and from %s ", key, to, from)
 			}()
@@ -564,12 +561,10 @@ func processTransfers(i *Indexer, transfers []transfersAtBlock, uris chan<- toke
 
 }
 
-func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers, to persist.Address, from persist.Address, contractAddress persist.Address, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields, sideEffects bool) {
+func findFields(i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields bool) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	if sideEffects {
-		wg.Add(1)
-	}
+
 	if optionalFields {
 		wg.Add(2)
 	}
@@ -590,13 +585,6 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 			previousOwners <- prevOwner
 		}()
 
-		if sideEffects {
-			go func() {
-				defer wg.Done()
-				runTransferSideEffects(i, contractAddress, tokenID, to, from, tokenBalances{})
-			}()
-		}
-
 	case persist.TokenTypeERC1155:
 		wg.Add(1)
 
@@ -607,13 +595,6 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 			if err != nil {
 				logrus.WithError(err).Errorf("error getting balance of %s for %s", from, key)
 				storeErr(err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
-			}
-
-			if sideEffects {
-				go func() {
-					defer wg.Done()
-					runTransferSideEffects(i, contractAddress, tokenID, to, from, bals)
-				}()
 			}
 
 			balances <- bals
@@ -674,13 +655,9 @@ func findFields(i *Indexer, transfer rpc.Transfer, key persist.TokenIdentifiers,
 	wg.Wait()
 }
 
-func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persist.Address, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
+func findOptionalFields(i *indexer, key persist.EthereumTokenIdentifiers, to, from persist.EthereumAddress, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	_, err := i.userRepo.GetByAddress(ctx, to)
-	if err != nil {
-		return
-	}
 
 	contractAddress, tokenID, err := key.GetParts()
 	if err != nil {
@@ -688,7 +665,7 @@ func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persi
 		return
 	}
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress, tokenID, tokenURI, i.ipfsClient, i.arweaveClient, i.storageClient)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient)
 	if err != nil {
 		logrus.WithError(err).Errorf("error making previews for %s", key)
 		return
@@ -698,70 +675,7 @@ func findOptionalFields(i *Indexer, key persist.TokenIdentifiers, to, from persi
 	medias <- res
 }
 
-func runTransferSideEffects(i *Indexer, contractAddress persist.Address, tokenID persist.TokenID, to, from persist.Address, bals tokenBalances) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if bals.fromAmt != nil {
-		if bals.fromAmt.Cmp(bigZero) != 0 {
-			return
-		}
-	}
-
-	user, err := i.userRepo.GetByAddress(ctx, from)
-	if err != nil {
-		return
-	}
-
-	for _, addr := range user.Addresses {
-		if addr.String() == to.String() {
-			return
-		}
-	}
-
-	err = updateCollections(ctx, contractAddress, tokenID, user.ID, i.collRepo)
-	if err != nil {
-		logrus.WithError(err).Errorf("error updating collections for %s: %s", persist.NewTokenIdentifiers(contractAddress, tokenID), err)
-		return
-	}
-}
-
-func updateCollections(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, userID persist.DBID, collRepo persist.CollectionTokenRepository) error {
-	colls, err := collRepo.GetByUserID(ctx, userID)
-	if err != nil {
-
-		return fmt.Errorf("error getting collections for %s", userID)
-	}
-
-	update := map[persist.DBID]persist.CollectionToken{}
-	for _, coll := range colls {
-		didUpdate := false
-		new := coll.NFTs[:0]
-		for _, nft := range coll.NFTs {
-			if nft.ContractAddress.String() != contractAddress.String() || nft.TokenID.String() != tokenID.String() {
-				new = append(new, nft)
-				didUpdate = true
-			}
-		}
-		coll.NFTs = new
-		if didUpdate {
-			update[coll.ID] = coll
-		}
-	}
-
-	for id, coll := range update {
-		nftIDs := make([]persist.DBID, len(coll.NFTs))
-		for i, nft := range coll.NFTs {
-			nftIDs[i] = nft.ID
-		}
-		err = collRepo.UpdateNFTsUnsafe(ctx, id, persist.CollectionTokenUpdateNftsInput{NFTs: nftIDs})
-		if err != nil {
-			return fmt.Errorf("error updating collection %s", id)
-		}
-	}
-	return nil
-}
-
-func getBalances(contractAddress persist.Address, from persist.Address, tokenID persist.TokenID, key persist.TokenIdentifiers, blockNumber persist.BlockNumber, to persist.Address, ethClient *ethclient.Client) (tokenBalances, error) {
+func getBalances(contractAddress persist.EthereumAddress, from persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, to persist.EthereumAddress, ethClient *ethclient.Client) (tokenBalances, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -787,7 +701,7 @@ func getBalances(contractAddress persist.Address, from persist.Address, tokenID 
 	return bal, nil
 }
 
-func getURI(contractAddress persist.Address, tokenID persist.TokenID, tokenType persist.TokenType, ethClient *ethclient.Client) persist.TokenURI {
+func getURI(contractAddress persist.EthereumAddress, tokenID persist.TokenID, tokenType persist.TokenType, ethClient *ethclient.Client) persist.TokenURI {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	u, err := rpc.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 	if err != nil {
@@ -802,7 +716,7 @@ func getURI(contractAddress persist.Address, tokenID persist.TokenID, tokenType 
 	return uriReplaced
 }
 
-func getMetadata(contractAddress persist.Address, uriReplaced persist.TokenURI, tokenID persist.TokenID, um uniqueMetadatas, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, persist.TokenURI) {
+func getMetadata(contractAddress persist.EthereumAddress, uriReplaced persist.TokenURI, tokenID persist.TokenID, um uniqueMetadatas, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, persist.TokenURI) {
 	var metadata persist.TokenMetadata
 	var err error
 	if handler, ok := um[contractAddress]; ok {
@@ -834,15 +748,15 @@ func getMetadata(contractAddress persist.Address, uriReplaced persist.TokenURI, 
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
+func (i *indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(4)
-	ownersMap := map[persist.TokenIdentifiers]ownerAtBlock{}
-	previousOwnersMap := map[persist.TokenIdentifiers][]ownerAtBlock{}
-	balancesMap := map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock{}
-	metadatasMap := map[persist.TokenIdentifiers]tokenMetadata{}
-	urisMap := map[persist.TokenIdentifiers]tokenURI{}
+	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
+	previousOwnersMap := map[persist.EthereumTokenIdentifiers][]ownerAtBlock{}
+	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
+	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
+	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
 	go receiveBalances(wg, balances, balancesMap, i.tokenRepo)
 	go receiveOwners(wg, owners, ownersMap, i.tokenRepo)
@@ -852,19 +766,19 @@ func (i *Indexer) processTokens(uris <-chan tokenURI, owners <-chan ownerAtBlock
 
 	logrus.Info("Done recieving field data, converting fields into tokens...")
 
-	createTokens(i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.TokenIdentifiers]tokenMedia{})
+	createTokens(i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
 }
 
-func (i *Indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, medias <-chan tokenMedia) {
+func (i *indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenMetadata, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, medias <-chan tokenMedia) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(6)
-	ownersMap := map[persist.TokenIdentifiers]ownerAtBlock{}
-	previousOwnersMap := map[persist.TokenIdentifiers][]ownerAtBlock{}
-	balancesMap := map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock{}
-	metadatasMap := map[persist.TokenIdentifiers]tokenMetadata{}
-	urisMap := map[persist.TokenIdentifiers]tokenURI{}
-	mediasMap := map[persist.TokenIdentifiers]tokenMedia{}
+	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
+	previousOwnersMap := map[persist.EthereumTokenIdentifiers][]ownerAtBlock{}
+	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
+	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
+	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
+	mediasMap := map[persist.EthereumTokenIdentifiers]tokenMedia{}
 
 	go receiveBalances(wg, balances, balancesMap, i.tokenRepo)
 	go receiveOwners(wg, owners, ownersMap, i.tokenRepo)
@@ -880,7 +794,7 @@ func (i *Indexer) processNewTokens(uris <-chan tokenURI, metadatas <-chan tokenM
 
 }
 
-func createTokens(i *Indexer, ownersMap map[persist.TokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.TokenIdentifiers][]ownerAtBlock, balancesMap map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock, metadatasMap map[persist.TokenIdentifiers]tokenMetadata, urisMap map[persist.TokenIdentifiers]tokenURI, mediasMap map[persist.TokenIdentifiers]tokenMedia) {
+func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata, urisMap map[persist.EthereumTokenIdentifiers]tokenURI, mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
 	tokens := i.fieldMapsToTokens(ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap)
 	if tokens == nil || len(tokens) == 0 {
 		logrus.Info("No tokens to process")
@@ -914,7 +828,7 @@ func createTokens(i *Indexer, ownersMap map[persist.TokenIdentifiers]ownerAtBloc
 
 }
 
-func receiveURIs(wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[persist.TokenIdentifiers]tokenURI) {
+func receiveURIs(wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[persist.EthereumTokenIdentifiers]tokenURI) {
 	defer wg.Done()
 
 	for uri := range uris {
@@ -922,7 +836,7 @@ func receiveURIs(wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[persist.To
 	}
 }
 
-func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMap map[persist.TokenIdentifiers]tokenMetadata) {
+func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMap map[persist.EthereumTokenIdentifiers]tokenMetadata) {
 	defer wg.Done()
 
 	for meta := range metadatas {
@@ -930,7 +844,7 @@ func receiveMetadatas(wg *sync.WaitGroup, metadatas <-chan tokenMetadata, metaMa
 	}
 }
 
-func receiveMedias(wg *sync.WaitGroup, medias <-chan tokenMedia, metaMap map[persist.TokenIdentifiers]tokenMedia) {
+func receiveMedias(wg *sync.WaitGroup, medias <-chan tokenMedia, metaMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
 	defer wg.Done()
 
 	for media := range medias {
@@ -938,7 +852,7 @@ func receiveMedias(wg *sync.WaitGroup, medias <-chan tokenMedia, metaMap map[per
 	}
 }
 
-func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, prevOwnersMap map[persist.TokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, prevOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for previousOwner := range prevOwners {
 		currentPreviousOwners, ok := prevOwnersMap[previousOwner.ti]
@@ -950,13 +864,13 @@ func receivePreviousOwners(wg *sync.WaitGroup, prevOwners <-chan ownerAtBlock, p
 	}
 }
 
-func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balances map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock, tokenRepo persist.TokenRepository) {
+func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for balance := range balanceChan {
 
 		balanceMap, ok := balances[balance.ti]
 		if !ok {
-			balanceMap = make(map[persist.Address]balanceAtBlock)
+			balanceMap = make(map[persist.EthereumAddress]balanceAtBlock)
 		}
 		toBal := balanceMap[balance.to]
 		if toBal.block < balance.block {
@@ -979,14 +893,14 @@ func receiveBalances(wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balan
 	}
 }
 
-func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners map[persist.TokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
+func receiveOwners(wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for owner := range ownersChan {
 		owners[owner.ti] = owner
 	}
 }
 
-func (i *Indexer) fieldMapsToTokens(owners map[persist.TokenIdentifiers]ownerAtBlock, previousOwners map[persist.TokenIdentifiers][]ownerAtBlock, balances map[persist.TokenIdentifiers]map[persist.Address]balanceAtBlock, metadatas map[persist.TokenIdentifiers]tokenMetadata, uris map[persist.TokenIdentifiers]tokenURI, medias map[persist.TokenIdentifiers]tokenMedia) []persist.Token {
+func (i *indexer) fieldMapsToTokens(owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata, uris map[persist.EthereumTokenIdentifiers]tokenURI, medias map[persist.EthereumTokenIdentifiers]tokenMedia) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)
@@ -999,9 +913,9 @@ func (i *Indexer) fieldMapsToTokens(owners map[persist.TokenIdentifiers]ownerAtB
 			logrus.WithError(err).Errorf("error getting parts from %s: - %s | val: %+v", k, err, v)
 			continue
 		}
-		previousOwnerAddresses := make([]persist.AddressAtBlock, len(previousOwners[k]))
+		previousOwnerAddresses := make([]persist.EthereumAddressAtBlock, len(previousOwners[k]))
 		for i, w := range previousOwners[k] {
-			previousOwnerAddresses[i] = persist.AddressAtBlock{Address: w.owner, Block: w.block}
+			previousOwnerAddresses[i] = persist.EthereumAddressAtBlock{Address: w.owner, Block: w.block}
 		}
 		delete(previousOwners, k)
 		metadata := metadatas[k]
@@ -1105,7 +1019,7 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		return err
 	}
 
-	contracts := make(map[persist.Address]bool)
+	contracts := make(map[persist.EthereumAddress]bool)
 
 	nextNow := time.Now()
 
@@ -1136,7 +1050,7 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 	}()
 }
 
-func fillContractFields(ethClient *ethclient.Client, contractAddress persist.Address, lastSyncedBlock persist.BlockNumber) persist.Contract {
+func fillContractFields(ethClient *ethclient.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {
 	c := persist.Contract{
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
@@ -1156,9 +1070,9 @@ func fillContractFields(ethClient *ethclient.Client, contractAddress persist.Add
 
 func getUniqueMetadataHandlers() uniqueMetadatas {
 	return uniqueMetadatas{
-		persist.Address("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
-		persist.Address("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-		persist.Address("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
+		persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
+		persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
+		persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
 	}
 }
 
@@ -1199,7 +1113,7 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 	return allTransfersAtBlock
 }
 
-func storeErr(err error, prefix string, from persist.Address, key persist.TokenIdentifiers, atBlock persist.BlockNumber, storageClient *storage.Client) {
+func storeErr(err error, prefix string, from persist.EthereumAddress, key persist.EthereumTokenIdentifiers, atBlock persist.BlockNumber, storageClient *storage.Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 

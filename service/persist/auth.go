@@ -30,7 +30,7 @@ type UserLoginAttempt struct {
 	ID             DBID         `json:"id"`
 	CreationTime   CreationTime `json:"created_at"`
 	Deleted        NullBool     `json:"-"`
-	Address        Address      `json:"address"`
+	Address        Wallet       `json:"address"`
 	Signature      NullString   `json:"signature"`
 	NonceValue     NullString   `json:"nonce_value"`
 	UserExists     NullBool     `json:"user_exists"`
@@ -39,15 +39,26 @@ type UserLoginAttempt struct {
 	ReqHeaders     ReqHeaders   `json:"req_headers"`
 }
 
+// CreateLoginAttemptInput is a type that holds the input for creating a login attempt
+type CreateLoginAttemptInput struct {
+	Address        Wallet     `json:"address"`
+	Signature      string     `json:"signature"`
+	NonceValue     string     `json:"nonce_value"`
+	UserExists     bool       `json:"user_exists"`
+	SignatureValid bool       `json:"signature_valid"`
+	ReqHostAddr    string     `json:"req_host_addr"`
+	ReqHeaders     ReqHeaders `json:"req_headers"`
+}
+
 // NonceRepository is the interface for interacting with the auth nonce persistence layer
 type NonceRepository interface {
-	Get(context.Context, Address) (UserNonce, error)
-	Create(context.Context, UserNonce) error
+	Get(context.Context, ChainAddress) (UserNonce, error)
+	Create(context.Context, string, ChainAddress) error
 }
 
 // LoginAttemptRepository is the interface for interacting with the auth login attempt persistence layer
 type LoginAttemptRepository interface {
-	Create(context.Context, UserLoginAttempt) (DBID, error)
+	Create(context.Context, CreateLoginAttemptInput) (DBID, error)
 }
 
 // Scan implements the sql.Scanner interface for the ReqHeaders type
@@ -66,9 +77,9 @@ func (h ReqHeaders) Value() (driver.Value, error) {
 
 // ErrNonceNotFoundForAddress is returned when no nonce is found for a given address
 type ErrNonceNotFoundForAddress struct {
-	Address Address
+	ChainAddress ChainAddress
 }
 
 func (e ErrNonceNotFoundForAddress) Error() string {
-	return fmt.Sprintf("no nonce found for address: %v", e.Address)
+	return fmt.Sprintf("no nonce found for address: %v", e.ChainAddress)
 }

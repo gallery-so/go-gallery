@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
@@ -83,7 +84,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	update := persist.GalleryUpdateInput{Collections: collections}
+	update := persist.GalleryTokenUpdateInput{Collections: collections}
 
 	err = api.repos.GalleryRepository.Update(ctx, galleryID, userID, update)
 	if err != nil {

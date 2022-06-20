@@ -29,7 +29,7 @@ directive @restrictEnvironment(allowed:[String!]!) on INPUT_FIELD_DEFINITION | I
 # state the fields that will be used to generate the ID. If a named field exists on the object and is
 # a string-based type, that field will be used as part of the ID automatically. Otherwise, a manual
 # getter method will need to be implemented to retrieve that component of the GqlID.
-directive @goGqlId(fields:[String!]!) on OBJECT
+directive @goGqlId(fields: [String!]!) on OBJECT
 
 # Injects a "Helper<TypeName>Data" struct embed into a generated type. Useful for adding backend-only
 # helper data necessary to resolve queries, while keeping that data out of the schema and invisible
@@ -53,21 +53,41 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
-    wallets: [Wallet]
+
+    # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
+    # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
+    # that appears in more than one of the user's wallets.
+    tokens: [Token] @goField(forceResolver: true)
+
+    wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
 }
 
-type Wallet implements Node @goGqlId(fields: ["address"]) {
+type Wallet implements Node {
     id: ID!
+    dbid: DBID!
+    chainAddress: ChainAddress
+    chain: Chain
+    walletType: WalletType
+    tokens: [Token] @goField(forceResolver: true)
+}
+
+type ChainAddress {
     address: Address
-    # TODO: Do we paginate these currently?
-    nfts: [Nft] @goField(forceResolver: true)
+    chain: Chain
+}
+
+input ChainAddressInput {
+    address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
+
+union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
@@ -82,16 +102,11 @@ union MediaSubtype =
 
 type PreviewURLSet {
     raw: String
+    thumbnail: String
     small: String
     medium: String
     large: String
-}
-
-type ImageURLSet {
-    raw: String
-    small: String
-    medium: String
-    large: String
+    srcSet: String
 }
 
 type VideoURLSet {
@@ -121,7 +136,7 @@ type ImageMedia implements Media {
     mediaURL: String
     mediaType: String
 
-    contentRenderURLs: ImageURLSet
+    contentRenderURL: String
 }
 
 type VideoMedia implements Media {
@@ -200,8 +215,12 @@ enum Chain {
     Polygon
     Optimism
 }
+enum WalletType {
+    EOA
+    GnosisSafe
+}
 
-type Nft implements Node {
+type Token implements Node {
     id: ID!
     dbid: DBID!
     creationTime: Time
@@ -215,16 +234,16 @@ type Nft implements Node {
     tokenUri: String
     tokenId: String
     quantity: String # source is a hex string
-    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    owner: GalleryUser @goField(forceResolver: true)
+    ownedByWallets: [Wallet] @goField(forceResolver: true)
     ownershipHistory: [OwnerAtBlock]
     tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-    contractAddress: Address
+    contract: Contract @goField(forceResolver: true)
     externalUrl: String
     blockNumber: String # source is uint64
-
     # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
     # struct and may ultimately end up elsewhere
-    creatorAddress: Address
+    creatorAddress: ChainAddress
     openseaCollectionName: String
 
     # temporary field while we're dependent on opensea
@@ -233,13 +252,15 @@ type Nft implements Node {
 
 type OwnerAtBlock {
     # TODO: will need to store addresses to make this resolver work
-    owner: GalleryUserOrWallet @goField(forceResolver: true)
+    owner: GalleryUserOrAddress @goField(forceResolver: true)
     blockNumber: String # source is uint64
 }
 
-type CollectionNft implements Node @goEmbedHelper @goGqlId(fields:["nftId", "collectionId"]) {
+type CollectionToken implements Node
+@goEmbedHelper
+@goGqlId(fields: ["tokenId", "collectionId"]) {
     id: ID!
-    nft: Nft
+    token: Token
     collection: Collection
 }
 
@@ -257,7 +278,7 @@ type Collection implements Node {
     gallery: Gallery @goField(forceResolver: true)
     layout: CollectionLayout
     hidden: Boolean
-    nfts: [CollectionNft] @goField(forceResolver: true)
+    tokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
@@ -268,9 +289,9 @@ type Gallery implements Node {
 }
 
 type TokenHolder @goEmbedHelper {
-    addresses: [Address]
+    wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
-    previewNfts: [String]
+    previewTokens: [String]
 }
 
 type MembershipTier implements Node {
@@ -282,18 +303,31 @@ type MembershipTier implements Node {
     owners: [TokenHolder]
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress"]) {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
     id: ID!
 
     lastUpdated: Time
 
-    contractAddress: Address
-    creatorAddress: Address
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
     name: String
     description: String
     previewImage: String
 
     owners: [TokenHolder]
+}
+
+type Contract implements Node {
+    id: ID!
+    dbid: DBID!
+
+    lastUpdated: Time
+
+    contractAddress: ChainAddress
+    creatorAddress: ChainAddress
+    chain: Chain
+    name: String
 }
 
 # We have this extra type in case we need to stick authed data
@@ -316,17 +350,20 @@ type ErrCollectionNotFound implements Error {
     message: String!
 }
 
-union NftByIdOrError = Nft | ErrNftNotFound
+union TokenByIdOrError = Token | ErrTokenNotFound
 
-type ErrNftNotFound implements Error {
+type ErrTokenNotFound implements Error {
     message: String!
 }
 
 union CollectionByIdOrError = Collection | ErrCollectionNotFound
 
-union CollectionNftByIdOrError = CollectionNft | ErrCollectionNotFound | ErrNftNotFound
+union CollectionTokenByIdOrError =
+    CollectionToken
+    | ErrCollectionNotFound
+    | ErrTokenNotFound
 
-union CommunityByAddressOrError = Community | ErrCommunityNotFound
+union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 type Query {
     node(id: ID!): Node
@@ -335,10 +372,10 @@ type Query {
     userById(id: DBID!): UserByIdOrError
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
-    nftById(id: DBID!): NftByIdOrError
-    collectionNftById(nftId: DBID!, collectionId: DBID!): CollectionNftByIdOrError
-    communityByAddress(contractAddress: Address!, forceRefresh: Boolean): CommunityByAddressOrError
-    generalAllowlist: [Address!]
+    tokenById(id: DBID!): TokenByIdOrError
+    collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
+    generalAllowlist: [ChainAddress!]
 }
 
 input CollectionLayoutInput {
@@ -350,7 +387,7 @@ input CreateCollectionInput {
     galleryId: DBID!
     name: String!
     collectorsNote: String!
-    nfts: [DBID!]!
+    tokens: [DBID!]!
     layout: CollectionLayoutInput!
 }
 
@@ -388,18 +425,18 @@ type UpdateCollectionInfoPayload {
     collection: Collection
 }
 
-input UpdateCollectionNftsInput {
+input UpdateCollectionTokensInput {
     collectionId: DBID!
-    nfts: [DBID!]!
+    tokens: [DBID!]!
     layout: CollectionLayoutInput!
 }
 
-union UpdateCollectionNftsPayloadOrError =
-    UpdateCollectionNftsPayload
+union UpdateCollectionTokensPayloadOrError =
+    UpdateCollectionTokensPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateCollectionNftsPayload {
+type UpdateCollectionTokensPayload {
     collection: Collection
 }
 
@@ -431,40 +468,41 @@ type UpdateGalleryCollectionsPayload {
     gallery: Gallery
 }
 
-input UpdateNftInfoInput {
-    nftId: DBID!
+input UpdateTokenInfoInput {
+    tokenId: DBID!
     collectorsNote: String!
 
-    # Optional (for now). Lets the backend know what collection the NFT was being edited in.
+    # Optional (for now). Lets the backend know what collection the token was being edited in.
     # Currently used to generate feedbot URLs.
     collectionId: DBID
 }
 
-union UpdateNftInfoPayloadOrError =
-    UpdateNftInfoPayload
+union UpdateTokenInfoPayloadOrError =
+    UpdateTokenInfoPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateNftInfoPayload {
-    nft: Nft
+type UpdateTokenInfoPayload {
+    token: Token
 }
 
-union AddUserAddressPayloadOrError =
-    AddUserAddressPayload
+union AddUserWalletPayloadOrError =
+    AddUserWalletPayload
     | ErrAuthenticationFailed
     | ErrNotAuthorized
     | ErrInvalidInput
+    | ErrAddressOwnedByUser
 
-type AddUserAddressPayload {
+type AddUserWalletPayload {
     viewer: Viewer
 }
 
-union RemoveUserAddressesPayloadOrError =
-    RemoveUserAddressesPayload
+union RemoveUserWalletsPayloadOrError =
+    RemoveUserWalletsPayload
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type RemoveUserAddressesPayload {
+type RemoveUserWalletsPayload {
     viewer: Viewer
 }
 
@@ -483,12 +521,12 @@ type UpdateUserInfoPayload {
     viewer: Viewer
 }
 
-union RefreshOpenSeaNftsPayloadOrError =
-    RefreshOpenSeaNftsPayload
+union RefreshTokensPayloadOrError =
+    RefreshTokensPayload
     | ErrNotAuthorized
     | ErrOpenSeaRefreshFailed
 
-type RefreshOpenSeaNftsPayload {
+type RefreshTokensPayload {
     viewer: Viewer
 }
 
@@ -497,13 +535,17 @@ type AuthNonce {
     userExists: Boolean
 }
 
-union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredNFT
+union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
 
 type ErrAuthenticationFailed implements Error {
     message: String!
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrAddressOwnedByUser implements Error {
     message: String!
 }
 
@@ -518,7 +560,7 @@ type ErrCommunityNotFound implements Error {
 union AuthorizationError =
     ErrNoCookie
     | ErrInvalidToken
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
     message: String!
@@ -539,7 +581,7 @@ type ErrInvalidToken implements Error {
     message: String!
 }
 
-type ErrDoesNotOwnRequiredNFT implements Error {
+type ErrDoesNotOwnRequiredToken implements Error {
     message: String!
 }
 
@@ -548,22 +590,22 @@ type ErrOpenSeaRefreshFailed implements Error {
 }
 
 input AuthMechanism {
-    debugAuth: DebugAuth
-    ethereumEoa: EthereumEoaAuth
+    eoa: EoaAuth
     gnosisSafe: GnosisSafeAuth
+    debug: DebugAuth
+}
+
+input EoaAuth {
+    chainAddress: ChainAddressInput!
+    nonce: String!
+    signature: String! @scrub
 }
 
 # DebugAuth always succeeds and returns the supplied userId and addresses.
 # Only available for local development.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
     userId: DBID
-    addresses: [Address!]!
-}
-
-input EthereumEoaAuth {
-    address: Address!
-    nonce: String!
-    signature: String! @scrub
+    chainAddresses:[ChainAddressInput!]!
 }
 
 input GnosisSafeAuth {
@@ -575,7 +617,7 @@ union LoginPayloadOrError =
     LoginPayload
     | ErrUserNotFound
     | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
     # TODO: Remove userId in favor of viewer
@@ -591,7 +633,7 @@ union CreateUserPayloadOrError =
     CreateUserPayload
     | ErrUserAlreadyExists
     | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredNFT
+    | ErrDoesNotOwnRequiredToken
 
 type CreateUserPayload {
     userId: DBID
@@ -624,8 +666,8 @@ type UnfollowUserPayload {
 
 type Mutation {
     # User Mutations
-    addUserAddress(address: Address!, authMechanism: AuthMechanism!): AddUserAddressPayloadOrError @authRequired
-    removeUserAddresses(addresses: [Address!]!): RemoveUserAddressesPayloadOrError @authRequired
+    addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
+    removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
     updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
     # Gallery Mutations
@@ -635,16 +677,15 @@ type Mutation {
     createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
     deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
     updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
-    updateCollectionNfts(input: UpdateCollectionNftsInput!): UpdateCollectionNftsPayloadOrError @authRequired
+    updateCollectionTokens(input: UpdateCollectionTokensInput!): UpdateCollectionTokensPayloadOrError @authRequired
     updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
 
-    # Nft Mutations
-    updateNftInfo(input: UpdateNftInfoInput!): UpdateNftInfoPayloadOrError @authRequired
+    # Token Mutations
+    updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-    # Mirroring the existing input (comma-separated list of addresses) because we expect to drop this functionality soon
-    refreshOpenSeaNfts(addresses: String): RefreshOpenSeaNftsPayloadOrError @authRequired
+    refreshTokens: RefreshTokensPayloadOrError @authRequired
 
-    getAuthNonce(address: Address!): GetAuthNoncePayloadOrError
+    getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
     createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError

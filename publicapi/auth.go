@@ -2,41 +2,46 @@ package publicapi
 
 import (
 	"context"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 type AuthAPI struct {
-	repos     *persist.Repositories
-	queries   *sqlc.Queries
-	loaders   *dataloader.Loaders
-	validator *validator.Validate
-	ethClient *ethclient.Client
+	repos              *persist.Repositories
+	queries            *sqlc.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	multiChainProvider *multichain.Provider
 }
 
-func (api AuthAPI) NewEthereumNonceAuthenticator(address persist.Address, nonce string, signature string, walletType auth.WalletType) auth.Authenticator {
-	authenticator := auth.EthereumNonceAuthenticator{
-		Address:    address,
-		Nonce:      nonce,
-		Signature:  signature,
-		WalletType: walletType,
-		UserRepo:   api.repos.UserRepository,
-		NonceRepo:  api.repos.NonceRepository,
-		EthClient:  api.ethClient,
+func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainAddress, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
+	authenticator := auth.NonceAuthenticator{
+		ChainAddress:       chainAddress,
+		Nonce:              nonce,
+		Signature:          signature,
+		WalletType:         walletType,
+		WalletRepo:         api.repos.WalletRepository,
+		MultichainProvider: api.multiChainProvider,
+		UserRepo:           api.repos.UserRepository,
+		NonceRepo:          api.repos.NonceRepository,
+		EthClient:          api.ethClient,
 	}
 	return authenticator
 }
 
-func (api AuthAPI) GetAuthNonce(ctx context.Context, address persist.Address) (nonce string, userExists bool, err error) {
+func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (nonce string, userExists bool, err error) {
 	gc := util.GinContextFromContext(ctx)
 	authed := auth.GetUserAuthedFromCtx(gc)
 
-	return auth.GetAuthNonce(ctx, address, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.EarlyAccessRepository, api.ethClient)
+	return auth.GetAuthNonce(ctx, chainAddress, authed, api.repos.UserRepository, api.repos.NonceRepository, api.repos.WalletRepository, api.repos.EarlyAccessRepository, api.ethClient)
 }
 
 func (api AuthAPI) Login(ctx context.Context, authenticator auth.Authenticator) (persist.DBID, error) {

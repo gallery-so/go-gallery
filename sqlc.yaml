@@ -12,37 +12,51 @@ packages:
 # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
 # the override should come _before_ the * entry
 overrides:
+  # Users
+  - column: "users.wallets"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
 
-# Users
-  - column: "users.addresses"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.AddressList"
-
-# Galleries
+  # Galleries
   - column: "galleries.collections"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
-# Collections
+  # Collections
   - column: "collections.nfts"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
   - column: "collections.layout"
     go_type: { "type": "TokenLayout" } # Required format when the type is in the same package as the generated code
 
-# Nfts
+  # Nfts
   - column: "nfts.contract"
     go_type: "github.com/mikeydub/go-gallery/service/persist.NFTContract"
 
-# Membership
+  # Tokens
+  - column: "tokens.owned_by_wallets"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+  - column: "tokens.contract"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+  # Contracts
+  - column: "contracts.address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+
+  # Membership
   - column: "membership.owners"
     go_type: "github.com/mikeydub/go-gallery/service/persist.TokenHolderList"
+  # Wallet
+  - column: "wallets.address"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+  - column: "wallets.wallet_type"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.WalletType"
 
-# Follows
+  # Follows
   - column: "follows.followee"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "follows.follower"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
 
-# Wildcards
-# Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+  # Wildcards
+  # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "*.owner_user_id"

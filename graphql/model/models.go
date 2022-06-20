@@ -2,26 +2,36 @@ package model
 
 import (
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type GqlID string
 
-func (r *CollectionNft) GetGqlIDField_NftID() string {
-	return r.NftId.String()
+func (r *CollectionToken) GetGqlIDField_TokenID() string {
+	return r.TokenId.String()
 }
 
-func (r *CollectionNft) GetGqlIDField_CollectionID() string {
-	return r.CollectionId.String()
+func (r *CollectionToken) GetGqlIDField_CollectionID() string {
+	return r.TokenId.String()
 }
 
-type HelperCollectionNftData struct {
-	NftId        persist.DBID
+func (r *Community) GetGqlIDField_Chain() string {
+	return fmt.Sprint(r.ContractAddress.Chain())
+}
+
+func (r *Community) GetGqlIDField_ContractAddress() string {
+	return r.ContractAddress.Address().String()
+}
+
+type HelperCollectionTokenData struct {
+	TokenId      persist.DBID
 	CollectionId persist.DBID
 }
 
 type HelperTokenHolderData struct {
-	UserId persist.DBID
+	UserId    persist.DBID
+	WalletIds []persist.DBID
 }
 
 type ErrInvalidIDFormat struct {
