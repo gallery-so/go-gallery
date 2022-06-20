@@ -163,8 +163,8 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 			}(addr, chain)
 		}
 	}
-	allTokens := []chainTokens{}
-	allContracts := []chainContracts{}
+	allTokens := make([]chainTokens, 0, len(user.Wallets))
+	allContracts := make([]chainContracts, 0, len(user.Wallets))
 	// ensure all tokens have been upserted
 	for i := 0; i < (len(user.Wallets) * 2); i++ {
 		select {
@@ -182,7 +182,6 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
 	}
-	addressesToContracts := map[string]persist.DBID{}
 	contractsForChain := map[persist.Chain][]persist.Address{}
 	for _, c := range newContracts {
 		if _, ok := contractsForChain[c.Chain]; !ok {
@@ -190,6 +189,8 @@ func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID)
 		}
 		contractsForChain[c.Chain] = append(contractsForChain[c.Chain], c.Address)
 	}
+
+	addressesToContracts := map[string]persist.DBID{}
 	for chain, addresses := range contractsForChain {
 		newContracts, err := d.ContractRepo.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
