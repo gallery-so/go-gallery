@@ -67,10 +67,6 @@ type Repositories struct {
 	CommunityRepository   CommunityRepository
 	EarlyAccessRepository EarlyAccessRepository
 	WalletRepository      WalletRepository
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	UserEventRepository       UserEventRepository
-	NftEventRepository        NftEventRepository
-	CollectionEventRepository CollectionEventRepository
 }
 
 // GenerateID generates a application-wide unique ID

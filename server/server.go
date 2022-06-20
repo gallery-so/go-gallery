@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 
@@ -35,8 +36,8 @@ import (
 func Init() {
 	setDefaults()
 
-	logger.InitLogger()
-	sentryutil.InitSentry()
+	initLogger()
+	initSentry()
 
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
@@ -114,11 +115,8 @@ func setDefaults() {
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
-	viper.SetDefault("GCLOUD_FEED_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
-	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 5)
-	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 
@@ -167,10 +165,6 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		CommunityRepository:   postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
 		WalletRepository:      postgres.NewWalletRepository(db),
-		// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-		UserEventRepository:       postgres.NewUserEventRepository(db),
-		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
-		NftEventRepository:        postgres.NewNftEventRepository(db),
 	}
 }
 
@@ -180,6 +174,48 @@ func newEthClient() *ethclient.Client {
 		panic(err)
 	}
 	return client
+}
+
+func initLogger() {
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.SetReportCaller(true)
+
+		if viper.GetString("ENV") != "production" {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+
+		if viper.GetString("ENV") == "local" {
+			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+		} else {
+			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
+			logger.SetFormatter(&logrus.JSONFormatter{})
+		}
+	})
+}
+
+func initSentry() {
+	if viper.GetString("ENV") == "local" {
+		logger.For(nil).Info("skipping sentry init")
+		return
+	}
+
+	logger.For(nil).Info("initializing sentry...")
+
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              viper.GetString("SENTRY_DSN"),
+		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		AttachStacktrace: true,
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			event = sentryutil.ScrubEventCookies(event, hint)
+			event = sentryutil.UpdateErrorFingerprints(event, hint)
+			return event
+		},
+	})
+
+	if err != nil {
+		logger.For(nil).Fatalf("failed to start sentry: %s", err)
+	}
 }
 
 func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {

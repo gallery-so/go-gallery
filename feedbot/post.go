@@ -6,26 +6,264 @@ import (
 	"fmt"
 	"html"
 
-	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/shurcooL/graphql"
 	"github.com/spf13/viper"
 )
 
-type Post struct {
-	name     string
-	criteria []func(Query) bool
-	poster   Poster
+type PostRenderSender struct {
+	PostRenderer
+	PostSender
 }
 
-type Poster interface {
-	Send(context.Context, Query) error
+func (r *PostRenderSender) RenderAndSend(ctx context.Context, message task.FeedbotMessage) error {
+	msg, err := r.Render(ctx, message)
+
+	if err != nil {
+		return err
+	}
+
+	if msg == "" {
+		return nil
+	}
+
+	return r.Send(ctx, msg)
 }
 
-type DiscordPoster struct {
-	render func(Query) string
+type PostRenderer struct {
+	gql *graphql.Client
 }
 
-func (d *DiscordPoster) Send(ctx context.Context, q Query) error {
-	content := html.UnescapeString(d.render(q))
+func (r *PostRenderer) Render(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	switch message.Action {
+	case persist.ActionUserCreated:
+		return r.createUserCreatedPost(ctx, message)
+	case persist.ActionUserFollowedUsers:
+		return r.createUserFollowedUsersPost(ctx, message)
+	case persist.ActionCollectorsNoteAddedToToken:
+		return r.createCollectorsNoteAddedToTokenPost(ctx, message)
+	case persist.ActionCollectionCreated:
+		return r.createCollectionCreatedPost(ctx, message)
+	case persist.ActionCollectorsNoteAddedToCollection:
+		return r.createCollectorsNoteAddedToCollectionPost(ctx, message)
+	case persist.ActionTokensAddedToCollection:
+		return r.createTokensAddedToCollectionPost(ctx, message)
+	default:
+		return "", fmt.Errorf("unknown action=%s; id=%s", message.Action, message.FeedEventID)
+	}
+}
+
+func (r *PostRenderer) createUserCreatedPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.UserCreated.Owner.Username == "" {
+		return "", nil
+	}
+
+	return fmt.Sprintf("**%s** joined Gallery: %s",
+		evt.FeedEvent.UserCreated.Owner.Username, userURL(evt.FeedEvent.UserCreated.Owner.Username),
+	), nil
+}
+
+func (r *PostRenderer) createUserFollowedUsersPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.UserFollowedUsers.Owner.Username == "" {
+		return "", nil
+	}
+
+	if len(evt.FeedEvent.UserFollowedUsers.Followed) == 1 {
+		return fmt.Sprintf("**%s** followed **%s**: %s",
+			evt.FeedEvent.UserFollowedUsers.Owner.Username,
+			evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username,
+			userURL(evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username),
+		), nil
+	} else {
+		return fmt.Sprintf("**%s** followed **%s** and %d other(s): %s",
+			evt.FeedEvent.UserFollowedUsers.Owner.Username,
+			evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username,
+			len(evt.FeedEvent.UserFollowedUsers.Followed)-1,
+			userURL(evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username),
+		), nil
+	}
+}
+
+func (r *PostRenderer) createCollectorsNoteAddedToTokenPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username == "" {
+		return "", nil
+	}
+
+	if evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Token.Name != "" {
+		return fmt.Sprintf("**%s** added a collector's note to *%s*: %s",
+			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+			evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Token.Name,
+			tokenURL(
+				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Collection.Dbid,
+				evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Token.Dbid,
+			),
+		), nil
+	} else {
+		return fmt.Sprintf("**%s** added a collector's note to their piece: %s",
+			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+			tokenURL(
+				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Collection.Dbid,
+				evt.FeedEvent.CollectorsNoteAddedToToken.CollectionToken.Token.Dbid,
+			),
+		), nil
+	}
+}
+
+func (r *PostRenderer) createCollectionCreatedPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.CollectionCreated.Owner.Username == "" {
+		return "", nil
+	}
+
+	if evt.FeedEvent.CollectionCreated.Collection.Name != "" {
+		return fmt.Sprintf("**%s** created a collection titled '*%s'*: %s",
+			evt.FeedEvent.CollectionCreated.Owner.Username,
+			evt.FeedEvent.CollectionCreated.Collection.Name,
+			collectionURL(
+				evt.FeedEvent.CollectionCreated.Owner.Username,
+				evt.FeedEvent.CollectionCreated.Collection.Dbid,
+			),
+		), nil
+	} else {
+		return fmt.Sprintf("**%s** created a collection: %s",
+			evt.FeedEvent.CollectionCreated.Owner.Username,
+			collectionURL(
+				evt.FeedEvent.CollectionCreated.Owner.Username,
+				evt.FeedEvent.CollectionCreated.Collection.Dbid,
+			),
+		), nil
+	}
+}
+
+func (r *PostRenderer) createCollectorsNoteAddedToCollectionPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username == "" {
+		return "", nil
+	}
+
+	if evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Name != "" {
+		return fmt.Sprintf("**%s** added a collector's note to their collection, *%s*: %s",
+			evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
+			evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Name,
+			collectionURL(
+				evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
+				evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Dbid,
+			),
+		), nil
+	} else {
+		return fmt.Sprintf("**%s** added a collector's note to their collection: %s",
+			evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
+			collectionURL(
+				evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
+				evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Dbid,
+			),
+		), nil
+	}
+}
+
+func (r *PostRenderer) createTokensAddedToCollectionPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
+	var evt EventQuery
+
+	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
+		"id": fmt.Sprintf("%sEvent", message.Action),
+	}); err != nil {
+		return "", err
+	}
+
+	if evt.FeedEvent.TokensAddedToCollection.Owner.Username == "" {
+		return "", nil
+	}
+
+	tokensAdded := len(evt.FeedEvent.TokensAddedToCollection.NewTokens)
+	username := evt.FeedEvent.TokensAddedToCollection.Owner.Username
+	collectionName := evt.FeedEvent.TokensAddedToCollection.Collection.Name
+	url := collectionURL(username, evt.FeedEvent.TokensAddedToCollection.Collection.Dbid)
+
+	var tokenName string
+	for _, token := range evt.FeedEvent.TokensAddedToCollection.NewTokens {
+		if token.Token.Name != "" {
+			tokenName = token.Token.Name
+			break
+		}
+	}
+
+	var msg string
+
+	if collectionName != "" && tokenName != "" {
+		msg = fmt.Sprintf("**%s** added *%s* ", username, tokenName)
+		if tokensAdded == 1 {
+			msg += fmt.Sprintf("to their collection, *%s*: %s", collectionName, url)
+		} else {
+			msg += fmt.Sprintf("and %v other NFT(s) to their collection, *%s*: %s",
+				tokensAdded-1, collectionName, url,
+			)
+		}
+		return msg, nil
+	} else if collectionName == "" && tokenName != "" {
+		msg = fmt.Sprintf("**%s** added *%s* ", username, tokenName)
+		if tokensAdded == 1 {
+			msg += fmt.Sprintf("to their collection: %s", url)
+		} else {
+			msg += fmt.Sprintf("and %v other NFT(s) to their collection: %s", tokensAdded-1, url)
+		}
+	} else if collectionName != "" && tokenName == "" {
+		return fmt.Sprintf("**%s** added %v NFT(s) to their collection, *%s*: %s",
+			username, tokensAdded, collectionName, url,
+		), nil
+	} else {
+		return fmt.Sprintf("**%s** added %v NFT(s) to their collection: %s",
+			username, tokensAdded, url,
+		), nil
+	}
+
+	return msg, nil
+}
+
+type PostSender struct{}
+
+func (s *PostSender) Send(ctx context.Context, post string) error {
+	content := html.UnescapeString(post)
 
 	message, err := json.Marshal(map[string]interface{}{
 		"content": content,
@@ -39,53 +277,6 @@ func (d *DiscordPoster) Send(ctx context.Context, q Query) error {
 	return sendMessage(ctx, message)
 }
 
-func (p *Post) Handle(ctx context.Context, q Query) (bool, error) {
-	if err := p.poster.Send(ctx, q); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (p *Post) Matches(q Query) bool {
-	for i, criteria := range p.criteria {
-		match := criteria(q)
-		logger.For(nil).Debugf("%s.%d is %v", p.name, i, match)
-		if !match {
-			return false
-		}
-	}
-	return true
-}
-
-type Feed []*Post
-
-var feedPosts = Feed{
-	userCreatedPost(),
-	userFollowedPost(),
-	nftCollectorsNoteAddedPost(),
-	collectionCreatedPost(),
-	collectionCollectorsNoteAddedPost(),
-	collectionTokensAddedPost(),
-}
-
-func (f Feed) SearchFor(ctx context.Context, q Query) (bool, error) {
-	logger.For(ctx).Debugf("handling event=%s; query=%v", q.EventID, q)
-
-	var handled bool
-	var err error
-
-	for _, p := range f {
-		if p.Matches(q) {
-			logger.For(ctx).Debugf("event=%s matches post=%s", q.EventID, p.name)
-			handled, err = p.Handle(ctx, q)
-			break
-		}
-	}
-
-	logger.For(ctx).Debugf("event=%s handled=%v err=%v", q.EventID, handled, err)
-	return handled, err
-}
-
 func userURL(username string) string {
 	return fmt.Sprintf("%s/%s", viper.GetString("GALLERY_HOST"), username)
 }
@@ -94,175 +285,56 @@ func collectionURL(username, collectionID string) string {
 	return fmt.Sprintf("%s/%s", userURL(username), collectionID)
 }
 
-func nftURL(username, collectionID, nftID string) string {
-	return fmt.Sprintf("%s/%s", collectionURL(username, collectionID), nftID)
+func tokenURL(username, collectionID, tokenID string) string {
+	return fmt.Sprintf("%s/%s", collectionURL(username, collectionID), tokenID)
 }
 
-func userCreatedPost() *Post {
-	return &Post{
-		name: "UserCreated",
-		criteria: append(
-			baseCriteria,
-			isUserCreatedEvent,
-			userNoEventsBefore,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				return fmt.Sprintf("**%s** joined Gallery: %s", q.Username, userURL(q.Username))
-			},
-		},
-	}
+type UserFragment struct {
+	Username string
 }
 
-func userFollowedPost() *Post {
-	return &Post{
-		name: "UserFollowed",
-		criteria: append(
-			baseCriteria,
-			isUserFollowedEvent,
-			followedUserHasUsername,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				return fmt.Sprintf("**%s** followed **%s**: %s", q.Username, q.FollowedUsername, userURL(q.FollowedUsername))
-			},
-		},
-	}
+type TokenFragment struct {
+	Dbid string
+	Name string
 }
 
-func nftCollectorsNoteAddedPost() *Post {
-	return &Post{
-		name: "NftCollectorsNoteAdded",
-		criteria: append(
-			baseCriteria,
-			isNftCollectorsNoteAddedEvent,
-			nftHasCollectorsNote,
-			nftBelongsToCollection,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				var message string
-				if q.NftName != "" {
-					message = fmt.Sprintf("**%s** added a collector's note to *%s*: %s", q.Username, q.NftName, nftURL(q.Username, q.CollectionID.String(), q.NftID.String()))
-				} else {
-					message = fmt.Sprintf("**%s** added a collector's note to their NFT: %s", q.Username, nftURL(q.Username, q.CollectionID.String(), q.NftID.String()))
-				}
-				return message
-			},
-		},
-	}
+type CollectionFragment struct {
+	Dbid string
+	Name string
 }
 
-func collectionCreatedPost() *Post {
-	return &Post{
-		name: "CollectionCreated",
-		criteria: append(
-			baseCriteria,
-			isCollectionCreatedEvent,
-			collectionHasNfts,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				var message string
-				if q.CollectionName != "" {
-					message = fmt.Sprintf("**%s** created a collection titled '*%s'*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
-				} else {
-					message = fmt.Sprintf("**%s** created a collection: %s", q.Username, collectionURL(q.Username, q.CollectionID.String()))
-				}
-				return message
-			},
-		},
-	}
-}
-
-func collectionCollectorsNoteAddedPost() *Post {
-	return &Post{
-		name: "CollectionCollectorsNoteAdded",
-		criteria: append(
-			baseCriteria,
-			isCollectionCollectorsNoteAddedEvent,
-			collectionHasCollectorsNote,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				var message string
-				if q.CollectionName != "" {
-					message = fmt.Sprintf("**%s** added a collector's note to their collection, *%s*: %s", q.Username, q.CollectionName, collectionURL(q.Username, q.CollectionID.String()))
-				} else {
-					message = fmt.Sprintf("**%s** added a collector's note to their collection: %s", q.Username, collectionURL(q.Username, q.CollectionID.String()))
-				}
-				return message
-			},
-		},
-	}
-}
-
-func collectionTokensAddedPost() *Post {
-	return &Post{
-		name: "CollectionTokensAdded",
-		criteria: append(
-			baseCriteria,
-			isCollectionTokensAddedEvent,
-			collectionHasNfts,
-			collectionHasNewTokensAdded,
-		),
-		poster: &DiscordPoster{
-			render: func(q Query) string {
-				var tokensAdded int
-				var tokenName string
-
-				if q.LastCollectionEvent != nil {
-					for _, nft := range q.CollectionNfts {
-						contains := false
-						for _, otherId := range q.LastCollectionEvent.Data.NFTs {
-							if nft.Nft.Dbid == otherId {
-								contains = true
-								break
-							}
-						}
-						if !contains {
-							tokensAdded++
-							if tokenName == "" && nft.Nft.Name != "" {
-								tokenName = nft.Nft.Name
-							}
-						}
-					}
-				} else {
-					tokensAdded = len(q.CollectionNfts)
-
-					for _, nft := range q.CollectionNfts {
-						if nft.Nft.Name != "" {
-							tokenName = nft.Nft.Name
-							break
-						}
-					}
-				}
-
-				url := collectionURL(q.Username, q.CollectionID.String())
-				var message string
-
-				if q.CollectionName != "" && tokenName != "" {
-					message = fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
-					if tokensAdded == 1 {
-						message += fmt.Sprintf("to their collection, *%s*: %s", q.CollectionName, url)
-					} else {
-						message += fmt.Sprintf("and %v other NFT(s) to their collection, *%s*: %s", tokensAdded-1, q.CollectionName, url)
-					}
-				} else if q.CollectionName == "" && tokenName != "" {
-					message = fmt.Sprintf("**%s** added *%s* ", q.Username, tokenName)
-					if tokensAdded == 1 {
-						message += fmt.Sprintf("to their collection: %s", url)
-					} else {
-						message += fmt.Sprintf("and %v other NFT(s) to their collection: %s", tokensAdded-1, url)
-					}
-				} else if q.CollectionName != "" && tokenName == "" {
-					message = fmt.Sprintf("**%s** added %v NFT(s) to their collection, *%s*: %s", q.Username, tokensAdded, q.CollectionName, url)
-				} else {
-					message = fmt.Sprintf("**%s** added %v NFT(s) to their collection: %s", q.Username, tokensAdded, url)
-				}
-
-				return message
-			},
-		},
-	}
+type EventQuery struct {
+	FeedEvent struct {
+		UserCreated struct {
+			Owner UserFragment
+		} `graphql:"...on UserCreatedEvent"`
+		UserFollowedUsers struct {
+			Owner    UserFragment
+			Followed []struct {
+				User UserFragment
+			}
+		} `graphql:"...on UserFollowedUsersEvent"`
+		CollectorsNoteAddedToToken struct {
+			Owner           UserFragment
+			CollectionToken struct {
+				Token      TokenFragment
+				Collection CollectionFragment
+			}
+		} `graphql:"...on CollectorsNoteAddedToTokenEvent"`
+		CollectionCreated struct {
+			Owner      UserFragment
+			Collection CollectionFragment
+		} `graphql:"...on CollectionCreatedEvent"`
+		CollectorsNoteAddedToCollection struct {
+			Owner      UserFragment
+			Collection CollectionFragment
+		} `graphql:"...on CollectorsNoteAddedToCollectionEvent"`
+		TokensAddedToCollection struct {
+			Owner      UserFragment
+			Collection CollectionFragment
+			NewTokens  []struct {
+				Token TokenFragment
+			}
+		} `graphql:"...on TokensAddedToCollectionEvent"`
+	} `graphql:"node(id: $id)"`
 }

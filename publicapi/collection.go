@@ -10,7 +10,6 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -107,7 +106,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	evt := sqlc.Event{
+	err = event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:      userID,
 		Action:       persist.ActionCollectionCreated,
 		ResourceID:   persist.ResourceTypeCollection,
@@ -117,17 +116,9 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
 		},
-	}
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return nil, err
-	}
+	})
 
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	collectionData := persist.CollectionEvent{NFTs: createdCollection.Nfts, CollectorsNote: persist.NullString(createdCollection.CollectorsNote.String)}
-	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
-
-	return &createdCollection, nil
+	return &createdCollection, err
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
@@ -185,24 +176,14 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	evt := sqlc.Event{
+	return event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:      userID,
 		Action:       persist.ActionCollectorsNoteAddedToCollection,
 		ResourceID:   persist.ResourceTypeCollection,
 		CollectionID: collectionID,
 		SubjectID:    collectionID,
 		Data:         persist.EventData{CollectionCollectorsNote: collectorsNote},
-	}
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
-
-	return nil
+	})
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout) error {
@@ -235,24 +216,14 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	evt := sqlc.Event{
+	return event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:      userID,
 		Action:       persist.ActionTokensAddedToCollection,
 		ResourceID:   persist.ResourceTypeCollection,
 		CollectionID: collectionID,
 		SubjectID:    collectionID,
 		Data:         persist.EventData{CollectionTokenIDs: tokens},
-	}
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	collectionData := persist.CollectionEvent{NFTs: tokens}
-	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
-
-	return nil
+	})
 }
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
@@ -278,19 +249,4 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	api.loaders.ClearAllCaches()
 
 	return nil
-}
-
-// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-// Everything below can be removed.
-func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
-	gc := util.GinContextFromContext(ctx)
-	collectionHandlers := event.For(gc).Collection
-	evt := persist.CollectionEventRecord{
-		UserID:       userID,
-		CollectionID: collectionID,
-		Code:         eventCode,
-		Data:         collectionData,
-	}
-
-	collectionHandlers.Dispatch(ctx, evt)
 }

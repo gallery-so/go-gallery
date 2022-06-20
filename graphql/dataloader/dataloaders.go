@@ -802,6 +802,7 @@ func loadUserFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([
 		return events, errors
 	}
 }
+
 func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
 	return func(params []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
 		events := make([][]sqlc.FeedEvent, len(params))

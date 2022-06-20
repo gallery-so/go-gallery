@@ -6,7 +6,6 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -164,7 +163,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	evt := sqlc.Event{
+	return event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:    userID,
 		Action:     persist.ActionCollectorsNoteAddedToToken,
 		ResourceID: persist.ResourceTypeToken,
@@ -174,30 +173,5 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 			TokenCollectionID:   collectionID,
 			TokenCollectorsNote: collectorsNote,
 		},
-	}
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	nftData := persist.NftEvent{CollectionID: collectionID, CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchTokenEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, tokenID, nftData)
-
-	return nil
-}
-
-// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-// Everything below can be removed.
-func dispatchTokenEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, tokenID persist.DBID, nftData persist.NftEvent) {
-	gc := util.GinContextFromContext(ctx)
-	nftHandlers := event.For(gc).Nft
-	evt := persist.NftEventRecord{
-		UserID: userID,
-		NftID:  tokenID,
-		Code:   eventCode,
-		Data:   nftData,
-	}
-
-	nftHandlers.Dispatch(ctx, evt)
+	})
 }

@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/shurcooL/graphql"
 	"github.com/spf13/viper"
 )
@@ -43,8 +42,8 @@ func TaskRequired() gin.HandlerFunc {
 	}
 }
 
-func handlersInit(router *gin.Engine, repos persist.Repositories, gql *graphql.Client) *gin.Engine {
+func handlersInit(router *gin.Engine, gql *graphql.Client) *gin.Engine {
 	router.GET("/ping", ping())
-	router.POST("/tasks/feed-event", TaskRequired(), handleMessage(repos, gql))
+	router.POST("/tasks/feed-event", TaskRequired(), handleMessage(gql))
 	return router
 }

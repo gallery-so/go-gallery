@@ -83,7 +83,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 		}
 
 		mediamapper.AddTo(c)
-		event.AddTo(c, repos, queries)
+		event.AddTo(c, queries)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp)
 		h.ServeHTTP(c.Writer, c.Request)
 	}

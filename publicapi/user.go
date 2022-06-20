@@ -148,24 +148,14 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	evt := sqlc.Event{
+	return event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:    userID,
 		Action:     persist.ActionUserCreated,
 		ResourceID: persist.ResourceTypeUser,
 		UserID:     userID,
 		SubjectID:  userID,
 		Data:       persist.EventData{UserBio: bio},
-	}
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	userData := persist.UserEvent{Bio: persist.NullString(bio)}
-	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
-
-	return nil
+	})
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
@@ -273,25 +263,14 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 
-	evt := sqlc.Event{
+	return event.DispatchEventToFeed(ctx, sqlc.Event{
 		ActorID:    curUserID,
 		Action:     persist.ActionUserFollowedUsers,
 		ResourceID: persist.ResourceTypeUser,
 		UserID:     userID,
 		SubjectID:  userID,
 		Data:       persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
-	}
-
-	err = event.DispatchEventToFeed(ctx, evt)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	userData := persist.UserEvent{FollowedUserID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
-
-	return err
+	})
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
@@ -308,17 +287,4 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 	}
 
 	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
-}
-
-// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-// Everything below can be removed.
-func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
-	gc := util.GinContextFromContext(ctx)
-	userHandlers := event.For(gc).User
-	evt := persist.UserEventRecord{
-		UserID: userID,
-		Code:   eventCode,
-		Data:   userData,
-	}
-	userHandlers.Dispatch(ctx, evt)
 }

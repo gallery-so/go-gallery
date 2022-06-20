@@ -17,15 +17,10 @@ const EventHandlerContextKey = "event.eventHandlers"
 
 type EventHandlers struct {
 	Feed *eventDispatcher
-
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	Collection *CollectionDispatcher
-	User       *UserDispatcher
-	Nft        *NftDispatcher
 }
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries) {
+func AddTo(ctx *gin.Context, queries *sqlc.Queries) {
 	eventDispatcher := eventDispatcher{handlers: map[persist.Action]eventHandler{}}
 	feedHandler := feedHandler{postgres.EventRepository{Queries: queries}}
 
@@ -36,29 +31,7 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries)
 	eventDispatcher.AddHandler(persist.ActionCollectorsNoteAddedToCollection, feedHandler)
 	eventDispatcher.AddHandler(persist.ActionTokensAddedToCollection, feedHandler)
 
-	// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-	collectionDispatcher := CollectionDispatcher{Handlers: map[persist.EventCode][]CollectionEventHandler{}}
-	collectionTask := task.CollectionFeedTask{CollectionEventRepo: repos.CollectionEventRepository}
-	collectionDispatcher.Handle(persist.CollectionCreatedEvent, &collectionTask)
-	collectionDispatcher.Handle(persist.CollectionCollectorsNoteAdded, &collectionTask)
-	collectionDispatcher.Handle(persist.CollectionTokensAdded, &collectionTask)
-	userDispatcher := UserDispatcher{Handlers: map[persist.EventCode][]UserEventHandler{}}
-	userTask := task.UserFeedTask{UserEventRepo: repos.UserEventRepository}
-	userDispatcher.Handle(persist.UserCreatedEvent, &userTask)
-	userDispatcher.Handle(persist.UserFollowedEvent, &userTask)
-	nftDispatcher := NftDispatcher{Handlers: map[persist.EventCode][]NftEventHandler{}}
-	nftTask := task.NftFeedEvent{NftEventRepo: repos.NftEventRepository}
-	nftDispatcher.Handle(persist.NftCollectorsNoteAddedEvent, &nftTask)
-
-	eventHandlers := &EventHandlers{
-		Feed: &eventDispatcher,
-
-		// TODO: Remove when the feedbot uses the feed API instead of creating its own posts.
-		Collection: &collectionDispatcher,
-		User:       &userDispatcher,
-		Nft:        &nftDispatcher,
-	}
-
+	eventHandlers := &EventHandlers{Feed: &eventDispatcher}
 	ctx.Set(EventHandlerContextKey, eventHandlers)
 }
 

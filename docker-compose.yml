@@ -40,8 +40,8 @@ services:
       - POSTGRES_DB=postgres
   cloudtasks:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
-    command: -host 0.0.0.0 -port 8123 -queue "projects/gallery-local/locations/here/queues/feed-event"
+    command: -host 0.0.0.0 -port 8123 -queue "projects/gallery-local/locations/here/queues/feed-event" -queue "projects/gallery-local/locations/here/queues/feed"
     ports:
       - "8123:8123"
     environment:
-      - APP_ENGINE_EMULATOR_HOST=http://host.docker.internal:4123
+      - APP_ENGINE_EMULATOR_HOST=http://host.docker.internal:4124
