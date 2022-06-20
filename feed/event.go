@@ -3,6 +3,7 @@ package feed
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -50,7 +51,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	case persist.ActionTokensAddedToCollection:
 		return b.createTokensAddedToCollectionEvent(ctx, event)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("unknown action=%s; id=%s", event.Action, event.ID)
 	}
 }
 

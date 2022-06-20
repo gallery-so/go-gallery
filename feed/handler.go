@@ -9,7 +9,7 @@ import (
 )
 
 // TaskRequired checks that the request came from Cloud Tasks.
-// Returns a 200 status in order to remove unknown messages from the task queue.
+// Returns a 200 status in order to remove bad messages from the task queue.
 func taskRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		taskName := c.Request.Header.Get("X-Appengine-Taskname")

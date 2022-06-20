@@ -3,10 +3,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"time"
-
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"time"
 )
 
 type EarlyAccessRepository struct {

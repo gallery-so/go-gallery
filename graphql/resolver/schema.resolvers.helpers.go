@@ -481,7 +481,6 @@ func resolveViewerFeed(ctx context.Context, page *model.Pagination) (*model.Feed
 	}
 
 	return eventsToFeed(ctx, token, events)
-
 }
 
 func resolveGlobalFeed(ctx context.Context, page *model.Pagination) (*model.Feed, error) {

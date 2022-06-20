@@ -408,7 +408,6 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) (refollowed bool, err error) {
 	err = u.addFollowerStmt.QueryRowContext(pCtx, persist.GenerateID(), follower, followee).Scan(&refollowed)
 	if err != nil {
-		panic(err)
 		return false, err
 	}
 

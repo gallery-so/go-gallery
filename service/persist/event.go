@@ -43,7 +43,7 @@ type ErrEventNotFoundByID struct {
 }
 
 func (e ErrEventNotFoundByID) Error() string {
-	return fmt.Sprintf("post not found by id: %s", e.ID)
+	return fmt.Sprintf("event not found by id: %s", e.ID)
 }
 
 type ErrUnknownAction struct {

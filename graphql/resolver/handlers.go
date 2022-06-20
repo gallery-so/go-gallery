@@ -72,7 +72,7 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 			sentryutil.ReportRemappedError(ctx, err, remapped)
 			return remapped, nil
 		}
-		logger.For(ctx).Errorf("unmapped error: %s", err)
+		logger.For(ctx).Debugf("unmapped error: %s", err)
 	}
 
 	sentryutil.ReportError(ctx, err)
