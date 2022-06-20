@@ -411,6 +411,10 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
+	ownedByWallets := []persist.Wallet{}
+	if walletID != "" {
+		ownedByWallets = append(ownedByWallets, persist.Wallet{ID: walletID})
+	}
 
 	token := persist.TokenGallery{
 		ID:               nft.ID,
@@ -422,7 +426,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
-		OwnedByWallets:   []persist.Wallet{{ID: walletID}},
+		OwnedByWallets:   ownedByWallets,
 		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
 		TokenID:          nft.OpenseaTokenID,
 		OwnerUserID:      ownerUserID,
