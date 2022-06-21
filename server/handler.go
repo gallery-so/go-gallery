@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
+	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -33,8 +34,7 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider) {
-	// TODO: Uncomment to re-enable GraphQL API
-	//parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider))
+	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider))
 
 	if viper.GetString("ENV") != "production" {
 		// TODO: Consider completely disabling introspection in production
