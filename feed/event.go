@@ -2,11 +2,9 @@ package feed
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -28,10 +26,6 @@ func NewEventBuilder() *EventBuilder {
 
 func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*sqlc.FeedEvent, error) {
 	event, err := b.eventRepo.Get(ctx, message.ID)
-
-	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
 
 	if err != nil {
 		return nil, err
