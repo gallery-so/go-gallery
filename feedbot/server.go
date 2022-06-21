@@ -5,11 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
-	"github.com/sirupsen/logrus"
 )
 
 func handleMessage(gql *graphql.Client) gin.HandlerFunc {
@@ -24,12 +22,10 @@ func handleMessage(gql *graphql.Client) gin.HandlerFunc {
 
 		err := discordHandler.RenderAndSend(c.Request.Context(), message)
 		if err != nil {
-			logger.For(c).WithFields(logrus.Fields{"feedEventID": message.FeedEventID}).Debugf("failed to handle event: %s", err)
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		logger.For(c).WithFields(logrus.Fields{"feedEventID": message.FeedEventID}).Debug("event processed")
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("event=%s processed", message.FeedEventID)})
 	}
 }
