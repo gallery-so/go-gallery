@@ -1062,9 +1062,8 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 
 const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
 SELECT fd.id, fd.version, fd.owner_id, fd.action, fd.data, fd.event_time, fd.event_ids, fd.deleted, fd.last_updated, fd.created_at FROM feed_events fd
-    INNER JOIN follows fl ON fd.owner_id = fl.followee
+    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $2 AND fd.deleted = false and fl.deleted = false
     WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
-    AND fl.follower = $2 AND fd.deleted = false AND fl.deleted = false
     ORDER BY fd.event_time DESC
     LIMIT $3
 `
