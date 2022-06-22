@@ -96,15 +96,13 @@ func NewArweaveClient() *goar.Client {
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
-func GetTokenContractMetadata(address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
+func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	contract := address.Address()
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
 	name, err := instance.Name(&bind.CallOpts{
 		Context: ctx,
 	})

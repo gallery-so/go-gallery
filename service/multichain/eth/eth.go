@@ -53,7 +53,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens?address=%s&limit=-1", d.indexerBaseURL, addr), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=-1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID), nil)
 	if err != nil {
 		return nil, err
@@ -172,11 +172,46 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
+// RefreshToken refreshes the metadata for a given token.
+func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) error {
+
+	input := indexer.UpdateTokenMediaInput{
+		TokenID:         ti.TokenID,
+		ContractAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(ti.ContractAddress)),
+		UpdateAll:       true,
+	}
+
+	m, err := json.Marshal(input)
+
+	buf := bytes.NewBuffer(m)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", d.indexerBaseURL), buf)
+	if err != nil {
+		return err
+	}
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 299 || res.StatusCode < 200 {
+		errResp := util.ErrorResponse{}
+		err = json.NewDecoder(res.Body).Decode(&errResp)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+	}
+
+	return nil
+}
+
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 
-	input := indexer.UpdateMediaInput{
-		OwnerAddress: persist.EthereumAddress(wallet.String()),
+	input := indexer.UpdateTokenMediaInput{
+		OwnerAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(wallet)),
 		UpdateAll:    all,
 	}
 
@@ -185,7 +220,42 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/update", d.indexerBaseURL), bytes.NewReader(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", d.indexerBaseURL), bytes.NewReader(asJSON))
+	if err != nil {
+		return err
+	}
+
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode >= 299 || res.StatusCode < 200 {
+		errResp := util.ErrorResponse{}
+		err = json.NewDecoder(res.Body).Decode(&errResp)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+	}
+
+	return nil
+}
+
+// RefreshContract refreshses the metadata for a contract
+func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
+	input := indexer.UpdateContractMediaInput{
+		Address: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(addr)),
+	}
+
+	asJSON, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/contracts/refresh", d.indexerBaseURL), bytes.NewReader(asJSON))
 	if err != nil {
 		return err
 	}

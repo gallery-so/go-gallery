@@ -14,6 +14,7 @@ type ContractRepository struct {
 	db                  *sql.DB
 	getByAddressStmt    *sql.Stmt
 	upsertByAddressStmt *sql.Stmt
+	updateByAddressStmt *sql.Stmt
 }
 
 // NewContractRepository creates a new postgres repository for interacting with contracts
@@ -27,7 +28,10 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6,CREATOR_ADDRESS = $7;`)
 	checkNoErr(err)
 
-	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt}
+	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5 WHERE ADDRESS = $1;`)
+	checkNoErr(err)
+
+	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt}
 }
 
 // GetByAddress returns the contract with the given address
@@ -71,6 +75,14 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 		return fmt.Errorf("error bulk upserting contracts: %v - SQL: %s -- VALS: %+v", err, sqlStr, vals)
 	}
 
+	return nil
+}
+
+// UpdateByAddress updates the given contract's metadata fields by its address field.
+func (c *ContractRepository) UpdateByAddress(ctx context.Context, addr persist.EthereumAddress, up persist.ContractUpdateInput) error {
+	if _, err := c.updateByAddressStmt.ExecContext(ctx, addr, up.Name, up.Symbol, up.CreatorAddress, up.LatestBlock); err != nil {
+		return err
+	}
 	return nil
 }
 

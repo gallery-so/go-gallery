@@ -61,6 +61,12 @@ type ChainAgnosticContract struct {
 	LatestBlock persist.BlockNumber `json:"latest_block"`
 }
 
+// ChainAgnosticIdentifiers identify tokens despite their chain
+type ChainAgnosticIdentifiers struct {
+	ContractAddress persist.Address `json:"contract_address"`
+	TokenID         persist.TokenID `json:"token_id"`
+}
+
 // ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
 type ErrChainNotFound struct {
 	Chain persist.Chain
@@ -87,8 +93,10 @@ type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
 	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, persist.TokenIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
+	RefreshToken(context.Context, ChainAgnosticIdentifiers) error
+	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
 	// do we want to return the tokens we validate?
