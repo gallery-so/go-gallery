@@ -23,6 +23,13 @@ func Init() {
 	http.Handle("/", router)
 }
 
+// InitServer initializes the indexer server
+func InitServer() {
+	router := coreInitServer()
+	logrus.Info("Starting indexer server...")
+	http.Handle("/", router)
+}
+
 func coreInit() (*gin.Engine, *indexer) {
 
 	setDefaults()
@@ -56,6 +63,38 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	logrus.Info("Registering handlers...")
 	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
+}
+
+func coreInitServer() *gin.Engine {
+
+	setDefaults()
+
+	tokenRepo, contractRepo := newRepos()
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		panic(err)
+	}
+	ethClient := rpc.NewEthClient()
+	ipfsClient := rpc.NewIPFSShell()
+	arweaveClient := rpc.NewArweaveClient()
+
+	router := gin.Default()
+
+	router.Use(middleware.HandleCORS())
+
+	if viper.GetString("ENV") != "production" {
+		gin.SetMode(gin.DebugMode)
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	logrus.Info("Registering handlers...")
+	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
 func setDefaults() {
