@@ -12,6 +12,11 @@ import (
 func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 	router.GET("/status", getStatus(i, tokenRepository))
 
+	return router
+}
+
+func handlersInitServer(router *gin.Engine, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
+
 	mediaGroup := router.Group("/media")
 	mediaGroup.POST("/update", updateMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 
