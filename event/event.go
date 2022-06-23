@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -61,6 +62,7 @@ func (d *eventDispatcher) Dispatch(ctx context.Context, event sqlc.Event) error 
 	if handler, ok := d.handlers[event.Action]; ok {
 		return handler.Handle(ctx, event)
 	}
+	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil
 }
 
