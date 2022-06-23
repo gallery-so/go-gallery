@@ -281,6 +281,8 @@ type ComplexityRoot struct {
 		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                   func(childComplexity int) int
+		RefreshContractMetadata  func(childComplexity int, contractID persist.DBID) int
+		RefreshTokenMetadata     func(childComplexity int, tokenID persist.DBID) int
 		RefreshTokens            func(childComplexity int) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
@@ -317,6 +319,14 @@ type ComplexityRoot struct {
 		UserByID            func(childComplexity int, id persist.DBID) int
 		UserByUsername      func(childComplexity int, username string) int
 		Viewer              func(childComplexity int) int
+	}
+
+	RefreshContractMetadataPayload struct {
+		Contract func(childComplexity int) int
+	}
+
+	RefreshTokenMetadataPayload struct {
+		Token func(childComplexity int) int
 	}
 
 	RefreshTokensPayload struct {
@@ -467,6 +477,8 @@ type MutationResolver interface {
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error)
+	RefreshTokenMetadata(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenMetadataPayloadOrError, error)
+	RefreshContractMetadata(ctx context.Context, contractID persist.DBID) (model.RefreshContractMetadataPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
@@ -1356,6 +1368,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Logout(childComplexity), true
 
+	case "Mutation.refreshContractMetadata":
+		if e.complexity.Mutation.RefreshContractMetadata == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_refreshContractMetadata_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RefreshContractMetadata(childComplexity, args["contractID"].(persist.DBID)), true
+
+	case "Mutation.refreshTokenMetadata":
+		if e.complexity.Mutation.RefreshTokenMetadata == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_refreshTokenMetadata_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RefreshTokenMetadata(childComplexity, args["tokenID"].(persist.DBID)), true
+
 	case "Mutation.refreshTokens":
 		if e.complexity.Mutation.RefreshTokens == nil {
 			break
@@ -1624,6 +1660,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Viewer(childComplexity), true
+
+	case "RefreshContractMetadataPayload.contract":
+		if e.complexity.RefreshContractMetadataPayload.Contract == nil {
+			break
+		}
+
+		return e.complexity.RefreshContractMetadataPayload.Contract(childComplexity), true
+
+	case "RefreshTokenMetadataPayload.token":
+		if e.complexity.RefreshTokenMetadataPayload.Token == nil {
+			break
+		}
+
+		return e.complexity.RefreshTokenMetadataPayload.Token(childComplexity), true
 
 	case "RefreshTokensPayload.viewer":
 		if e.complexity.RefreshTokensPayload.Viewer == nil {
@@ -2648,6 +2698,20 @@ type RefreshTokensPayload {
     viewer: Viewer
 }
 
+union RefreshTokenMetadataPayloadOrError = RefreshTokenMetadataPayload | ErrInvalidInput
+
+type RefreshTokenMetadataPayload {
+    token: Token
+}
+
+union RefreshContractMetadataPayloadOrError =
+    RefreshContractMetadataPayload
+  | ErrInvalidInput
+
+type RefreshContractMetadataPayload {
+    contract: Contract
+}
+
 type AuthNonce {
     nonce: String
     userExists: Boolean
@@ -2802,6 +2866,8 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
     refreshTokens: RefreshTokensPayloadOrError @authRequired
+    refreshTokenMetadata(tokenID: DBID!): RefreshTokenMetadataPayloadOrError
+    refreshContractMetadata(contractID: DBID!): RefreshContractMetadataPayloadOrError
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -2946,6 +3012,36 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 		}
 	}
 	args["authMechanism"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_refreshContractMetadata_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["contractID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contractID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["contractID"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_refreshTokenMetadata_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["tokenID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["tokenID"] = arg0
 	return args, nil
 }
 
@@ -7346,6 +7442,84 @@ func (ec *executionContext) _Mutation_refreshTokens(ctx context.Context, field g
 	return ec.marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_refreshTokenMetadata(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_refreshTokenMetadata_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RefreshTokenMetadata(rctx, args["tokenID"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RefreshTokenMetadataPayloadOrError)
+	fc.Result = res
+	return ec.marshalORefreshTokenMetadataPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokenMetadataPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_refreshContractMetadata(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_refreshContractMetadata_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RefreshContractMetadata(rctx, args["contractID"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RefreshContractMetadataPayloadOrError)
+	fc.Result = res
+	return ec.marshalORefreshContractMetadataPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshContractMetadataPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -8334,6 +8508,70 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 	res := resTmp.(*introspection.Schema)
 	fc.Result = res
 	return ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RefreshContractMetadataPayload_contract(ctx context.Context, field graphql.CollectedField, obj *model.RefreshContractMetadataPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RefreshContractMetadataPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Contract, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Contract)
+	fc.Result = res
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RefreshTokenMetadataPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.RefreshTokenMetadataPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RefreshTokenMetadataPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _RefreshTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RefreshTokensPayload) (ret graphql.Marshaler) {
@@ -12747,6 +12985,52 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	}
 }
 
+func (ec *executionContext) _RefreshContractMetadataPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshContractMetadataPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.RefreshContractMetadataPayload:
+		return ec._RefreshContractMetadataPayload(ctx, sel, &obj)
+	case *model.RefreshContractMetadataPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RefreshContractMetadataPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _RefreshTokenMetadataPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshTokenMetadataPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.RefreshTokenMetadataPayload:
+		return ec._RefreshTokenMetadataPayload(ctx, sel, &obj)
+	case *model.RefreshTokenMetadataPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RefreshTokenMetadataPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _RefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RefreshTokensPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -13894,7 +14178,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenMetadataPayloadOrError", "RefreshContractMetadataPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -14912,6 +15196,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "refreshTokenMetadata":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_refreshTokenMetadata(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "refreshContractMetadata":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_refreshContractMetadata(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "getAuthNonce":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_getAuthNonce(ctx, field)
@@ -15305,6 +15603,62 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var refreshContractMetadataPayloadImplementors = []string{"RefreshContractMetadataPayload", "RefreshContractMetadataPayloadOrError"}
+
+func (ec *executionContext) _RefreshContractMetadataPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshContractMetadataPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, refreshContractMetadataPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RefreshContractMetadataPayload")
+		case "contract":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._RefreshContractMetadataPayload_contract(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var refreshTokenMetadataPayloadImplementors = []string{"RefreshTokenMetadataPayload", "RefreshTokenMetadataPayloadOrError"}
+
+func (ec *executionContext) _RefreshTokenMetadataPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RefreshTokenMetadataPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, refreshTokenMetadataPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RefreshTokenMetadataPayload")
+		case "token":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._RefreshTokenMetadataPayload_token(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -17802,6 +18156,20 @@ func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._PreviewURLSet(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORefreshContractMetadataPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshContractMetadataPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshContractMetadataPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RefreshContractMetadataPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORefreshTokenMetadataPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokenMetadataPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshTokenMetadataPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RefreshTokenMetadataPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORefreshTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshTokensPayloadOrError) graphql.Marshaler {

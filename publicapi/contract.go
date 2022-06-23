@@ -36,3 +36,28 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 
 	return &contract, nil
 }
+
+// RefreshContract refreshes the metadata for a given contract DBID
+func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	contract, err := api.loaders.ContractByContractId.Load(contractID)
+	if err != nil {
+		return err
+	}
+
+	err = api.multichainProvider.RefreshContract(ctx, persist.NewContractIdentifiers(contract.Address, persist.Chain(contract.Chain.Int32)))
+	if err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
+
+}

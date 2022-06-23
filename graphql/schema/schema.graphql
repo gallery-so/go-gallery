@@ -530,6 +530,24 @@ type RefreshTokensPayload {
     viewer: Viewer
 }
 
+union RefreshTokenMetadataPayloadOrError =
+    RefreshTokenMetadataPayload
+  | ErrInvalidInput
+  | ErrOpenSeaRefreshFailed
+
+type RefreshTokenMetadataPayload {
+    token: Token
+}
+
+union RefreshContractMetadataPayloadOrError =
+    RefreshContractMetadataPayload
+  | ErrInvalidInput
+  | ErrOpenSeaRefreshFailed
+
+type RefreshContractMetadataPayload {
+    contract: Contract
+}
+
 type AuthNonce {
     nonce: String
     userExists: Boolean
@@ -684,6 +702,8 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
     refreshTokens: RefreshTokensPayloadOrError @authRequired
+    refreshTokenMetadata(tokenID: DBID!): RefreshTokenMetadataPayloadOrError
+    refreshContractMetadata(contractID: DBID!): RefreshContractMetadataPayloadOrError
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 

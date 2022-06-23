@@ -245,6 +245,24 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
 }
 
+// RefreshToken refreshes a token on the given chain using the chain provider for that chain
+func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+	provider, ok := d.Chains[ti.Chain]
+	if !ok {
+		return ErrChainNotFound{Chain: ti.Chain}
+	}
+	return provider.RefreshToken(ctx, ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID})
+}
+
+// RefreshContract refreshes a contract on the given chain using the chain provider for that chain
+func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
+	provider, ok := d.Chains[ci.Chain]
+	if !ok {
+		return ErrChainNotFound{Chain: ci.Chain}
+	}
+	return provider.RefreshContract(ctx, ci.ContractAddress)
+}
+
 func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	res := make([]persist.TokenGallery, 0, len(chaintokens))
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)

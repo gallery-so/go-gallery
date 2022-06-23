@@ -79,6 +79,14 @@ type Node interface {
 	IsNode()
 }
 
+type RefreshContractMetadataPayloadOrError interface {
+	IsRefreshContractMetadataPayloadOrError()
+}
+
+type RefreshTokenMetadataPayloadOrError interface {
+	IsRefreshTokenMetadataPayloadOrError()
+}
+
 type RefreshTokensPayloadOrError interface {
 	IsRefreshTokensPayloadOrError()
 }
@@ -320,6 +328,8 @@ func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
 func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
+func (ErrInvalidInput) IsRefreshTokenMetadataPayloadOrError()     {}
+func (ErrInvalidInput) IsRefreshContractMetadataPayloadOrError()  {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
 func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
@@ -513,6 +523,18 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type RefreshContractMetadataPayload struct {
+	Contract *Contract `json:"contract"`
+}
+
+func (RefreshContractMetadataPayload) IsRefreshContractMetadataPayloadOrError() {}
+
+type RefreshTokenMetadataPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (RefreshTokenMetadataPayload) IsRefreshTokenMetadataPayloadOrError() {}
 
 type RefreshTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`

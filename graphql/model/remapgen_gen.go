@@ -88,6 +88,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"RefreshContractMetadataPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RefreshContractMetadataPayloadOrError)
+		return obj, ok
+	},
+
+	"RefreshTokenMetadataPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RefreshTokenMetadataPayloadOrError)
+		return obj, ok
+	},
+
 	"RefreshTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RefreshTokensPayloadOrError)
 		return obj, ok
