@@ -28,7 +28,7 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	upsertByAddressStmt, err := db.PrepareContext(ctx, `INSERT INTO contracts (ID,VERSION,ADDRESS,SYMBOL,NAME,LATEST_BLOCK,CREATOR_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (ADDRESS) DO UPDATE SET VERSION = $2,ADDRESS = $3,SYMBOL = $4,NAME = $5,LATEST_BLOCK = $6,CREATOR_ADDRESS = $7;`)
 	checkNoErr(err)
 
-	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5 WHERE ADDRESS = $1;`)
+	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5, LAST_UPDATED = $6 WHERE ADDRESS = $1;`)
 	checkNoErr(err)
 
 	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt}
@@ -80,7 +80,7 @@ func (c *ContractRepository) BulkUpsert(pCtx context.Context, pContracts []persi
 
 // UpdateByAddress updates the given contract's metadata fields by its address field.
 func (c *ContractRepository) UpdateByAddress(ctx context.Context, addr persist.EthereumAddress, up persist.ContractUpdateInput) error {
-	if _, err := c.updateByAddressStmt.ExecContext(ctx, addr, up.Name, up.Symbol, up.CreatorAddress, up.LatestBlock); err != nil {
+	if _, err := c.updateByAddressStmt.ExecContext(ctx, addr, up.Name, up.Symbol, up.CreatorAddress, up.LatestBlock, persist.LastUpdatedTime{}); err != nil {
 		return err
 	}
 	return nil

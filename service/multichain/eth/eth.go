@@ -63,7 +63,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -94,7 +94,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -124,7 +124,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -154,7 +154,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -195,7 +195,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -232,7 +232,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -244,7 +244,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 	return nil
 }
 
-// RefreshContract refreshses the metadata for a contract
+// RefreshContract refreshes the metadata for a contract
 func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
 	input := indexer.UpdateContractMediaInput{
 		Address: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(addr)),
@@ -267,7 +267,7 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
@@ -300,7 +300,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 	defer res.Body.Close()
 
-	if res.StatusCode >= 299 || res.StatusCode < 200 {
+	if res.StatusCode != 200 {
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
