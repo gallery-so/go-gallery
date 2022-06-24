@@ -14,7 +14,9 @@ import (
 )
 
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
 type CreateCollectionEventParams struct {
@@ -22,9 +24,11 @@ type CreateCollectionEventParams struct {
 	ActorID        persist.DBID
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
-	CollectionID   persist.DBID
 	SubjectID      persist.DBID
 	Data           persist.EventData
+	CreatedAt      time.Time
+	GraceTime      time.Time
+	WindowStart    time.Time
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -33,9 +37,11 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		arg.ActorID,
 		arg.Action,
 		arg.ResourceTypeID,
-		arg.CollectionID,
 		arg.SubjectID,
 		arg.Data,
+		arg.CreatedAt,
+		arg.GraceTime,
+		arg.WindowStart,
 	)
 	var i Event
 	err := row.Scan(
@@ -52,6 +58,8 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GraceTime,
+		&i.PriorEventID,
 	)
 	return i, err
 }
@@ -95,7 +103,9 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 }
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
 type CreateTokenEventParams struct {
@@ -103,9 +113,11 @@ type CreateTokenEventParams struct {
 	ActorID        persist.DBID
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
-	TokenID        persist.DBID
 	SubjectID      persist.DBID
 	Data           persist.EventData
+	CreatedAt      time.Time
+	GraceTime      time.Time
+	WindowStart    time.Time
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -114,9 +126,11 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		arg.ActorID,
 		arg.Action,
 		arg.ResourceTypeID,
-		arg.TokenID,
 		arg.SubjectID,
 		arg.Data,
+		arg.CreatedAt,
+		arg.GraceTime,
+		arg.WindowStart,
 	)
 	var i Event
 	err := row.Scan(
@@ -133,12 +147,16 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GraceTime,
+		&i.PriorEventID,
 	)
 	return i, err
 }
 
 const createUserEvent = `-- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
 type CreateUserEventParams struct {
@@ -146,9 +164,11 @@ type CreateUserEventParams struct {
 	ActorID        persist.DBID
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
-	UserID         persist.DBID
 	SubjectID      persist.DBID
 	Data           persist.EventData
+	CreatedAt      time.Time
+	GraceTime      time.Time
+	WindowStart    time.Time
 }
 
 func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
@@ -157,9 +177,11 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		arg.ActorID,
 		arg.Action,
 		arg.ResourceTypeID,
-		arg.UserID,
 		arg.SubjectID,
 		arg.Data,
+		arg.CreatedAt,
+		arg.GraceTime,
+		arg.WindowStart,
 	)
 	var i Event
 	err := row.Scan(
@@ -176,6 +198,8 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GraceTime,
+		&i.PriorEventID,
 	)
 	return i, err
 }
@@ -292,7 +316,7 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id FROM events WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) {
@@ -312,12 +336,14 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GraceTime,
+		&i.PriorEventID,
 	)
 	return i, err
 }
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > $3 AND created_at <= $4
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > $3 AND created_at <= $4
 `
 
 type GetEventsInWindowParams struct {
@@ -355,6 +381,8 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 			&i.Deleted,
 			&i.LastUpdated,
 			&i.CreatedAt,
+			&i.GraceTime,
+			&i.PriorEventID,
 		); err != nil {
 			return nil, err
 		}
@@ -434,6 +462,35 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 		&i.Collections,
 	)
 	return i, err
+}
+
+const getLastEventInWindow = `-- name: GetLastEventInWindow :one
+
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND deleted = false
+    AND created_at > $3 AND created_at <= $4
+    LIMIT 1
+)
+`
+
+type GetLastEventInWindowParams struct {
+	ActorID   persist.DBID
+	Action    persist.Action
+	TimeStart time.Time
+	TimeEnd   time.Time
+}
+
+func (q *Queries) GetLastEventInWindow(ctx context.Context, arg GetLastEventInWindowParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getLastEventInWindow,
+		arg.ActorID,
+		arg.Action,
+		arg.TimeStart,
+		arg.TimeEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const getLastFeedEvent = `-- name: GetLastFeedEvent :one
@@ -860,34 +917,6 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 		return nil, err
 	}
 	return items, nil
-}
-
-const isWindowActive = `-- name: IsWindowActive :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > $3 AND created_at <= $4
-    LIMIT 1
-)
-`
-
-type IsWindowActiveParams struct {
-	ActorID   persist.DBID
-	Action    persist.Action
-	TimeStart time.Time
-	TimeEnd   time.Time
-}
-
-func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isWindowActive,
-		arg.ActorID,
-		arg.Action,
-		arg.TimeStart,
-		arg.TimeEnd,
-	)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const isWindowActiveWithSubject = `-- name: IsWindowActiveWithSubject :one

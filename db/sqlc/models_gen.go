@@ -91,6 +91,8 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
+	GraceTime      time.Time
+	PriorEventID   persist.DBID
 }
 
 type Feature struct {

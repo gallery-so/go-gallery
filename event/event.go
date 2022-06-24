@@ -20,6 +20,8 @@ type EventHandlers struct {
 	Feed *eventDispatcher
 }
 
+var graceBuffer = time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second
+
 // Register specific event handlers
 func AddTo(ctx *gin.Context, queries *sqlc.Queries) {
 	eventDispatcher := eventDispatcher{handlers: map[persist.Action]eventHandler{}}
@@ -71,14 +73,10 @@ type feedHandler struct {
 }
 
 func (h feedHandler) Handle(ctx context.Context, event sqlc.Event) error {
-	persisted, err := h.eventRepo.Add(ctx, event)
+	persisted, err := h.eventRepo.Add(ctx, event, graceBuffer)
 	if err != nil {
 		return err
 	}
 
-	scheduleOn := persisted.CreatedAt.Add(
-		time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second,
-	)
-
-	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID})
+	return task.CreateTaskForFeed(ctx, persisted.GraceTime, task.FeedMessage{ID: persisted.ID})
 }

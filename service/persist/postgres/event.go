@@ -16,7 +16,10 @@ func (r *EventRepository) Get(ctx context.Context, eventID persist.DBID) (sqlc.E
 	return r.Queries.GetEvent(ctx, eventID)
 }
 
-func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+func (r *EventRepository) Add(ctx context.Context, event sqlc.Event, grace time.Duration) (*sqlc.Event, error) {
+	event.CreatedAt = time.Now()
+	event.GraceTime = event.CreatedAt.Add(grace)
+
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeUser:
 		return r.AddUserEvent(ctx, event)
@@ -35,9 +38,10 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		UserID:         event.UserID,
 		SubjectID:      event.SubjectID,
 		Data:           event.Data,
+		CreatedAt:      event.CreatedAt,
+		GraceTime:      event.GraceTime,
 	})
 	return &event, err
 }
@@ -48,9 +52,10 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		TokenID:        event.TokenID,
 		SubjectID:      event.SubjectID,
 		Data:           event.Data,
+		CreatedAt:      event.CreatedAt,
+		GraceTime:      event.GraceTime,
 	})
 	return &event, err
 }
@@ -61,32 +66,33 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		CollectionID:   event.CollectionID,
 		SubjectID:      event.SubjectID,
 		Data:           event.Data,
+		CreatedAt:      event.CreatedAt,
+		GraceTime:      event.GraceTime,
 	})
 	return &event, err
 }
 
 // WindowActive checks if there are more recent events with an action that matches the provided event.
-func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event, since time.Time) (bool, error) {
+func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
 		ActorID:   event.ActorID,
 		Action:    event.Action,
 		TimeStart: event.CreatedAt,
-		TimeEnd:   since,
+		TimeEnd:   event.GraceTime,
 	})
 }
 
 // WindowActiveForSubject checks if there are more recent events with an action on a specific resource such as
 // as a collection or a token.
-func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc.Event, since time.Time) (bool, error) {
+func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActiveWithSubject(ctx, sqlc.IsWindowActiveWithSubjectParams{
 		ActorID:   event.ActorID,
 		Action:    event.Action,
 		SubjectID: event.SubjectID,
 		TimeStart: event.CreatedAt,
-		TimeEnd:   since,
+		TimeEnd:   event.GraceTime,
 	})
 }
 

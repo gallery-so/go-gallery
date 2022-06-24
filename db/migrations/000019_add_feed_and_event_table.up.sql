@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS events (
     DATA JSONB,
     DELETED boolean NOT NULL DEFAULT false,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    GRACE_TIME timestamptz NOT NULL,
+    PRIOR_EVENT_ID varchar(255) REFERENCES events (id)
 );
 
 CREATE INDEX IF NOT EXISTS events_actor_id_action_created_at_idx ON events (actor_id, action, created_at DESC);

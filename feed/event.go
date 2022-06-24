@@ -3,7 +3,6 @@ package feed
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -50,7 +49,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 }
 
 func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActive(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -78,7 +77,7 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Ev
 }
 
 func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActive(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -90,16 +89,15 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 		return nil, err
 	}
 
-	windowStart := time.Unix(0, 0)
-	if feedEvent != nil {
-		windowStart = feedEvent.CreatedAt
-	}
+	events := []sqlc.Event{event}
 
-	events, err := b.eventRepo.EventsInWindow(ctx,
-		event.ActorID, event.Action, windowStart, event.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
+	if feedEvent != nil {
+		events, err = b.eventRepo.EventsInWindow(ctx,
+			event.ActorID, event.Action, feedEvent.EventTime, event.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var followedIDs []persist.DBID
@@ -132,7 +130,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -174,7 +172,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 }
 
 func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -202,7 +200,7 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event s
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -238,7 +236,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 }
 
 func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event, time.Now())
+	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {

@@ -140,18 +140,28 @@ SELECT tokens.* FROM tokens, users
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    @id, @actor_id, @action, @resource_type_id, @resource_type_id, @subject_id, @data, @created_at, @grace_time, (SELECT id FROM events et WHERE actor_id = @actor_id AND action = @action AND subject_id = @subject_id AND et.created_at < @created_at AND et.created_at >= @window_start AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    @id, @actor_id, @action, @resource_type_id, @resource_type_id, @subject_id, @data, @created_at, @grace_time, (SELECT id FROM events et WHERE actor_id = @actor_id AND action = @action AND subject_id = @subject_id AND et.created_at < @created_at AND et.created_at >= @window_start AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
+    @id, @actor_id, @action, @resource_type_id, @resource_type_id, @subject_id, @data, @created_at, @grace_time, (SELECT id FROM events et WHERE actor_id = @actor_id AND action = @action AND subject_id = @subject_id AND et.created_at < @created_at AND et.created_at >= @window_start AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
 -- name: GetEventsInWindow :many
+WITH RECURSIVE window_events AS (
+
+)
+
 SELECT * FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > @time_start AND created_at <= @time_end;
 
 -- name: IsWindowActive :one

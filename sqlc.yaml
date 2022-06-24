@@ -72,6 +72,8 @@ overrides:
     go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
   - column: "events.data"
     go_type: "github.com/mikeydub/go-gallery/service/persist.EventData"
+  - column: "events.prior_event_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
 
   # Feed Events
   - column: "feed_events.owner_id"
