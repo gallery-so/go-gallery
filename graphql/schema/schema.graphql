@@ -476,6 +476,7 @@ union FeedEventByIdOrError =
     | UserFollowedUsersFeedEvent
     | CollectorsNoteAddedToTokenFeedEvent
     | CollectionCreatedFeedEvent
+    | CollectorsNoteAddedToCollectionFeedEvent
     | TokensAddedToCollectionFeedEvent
     | ErrFeedEventNotFoundByID
     | ErrUnknownAction

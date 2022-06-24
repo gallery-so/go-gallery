@@ -227,8 +227,9 @@ type CollectorsNoteAddedToCollectionFeedEvent struct {
 	NewCollectorsNote *string        `json:"newCollectorsNote"`
 }
 
-func (CollectorsNoteAddedToCollectionFeedEvent) IsNode()      {}
-func (CollectorsNoteAddedToCollectionFeedEvent) IsFeedEvent() {}
+func (CollectorsNoteAddedToCollectionFeedEvent) IsNode()                 {}
+func (CollectorsNoteAddedToCollectionFeedEvent) IsFeedEvent()            {}
+func (CollectorsNoteAddedToCollectionFeedEvent) IsFeedEventByIDOrError() {}
 
 type CollectorsNoteAddedToTokenFeedEvent struct {
 	Dbid              persist.DBID     `json:"dbid"`

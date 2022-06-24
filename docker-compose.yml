@@ -42,6 +42,6 @@ services:
   nginx:
     image: nginx
     ports:
-      - "8123:8123"
+      - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf

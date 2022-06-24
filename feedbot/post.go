@@ -55,10 +55,10 @@ func (r *PostRenderer) Render(ctx context.Context, message task.FeedbotMessage) 
 }
 
 func (r *PostRenderer) createUserCreatedPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -73,10 +73,10 @@ func (r *PostRenderer) createUserCreatedPost(ctx context.Context, message task.F
 }
 
 func (r *PostRenderer) createUserFollowedUsersPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -102,10 +102,10 @@ func (r *PostRenderer) createUserFollowedUsersPost(ctx context.Context, message 
 }
 
 func (r *PostRenderer) createCollectorsNoteAddedToTokenPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -137,10 +137,10 @@ func (r *PostRenderer) createCollectorsNoteAddedToTokenPost(ctx context.Context,
 }
 
 func (r *PostRenderer) createCollectionCreatedPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -170,10 +170,10 @@ func (r *PostRenderer) createCollectionCreatedPost(ctx context.Context, message 
 }
 
 func (r *PostRenderer) createCollectorsNoteAddedToCollectionPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -203,10 +203,10 @@ func (r *PostRenderer) createCollectorsNoteAddedToCollectionPost(ctx context.Con
 }
 
 func (r *PostRenderer) createTokensAddedToCollectionPost(ctx context.Context, message task.FeedbotMessage) (string, error) {
-	var evt EventQuery
+	var evt FeedEventQuery
 
 	if err := r.gql.Query(ctx, &evt, map[string]interface{}{
-		"id": fmt.Sprintf("%sEvent:%s", message.Action, message.FeedEventID),
+		"id": message.FeedEventID,
 	}); err != nil {
 		return "", err
 	}
@@ -330,38 +330,38 @@ type CollectionFragment struct {
 	Name string
 }
 
-type EventQuery struct {
+type FeedEventQuery struct {
 	FeedEvent struct {
 		UserCreated struct {
 			Owner UserFragment
-		} `graphql:"...on UserCreatedEvent"`
+		} `graphql:"...on UserCreatedFeedEvent"`
 		UserFollowedUsers struct {
 			Owner    UserFragment
 			Followed []struct {
 				User UserFragment
 			}
-		} `graphql:"...on UserFollowedUsersEvent"`
+		} `graphql:"...on UserFollowedUsersFeedEvent"`
 		CollectorsNoteAddedToToken struct {
 			Owner UserFragment
 			Token struct {
 				Token      TokenFragment
 				Collection CollectionFragment
 			}
-		} `graphql:"...on CollectorsNoteAddedToTokenEvent"`
+		} `graphql:"...on CollectorsNoteAddedToTokenFeedEvent"`
 		CollectionCreated struct {
 			Owner      UserFragment
 			Collection CollectionFragment
-		} `graphql:"...on CollectionCreatedEvent"`
+		} `graphql:"...on CollectionCreatedFeedEvent"`
 		CollectorsNoteAddedToCollection struct {
 			Owner      UserFragment
 			Collection CollectionFragment
-		} `graphql:"...on CollectorsNoteAddedToCollectionEvent"`
+		} `graphql:"...on CollectorsNoteAddedToCollectionFeedEvent"`
 		TokensAddedToCollection struct {
 			Owner      UserFragment
 			Collection CollectionFragment
 			NewTokens  []struct {
 				Token TokenFragment
 			}
-		} `graphql:"...on TokensAddedToCollectionEvent"`
-	} `graphql:"node(id: $id)"`
+		} `graphql:"...on TokensAddedToCollectionFeedEvent"`
+	} `graphql:"feedEventById(id: $id)"`
 }

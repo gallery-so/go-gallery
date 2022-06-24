@@ -396,22 +396,6 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 	return output, nil
 }
 
-func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEvent, error) {
-	evt, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	event, err := feedEventToModel(ctx, evt)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return event, err
-}
-
 func resolveCollectionCreatedFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.CollectionCreatedFeedEvent, error) {
 	evt, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 
@@ -419,7 +403,7 @@ func resolveCollectionCreatedFeedEventByEventID(ctx context.Context, eventID per
 		return nil, err
 	}
 
-	event, err := eventToCollectionCreatedFeedEvent(evt)
+	event, err := eventToCollectionCreatedFeedEventModel(evt)
 
 	return &event, err
 }
@@ -431,7 +415,7 @@ func resolveCollectorsNoteAddedToCollectionFeedEventByEventID(ctx context.Contex
 		return nil, err
 	}
 
-	event, err := eventToCollectorsNoteAddedToCollectionFeedEvent(evt)
+	event, err := eventToCollectorsNoteAddedToCollectionFeedEventModel(evt)
 
 	return &event, err
 }
@@ -443,7 +427,7 @@ func resolveCollectorsNoteAddedToTokenFeedEventByEventID(ctx context.Context, ev
 		return nil, err
 	}
 
-	event, err := eventToCollectorsNoteAddedToTokenFeedEvent(evt)
+	event, err := eventToCollectorsNoteAddedToTokenFeedEventModel(evt)
 
 	return &event, err
 }
@@ -455,7 +439,7 @@ func resolveTokensAddedToCollectionFeedEventByEventID(ctx context.Context, event
 		return nil, err
 	}
 
-	event, err := eventToTokensAddedToCollectionFeedEvent(evt)
+	event, err := eventToTokensAddedToCollectionFeedEventModel(evt)
 
 	return &event, err
 }
@@ -467,7 +451,7 @@ func resolveUserCreatedFeedEventByEventID(ctx context.Context, eventID persist.D
 		return nil, err
 	}
 
-	event, err := eventToUserCreatedFeedEvent(evt)
+	event, err := eventToUserCreatedFeedEventModel(evt)
 
 	return &event, err
 }
@@ -479,7 +463,7 @@ func resolveUserFollowedUsersFeedEventByEventID(ctx context.Context, eventID per
 		return nil, err
 	}
 
-	event, err := eventToUserFollowedUsersFeedEvent(evt)
+	event, err := eventToUserFollowedUsersFeedEventModel(evt)
 
 	return &event, err
 }
@@ -547,23 +531,23 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 func feedEventToModel(ctx context.Context, event *sqlc.FeedEvent) (model.FeedEvent, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
-		return eventToUserCreatedFeedEvent(event)
+		return eventToUserCreatedFeedEventModel(event)
 	case persist.ActionUserFollowedUsers:
-		return eventToUserFollowedUsersFeedEvent(event)
+		return eventToUserFollowedUsersFeedEventModel(event)
 	case persist.ActionCollectorsNoteAddedToToken:
-		return eventToCollectorsNoteAddedToTokenFeedEvent(event)
+		return eventToCollectorsNoteAddedToTokenFeedEventModel(event)
 	case persist.ActionCollectionCreated:
-		return eventToCollectionCreatedFeedEvent(event)
+		return eventToCollectionCreatedFeedEventModel(event)
 	case persist.ActionCollectorsNoteAddedToCollection:
-		return eventToCollectorsNoteAddedToCollectionFeedEvent(event)
+		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event)
 	case persist.ActionTokensAddedToCollection:
-		return eventToTokensAddedToCollectionFeedEvent(event)
+		return eventToTokensAddedToCollectionFeedEventModel(event)
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
 }
 
-func eventToUserCreatedFeedEvent(event *sqlc.FeedEvent) (model.UserCreatedFeedEvent, error) {
+func eventToUserCreatedFeedEventModel(event *sqlc.FeedEvent) (model.UserCreatedFeedEvent, error) {
 	return model.UserCreatedFeedEvent{
 		Dbid:      event.ID,
 		EventTime: event.EventTime,
@@ -572,7 +556,7 @@ func eventToUserCreatedFeedEvent(event *sqlc.FeedEvent) (model.UserCreatedFeedEv
 	}, nil
 }
 
-func eventToUserFollowedUsersFeedEvent(event *sqlc.FeedEvent) (model.UserFollowedUsersFeedEvent, error) {
+func eventToUserFollowedUsersFeedEventModel(event *sqlc.FeedEvent) (model.UserFollowedUsersFeedEvent, error) {
 	followed := make([]*model.FollowInfo, len(event.Data.UserFollowedIDs))
 
 	for i, userID := range event.Data.UserFollowedIDs {
@@ -591,7 +575,7 @@ func eventToUserFollowedUsersFeedEvent(event *sqlc.FeedEvent) (model.UserFollowe
 	}, nil
 }
 
-func eventToCollectorsNoteAddedToTokenFeedEvent(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToTokenFeedEvent, error) {
+func eventToCollectorsNoteAddedToTokenFeedEventModel(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToTokenFeedEvent, error) {
 	return model.CollectorsNoteAddedToTokenFeedEvent{
 		Dbid:      event.ID,
 		EventTime: event.EventTime,
@@ -605,7 +589,7 @@ func eventToCollectorsNoteAddedToTokenFeedEvent(event *sqlc.FeedEvent) (model.Co
 	}, nil
 }
 
-func eventToCollectionCreatedFeedEvent(event *sqlc.FeedEvent) (model.CollectionCreatedFeedEvent, error) {
+func eventToCollectionCreatedFeedEventModel(event *sqlc.FeedEvent) (model.CollectionCreatedFeedEvent, error) {
 	return model.CollectionCreatedFeedEvent{
 		Dbid:       event.ID,
 		EventTime:  event.EventTime,
@@ -615,7 +599,7 @@ func eventToCollectionCreatedFeedEvent(event *sqlc.FeedEvent) (model.CollectionC
 	}, nil
 }
 
-func eventToCollectorsNoteAddedToCollectionFeedEvent(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToCollectionFeedEvent, error) {
+func eventToCollectorsNoteAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToCollectionFeedEvent, error) {
 	return model.CollectorsNoteAddedToCollectionFeedEvent{
 		Dbid:              event.ID,
 		EventTime:         event.EventTime,
@@ -626,7 +610,7 @@ func eventToCollectorsNoteAddedToCollectionFeedEvent(event *sqlc.FeedEvent) (mod
 	}, nil
 }
 
-func eventToTokensAddedToCollectionFeedEvent(event *sqlc.FeedEvent) (model.TokensAddedToCollectionFeedEvent, error) {
+func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) (model.TokensAddedToCollectionFeedEvent, error) {
 	return model.TokensAddedToCollectionFeedEvent{
 		Dbid:       event.ID,
 		EventTime:  event.EventTime,

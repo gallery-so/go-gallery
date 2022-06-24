@@ -514,13 +514,28 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, page *model.Pagination) 
 }
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
-	event, err := resolveFeedEventByEventID(ctx, id)
+	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, id)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return model.FeedEventByIdOrErrorAdapter{FeedEvent: event}, nil
+	switch event.Action {
+	case persist.ActionUserCreated:
+		return eventToUserCreatedFeedEventModel(event)
+	case persist.ActionUserFollowedUsers:
+		return eventToUserFollowedUsersFeedEventModel(event)
+	case persist.ActionCollectorsNoteAddedToToken:
+		return eventToCollectorsNoteAddedToTokenFeedEventModel(event)
+	case persist.ActionCollectionCreated:
+		return eventToCollectionCreatedFeedEventModel(event)
+	case persist.ActionCollectorsNoteAddedToCollection:
+		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event)
+	case persist.ActionTokensAddedToCollection:
+		return eventToTokensAddedToCollectionFeedEventModel(event)
+	default:
+		return nil, persist.ErrUnknownAction{Action: event.Action}
+	}
 }
 
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {

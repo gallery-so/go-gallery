@@ -680,7 +680,7 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 }
 
 const getNewTokensByFeedEventIdBatch = `-- name: GetNewTokensByFeedEventIdBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE id in (SELECT data ->> 'collection_new_token_ids' FROM feed_events fe where fe.id = $1)
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE id = ANY(SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') FROM feed_events fe where fe.id = $1)
 `
 
 type GetNewTokensByFeedEventIdBatchBatchResults struct {

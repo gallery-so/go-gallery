@@ -3082,6 +3082,7 @@ union FeedEventByIdOrError =
     | UserFollowedUsersFeedEvent
     | CollectorsNoteAddedToTokenFeedEvent
     | CollectionCreatedFeedEvent
+    | CollectorsNoteAddedToCollectionFeedEvent
     | TokensAddedToCollectionFeedEvent
     | ErrFeedEventNotFoundByID
     | ErrUnknownAction
@@ -14888,6 +14889,13 @@ func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._CollectionCreatedFeedEvent(ctx, sel, obj)
+	case model.CollectorsNoteAddedToCollectionFeedEvent:
+		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, &obj)
+	case *model.CollectorsNoteAddedToCollectionFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, obj)
 	case model.TokensAddedToCollectionFeedEvent:
 		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, &obj)
 	case *model.TokensAddedToCollectionFeedEvent:
@@ -16184,7 +16192,7 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 	return out
 }
 
-var collectorsNoteAddedToCollectionFeedEventImplementors = []string{"CollectorsNoteAddedToCollectionFeedEvent", "Node", "FeedEvent"}
+var collectorsNoteAddedToCollectionFeedEventImplementors = []string{"CollectorsNoteAddedToCollectionFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToCollectionFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToCollectionFeedEventImplementors)
