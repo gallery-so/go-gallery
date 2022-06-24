@@ -47,7 +47,7 @@ func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event sqlc
 	evt, err := r.Queries.GetLastFeedEventForToken(ctx, sqlc.GetLastFeedEventForTokenParams{
 		OwnerID:   event.ActorID,
 		Action:    event.Action,
-		Column3:   string(event.SubjectID), // refers to tokenID, sadly sqlc wasn't able to name this nicely
+		TokenID:   string(event.SubjectID),
 		EventTime: event.CreatedAt,
 	})
 
@@ -66,10 +66,10 @@ func (r *FeedRepository) LastCollectionEventFromEvent(ctx context.Context, event
 // LastCollectionEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
 func (r *FeedRepository) LastCollectionEvent(ctx context.Context, ownerID persist.DBID, action persist.Action, collectionID persist.DBID, since time.Time) (*sqlc.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, sqlc.GetLastFeedEventForCollectionParams{
-		OwnerID:   ownerID,
-		Action:    action,
-		Column3:   string(collectionID), // refers to collectionID, sadly sqlc wasn't able to name this nicely
-		EventTime: since,
+		OwnerID:      ownerID,
+		Action:       action,
+		CollectionID: string(collectionID),
+		EventTime:    since,
 	})
 
 	if errors.Is(err, pgx.ErrNoRows) {

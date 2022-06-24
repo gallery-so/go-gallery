@@ -323,16 +323,16 @@ SELECT id, version, actor_id, resource_id, subject_id, user_id, token_id, collec
 type GetEventsInWindowParams struct {
 	ActorID   persist.DBID
 	Action    persist.Action
-	Timestart time.Time
-	Timeend   time.Time
+	TimeStart time.Time
+	TimeEnd   time.Time
 }
 
 func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
 	rows, err := q.db.Query(ctx, getEventsInWindow,
 		arg.ActorID,
 		arg.Action,
-		arg.Timestart,
-		arg.Timeend,
+		arg.TimeStart,
+		arg.TimeEnd,
 	)
 	if err != nil {
 		return nil, err
@@ -469,24 +469,24 @@ func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventPara
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $3::varchar AND event_time < $4 AND deleted = false
+    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
 `
 
 type GetLastFeedEventForCollectionParams struct {
-	OwnerID   persist.DBID
-	Action    persist.Action
-	Column3   string
-	EventTime time.Time
+	OwnerID      persist.DBID
+	Action       persist.Action
+	EventTime    time.Time
+	CollectionID string
 }
 
 func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLastFeedEventForCollectionParams) (FeedEvent, error) {
 	row := q.db.QueryRow(ctx, getLastFeedEventForCollection,
 		arg.OwnerID,
 		arg.Action,
-		arg.Column3,
 		arg.EventTime,
+		arg.CollectionID,
 	)
 	var i FeedEvent
 	err := row.Scan(
@@ -506,7 +506,7 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $3::varchar AND event_time < $4 AND deleted = false
+    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
 `
@@ -514,16 +514,16 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
 type GetLastFeedEventForTokenParams struct {
 	OwnerID   persist.DBID
 	Action    persist.Action
-	Column3   string
 	EventTime time.Time
+	TokenID   string
 }
 
 func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedEventForTokenParams) (FeedEvent, error) {
 	row := q.db.QueryRow(ctx, getLastFeedEventForToken,
 		arg.OwnerID,
 		arg.Action,
-		arg.Column3,
 		arg.EventTime,
+		arg.TokenID,
 	)
 	var i FeedEvent
 	err := row.Scan(
@@ -874,16 +874,16 @@ SELECT EXISTS(
 type IsWindowActiveParams struct {
 	ActorID   persist.DBID
 	Action    persist.Action
-	Timestart time.Time
-	Timeend   time.Time
+	TimeStart time.Time
+	TimeEnd   time.Time
 }
 
 func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isWindowActive,
 		arg.ActorID,
 		arg.Action,
-		arg.Timestart,
-		arg.Timeend,
+		arg.TimeStart,
+		arg.TimeEnd,
 	)
 	var exists bool
 	err := row.Scan(&exists)
@@ -903,8 +903,8 @@ type IsWindowActiveWithSubjectParams struct {
 	ActorID   persist.DBID
 	Action    persist.Action
 	SubjectID persist.DBID
-	Timestart time.Time
-	Timeend   time.Time
+	TimeStart time.Time
+	TimeEnd   time.Time
 }
 
 func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowActiveWithSubjectParams) (bool, error) {
@@ -912,8 +912,8 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 		arg.ActorID,
 		arg.Action,
 		arg.SubjectID,
-		arg.Timestart,
-		arg.Timeend,
+		arg.TimeStart,
+		arg.TimeEnd,
 	)
 	var exists bool
 	err := row.Scan(&exists)

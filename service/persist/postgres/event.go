@@ -73,8 +73,8 @@ func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event, si
 	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
 		ActorID:   event.ActorID,
 		Action:    event.Action,
-		Timestart: event.CreatedAt,
-		Timeend:   since,
+		TimeStart: event.CreatedAt,
+		TimeEnd:   since,
 	})
 }
 
@@ -85,8 +85,8 @@ func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc
 		ActorID:   event.ActorID,
 		Action:    event.Action,
 		SubjectID: event.SubjectID,
-		Timestart: event.CreatedAt,
-		Timeend:   since,
+		TimeStart: event.CreatedAt,
+		TimeEnd:   since,
 	})
 }
 
@@ -95,7 +95,7 @@ func (r *EventRepository) EventsInWindow(ctx context.Context, actorID persist.DB
 	return r.Queries.GetEventsInWindow(ctx, sqlc.GetEventsInWindowParams{
 		ActorID:   actorID,
 		Action:    action,
-		Timestart: windowStart,
-		Timeend:   windowEnd,
+		TimeStart: windowStart,
+		TimeEnd:   windowEnd,
 	})
 }

@@ -149,13 +149,13 @@ INSERT INTO events (id, actor_id, action, resource_id, collection_id, subject_id
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
 -- name: GetEventsInWindow :many
-SELECT * FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > @timestart AND created_at <= @timeend;
+SELECT * FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > @time_start AND created_at <= @time_end;
 
 -- name: IsWindowActive :one
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > @timestart AND created_at <= @timeend
+    AND created_at > @time_start AND created_at <= @time_end
     LIMIT 1
 );
 
@@ -163,7 +163,7 @@ SELECT EXISTS(
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
-    AND created_at > @timestart AND created_at <= @timeend
+    AND created_at > @time_start AND created_at <= @time_end
     LIMIT 1
 );
 
@@ -195,12 +195,12 @@ SELECT * FROM feed_events
 
 -- name: GetLastFeedEventForToken :one
 SELECT * FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $3::varchar AND event_time < $4 AND deleted = false
+    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = @token_id::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1;
 
 -- name: GetLastFeedEventForCollection :one
 SELECT * FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $3::varchar AND event_time < $4 AND deleted = false
+    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = @collection_id::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1;
