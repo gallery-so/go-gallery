@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/publicapi/option"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/mikeydub/go-gallery/debugtools"
@@ -468,10 +469,10 @@ func resolveUserFollowedUsersFeedEventByEventID(ctx context.Context, eventID per
 }
 
 func resolveViewerFeed(ctx context.Context, page *model.Pagination) (*model.Feed, error) {
-	opts := make([]publicapi.FeedOption, 0)
+	opts := make([]option.FeedOption, 0)
 
 	if page != nil {
-		opts = append(opts, publicapi.WithPage(page))
+		opts = append(opts, option.WithFeedPage(page))
 	}
 
 	events, token, err := publicapi.For(ctx).Feed.ViewerFeed(ctx, opts...)
@@ -484,10 +485,10 @@ func resolveViewerFeed(ctx context.Context, page *model.Pagination) (*model.Feed
 }
 
 func resolveGlobalFeed(ctx context.Context, page *model.Pagination) (*model.Feed, error) {
-	opts := make([]publicapi.FeedOption, 0)
+	opts := make([]option.FeedOption, 0)
 
 	if page != nil {
-		opts = append(opts, publicapi.WithPage(page))
+		opts = append(opts, option.WithFeedPage(page))
 	}
 
 	events, token, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, opts...)
