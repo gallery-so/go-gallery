@@ -471,6 +471,14 @@ type ErrFeedEventNotFoundByID implements Error {
 }
 
 union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrFeedEventNotFoundByID
+union FeedEventByIdOrError =
+    | UserCreatedFeedEvent
+    | UserFollowedUsersFeedEvent
+    | CollectorsNoteAddedToTokenFeedEvent
+    | CollectionCreatedFeedEvent
+    | TokensAddedToCollectionFeedEvent
+    | ErrFeedEventNotFoundByID
+    | ErrUnknownAction
 
 type Query {
     node(id: ID!): Node
@@ -484,6 +492,7 @@ type Query {
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     globalFeed(page: Pagination): FeedOrError
+    feedEventById(id: DBID!): FeedEventByIdOrError
 }
 
 input CollectionLayoutInput {

@@ -396,6 +396,22 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 	return output, nil
 }
 
+func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEvent, error) {
+	evt, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	event, err := feedEventToModel(ctx, evt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return event, err
+}
+
 func resolveCollectionCreatedFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.CollectionCreatedFeedEvent, error) {
 	evt, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 

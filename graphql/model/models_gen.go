@@ -52,6 +52,10 @@ type FeedEvent interface {
 	IsFeedEvent()
 }
 
+type FeedEventByIDOrError interface {
+	IsFeedEventByIDOrError()
+}
+
 type FeedOrError interface {
 	IsFeedOrError()
 }
@@ -191,8 +195,9 @@ type CollectionCreatedFeedEvent struct {
 	Collection *Collection    `json:"collection"`
 }
 
-func (CollectionCreatedFeedEvent) IsNode()      {}
-func (CollectionCreatedFeedEvent) IsFeedEvent() {}
+func (CollectionCreatedFeedEvent) IsNode()                 {}
+func (CollectionCreatedFeedEvent) IsFeedEvent()            {}
+func (CollectionCreatedFeedEvent) IsFeedEventByIDOrError() {}
 
 type CollectionLayout struct {
 	Columns    *int   `json:"columns"`
@@ -234,8 +239,9 @@ type CollectorsNoteAddedToTokenFeedEvent struct {
 	NewCollectorsNote *string          `json:"newCollectorsNote"`
 }
 
-func (CollectorsNoteAddedToTokenFeedEvent) IsNode()      {}
-func (CollectorsNoteAddedToTokenFeedEvent) IsFeedEvent() {}
+func (CollectorsNoteAddedToTokenFeedEvent) IsNode()                 {}
+func (CollectorsNoteAddedToTokenFeedEvent) IsFeedEvent()            {}
+func (CollectorsNoteAddedToTokenFeedEvent) IsFeedEventByIDOrError() {}
 
 type Community struct {
 	LastUpdated     *time.Time            `json:"lastUpdated"`
@@ -349,8 +355,9 @@ type ErrFeedEventNotFoundByID struct {
 	Message string `json:"message"`
 }
 
-func (ErrFeedEventNotFoundByID) IsError()       {}
-func (ErrFeedEventNotFoundByID) IsFeedOrError() {}
+func (ErrFeedEventNotFoundByID) IsError()                {}
+func (ErrFeedEventNotFoundByID) IsFeedOrError()          {}
+func (ErrFeedEventNotFoundByID) IsFeedEventByIDOrError() {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -428,8 +435,9 @@ type ErrUnknownAction struct {
 	Message string `json:"message"`
 }
 
-func (ErrUnknownAction) IsError()       {}
-func (ErrUnknownAction) IsFeedOrError() {}
+func (ErrUnknownAction) IsError()                {}
+func (ErrUnknownAction) IsFeedOrError()          {}
+func (ErrUnknownAction) IsFeedEventByIDOrError() {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -662,8 +670,9 @@ type TokensAddedToCollectionFeedEvent struct {
 	NewTokens  []*CollectionToken `json:"newTokens"`
 }
 
-func (TokensAddedToCollectionFeedEvent) IsNode()      {}
-func (TokensAddedToCollectionFeedEvent) IsFeedEvent() {}
+func (TokensAddedToCollectionFeedEvent) IsNode()                 {}
+func (TokensAddedToCollectionFeedEvent) IsFeedEvent()            {}
+func (TokensAddedToCollectionFeedEvent) IsFeedEventByIDOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
@@ -758,8 +767,9 @@ type UserCreatedFeedEvent struct {
 	Action    persist.Action `json:"action"`
 }
 
-func (UserCreatedFeedEvent) IsNode()      {}
-func (UserCreatedFeedEvent) IsFeedEvent() {}
+func (UserCreatedFeedEvent) IsNode()                 {}
+func (UserCreatedFeedEvent) IsFeedEvent()            {}
+func (UserCreatedFeedEvent) IsFeedEventByIDOrError() {}
 
 type UserFollowedUsersFeedEvent struct {
 	Dbid      persist.DBID   `json:"dbid"`
@@ -769,8 +779,9 @@ type UserFollowedUsersFeedEvent struct {
 	Followed  []*FollowInfo  `json:"followed"`
 }
 
-func (UserFollowedUsersFeedEvent) IsNode()      {}
-func (UserFollowedUsersFeedEvent) IsFeedEvent() {}
+func (UserFollowedUsersFeedEvent) IsNode()                 {}
+func (UserFollowedUsersFeedEvent) IsFeedEvent()            {}
+func (UserFollowedUsersFeedEvent) IsFeedEventByIDOrError() {}
 
 type VideoMedia struct {
 	PreviewURLs       *PreviewURLSet `json:"previewURLs"`

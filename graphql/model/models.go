@@ -49,3 +49,9 @@ type ErrInvalidIDType struct {
 func (e ErrInvalidIDType) Error() string {
 	return fmt.Sprintf("no fetch method found for ID type '%s'", e.typeName)
 }
+
+type FeedEventByIdOrErrorAdapter struct {
+	FeedEvent FeedEvent
+}
+
+func (a FeedEventByIdOrErrorAdapter) IsFeedEventByIDOrError() {}

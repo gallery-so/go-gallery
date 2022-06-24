@@ -370,6 +370,7 @@ type ComplexityRoot struct {
 		CollectionByID      func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CommunityByAddress  func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		FeedEventByID       func(childComplexity int, id persist.DBID) int
 		GeneralAllowlist    func(childComplexity int) int
 		GlobalFeed          func(childComplexity int, page *model.Pagination) int
 		MembershipTiers     func(childComplexity int, forceRefresh *bool) int
@@ -596,6 +597,7 @@ type QueryResolver interface {
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GlobalFeed(ctx context.Context, page *model.Pagination) (model.FeedOrError, error)
+	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
 type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
@@ -1875,6 +1877,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
+	case "Query.feedEventById":
+		if e.complexity.Query.FeedEventByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_feedEventById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FeedEventByID(childComplexity, args["id"].(persist.DBID)), true
+
 	case "Query.generalAllowlist":
 		if e.complexity.Query.GeneralAllowlist == nil {
 			break
@@ -3063,6 +3077,14 @@ type ErrFeedEventNotFoundByID implements Error {
 }
 
 union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrFeedEventNotFoundByID
+union FeedEventByIdOrError =
+    | UserCreatedFeedEvent
+    | UserFollowedUsersFeedEvent
+    | CollectorsNoteAddedToTokenFeedEvent
+    | CollectionCreatedFeedEvent
+    | TokensAddedToCollectionFeedEvent
+    | ErrFeedEventNotFoundByID
+    | ErrUnknownAction
 
 type Query {
     node(id: ID!): Node
@@ -3076,6 +3098,7 @@ type Query {
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     globalFeed(page: Pagination): FeedOrError
+    feedEventById(id: DBID!): FeedEventByIdOrError
 }
 
 input CollectionLayoutInput {
@@ -3726,6 +3749,21 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["forceRefresh"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -9898,6 +9936,45 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	return ec.marshalOFeedOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_feedEventById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_feedEventById_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FeedEventByID(rctx, args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.FeedEventByIDOrError)
+	fc.Result = res
+	return ec.marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -14779,6 +14856,64 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 	}
 }
 
+func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventByIDOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UserCreatedFeedEvent:
+		return ec._UserCreatedFeedEvent(ctx, sel, &obj)
+	case *model.UserCreatedFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UserCreatedFeedEvent(ctx, sel, obj)
+	case model.UserFollowedUsersFeedEvent:
+		return ec._UserFollowedUsersFeedEvent(ctx, sel, &obj)
+	case *model.UserFollowedUsersFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UserFollowedUsersFeedEvent(ctx, sel, obj)
+	case model.CollectorsNoteAddedToTokenFeedEvent:
+		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, &obj)
+	case *model.CollectorsNoteAddedToTokenFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, obj)
+	case model.CollectionCreatedFeedEvent:
+		return ec._CollectionCreatedFeedEvent(ctx, sel, &obj)
+	case *model.CollectionCreatedFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CollectionCreatedFeedEvent(ctx, sel, obj)
+	case model.TokensAddedToCollectionFeedEvent:
+		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, &obj)
+	case *model.TokensAddedToCollectionFeedEvent:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, obj)
+	case model.ErrFeedEventNotFoundByID:
+		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFoundByID:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
+	case model.ErrUnknownAction:
+		return ec._ErrUnknownAction(ctx, sel, &obj)
+	case *model.ErrUnknownAction:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUnknownAction(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _FeedOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -15871,7 +16006,7 @@ func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var collectionCreatedFeedEventImplementors = []string{"CollectionCreatedFeedEvent", "Node", "FeedEvent"}
+var collectionCreatedFeedEventImplementors = []string{"CollectionCreatedFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _CollectionCreatedFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionCreatedFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, collectionCreatedFeedEventImplementors)
@@ -16154,7 +16289,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 	return out
 }
 
-var collectorsNoteAddedToTokenFeedEventImplementors = []string{"CollectorsNoteAddedToTokenFeedEvent", "Node", "FeedEvent"}
+var collectorsNoteAddedToTokenFeedEventImplementors = []string{"CollectorsNoteAddedToTokenFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToTokenFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToTokenFeedEventImplementors)
@@ -16675,7 +16810,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errFeedEventNotFoundByIDImplementors = []string{"ErrFeedEventNotFoundByID", "Error", "FeedOrError"}
+var errFeedEventNotFoundByIDImplementors = []string{"ErrFeedEventNotFoundByID", "Error", "FeedOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrFeedEventNotFoundByID(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFoundByID) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundByIDImplementors)
@@ -16922,7 +17057,7 @@ func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedOrError"}
+var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrUnknownAction(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUnknownAction) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUnknownActionImplementors)
@@ -18280,6 +18415,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "feedEventById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_feedEventById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "__type":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -18690,7 +18845,7 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var tokensAddedToCollectionFeedEventImplementors = []string{"TokensAddedToCollectionFeedEvent", "Node", "FeedEvent"}
+var tokensAddedToCollectionFeedEventImplementors = []string{"TokensAddedToCollectionFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.TokensAddedToCollectionFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, tokensAddedToCollectionFeedEventImplementors)
@@ -19067,7 +19222,7 @@ func (ec *executionContext) _UpdateUserInfoPayload(ctx context.Context, sel ast.
 	return out
 }
 
-var userCreatedFeedEventImplementors = []string{"UserCreatedFeedEvent", "Node", "FeedEvent"}
+var userCreatedFeedEventImplementors = []string{"UserCreatedFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.UserCreatedFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, userCreatedFeedEventImplementors)
@@ -19148,7 +19303,7 @@ func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.S
 	return out
 }
 
-var userFollowedUsersFeedEventImplementors = []string{"UserFollowedUsersFeedEvent", "Node", "FeedEvent"}
+var userFollowedUsersFeedEventImplementors = []string{"UserFollowedUsersFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _UserFollowedUsersFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.UserFollowedUsersFeedEvent) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, userFollowedUsersFeedEventImplementors)
@@ -20897,6 +21052,13 @@ func (ec *executionContext) marshalOFeedEvent2ᚕgithubᚗcomᚋmikeydubᚋgoᚑ
 	wg.Wait()
 
 	return ret
+}
+
+func (ec *executionContext) marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventByIdOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFeedOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedOrError) graphql.Marshaler {

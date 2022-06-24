@@ -513,6 +513,16 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, page *model.Pagination) 
 	return feed, nil
 }
 
+func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
+	event, err := resolveFeedEventByEventID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return model.FeedEventByIdOrErrorAdapter{FeedEvent: event}, nil
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
