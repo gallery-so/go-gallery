@@ -506,7 +506,7 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 		return nil, err
 	}
 
-	tokens, err := publicapi.For(ctx).Token.GetTokensByIds(ctx, event.Data.CollectionNewTokenIDs)
+	tokens, err := publicapi.For(ctx).Token.GetNewTokensByFeedEventID(ctx, eventID)
 
 	if err != nil {
 		return nil, err

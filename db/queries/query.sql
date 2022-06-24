@@ -66,6 +66,9 @@ SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
     AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
+-- name: GetNewTokensByFeedEventIdBatch :batchmany
+SELECT * FROM tokens WHERE id in (SELECT data ->> 'collection_new_token_ids' FROM feed_events fe where fe.id = $1);
+
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
 

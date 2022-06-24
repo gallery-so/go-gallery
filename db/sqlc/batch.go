@@ -679,6 +679,76 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getNewTokensByFeedEventIdBatch = `-- name: GetNewTokensByFeedEventIdBatch :batchmany
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE id in (SELECT data ->> 'collection_new_token_ids' FROM feed_events fe where fe.id = $1)
+`
+
+type GetNewTokensByFeedEventIdBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetNewTokensByFeedEventIdBatch(ctx context.Context, id []persist.DBID) *GetNewTokensByFeedEventIdBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getNewTokensByFeedEventIdBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetNewTokensByFeedEventIdBatchBatchResults{br, 0}
+}
+
+func (b *GetNewTokensByFeedEventIdBatchBatchResults) Query(f func(int, []Token, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Token
+		for rows.Next() {
+			var i Token
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.Name,
+				&i.Description,
+				&i.CollectorsNote,
+				&i.Media,
+				&i.TokenUri,
+				&i.TokenType,
+				&i.TokenID,
+				&i.Quantity,
+				&i.OwnershipHistory,
+				&i.TokenMetadata,
+				&i.ExternalUrl,
+				&i.BlockNumber,
+				&i.OwnerUserID,
+				&i.OwnedByWallets,
+				&i.Chain,
+				&i.Contract,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE id = $1 AND deleted = false
 `

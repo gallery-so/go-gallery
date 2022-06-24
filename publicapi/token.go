@@ -64,21 +64,17 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByIds(ctx context.Context, tokenIDs []persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"tokenIDs": {tokenIDs, "required,unique"},
+		"eventID": {eventID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	tokens, errors := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
-
-	// More convenient to return a single error
-	for _, err := range errors {
-		if err != nil {
-			return nil, err
-		}
+	tokens, err := api.loaders.NewTokensByFeedEventID.Load(eventID)
+	if err != nil {
+		return nil, err
 	}
 
 	return tokens, nil
