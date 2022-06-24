@@ -42,11 +42,11 @@ type FeedEventData struct {
 	CollectionNewCollectorsNote string   `json:"collection_new_collectors_note"`
 }
 
-type ErrEventNotFoundByID struct {
+type ErrFeedEventNotFoundByID struct {
 	ID DBID
 }
 
-func (e ErrEventNotFoundByID) Error() string {
+func (e ErrFeedEventNotFoundByID) Error() string {
 	return fmt.Sprintf("event not found by id: %s", e.ID)
 }
 

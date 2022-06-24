@@ -339,6 +339,7 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+    feed(page: Pagination): Feed @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -387,7 +388,7 @@ enum Action {
     TokensAddedToCollection
 }
 
-interface Event implements Node {
+interface FeedEvent implements Node {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -400,7 +401,7 @@ type FollowInfo {
     followedBack: Boolean
 }
 
-type UserCreatedEvent implements Node & Event {
+type UserCreatedFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -408,7 +409,7 @@ type UserCreatedEvent implements Node & Event {
     action: Action!
 }
 
-type UserFollowedUsersEvent implements Node & Event {
+type UserFollowedUsersFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -417,7 +418,7 @@ type UserFollowedUsersEvent implements Node & Event {
     followed: [FollowInfo]
 }
 
-type CollectorsNoteAddedToTokenEvent implements Node & Event {
+type CollectorsNoteAddedToTokenFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -427,7 +428,7 @@ type CollectorsNoteAddedToTokenEvent implements Node & Event {
     newCollectorsNote: String
 }
 
-type CollectionCreatedEvent implements Node & Event {
+type CollectionCreatedFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -436,7 +437,7 @@ type CollectionCreatedEvent implements Node & Event {
     collection: Collection @goField(forceResolver: true)
 }
 
-type CollectorsNoteAddedToCollectionEvent implements Node & Event {
+type CollectorsNoteAddedToCollectionFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -446,7 +447,7 @@ type CollectorsNoteAddedToCollectionEvent implements Node & Event {
     newCollectorsNote: String
 }
 
-type TokensAddedToCollectionEvent implements Node & Event {
+type TokensAddedToCollectionFeedEvent implements Node & FeedEvent {
     id: ID!
     dbid: DBID!
     eventTime: Time!
@@ -457,20 +458,19 @@ type TokensAddedToCollectionEvent implements Node & Event {
 }
 
 type Feed {
-    events: [Event]
+    events: [FeedEvent]
     pageInfo: PageInfo!
-    viewer: Viewer
 }
 
 type ErrUnknownAction implements Error {
     message: String!
 }
 
-type ErrEventNotFoundByID implements Error {
+type ErrFeedEventNotFoundByID implements Error {
     message: String!
 }
 
-union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrEventNotFoundByID
+union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrFeedEventNotFoundByID
 
 type Query {
     node(id: ID!): Node
@@ -483,7 +483,6 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    viewerFeed(page: Pagination): FeedOrError @authRequired
     globalFeed(page: Pagination): FeedOrError
 }
 

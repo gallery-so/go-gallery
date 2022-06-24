@@ -47,9 +47,9 @@ type Error interface {
 	IsError()
 }
 
-type Event interface {
+type FeedEvent interface {
 	Node
-	IsEvent()
+	IsFeedEvent()
 }
 
 type FeedOrError interface {
@@ -183,7 +183,7 @@ type Collection struct {
 func (Collection) IsNode()                  {}
 func (Collection) IsCollectionByIDOrError() {}
 
-type CollectionCreatedEvent struct {
+type CollectionCreatedFeedEvent struct {
 	Dbid       persist.DBID   `json:"dbid"`
 	EventTime  time.Time      `json:"eventTime"`
 	Owner      *GalleryUser   `json:"owner"`
@@ -191,8 +191,8 @@ type CollectionCreatedEvent struct {
 	Collection *Collection    `json:"collection"`
 }
 
-func (CollectionCreatedEvent) IsNode()  {}
-func (CollectionCreatedEvent) IsEvent() {}
+func (CollectionCreatedFeedEvent) IsNode()      {}
+func (CollectionCreatedFeedEvent) IsFeedEvent() {}
 
 type CollectionLayout struct {
 	Columns    *int   `json:"columns"`
@@ -213,7 +213,7 @@ type CollectionToken struct {
 func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
 
-type CollectorsNoteAddedToCollectionEvent struct {
+type CollectorsNoteAddedToCollectionFeedEvent struct {
 	Dbid              persist.DBID   `json:"dbid"`
 	EventTime         time.Time      `json:"eventTime"`
 	Owner             *GalleryUser   `json:"owner"`
@@ -222,10 +222,10 @@ type CollectorsNoteAddedToCollectionEvent struct {
 	NewCollectorsNote *string        `json:"newCollectorsNote"`
 }
 
-func (CollectorsNoteAddedToCollectionEvent) IsNode()  {}
-func (CollectorsNoteAddedToCollectionEvent) IsEvent() {}
+func (CollectorsNoteAddedToCollectionFeedEvent) IsNode()      {}
+func (CollectorsNoteAddedToCollectionFeedEvent) IsFeedEvent() {}
 
-type CollectorsNoteAddedToTokenEvent struct {
+type CollectorsNoteAddedToTokenFeedEvent struct {
 	Dbid              persist.DBID     `json:"dbid"`
 	EventTime         time.Time        `json:"eventTime"`
 	Owner             *GalleryUser     `json:"owner"`
@@ -234,8 +234,8 @@ type CollectorsNoteAddedToTokenEvent struct {
 	NewCollectorsNote *string          `json:"newCollectorsNote"`
 }
 
-func (CollectorsNoteAddedToTokenEvent) IsNode()  {}
-func (CollectorsNoteAddedToTokenEvent) IsEvent() {}
+func (CollectorsNoteAddedToTokenFeedEvent) IsNode()      {}
+func (CollectorsNoteAddedToTokenFeedEvent) IsFeedEvent() {}
 
 type Community struct {
 	LastUpdated     *time.Time            `json:"lastUpdated"`
@@ -345,12 +345,12 @@ func (ErrDoesNotOwnRequiredToken) IsError()                      {}
 func (ErrDoesNotOwnRequiredToken) IsLoginPayloadOrError()        {}
 func (ErrDoesNotOwnRequiredToken) IsCreateUserPayloadOrError()   {}
 
-type ErrEventNotFoundByID struct {
+type ErrFeedEventNotFoundByID struct {
 	Message string `json:"message"`
 }
 
-func (ErrEventNotFoundByID) IsError()       {}
-func (ErrEventNotFoundByID) IsFeedOrError() {}
+func (ErrFeedEventNotFoundByID) IsError()       {}
+func (ErrFeedEventNotFoundByID) IsFeedOrError() {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -451,9 +451,8 @@ func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
 type Feed struct {
-	Events   []Event   `json:"events"`
-	PageInfo *PageInfo `json:"pageInfo"`
-	Viewer   *Viewer   `json:"viewer"`
+	Events   []FeedEvent `json:"events"`
+	PageInfo *PageInfo   `json:"pageInfo"`
 }
 
 func (Feed) IsFeedOrError() {}
@@ -654,7 +653,7 @@ type TokenHolder struct {
 	PreviewTokens []*string    `json:"previewTokens"`
 }
 
-type TokensAddedToCollectionEvent struct {
+type TokensAddedToCollectionFeedEvent struct {
 	Dbid       persist.DBID       `json:"dbid"`
 	EventTime  time.Time          `json:"eventTime"`
 	Owner      *GalleryUser       `json:"owner"`
@@ -663,8 +662,8 @@ type TokensAddedToCollectionEvent struct {
 	NewTokens  []*CollectionToken `json:"newTokens"`
 }
 
-func (TokensAddedToCollectionEvent) IsNode()  {}
-func (TokensAddedToCollectionEvent) IsEvent() {}
+func (TokensAddedToCollectionFeedEvent) IsNode()      {}
+func (TokensAddedToCollectionFeedEvent) IsFeedEvent() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
@@ -752,17 +751,17 @@ type UpdateUserInfoPayload struct {
 
 func (UpdateUserInfoPayload) IsUpdateUserInfoPayloadOrError() {}
 
-type UserCreatedEvent struct {
+type UserCreatedFeedEvent struct {
 	Dbid      persist.DBID   `json:"dbid"`
 	EventTime time.Time      `json:"eventTime"`
 	Owner     *GalleryUser   `json:"owner"`
 	Action    persist.Action `json:"action"`
 }
 
-func (UserCreatedEvent) IsNode()  {}
-func (UserCreatedEvent) IsEvent() {}
+func (UserCreatedFeedEvent) IsNode()      {}
+func (UserCreatedFeedEvent) IsFeedEvent() {}
 
-type UserFollowedUsersEvent struct {
+type UserFollowedUsersFeedEvent struct {
 	Dbid      persist.DBID   `json:"dbid"`
 	EventTime time.Time      `json:"eventTime"`
 	Owner     *GalleryUser   `json:"owner"`
@@ -770,8 +769,8 @@ type UserFollowedUsersEvent struct {
 	Followed  []*FollowInfo  `json:"followed"`
 }
 
-func (UserFollowedUsersEvent) IsNode()  {}
-func (UserFollowedUsersEvent) IsEvent() {}
+func (UserFollowedUsersFeedEvent) IsNode()      {}
+func (UserFollowedUsersFeedEvent) IsFeedEvent() {}
 
 type VideoMedia struct {
 	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
@@ -793,6 +792,7 @@ type VideoURLSet struct {
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
+	Feed            *Feed            `json:"feed"`
 }
 
 func (Viewer) IsViewerOrError() {}

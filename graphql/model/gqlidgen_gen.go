@@ -14,8 +14,8 @@ func (r *Collection) ID() GqlID {
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
 
-func (r *CollectionCreatedEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("CollectionCreatedEvent:%s", r.Dbid))
+func (r *CollectionCreatedFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("CollectionCreatedFeedEvent:%s", r.Dbid))
 }
 
 func (r *CollectionToken) ID() GqlID {
@@ -32,12 +32,12 @@ func (r *CollectionToken) ID() GqlID {
 	return GqlID(fmt.Sprintf("CollectionToken:%s:%s", r.GetGqlIDField_TokenID(), r.GetGqlIDField_CollectionID()))
 }
 
-func (r *CollectorsNoteAddedToCollectionEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("CollectorsNoteAddedToCollectionEvent:%s", r.Dbid))
+func (r *CollectorsNoteAddedToCollectionFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("CollectorsNoteAddedToCollectionFeedEvent:%s", r.Dbid))
 }
 
-func (r *CollectorsNoteAddedToTokenEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("CollectorsNoteAddedToTokenEvent:%s", r.Dbid))
+func (r *CollectorsNoteAddedToTokenFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("CollectorsNoteAddedToTokenFeedEvent:%s", r.Dbid))
 }
 
 func (r *Community) ID() GqlID {
@@ -74,16 +74,16 @@ func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
 
-func (r *TokensAddedToCollectionEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("TokensAddedToCollectionEvent:%s", r.Dbid))
+func (r *TokensAddedToCollectionFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("TokensAddedToCollectionFeedEvent:%s", r.Dbid))
 }
 
-func (r *UserCreatedEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("UserCreatedEvent:%s", r.Dbid))
+func (r *UserCreatedFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("UserCreatedFeedEvent:%s", r.Dbid))
 }
 
-func (r *UserFollowedUsersEvent) ID() GqlID {
-	return GqlID(fmt.Sprintf("UserFollowedUsersEvent:%s", r.Dbid))
+func (r *UserFollowedUsersFeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("UserFollowedUsersFeedEvent:%s", r.Dbid))
 }
 
 func (r *Wallet) ID() GqlID {
@@ -91,21 +91,21 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnCollection                           func(ctx context.Context, dbid persist.DBID) (*Collection, error)
-	OnCollectionCreatedEvent               func(ctx context.Context, dbid persist.DBID) (*CollectionCreatedEvent, error)
-	OnCollectionToken                      func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
-	OnCollectorsNoteAddedToCollectionEvent func(ctx context.Context, dbid persist.DBID) (*CollectorsNoteAddedToCollectionEvent, error)
-	OnCollectorsNoteAddedToTokenEvent      func(ctx context.Context, dbid persist.DBID) (*CollectorsNoteAddedToTokenEvent, error)
-	OnCommunity                            func(ctx context.Context, contractAddress string, chain string) (*Community, error)
-	OnContract                             func(ctx context.Context, dbid persist.DBID) (*Contract, error)
-	OnGallery                              func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
-	OnGalleryUser                          func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipTier                       func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
-	OnToken                                func(ctx context.Context, dbid persist.DBID) (*Token, error)
-	OnTokensAddedToCollectionEvent         func(ctx context.Context, dbid persist.DBID) (*TokensAddedToCollectionEvent, error)
-	OnUserCreatedEvent                     func(ctx context.Context, dbid persist.DBID) (*UserCreatedEvent, error)
-	OnUserFollowedUsersEvent               func(ctx context.Context, dbid persist.DBID) (*UserFollowedUsersEvent, error)
-	OnWallet                               func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
+	OnCollection                               func(ctx context.Context, dbid persist.DBID) (*Collection, error)
+	OnCollectionCreatedFeedEvent               func(ctx context.Context, dbid persist.DBID) (*CollectionCreatedFeedEvent, error)
+	OnCollectionToken                          func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
+	OnCollectorsNoteAddedToCollectionFeedEvent func(ctx context.Context, dbid persist.DBID) (*CollectorsNoteAddedToCollectionFeedEvent, error)
+	OnCollectorsNoteAddedToTokenFeedEvent      func(ctx context.Context, dbid persist.DBID) (*CollectorsNoteAddedToTokenFeedEvent, error)
+	OnCommunity                                func(ctx context.Context, contractAddress string, chain string) (*Community, error)
+	OnContract                                 func(ctx context.Context, dbid persist.DBID) (*Contract, error)
+	OnGallery                                  func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
+	OnGalleryUser                              func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipTier                           func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnToken                                    func(ctx context.Context, dbid persist.DBID) (*Token, error)
+	OnTokensAddedToCollectionFeedEvent         func(ctx context.Context, dbid persist.DBID) (*TokensAddedToCollectionFeedEvent, error)
+	OnUserCreatedFeedEvent                     func(ctx context.Context, dbid persist.DBID) (*UserCreatedFeedEvent, error)
+	OnUserFollowedUsersFeedEvent               func(ctx context.Context, dbid persist.DBID) (*UserFollowedUsersFeedEvent, error)
+	OnWallet                                   func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -123,26 +123,26 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnCollection(ctx, persist.DBID(ids[0]))
-	case "CollectionCreatedEvent":
+	case "CollectionCreatedFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectionCreatedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectionCreatedFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCollectionCreatedEvent(ctx, persist.DBID(ids[0]))
+		return n.OnCollectionCreatedFeedEvent(ctx, persist.DBID(ids[0]))
 	case "CollectionToken":
 		if len(ids) != 2 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectionToken' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnCollectionToken(ctx, string(ids[0]), string(ids[1]))
-	case "CollectorsNoteAddedToCollectionEvent":
+	case "CollectorsNoteAddedToCollectionFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectorsNoteAddedToCollectionEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectorsNoteAddedToCollectionFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCollectorsNoteAddedToCollectionEvent(ctx, persist.DBID(ids[0]))
-	case "CollectorsNoteAddedToTokenEvent":
+		return n.OnCollectorsNoteAddedToCollectionFeedEvent(ctx, persist.DBID(ids[0]))
+	case "CollectorsNoteAddedToTokenFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectorsNoteAddedToTokenEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectorsNoteAddedToTokenFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnCollectorsNoteAddedToTokenEvent(ctx, persist.DBID(ids[0]))
+		return n.OnCollectorsNoteAddedToTokenFeedEvent(ctx, persist.DBID(ids[0]))
 	case "Community":
 		if len(ids) != 2 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -173,21 +173,21 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnToken(ctx, persist.DBID(ids[0]))
-	case "TokensAddedToCollectionEvent":
+	case "TokensAddedToCollectionFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'TokensAddedToCollectionEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'TokensAddedToCollectionFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnTokensAddedToCollectionEvent(ctx, persist.DBID(ids[0]))
-	case "UserCreatedEvent":
+		return n.OnTokensAddedToCollectionFeedEvent(ctx, persist.DBID(ids[0]))
+	case "UserCreatedFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'UserCreatedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'UserCreatedFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnUserCreatedEvent(ctx, persist.DBID(ids[0]))
-	case "UserFollowedUsersEvent":
+		return n.OnUserCreatedFeedEvent(ctx, persist.DBID(ids[0]))
+	case "UserFollowedUsersFeedEvent":
 		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'UserFollowedUsersEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'UserFollowedUsersFeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnUserFollowedUsersEvent(ctx, persist.DBID(ids[0]))
+		return n.OnUserFollowedUsersFeedEvent(ctx, persist.DBID(ids[0]))
 	case "Wallet":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -202,14 +202,14 @@ func (n *NodeFetcher) ValidateHandlers() {
 	switch {
 	case n.OnCollection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
-	case n.OnCollectionCreatedEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionCreatedEvent")
+	case n.OnCollectionCreatedFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionCreatedFeedEvent")
 	case n.OnCollectionToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionToken")
-	case n.OnCollectorsNoteAddedToCollectionEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectorsNoteAddedToCollectionEvent")
-	case n.OnCollectorsNoteAddedToTokenEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectorsNoteAddedToTokenEvent")
+	case n.OnCollectorsNoteAddedToCollectionFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectorsNoteAddedToCollectionFeedEvent")
+	case n.OnCollectorsNoteAddedToTokenFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectorsNoteAddedToTokenFeedEvent")
 	case n.OnCommunity == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCommunity")
 	case n.OnContract == nil:
@@ -222,12 +222,12 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
-	case n.OnTokensAddedToCollectionEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnTokensAddedToCollectionEvent")
-	case n.OnUserCreatedEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnUserCreatedEvent")
-	case n.OnUserFollowedUsersEvent == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnUserFollowedUsersEvent")
+	case n.OnTokensAddedToCollectionFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnTokensAddedToCollectionFeedEvent")
+	case n.OnUserCreatedFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnUserCreatedFeedEvent")
+	case n.OnUserFollowedUsersFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnUserFollowedUsersFeedEvent")
 	case n.OnWallet == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnWallet")
 	}

@@ -771,7 +771,7 @@ func loadEventById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func(
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrEventNotFoundByID{ID: eventIds[i]}
+				errors[i] = persist.ErrFeedEventNotFoundByID{ID: eventIds[i]}
 			}
 		})
 
