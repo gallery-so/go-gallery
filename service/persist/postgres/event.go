@@ -96,12 +96,7 @@ func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc
 	})
 }
 
-// EventsInWindow returns events belonging to the same window of activity.
-func (r *EventRepository) EventsInWindow(ctx context.Context, actorID persist.DBID, action persist.Action, windowStart time.Time, windowEnd time.Time) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindow(ctx, sqlc.GetEventsInWindowParams{
-		ActorID:   actorID,
-		Action:    action,
-		TimeStart: windowStart,
-		TimeEnd:   windowEnd,
-	})
+// EventsInWindow returns events belonging to the same window of activity as the given eventID.
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindow(ctx, eventID)
 }

@@ -15,7 +15,8 @@ import (
 
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+    $1, $2, $3, $4, $5, $5, $6, $7, $8,
+    (SELECT id FROM events e WHERE e.actor_id = $2::varchar AND e.action = $3::varchar AND e.subject_id = $5::varchar AND e.created_at < $7 AND e.created_at >= $9 AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
 ) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
@@ -104,7 +105,8 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+    $1, $2, $3, $4, $5, $5, $6, $7, $8,
+    (SELECT id FROM events e WHERE e.actor_id = $2::varchar AND e.action = $3::varchar AND e.subject_id = $5::varchar AND e.created_at < $7 AND e.created_at >= $9 AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
 ) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
@@ -155,7 +157,8 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 
 const createUserEvent = `-- name: CreateUserEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    $1, $2, $3, $4, $4, $5, $6, $7, $8, (SELECT id FROM events et WHERE actor_id = $2 AND action = $3 AND subject_id = $5 AND et.created_at < $7 AND et.created_at >= $9 AND deleted = false ORDER BY CREATED_AT DESC LIMIT 1)::varchar
+    $1, $2, $3, $4, $5, $5, $6, $7, $8,
+    (SELECT id FROM events e WHERE e.actor_id = $2::varchar AND e.action = $3::varchar AND e.subject_id = $5::varchar AND e.created_at < $7 AND e.created_at >= $9 AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
 ) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id
 `
 
@@ -343,23 +346,16 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 }
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > $3 AND created_at <= $4
+WITH RECURSIVE activity(id, prior_event_id) AS (
+    SELECT id, prior_event_id FROM events WHERE events.id = $1
+    UNION
+    SELECT e.id, e.prior_event_id FROM events e, activity a WHERE e.id = a.prior_event_id
+)
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, grace_time, prior_event_id FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
 `
 
-type GetEventsInWindowParams struct {
-	ActorID   persist.DBID
-	Action    persist.Action
-	TimeStart time.Time
-	TimeEnd   time.Time
-}
-
-func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, getEventsInWindow,
-		arg.ActorID,
-		arg.Action,
-		arg.TimeStart,
-		arg.TimeEnd,
-	)
+func (q *Queries) GetEventsInWindow(ctx context.Context, id persist.DBID) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getEventsInWindow, id)
 	if err != nil {
 		return nil, err
 	}
@@ -462,35 +458,6 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 		&i.Collections,
 	)
 	return i, err
-}
-
-const getLastEventInWindow = `-- name: GetLastEventInWindow :one
-
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > $3 AND created_at <= $4
-    LIMIT 1
-)
-`
-
-type GetLastEventInWindowParams struct {
-	ActorID   persist.DBID
-	Action    persist.Action
-	TimeStart time.Time
-	TimeEnd   time.Time
-}
-
-func (q *Queries) GetLastEventInWindow(ctx context.Context, arg GetLastEventInWindowParams) (bool, error) {
-	row := q.db.QueryRow(ctx, getLastEventInWindow,
-		arg.ActorID,
-		arg.Action,
-		arg.TimeStart,
-		arg.TimeEnd,
-	)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const getLastFeedEvent = `-- name: GetLastFeedEvent :one
@@ -917,6 +884,34 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 		return nil, err
 	}
 	return items, nil
+}
+
+const isWindowActive = `-- name: IsWindowActive :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND deleted = false
+    AND created_at > $3 AND created_at <= $4
+    LIMIT 1
+)
+`
+
+type IsWindowActiveParams struct {
+	ActorID   persist.DBID
+	Action    persist.Action
+	TimeStart time.Time
+	TimeEnd   time.Time
+}
+
+func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActive,
+		arg.ActorID,
+		arg.Action,
+		arg.TimeStart,
+		arg.TimeEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const isWindowActiveWithSubject = `-- name: IsWindowActiveWithSubject :one

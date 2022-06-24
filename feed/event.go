@@ -92,9 +92,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 	events := []sqlc.Event{event}
 
 	if feedEvent != nil {
-		events, err = b.eventRepo.EventsInWindow(ctx,
-			event.ActorID, event.Action, feedEvent.EventTime, event.CreatedAt,
-		)
+		events, err = b.eventRepo.EventsInWindow(ctx, event.ID)
 		if err != nil {
 			return nil, err
 		}
