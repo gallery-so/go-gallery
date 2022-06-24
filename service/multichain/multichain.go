@@ -61,6 +61,12 @@ type ChainAgnosticContract struct {
 	LatestBlock persist.BlockNumber `json:"latest_block"`
 }
 
+// ChainAgnosticIdentifiers identify tokens despite their chain
+type ChainAgnosticIdentifiers struct {
+	ContractAddress persist.Address `json:"contract_address"`
+	TokenID         persist.TokenID `json:"token_id"`
+}
+
 // ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
 type ErrChainNotFound struct {
 	Chain persist.Chain
@@ -87,8 +93,10 @@ type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
 	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, persist.TokenIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
+	RefreshToken(context.Context, ChainAgnosticIdentifiers) error
+	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
 	// do we want to return the tokens we validate?
@@ -120,9 +128,9 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 	}
 }
 
-// UpdateTokensForUser updates the media for all tokens for a user
+// SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
-func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID) error {
+func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 	user, err := d.UserRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -235,6 +243,24 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
 	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
+}
+
+// RefreshToken refreshes a token on the given chain using the chain provider for that chain
+func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+	provider, ok := d.Chains[ti.Chain]
+	if !ok {
+		return ErrChainNotFound{Chain: ti.Chain}
+	}
+	return provider.RefreshToken(ctx, ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID})
+}
+
+// RefreshContract refreshes a contract on the given chain using the chain provider for that chain
+func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
+	provider, ok := d.Chains[ci.Chain]
+	if !ok {
+		return ErrChainNotFound{Chain: ci.Chain}
+	}
+	return provider.RefreshContract(ctx, ci.ContractAddress)
 }
 
 func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {

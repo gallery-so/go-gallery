@@ -97,16 +97,42 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
-func (api TokenAPI) RefreshTokens(ctx context.Context) error {
+func (api TokenAPI) SyncTokens(ctx context.Context) error {
 	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = api.multichainProvider.UpdateTokensForUser(ctx, userID)
+	err = api.multichainProvider.SyncTokens(ctx, userID)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
+}
+
+func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
+	if err := validateFields(api.validator, validationMap{
+		"tokenID": {tokenDBID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	token, err := api.loaders.TokenByTokenID.Load(tokenDBID)
+	if err != nil {
+		return err
+	}
+	contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+	if err != nil {
+		return err
+	}
+
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)))
+	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 

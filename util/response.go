@@ -18,7 +18,7 @@ type SuccessResponse struct {
 
 // ErrInvalidInput is an error response for an invalid input
 type ErrInvalidInput struct {
-	Reason string
+	Reason string `json:"reason"`
 }
 
 func (e ErrInvalidInput) Error() string {

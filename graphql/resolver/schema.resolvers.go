@@ -295,16 +295,56 @@ func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.Upda
 	return output, nil
 }
 
-func (r *mutationResolver) RefreshTokens(ctx context.Context) (model.RefreshTokensPayloadOrError, error) {
+func (r *mutationResolver) SyncTokens(ctx context.Context) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Token.RefreshTokens(ctx)
+	err := api.Token.SyncTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.RefreshTokensPayload{
+	output := &model.SyncTokensPayload{
 		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Token.RefreshToken(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := resolveTokenByTokenID(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RefreshTokenPayload{
+		Token: token,
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Contract.RefreshContract(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := resolveContractByContractID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RefreshContractPayload{
+		Contract: contract,
 	}
 
 	return output, nil

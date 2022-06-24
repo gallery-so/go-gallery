@@ -184,7 +184,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti persist.TokenIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -566,6 +566,16 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 		CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		LatestBlock:    persist.BlockNumber(block),
 	}, nil
+}
+
+// RefreshToken refreshes the metadata for a given token.
+func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers) error {
+	return nil
+}
+
+// RefreshContract refreshses the metadata for a contract
+func (p *Provider) RefreshContract(context.Context, persist.Address) error {
+	return nil
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)

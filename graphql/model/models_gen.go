@@ -79,12 +79,20 @@ type Node interface {
 	IsNode()
 }
 
-type RefreshTokensPayloadOrError interface {
-	IsRefreshTokensPayloadOrError()
+type RefreshContractPayloadOrError interface {
+	IsRefreshContractPayloadOrError()
+}
+
+type RefreshTokenPayloadOrError interface {
+	IsRefreshTokenPayloadOrError()
 }
 
 type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
+}
+
+type SyncTokensPayloadOrError interface {
+	IsSyncTokensPayloadOrError()
 }
 
 type TokenByIDOrError interface {
@@ -320,6 +328,8 @@ func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
 func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
+func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
+func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
 func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
@@ -354,15 +364,17 @@ func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
 func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
 func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
-func (ErrNotAuthorized) IsRefreshTokensPayloadOrError()            {}
+func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 
 type ErrOpenSeaRefreshFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrOpenSeaRefreshFailed) IsRefreshTokensPayloadOrError() {}
-func (ErrOpenSeaRefreshFailed) IsError()                       {}
+func (ErrOpenSeaRefreshFailed) IsSyncTokensPayloadOrError()      {}
+func (ErrOpenSeaRefreshFailed) IsRefreshTokenPayloadOrError()    {}
+func (ErrOpenSeaRefreshFailed) IsRefreshContractPayloadOrError() {}
+func (ErrOpenSeaRefreshFailed) IsError()                         {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -514,17 +526,29 @@ type PreviewURLSet struct {
 	SrcSet    *string `json:"srcSet"`
 }
 
-type RefreshTokensPayload struct {
-	Viewer *Viewer `json:"viewer"`
+type RefreshContractPayload struct {
+	Contract *Contract `json:"contract"`
 }
 
-func (RefreshTokensPayload) IsRefreshTokensPayloadOrError() {}
+func (RefreshContractPayload) IsRefreshContractPayloadOrError() {}
+
+type RefreshTokenPayload struct {
+	Token *Token `json:"token"`
+}
+
+func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
 
 type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
 func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
+
+type SyncTokensPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (SyncTokensPayload) IsSyncTokensPayloadOrError() {}
 
 type TextMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

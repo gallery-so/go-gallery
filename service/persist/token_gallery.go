@@ -54,6 +54,12 @@ type TokenIdentifiers struct {
 	Chain           Chain   `json:"chain"`
 }
 
+// ContractIdentifiers represents a unique identifier for a contract
+type ContractIdentifiers struct {
+	ContractAddress Address `json:"contract_address"`
+	Chain           Chain   `json:"chain"`
+}
+
 // TokenInCollection represents a token within a collection
 type TokenInCollection struct {
 	ID           DBID         `json:"id" binding:"required"`
@@ -162,6 +168,14 @@ func (t *TokenIdentifiers) Scan(i interface{}) error {
 		Chain:           Chain(chain),
 	}
 	return nil
+}
+
+// NewContractIdentifiers creates a new contract identifiers
+func NewContractIdentifiers(pContractAddress Address, pChain Chain) ContractIdentifiers {
+	return ContractIdentifiers{
+		ContractAddress: pContractAddress,
+		Chain:           pChain,
+	}
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type

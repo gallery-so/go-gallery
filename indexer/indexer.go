@@ -1055,7 +1055,9 @@ func fillContractFields(ethClient *ethclient.Client, contractAddress persist.Eth
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
 	}
-	cMetadata, err := rpc.GetTokenContractMetadata(contractAddress, ethClient)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	cMetadata, err := rpc.GetTokenContractMetadata(ctx, contractAddress, ethClient)
 	if err != nil {
 		// TODO figure out what type of error this is
 		logrus.WithError(err).WithField("address", contractAddress).Error("error getting contract metadata")
