@@ -14,17 +14,17 @@ import (
 )
 
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
 
 type CreateCollectionEventParams struct {
-	ID           persist.DBID
-	ActorID      persist.DBID
-	Action       persist.Action
-	ResourceID   persist.ResourceType
-	CollectionID persist.DBID
-	SubjectID    persist.DBID
-	Data         persist.EventData
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	CollectionID   persist.DBID
+	SubjectID      persist.DBID
+	Data           persist.EventData
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -32,7 +32,7 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		arg.ID,
 		arg.ActorID,
 		arg.Action,
-		arg.ResourceID,
+		arg.ResourceTypeID,
 		arg.CollectionID,
 		arg.SubjectID,
 		arg.Data,
@@ -42,7 +42,7 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		&i.ID,
 		&i.Version,
 		&i.ActorID,
-		&i.ResourceID,
+		&i.ResourceTypeID,
 		&i.SubjectID,
 		&i.UserID,
 		&i.TokenID,
@@ -95,17 +95,17 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 }
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
 
 type CreateTokenEventParams struct {
-	ID         persist.DBID
-	ActorID    persist.DBID
-	Action     persist.Action
-	ResourceID persist.ResourceType
-	TokenID    persist.DBID
-	SubjectID  persist.DBID
-	Data       persist.EventData
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	TokenID        persist.DBID
+	SubjectID      persist.DBID
+	Data           persist.EventData
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -113,7 +113,7 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		arg.ID,
 		arg.ActorID,
 		arg.Action,
-		arg.ResourceID,
+		arg.ResourceTypeID,
 		arg.TokenID,
 		arg.SubjectID,
 		arg.Data,
@@ -123,7 +123,7 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		&i.ID,
 		&i.Version,
 		&i.ActorID,
-		&i.ResourceID,
+		&i.ResourceTypeID,
 		&i.SubjectID,
 		&i.UserID,
 		&i.TokenID,
@@ -138,17 +138,17 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 }
 
 const createUserEvent = `-- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
 
 type CreateUserEventParams struct {
-	ID         persist.DBID
-	ActorID    persist.DBID
-	Action     persist.Action
-	ResourceID persist.ResourceType
-	UserID     persist.DBID
-	SubjectID  persist.DBID
-	Data       persist.EventData
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	UserID         persist.DBID
+	SubjectID      persist.DBID
+	Data           persist.EventData
 }
 
 func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
@@ -156,7 +156,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		arg.ID,
 		arg.ActorID,
 		arg.Action,
-		arg.ResourceID,
+		arg.ResourceTypeID,
 		arg.UserID,
 		arg.SubjectID,
 		arg.Data,
@@ -166,7 +166,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.ID,
 		&i.Version,
 		&i.ActorID,
-		&i.ResourceID,
+		&i.ResourceTypeID,
 		&i.SubjectID,
 		&i.UserID,
 		&i.TokenID,
@@ -292,7 +292,7 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, version, actor_id, resource_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) {
@@ -302,7 +302,7 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 		&i.ID,
 		&i.Version,
 		&i.ActorID,
-		&i.ResourceID,
+		&i.ResourceTypeID,
 		&i.SubjectID,
 		&i.UserID,
 		&i.TokenID,
@@ -317,7 +317,7 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 }
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
-SELECT id, version, actor_id, resource_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > $3 AND created_at <= $4
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE actor_id = $1 AND action = $2 AND deleted = false AND created_at > $3 AND created_at <= $4
 `
 
 type GetEventsInWindowParams struct {
@@ -345,7 +345,7 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 			&i.ID,
 			&i.Version,
 			&i.ActorID,
-			&i.ResourceID,
+			&i.ResourceTypeID,
 			&i.SubjectID,
 			&i.UserID,
 			&i.TokenID,

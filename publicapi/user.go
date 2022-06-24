@@ -149,12 +149,12 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 
 	// Send event
 	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:    userID,
-		Action:     persist.ActionUserCreated,
-		ResourceID: persist.ResourceTypeUser,
-		UserID:     userID,
-		SubjectID:  userID,
-		Data:       persist.EventData{UserBio: bio},
+		ActorID:        userID,
+		Action:         persist.ActionUserCreated,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         userID,
+		SubjectID:      userID,
+		Data:           persist.EventData{UserBio: bio},
 	})
 }
 
@@ -264,12 +264,12 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:    curUserID,
-		Action:     persist.ActionUserFollowedUsers,
-		ResourceID: persist.ResourceTypeUser,
-		UserID:     userID,
-		SubjectID:  userID,
-		Data:       persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+		ActorID:        curUserID,
+		Action:         persist.ActionUserFollowedUsers,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         userID,
+		SubjectID:      userID,
+		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
 	})
 }
 

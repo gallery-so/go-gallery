@@ -164,11 +164,11 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 
 	// Send event
 	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:    userID,
-		Action:     persist.ActionCollectorsNoteAddedToToken,
-		ResourceID: persist.ResourceTypeToken,
-		TokenID:    tokenID,
-		SubjectID:  tokenID,
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		TokenID:        tokenID,
+		SubjectID:      tokenID,
 		Data: persist.EventData{
 			TokenCollectionID:   collectionID,
 			TokenCollectorsNote: collectorsNote,

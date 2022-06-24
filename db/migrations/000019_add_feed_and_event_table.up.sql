@@ -1,21 +1,8 @@
-CREATE TABLE IF NOT EXISTS resource_types (
-    ID serial PRIMARY KEY,
-    RESOURCE_NAME varchar(255),
-    DELETED boolean NOT NULL DEFAULT false,
-    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO resource_types (id, resource_name) VALUES
-    (0, 'user'),
-    (1, 'token'),
-    (2, 'collection');
-
 CREATE TABLE IF NOT EXISTS events (
     ID varchar(255) PRIMARY KEY,
     VERSION int NOT NULL DEFAULT 0,
     ACTOR_ID varchar(255) NOT NULL REFERENCES users (id),
-    RESOURCE_ID int REFERENCES resource_types (id),
+    RESOURCE_TYPE_ID int NOT NULL,
     SUBJECT_ID varchar(255) NOT NULL,
     -- These columns are to maintain referential integrity with each of the resource entitites
     USER_ID varchar(255) REFERENCES users (id),

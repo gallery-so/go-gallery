@@ -58,7 +58,7 @@ overrides:
   # Events
   - column: "events.actor_id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
-  - column: "events.resource_id"
+  - column: "events.resource_type_id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.ResourceType"
   - column: "events.user_id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"

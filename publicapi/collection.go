@@ -107,11 +107,11 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	// Send event
 	err = event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:      userID,
-		Action:       persist.ActionCollectionCreated,
-		ResourceID:   persist.ResourceTypeCollection,
-		CollectionID: collectionID,
-		SubjectID:    collectionID,
+		ActorID:        userID,
+		Action:         persist.ActionCollectionCreated,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
 		Data: persist.EventData{
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
@@ -177,12 +177,12 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 
 	// Send event
 	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:      userID,
-		Action:       persist.ActionCollectorsNoteAddedToCollection,
-		ResourceID:   persist.ResourceTypeCollection,
-		CollectionID: collectionID,
-		SubjectID:    collectionID,
-		Data:         persist.EventData{CollectionCollectorsNote: collectorsNote},
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
 	})
 }
 
@@ -217,12 +217,12 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 	// Send event
 	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:      userID,
-		Action:       persist.ActionTokensAddedToCollection,
-		ResourceID:   persist.ResourceTypeCollection,
-		CollectionID: collectionID,
-		SubjectID:    collectionID,
-		Data:         persist.EventData{CollectionTokenIDs: tokens},
+		ActorID:        userID,
+		Action:         persist.ActionTokensAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionTokenIDs: tokens},
 	})
 }
 

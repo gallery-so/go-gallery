@@ -137,13 +137,13 @@ SELECT tokens.* FROM tokens, users
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
