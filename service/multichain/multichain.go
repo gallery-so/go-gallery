@@ -128,9 +128,9 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 	}
 }
 
-// UpdateTokensForUser updates the media for all tokens for a user
+// SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
-func (d *Provider) UpdateTokensForUser(ctx context.Context, userID persist.DBID) error {
+func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 	user, err := d.UserRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err

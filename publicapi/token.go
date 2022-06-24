@@ -97,14 +97,14 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
-func (api TokenAPI) RefreshTokensForUser(ctx context.Context) error {
+func (api TokenAPI) SyncTokens(ctx context.Context) error {
 	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = api.multichainProvider.UpdateTokensForUser(ctx, userID)
+	err = api.multichainProvider.SyncTokens(ctx, userID)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}

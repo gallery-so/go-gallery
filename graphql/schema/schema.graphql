@@ -521,30 +521,30 @@ type UpdateUserInfoPayload {
     viewer: Viewer
 }
 
-union RefreshTokensPayloadOrError =
-    RefreshTokensPayload
+union SyncTokensPayloadOrError =
+    SyncTokensPayload
     | ErrNotAuthorized
     | ErrOpenSeaRefreshFailed
 
-type RefreshTokensPayload {
+type SyncTokensPayload {
     viewer: Viewer
 }
 
-union RefreshTokenMetadataPayloadOrError =
-    RefreshTokenMetadataPayload
+union RefreshTokenPayloadOrError =
+    RefreshTokenPayload
   | ErrInvalidInput
   | ErrOpenSeaRefreshFailed
 
-type RefreshTokenMetadataPayload {
+type RefreshTokenPayload {
     token: Token
 }
 
-union RefreshContractMetadataPayloadOrError =
-    RefreshContractMetadataPayload
+union RefreshContractPayloadOrError =
+    RefreshContractPayload
   | ErrInvalidInput
   | ErrOpenSeaRefreshFailed
 
-type RefreshContractMetadataPayload {
+type RefreshContractPayload {
     contract: Contract
 }
 
@@ -701,9 +701,9 @@ type Mutation {
     # Token Mutations
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-    refreshTokens: RefreshTokensPayloadOrError @authRequired
-    refreshTokenMetadata(tokenID: DBID!): RefreshTokenMetadataPayloadOrError
-    refreshContractMetadata(contractID: DBID!): RefreshContractMetadataPayloadOrError
+    syncTokens: SyncTokensPayloadOrError @authRequired
+    refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
+    refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
