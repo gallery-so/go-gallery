@@ -1,3 +1,5 @@
+cloud-tasks : export APP_ENGINE_EMULATOR_HOST := http://localhost:8080
+
 solc:
 	solc --abi ./contracts/sol/IERC721.sol > ./contracts/abi/IERC721.abi
 	solc --abi ./contracts/sol/IERC20.sol > ./contracts/abi/IERC20.abi
@@ -42,3 +44,8 @@ docker-start: docker-stop
 
 docker-stop: 
 	docker-compose down
+
+cloud-tasks: docker-start
+	@cd ./cloud-tasks-emulator && go run ./ -port 8123 \
+		-queue projects/gallery-local/locations/here/queues/feedbot \
+		-queue projects/gallery-local/locations/here/queues/feed

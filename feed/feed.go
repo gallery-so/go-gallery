@@ -46,7 +46,7 @@ func setDefaults() {
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
-	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.AutomaticEnv()
 
