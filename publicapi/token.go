@@ -5,6 +5,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/event"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
@@ -180,9 +181,10 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -166,9 +167,10 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return nil
 }
@@ -296,9 +298,10 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return nil
 }

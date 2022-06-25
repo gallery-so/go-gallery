@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
@@ -127,9 +128,10 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return &createdCollection, err
 }
@@ -205,9 +207,10 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return nil
 }
@@ -258,9 +261,10 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		})
 
 		if err != nil {
+			logger.For(ctx).Error(ctx)
 			sentryutil.ReportError(ctx, err)
 		}
-	}(sentryutil.NewSentryHubContext(ctx))
+	}(sentryutil.NewSentryHubGinContext(ctx))
 
 	return nil
 }

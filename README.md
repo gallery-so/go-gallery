@@ -124,7 +124,7 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
                                             +-------------->  feedbot   |
                                                            |  (:4123)   |
                                                            +------------+
-``` 
+```
 
 To get started:
 ```bash

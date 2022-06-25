@@ -153,7 +153,7 @@ func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, actio
 	scope.SetContext(eventContextName, eventCtx)
 }
 
-func NewSentryHubContext(ctx context.Context) context.Context {
+func NewSentryHubGinContext(ctx context.Context) *gin.Context {
 	cpy := util.GinContextFromContext(ctx).Copy()
 
 	if hub := SentryHubFromContext(cpy); hub != nil {
