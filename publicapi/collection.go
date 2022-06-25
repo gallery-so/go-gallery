@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -106,17 +107,27 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	err = event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionCollectionCreated,
-		ResourceTypeID: persist.ResourceTypeCollection,
-		CollectionID:   collectionID,
-		SubjectID:      collectionID,
-		Data: persist.EventData{
-			CollectionTokenIDs:       createdCollection.Nfts,
-			CollectionCollectorsNote: collectorsNote,
-		},
-	})
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionCollectionCreated)
+		}
+
+		err = event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        userID,
+			Action:         persist.ActionCollectionCreated,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			CollectionID:   collectionID,
+			SubjectID:      collectionID,
+			Data: persist.EventData{
+				CollectionTokenIDs:       createdCollection.Nfts,
+				CollectionCollectorsNote: collectorsNote,
+			},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
 
 	return &createdCollection, err
 }
@@ -176,14 +187,26 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionCollectorsNoteAddedToCollection,
-		ResourceTypeID: persist.ResourceTypeCollection,
-		CollectionID:   collectionID,
-		SubjectID:      collectionID,
-		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
-	})
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionCollectorsNoteAddedToCollection)
+		}
+
+		err := event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        userID,
+			Action:         persist.ActionCollectorsNoteAddedToCollection,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			CollectionID:   collectionID,
+			SubjectID:      collectionID,
+			Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
+
+	return nil
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout) error {
@@ -216,14 +239,26 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionTokensAddedToCollection,
-		ResourceTypeID: persist.ResourceTypeCollection,
-		CollectionID:   collectionID,
-		SubjectID:      collectionID,
-		Data:           persist.EventData{CollectionTokenIDs: tokens},
-	})
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionTokensAddedToCollection)
+		}
+
+		err := event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        userID,
+			Action:         persist.ActionTokensAddedToCollection,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			CollectionID:   collectionID,
+			SubjectID:      collectionID,
+			Data:           persist.EventData{CollectionTokenIDs: tokens},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
+
+	return nil
 }
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {

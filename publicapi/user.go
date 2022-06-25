@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -148,14 +149,26 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionUserCreated,
-		ResourceTypeID: persist.ResourceTypeUser,
-		UserID:         userID,
-		SubjectID:      userID,
-		Data:           persist.EventData{UserBio: bio},
-	})
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, userID, persist.ActionUserCreated)
+		}
+
+		err := event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        userID,
+			Action:         persist.ActionUserCreated,
+			ResourceTypeID: persist.ResourceTypeUser,
+			UserID:         userID,
+			SubjectID:      userID,
+			Data:           persist.EventData{UserBio: bio},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
+
+	return nil
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
@@ -258,19 +271,33 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	// Send event
-	followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, userID, curUserID)
-	if err != nil {
-		return err
-	}
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, userID, persist.ActionUserFollowedUsers)
+		}
 
-	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        curUserID,
-		Action:         persist.ActionUserFollowedUsers,
-		ResourceTypeID: persist.ResourceTypeUser,
-		UserID:         userID,
-		SubjectID:      userID,
-		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
-	})
+		followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, userID, curUserID)
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+			return
+		}
+
+		err = event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        curUserID,
+			Action:         persist.ActionUserFollowedUsers,
+			ResourceTypeID: persist.ResourceTypeUser,
+			UserID:         userID,
+			SubjectID:      userID,
+			Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
+
+	return nil
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {

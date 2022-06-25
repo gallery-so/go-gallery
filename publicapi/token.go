@@ -6,6 +6,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -159,15 +160,27 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	return event.DispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionCollectorsNoteAddedToToken,
-		ResourceTypeID: persist.ResourceTypeToken,
-		TokenID:        tokenID,
-		SubjectID:      tokenID,
-		Data: persist.EventData{
-			TokenCollectionID:   collectionID,
-			TokenCollectorsNote: collectorsNote,
-		},
-	})
+	go func(ctx context.Context) {
+		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+			sentryutil.SetEventContext(hub.Scope(), userID, tokenID, persist.ActionCollectorsNoteAddedToToken)
+		}
+
+		err := event.DispatchEventToFeed(ctx, sqlc.Event{
+			ActorID:        userID,
+			Action:         persist.ActionCollectorsNoteAddedToToken,
+			ResourceTypeID: persist.ResourceTypeToken,
+			TokenID:        tokenID,
+			SubjectID:      tokenID,
+			Data: persist.EventData{
+				TokenCollectionID:   collectionID,
+				TokenCollectorsNote: collectorsNote,
+			},
+		})
+
+		if err != nil {
+			sentryutil.ReportError(ctx, err)
+		}
+	}(sentryutil.NewSentryHubContext(ctx))
+
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ import (
 const (
 	authContextName  = "auth context"
 	errorContextName = "error context"
+	eventContextName = "event context"
 )
 
 type authContext struct {
@@ -29,6 +31,12 @@ type authContext struct {
 type errorContext struct {
 	Mapped   bool
 	MappedTo string
+}
+
+type eventContext struct {
+	ActorID   persist.DBID
+	SubjectID persist.DBID
+	Action    persist.Action
 }
 
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
@@ -135,14 +143,24 @@ func SetErrorContext(scope *sentry.Scope, mapped bool, mappedTo string) {
 	scope.SetContext(errorContextName, errCtx)
 }
 
-func NewSentryHubContext(ctx context.Context, hub *sentry.Hub) context.Context {
-	var cpy *sentry.Hub
-
-	if hub != nil {
-		cpy = hub.Clone()
+func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
+	eventCtx := eventContext{
+		ActorID:   actorID,
+		SubjectID: subjectID,
+		Action:    action,
 	}
 
-	return sentry.SetHubOnContext(ctx, cpy)
+	scope.SetContext(eventContextName, eventCtx)
+}
+
+func NewSentryHubContext(ctx context.Context) context.Context {
+	cpy := util.GinContextFromContext(ctx).Copy()
+
+	if hub := SentryHubFromContext(cpy); hub != nil {
+		cpy.Request = cpy.Request.WithContext(sentry.SetHubOnContext(cpy.Request.Context(), hub.Clone()))
+	}
+
+	return cpy
 }
 
 // SentryHubFromContext gets a Hub from the supplied context, or from an underlying
