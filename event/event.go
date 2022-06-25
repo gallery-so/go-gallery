@@ -71,10 +71,12 @@ type feedHandler struct {
 }
 
 func (h feedHandler) Handle(ctx context.Context, event sqlc.Event) error {
-	persisted, err := h.eventRepo.Add(ctx, event, time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS"))*time.Second)
+	persisted, err := h.eventRepo.Add(ctx, event)
+
 	if err != nil {
 		return err
 	}
 
-	return task.CreateTaskForFeed(ctx, persisted.GraceTime, task.FeedMessage{ID: persisted.ID})
+	scheduleOn := persisted.CreatedAt.Add(time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
+	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID})
 }

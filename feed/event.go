@@ -2,7 +2,6 @@ package feed
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -44,7 +43,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	case persist.ActionTokensAddedToCollection:
 		return b.createTokensAddedToCollectionEvent(ctx, event)
 	default:
-		return nil, fmt.Errorf("unknown action=%s; id=%s", event.Action, event.ID)
+		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
 }
 
@@ -92,7 +91,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 	events := []sqlc.Event{event}
 
 	if feedEvent != nil {
-		events, err = b.eventRepo.EventsInWindow(ctx, event.ID)
+		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, event.FeedWindowSize)
 		if err != nil {
 			return nil, err
 		}

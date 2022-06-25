@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
+	"github.com/spf13/viper"
 )
 
 const maxTokensPerCollection = 1000
@@ -122,6 +123,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 				CollectionTokenIDs:       createdCollection.Nfts,
 				CollectionCollectorsNote: collectorsNote,
 			},
+			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
 		})
 
 		if err != nil {
@@ -199,6 +201,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 			CollectionID:   collectionID,
 			SubjectID:      collectionID,
 			Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
+			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
 		})
 
 		if err != nil {
@@ -251,6 +254,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 			CollectionID:   collectionID,
 			SubjectID:      collectionID,
 			Data:           persist.EventData{CollectionTokenIDs: tokens},
+			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
 		})
 
 		if err != nil {

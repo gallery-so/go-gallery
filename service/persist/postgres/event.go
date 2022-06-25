@@ -16,10 +16,7 @@ func (r *EventRepository) Get(ctx context.Context, eventID persist.DBID) (sqlc.E
 	return r.Queries.GetEvent(ctx, eventID)
 }
 
-func (r *EventRepository) Add(ctx context.Context, event sqlc.Event, grace time.Duration) (*sqlc.Event, error) {
-	event.CreatedAt = time.Now()
-	event.GraceTime = event.CreatedAt.Add(grace)
-
+func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeUser:
 		return r.AddUserEvent(ctx, event)
@@ -38,10 +35,9 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		SubjectID:      event.SubjectID,
+		UserID:         event.SubjectID,
 		Data:           event.Data,
-		CreatedAt:      event.CreatedAt,
-		GraceTime:      event.GraceTime,
+		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -52,10 +48,9 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		SubjectID:      event.SubjectID,
+		TokenID:        event.SubjectID,
 		Data:           event.Data,
-		CreatedAt:      event.CreatedAt,
-		GraceTime:      event.GraceTime,
+		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -66,10 +61,9 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		SubjectID:      event.SubjectID,
+		CollectionID:   event.SubjectID,
 		Data:           event.Data,
-		CreatedAt:      event.CreatedAt,
-		GraceTime:      event.GraceTime,
+		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -77,10 +71,10 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 // WindowActive checks if there are more recent events with an action that matches the provided event.
 func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
-		ActorID:   event.ActorID,
-		Action:    event.Action,
-		TimeStart: event.CreatedAt,
-		TimeEnd:   event.GraceTime,
+		ActorID:     event.ActorID,
+		Action:      event.Action,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(time.Duration(event.FeedWindowSize) * time.Second),
 	})
 }
 
@@ -88,15 +82,18 @@ func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (b
 // as a collection or a token.
 func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActiveWithSubject(ctx, sqlc.IsWindowActiveWithSubjectParams{
-		ActorID:   event.ActorID,
-		Action:    event.Action,
-		SubjectID: event.SubjectID,
-		TimeStart: event.CreatedAt,
-		TimeEnd:   event.GraceTime,
+		ActorID:     event.ActorID,
+		Action:      event.Action,
+		SubjectID:   event.SubjectID,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(time.Duration(event.FeedWindowSize) * time.Second),
 	})
 }
 
 // EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindow(ctx, eventID)
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindow(ctx, sqlc.GetEventsInWindowParams{
+		ID:   eventID,
+		Secs: float64(windowSeconds),
+	})
 }

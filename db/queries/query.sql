@@ -140,31 +140,27 @@ SELECT tokens.* FROM tokens, users
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    @id, @actor_id, @action, @resource_type_id, @subject_id, @subject_id, @data, @created_at, @grace_time,
-    (SELECT id FROM events e WHERE e.actor_id = @actor_id::varchar AND e.action = @action::varchar AND e.subject_id = @subject_id::varchar AND e.created_at < @created_at AND e.created_at >= @window_start AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
-) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, feed_window_size) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    @id, @actor_id, @action, @resource_type_id, @subject_id, @subject_id, @data, @created_at, @grace_time,
-    (SELECT id FROM events e WHERE e.actor_id = @actor_id::varchar AND e.action = @action::varchar AND e.subject_id = @subject_id::varchar AND e.created_at < @created_at AND e.created_at >= @window_start AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
-) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, feed_window_size) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, created_at, grace_time, prior_event_id) VALUES (
-    @id, @actor_id, @action, @resource_type_id, @subject_id, @subject_id, @data, @created_at, @grace_time,
-    (SELECT id FROM events e WHERE e.actor_id = @actor_id::varchar AND e.action = @action::varchar AND e.subject_id = @subject_id::varchar AND e.created_at < @created_at AND e.created_at >= @window_start AND e.deleted = false ORDER BY e.created_at DESC LIMIT 1)
-) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, feed_window_size) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
 -- name: GetEventsInWindow :many
-WITH RECURSIVE activity(id, prior_event_id) AS (
-    SELECT id, prior_event_id FROM events WHERE events.id = $1
+WITH RECURSIVE activity AS (
+    SELECT * FROM events WHERE events.id = $1 AND deleted = false
     UNION
-    SELECT e.id, e.prior_event_id FROM events e, activity a WHERE e.id = a.prior_event_id
+    SELECT e.* FROM events e, activity a
+    WHERE e.actor_id = a.actor_id
+        AND e.action = a.action
+        AND e.created_at < a.created_at
+        AND e.created_at >= a.created_at - make_interval(secs => $2)
+        AND e.deleted = false
 )
 SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
 
@@ -172,7 +168,7 @@ SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > @time_start AND created_at <= @time_end
+    AND created_at > @window_start AND created_at <= @window_end
     LIMIT 1
 );
 
@@ -180,7 +176,7 @@ SELECT EXISTS(
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
-    AND created_at > @time_start AND created_at <= @time_end
+    AND created_at > @window_start AND created_at <= @window_end
     LIMIT 1
 );
 

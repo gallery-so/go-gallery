@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
+	"github.com/spf13/viper"
 )
 
 type UserAPI struct {
@@ -161,6 +162,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 			UserID:         userID,
 			SubjectID:      userID,
 			Data:           persist.EventData{UserBio: bio},
+			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
 		})
 
 		if err != nil {
@@ -290,6 +292,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 			UserID:         userID,
 			SubjectID:      userID,
 			Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
 		})
 
 		if err != nil {
