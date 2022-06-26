@@ -39,26 +39,26 @@ func run() {
 
 	// Users migration
 
-	// if err := copyBack(pgClient); err != nil {
-	// 	panic(err)
-	// }
+	if err := copyBack(pgClient); err != nil {
+		panic(err)
+	}
 
-	// if err := copyUsersToTempTable(pgClient); err != nil {
-	// 	panic(err)
-	// }
+	if err := copyUsersToTempTable(pgClient); err != nil {
+		panic(err)
+	}
 
-	// logrus.Info("Getting all users wallets...")
-	// idsToAddresses, err := getAllUsersWallets(pgClient)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// logrus.Info("Getting all users wallets... Done")
-	// logrus.Infof("Found %d users", len(idsToAddresses))
+	logrus.Info("Getting all users wallets...")
+	idsToAddresses, err := getAllUsersWallets(pgClient)
+	if err != nil {
+		panic(err)
+	}
+	logrus.Info("Getting all users wallets... Done")
+	logrus.Infof("Found %d users", len(idsToAddresses))
 
-	// logrus.Info("Creating wallets and addresses in DB and adding them to users...")
-	// if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
-	// 	panic(err)
-	// }
+	logrus.Info("Creating wallets and addresses in DB and adding them to users...")
+	if err := createWalletAndAddresses(pgClient, idsToAddresses); err != nil {
+		panic(err)
+	}
 
 	// NFTs migration
 
@@ -278,7 +278,7 @@ func migrateNFTs(pg *sql.DB, ethClient *ethclient.Client, nfts <-chan persist.NF
 							backChan:        backChan,
 						}
 						contractsChan <- toUpsertContract
-						contractID = <-backChan
+						newContractID = <-backChan
 					}
 					contractID = newContractID
 					contracts.Store(normalized, contractID)
@@ -411,6 +411,10 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 	if err != nil && err != sql.ErrNoRows {
 		return persist.TokenGallery{}, err
 	}
+	ownedByWallets := []persist.Wallet{}
+	if walletID != "" {
+		ownedByWallets = append(ownedByWallets, persist.Wallet{ID: walletID})
+	}
 
 	token := persist.TokenGallery{
 		ID:               nft.ID,
@@ -422,7 +426,7 @@ func nftToToken(ctx context.Context, pg *sql.DB, nft persist.NFT, contractID per
 		OwnershipHistory: []persist.AddressAtBlock{},
 		CollectorsNote:   nft.CollectorsNote,
 		Chain:            persist.ChainETH,
-		OwnedByWallets:   []persist.Wallet{{ID: walletID}},
+		OwnedByWallets:   ownedByWallets,
 		TokenURI:         persist.TokenURI(nft.TokenMetadataURL),
 		TokenID:          nft.OpenseaTokenID,
 		OwnerUserID:      ownerUserID,

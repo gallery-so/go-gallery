@@ -124,7 +124,7 @@ func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Tok
 	vals := make([]interface{}, 0, len(pTokens)*15)
 	for i, token := range pTokens {
 		insertSQL += generateValuesPlaceholders(15, i*15) + ","
-		vals = append(vals, token.ID, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version)
+		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version)
 	}
 	insertSQL = insertSQL[:len(insertSQL)-1]
 	insertSQL += " RETURNING ID"
@@ -156,7 +156,7 @@ func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Tok
 func (t *TokenRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
 
 	var id persist.DBID
-	err := t.createStmt.QueryRowContext(pCtx, pToken.ID, pToken.Version, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pq.Array(pToken.OwnershipHistory), pToken.ContractAddress).Scan(&id)
+	err := t.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pToken.Version, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pq.Array(pToken.OwnershipHistory), pToken.ContractAddress).Scan(&id)
 	if err != nil {
 		return "", err
 	}

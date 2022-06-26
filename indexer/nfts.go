@@ -31,9 +31,9 @@ var mediaDownloadLock = &sync.Mutex{}
 
 var bigZero = big.NewInt(0)
 
-// UpdateMediaInput is the input for the update media endpoint that will find all of the media content
+// UpdateTokenMediaInput is the input for the update media endpoint that will find all of the media content
 // for an addresses NFTs and cache it in a storage bucket
-type UpdateMediaInput struct {
+type UpdateTokenMediaInput struct {
 	OwnerAddress    persist.EthereumAddress `json:"owner_address,omitempty"`
 	TokenID         persist.TokenID         `json:"token_id,omitempty"`
 	ContractAddress persist.EthereumAddress `json:"contract_address,omitempty"`
@@ -176,8 +176,8 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 	}
 }
 
-// ValidateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
-func ValidateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepository persist.UserRepository, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
+// validateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
+func validateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepository persist.UserRepository, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
 
 	currentNFTs, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
 	if err != nil {
@@ -385,15 +385,15 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
+func updateTokenMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input := UpdateMediaInput{}
+		input := UpdateTokenMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		err := UpdateMedia(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+		err := updateMediaForToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -403,8 +403,8 @@ func updateMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.C
 	}
 }
 
-// UpdateMedia will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
-func UpdateMedia(c context.Context, input UpdateMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) error {
+// updateMediaForToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
+func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) error {
 	if input.TokenID != "" && input.ContractAddress != "" {
 		logrus.Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
 		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)

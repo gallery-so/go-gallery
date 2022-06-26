@@ -146,7 +146,7 @@ func (t *TokenGalleryRepository) CreateBulk(pCtx context.Context, pTokens []pers
 	vals := make([]interface{}, 0, len(pTokens)*18)
 	for i, token := range pTokens {
 		insertSQL += generateValuesPlaceholders(18, i*18) + ","
-		vals = append(vals, token.ID, token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version)
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version)
 	}
 	insertSQL = insertSQL[:len(insertSQL)-1]
 	insertSQL += " RETURNING ID"
@@ -178,7 +178,7 @@ func (t *TokenGalleryRepository) CreateBulk(pCtx context.Context, pTokens []pers
 func (t *TokenGalleryRepository) Create(pCtx context.Context, pToken persist.TokenGallery) (persist.DBID, error) {
 
 	var id persist.DBID
-	err := t.createStmt.QueryRowContext(pCtx, pToken.ID, pToken.Version, pToken.CollectorsNote, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerUserID, pToken.OwnedByWallets, pq.Array(pToken.OwnershipHistory), pToken.Contract).Scan(&id)
+	err := t.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pToken.Version, pToken.CollectorsNote, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerUserID, pToken.OwnedByWallets, pq.Array(pToken.OwnershipHistory), pToken.Contract).Scan(&id)
 	if err != nil {
 		return "", err
 	}

@@ -12,12 +12,19 @@ import (
 func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 	router.GET("/status", getStatus(i, tokenRepository))
 
-	mediaGroup := router.Group("/media")
-	mediaGroup.POST("/update", updateMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	return router
+}
+
+func handlersInitServer(router *gin.Engine, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 
 	nftsGroup := router.Group("/nfts")
+	nftsGroup.POST("/refresh", updateTokenMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	nftsGroup.POST("/validate", validateWalletsNFTs(tokenRepository, contractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	nftsGroup.GET("/get", getTokens(tokenRepository, ipfsClient, ethClient))
+
+	contractsGroup := router.Group("/contracts")
+	contractsGroup.GET("/get", getContract(contractRepository))
+	contractsGroup.POST("/refresh", updateContractMedia(contractRepository, ethClient))
 
 	return router
 }
