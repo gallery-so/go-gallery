@@ -470,6 +470,7 @@ union FeedEventByIdOrError =
     | ErrUnknownAction
 
 type PageInfo {
+    size: Int!
     hasPreviousPage: Boolean!
     hasNextPage: Boolean!
     startCursor: String!

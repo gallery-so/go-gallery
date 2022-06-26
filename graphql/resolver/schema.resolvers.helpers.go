@@ -500,7 +500,6 @@ func resolveGlobalFeed(ctx context.Context, before *string, after *string, first
 	}
 
 	events, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, beforeToken, afterToken, first, last)
-
 	if err != nil {
 		return nil, err
 	}
@@ -636,34 +635,38 @@ func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) model.T
 }
 
 func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedConnection, error) {
-	evts := make([]*model.FeedEdge, len(events))
 
 	var pageInfo model.PageInfo
 
+	// trim to size of first
 	if first != nil && len(events) > *first {
 		events = events[:*first]
 		pageInfo.HasNextPage = true
 	}
 
+	// trim to size of last
 	if last != nil && len(events) > *last {
 		events = events[len(events)-*last:]
 		pageInfo.HasPreviousPage = true
 	}
+
+	edges := make([]*model.FeedEdge, len(events))
+	pageInfo.Size = len(edges)
 
 	for i, e := range events {
 		evt, err := feedEventToEdge(&e)
 		if err != nil {
 			return nil, err
 		}
-		evts[i] = evt
+		edges[i] = evt
 	}
 
-	if len(events) > 0 {
-		pageInfo.StartCursor = evts[0].Cursor
-		pageInfo.EndCursor = evts[len(evts)-1].Cursor
+	if len(edges) > 0 {
+		pageInfo.StartCursor = edges[0].Cursor
+		pageInfo.EndCursor = edges[len(edges)-1].Cursor
 	}
 
-	return &model.FeedConnection{Edges: evts, PageInfo: &pageInfo}, nil
+	return &model.FeedConnection{Edges: edges, PageInfo: &pageInfo}, nil
 }
 
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {

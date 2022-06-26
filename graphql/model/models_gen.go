@@ -603,6 +603,7 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
+	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`
 	StartCursor     string `json:"startCursor"`

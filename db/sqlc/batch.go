@@ -566,12 +566,12 @@ WITH cursors AS (
     (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_before,
     (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_after
 ), edges AS (
-    SELECT id
-    FROM feed_events
+    SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors) AND deleted = false
-    ORDER BY event_time DESC
 )
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges) AND $1::bool = $1::bool
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges)
+    AND $1::bool = $1::bool -- sqlc bug requiring at least one param by position
+    ORDER BY event_time DESC
 `
 
 type GetGlobalFeedViewBatchBatchResults struct {
@@ -1140,18 +1140,15 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 
 const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
-    SELECT id, COALESCE(event_time, '1970-01-01'::timestamptz) event_time FROM feed_events fe WHERE fe.id = $2 AND deleted = false
-    UNION ALL
-    SELECT id, COALESCE(event_time, now()) event_time FROM feed_events fe WHERE fe.id = $3 AND deleted = false
+    SELECT
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_after
 ), edges AS (
-    SELECT fd.id
-    FROM feed_events fd
-    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $1 AND fd.deleted = false and fl.deleted = false
-    WHERE event_time > (SELECT event_time FROM cursors LIMIT 1 OFFSET 0)
-    AND event_time < (SELECT event_time FROM cursors LIMIT 1 OFFSET 1)
-    ORDER BY event_time DESC
+    SELECT fe.id FROM feed_events fe
+    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
+    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors)
 )
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT cur FROM edges)
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time DESC
 `
 
 type GetUserFeedViewBatchBatchResults struct {

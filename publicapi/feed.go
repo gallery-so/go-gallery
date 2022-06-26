@@ -41,8 +41,6 @@ func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	// Validate
-	// Note that pagination that includes both `first` and `last` is discouraged because it makes pagination confusing
-	// but the server does support it.
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
 		"first":  {first, "omitempty,gte=0"},
@@ -52,9 +50,11 @@ func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	var params = sqlc.GetUserFeedViewBatchParams{Follower: userID}
+
 	if before != nil {
 		params.CurBefore = string(*before)
 	}
+
 	if after != nil {
 		params.CurAfter = string(*after)
 	}
@@ -70,8 +70,6 @@ func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *
 
 func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
 	// Validate
-	// Note that pagination that includes both `first` and `last` is discouraged because it makes pagination confusing
-	// but the server does support it.
 	if err := validateFields(api.validator, validationMap{
 		"first": {first, "omitempty,gte=0"},
 		"last":  {last, "omitempty,gte=0"},
