@@ -167,7 +167,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))
@@ -298,7 +298,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))

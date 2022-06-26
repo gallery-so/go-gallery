@@ -207,7 +207,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))

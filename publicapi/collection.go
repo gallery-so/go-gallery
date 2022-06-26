@@ -128,7 +128,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))
@@ -207,7 +207,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))
@@ -261,7 +261,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		})
 
 		if err != nil {
-			logger.For(ctx).Error(ctx)
+			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
 	}(sentryutil.NewSentryHubGinContext(ctx))
