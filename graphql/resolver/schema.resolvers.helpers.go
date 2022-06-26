@@ -635,7 +635,6 @@ func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) model.T
 }
 
 func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedConnection, error) {
-
 	var pageInfo model.PageInfo
 
 	// trim to size of first
