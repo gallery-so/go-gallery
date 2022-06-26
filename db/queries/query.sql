@@ -181,18 +181,33 @@ SELECT EXISTS(
 );
 
 -- name: GetGlobalFeedViewBatch :batchmany
-SELECT * FROM feed_events
-    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
-    AND deleted = false
+WITH cursors AS (
+    SELECT
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), make_date(1970, 1, 1))) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), now())) cur_after
+), edges AS (
+    SELECT id
+    FROM feed_events
+    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors) AND deleted = false
     ORDER BY event_time DESC
-    LIMIT $2;
+)
+SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
+    AND $1::bool = $1::bool -- sqlc bug requiring there to be at least one unnamed param
 
 -- name: GetUserFeedViewBatch :batchmany
-SELECT fd.* FROM feed_events fd
-    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $2 AND fd.deleted = false and fl.deleted = false
-    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
-    ORDER BY fd.event_time DESC
-    LIMIT $3;
+WITH cursors AS (
+    SELECT id, COALESCE(event_time, '1970-01-01'::timestamptz) event_time FROM feed_events fe WHERE fe.id = @cur_before AND deleted = false
+    UNION ALL
+    SELECT id, COALESCE(event_time, now()) event_time FROM feed_events fe WHERE fe.id = @cur_after AND deleted = false
+), edges AS (
+    SELECT fd.id
+    FROM feed_events fd
+    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $1 AND fd.deleted = false and fl.deleted = false
+    WHERE event_time > (SELECT event_time FROM cursors LIMIT 1 OFFSET 0)
+    AND event_time < (SELECT event_time FROM cursors LIMIT 1 OFFSET 1)
+    ORDER BY event_time DESC
+)
+SELECT * FROM feed_events WHERE id = ANY(SELECT cur FROM edges);
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

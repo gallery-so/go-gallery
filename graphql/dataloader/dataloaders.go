@@ -842,6 +842,9 @@ func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 		defer b.Close()
 
 		b.Query(func(i int, evts []sqlc.FeedEvent, err error) {
+			if err != nil {
+				panic(err)
+			}
 			events[i] = evts
 			errors[i] = err
 

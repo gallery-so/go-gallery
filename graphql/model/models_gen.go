@@ -47,6 +47,10 @@ type Error interface {
 	IsError()
 }
 
+type FeedConnectionOrError interface {
+	IsFeedConnectionOrError()
+}
+
 type FeedEvent interface {
 	Node
 	IsFeedEvent()
@@ -54,10 +58,6 @@ type FeedEvent interface {
 
 type FeedEventByIDOrError interface {
 	IsFeedEventByIDOrError()
-}
-
-type FeedOrError interface {
-	IsFeedOrError()
 }
 
 type FollowUserPayloadOrError interface {
@@ -356,9 +356,9 @@ type ErrFeedEventNotFoundByID struct {
 	Message string `json:"message"`
 }
 
-func (ErrFeedEventNotFoundByID) IsError()                {}
-func (ErrFeedEventNotFoundByID) IsFeedOrError()          {}
-func (ErrFeedEventNotFoundByID) IsFeedEventByIDOrError() {}
+func (ErrFeedEventNotFoundByID) IsError()                 {}
+func (ErrFeedEventNotFoundByID) IsFeedConnectionOrError() {}
+func (ErrFeedEventNotFoundByID) IsFeedEventByIDOrError()  {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -403,7 +403,7 @@ type ErrNotAuthorized struct {
 }
 
 func (ErrNotAuthorized) IsViewerOrError()                          {}
-func (ErrNotAuthorized) IsFeedOrError()                            {}
+func (ErrNotAuthorized) IsFeedConnectionOrError()                  {}
 func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
@@ -436,9 +436,9 @@ type ErrUnknownAction struct {
 	Message string `json:"message"`
 }
 
-func (ErrUnknownAction) IsError()                {}
-func (ErrUnknownAction) IsFeedOrError()          {}
-func (ErrUnknownAction) IsFeedEventByIDOrError() {}
+func (ErrUnknownAction) IsError()                 {}
+func (ErrUnknownAction) IsFeedConnectionOrError() {}
+func (ErrUnknownAction) IsFeedEventByIDOrError()  {}
 
 type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
@@ -459,12 +459,17 @@ func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
-type Feed struct {
-	Events   []FeedEvent `json:"events"`
+type FeedConnection struct {
+	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
 }
 
-func (Feed) IsFeedOrError() {}
+func (FeedConnection) IsFeedConnectionOrError() {}
+
+type FeedEdge struct {
+	Node   FeedEvent `json:"node"`
+	Cursor string    `json:"cursor"`
+}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
@@ -586,14 +591,10 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
-	Size        *int          `json:"size"`
-	HasNextPage *bool         `json:"hasNextPage"`
-	NextToken   *persist.DBID `json:"nextToken"`
-}
-
-type Pagination struct {
-	Token *persist.DBID `json:"token"`
-	Limit *int          `json:"limit"`
+	HasPreviousPage bool   `json:"hasPreviousPage"`
+	HasNextPage     bool   `json:"hasNextPage"`
+	StartCursor     string `json:"startCursor"`
+	EndCursor       string `json:"endCursor"`
 }
 
 type PreviewURLSet struct {
@@ -804,7 +805,7 @@ type VideoURLSet struct {
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
-	Feed            *Feed            `json:"feed"`
+	Feed            *FeedConnection  `json:"feed"`
 }
 
 func (Viewer) IsViewerOrError() {}

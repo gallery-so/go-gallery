@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mikeydub/go-gallery/publicapi/option"
+	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/graphql/model/cursor"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -403,7 +403,7 @@ func resolveCollectionCreatedFeedEventByEventID(ctx context.Context, eventID per
 		return nil, err
 	}
 
-	event, err := eventToCollectionCreatedFeedEventModel(evt)
+	event := eventToCollectionCreatedFeedEventModel(evt)
 
 	return &event, err
 }
@@ -415,7 +415,7 @@ func resolveCollectorsNoteAddedToCollectionFeedEventByEventID(ctx context.Contex
 		return nil, err
 	}
 
-	event, err := eventToCollectorsNoteAddedToCollectionFeedEventModel(evt)
+	event := eventToCollectorsNoteAddedToCollectionFeedEventModel(evt)
 
 	return &event, err
 }
@@ -427,7 +427,7 @@ func resolveCollectorsNoteAddedToTokenFeedEventByEventID(ctx context.Context, ev
 		return nil, err
 	}
 
-	event, err := eventToCollectorsNoteAddedToTokenFeedEventModel(evt)
+	event := eventToCollectorsNoteAddedToTokenFeedEventModel(evt)
 
 	return &event, err
 }
@@ -439,7 +439,7 @@ func resolveTokensAddedToCollectionFeedEventByEventID(ctx context.Context, event
 		return nil, err
 	}
 
-	event, err := eventToTokensAddedToCollectionFeedEventModel(evt)
+	event := eventToTokensAddedToCollectionFeedEventModel(evt)
 
 	return &event, err
 }
@@ -451,7 +451,7 @@ func resolveUserCreatedFeedEventByEventID(ctx context.Context, eventID persist.D
 		return nil, err
 	}
 
-	event, err := eventToUserCreatedFeedEventModel(evt)
+	event := eventToUserCreatedFeedEventModel(evt)
 
 	return &event, err
 }
@@ -463,41 +463,49 @@ func resolveUserFollowedUsersFeedEventByEventID(ctx context.Context, eventID per
 		return nil, err
 	}
 
-	event, err := eventToUserFollowedUsersFeedEventModel(evt)
+	event := eventToUserFollowedUsersFeedEventModel(evt)
 
 	return &event, err
 }
 
-func resolveViewerFeed(ctx context.Context, page *model.Pagination) (*model.Feed, error) {
-	opts := make([]option.FeedOption, 0)
-
-	if page != nil {
-		opts = append(opts, option.WithFeedPage(page))
+func resolveViewerFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	beforeToken, err := cursor.DecodeToDBID(before)
+	if err != nil {
+		return nil, err
 	}
 
-	events, token, err := publicapi.For(ctx).Feed.ViewerFeed(ctx, opts...)
+	afterToken, err := cursor.DecodeToDBID(after)
+	if err != nil {
+		return nil, err
+	}
+
+	events, err := publicapi.For(ctx).Feed.ViewerFeed(ctx, beforeToken, afterToken, first, last)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return eventsToFeed(ctx, token, events)
+	return eventsToFeed(events, first, last)
 }
 
-func resolveGlobalFeed(ctx context.Context, page *model.Pagination) (*model.Feed, error) {
-	opts := make([]option.FeedOption, 0)
-
-	if page != nil {
-		opts = append(opts, option.WithFeedPage(page))
+func resolveGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	beforeToken, err := cursor.DecodeToDBID(before)
+	if err != nil {
+		return nil, err
 	}
 
-	events, token, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, opts...)
+	afterToken, err := cursor.DecodeToDBID(after)
+	if err != nil {
+		return nil, err
+	}
+
+	events, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, beforeToken, afterToken, first, last)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return eventsToFeed(ctx, token, events)
+	return eventsToFeed(events, first, last)
 }
 
 func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*model.CollectionToken, error) {
@@ -528,35 +536,41 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 	return newTokens, nil
 }
 
-func feedEventToModel(ctx context.Context, event *sqlc.FeedEvent) (model.FeedEvent, error) {
+func feedEventToEdge(event *sqlc.FeedEvent) (*model.FeedEdge, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
-		return eventToUserCreatedFeedEventModel(event)
+		node := eventToUserCreatedFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionUserFollowedUsers:
-		return eventToUserFollowedUsersFeedEventModel(event)
+		node := eventToUserFollowedUsersFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionCollectorsNoteAddedToToken:
-		return eventToCollectorsNoteAddedToTokenFeedEventModel(event)
+		node := eventToCollectorsNoteAddedToTokenFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionCollectionCreated:
-		return eventToCollectionCreatedFeedEventModel(event)
+		node := eventToCollectionCreatedFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionCollectorsNoteAddedToCollection:
-		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event)
+		node := eventToCollectionCreatedFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionTokensAddedToCollection:
-		return eventToTokensAddedToCollectionFeedEventModel(event)
+		node := eventToTokensAddedToCollectionFeedEventModel(event)
+		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
 }
 
-func eventToUserCreatedFeedEventModel(event *sqlc.FeedEvent) (model.UserCreatedFeedEvent, error) {
+func eventToUserCreatedFeedEventModel(event *sqlc.FeedEvent) model.UserCreatedFeedEvent {
 	return model.UserCreatedFeedEvent{
 		Dbid:      event.ID,
 		EventTime: event.EventTime,
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
 		Action:    event.Action,
-	}, nil
+	}
 }
 
-func eventToUserFollowedUsersFeedEventModel(event *sqlc.FeedEvent) (model.UserFollowedUsersFeedEvent, error) {
+func eventToUserFollowedUsersFeedEventModel(event *sqlc.FeedEvent) model.UserFollowedUsersFeedEvent {
 	followed := make([]*model.FollowInfo, len(event.Data.UserFollowedIDs))
 
 	for i, userID := range event.Data.UserFollowedIDs {
@@ -572,10 +586,10 @@ func eventToUserFollowedUsersFeedEventModel(event *sqlc.FeedEvent) (model.UserFo
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
 		Action:    event.Action,
 		Followed:  followed,
-	}, nil
+	}
 }
 
-func eventToCollectorsNoteAddedToTokenFeedEventModel(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToTokenFeedEvent, error) {
+func eventToCollectorsNoteAddedToTokenFeedEventModel(event *sqlc.FeedEvent) model.CollectorsNoteAddedToTokenFeedEvent {
 	return model.CollectorsNoteAddedToTokenFeedEvent{
 		Dbid:      event.ID,
 		EventTime: event.EventTime,
@@ -586,20 +600,20 @@ func eventToCollectorsNoteAddedToTokenFeedEventModel(event *sqlc.FeedEvent) (mod
 		},
 		Action:            event.Action,
 		NewCollectorsNote: util.StringToPointer(event.Data.TokenNewCollectorsNote),
-	}, nil
+	}
 }
 
-func eventToCollectionCreatedFeedEventModel(event *sqlc.FeedEvent) (model.CollectionCreatedFeedEvent, error) {
+func eventToCollectionCreatedFeedEventModel(event *sqlc.FeedEvent) model.CollectionCreatedFeedEvent {
 	return model.CollectionCreatedFeedEvent{
 		Dbid:       event.ID,
 		EventTime:  event.EventTime,
 		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     event.Action,
-	}, nil
+	}
 }
 
-func eventToCollectorsNoteAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) (model.CollectorsNoteAddedToCollectionFeedEvent, error) {
+func eventToCollectorsNoteAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) model.CollectorsNoteAddedToCollectionFeedEvent {
 	return model.CollectorsNoteAddedToCollectionFeedEvent{
 		Dbid:              event.ID,
 		EventTime:         event.EventTime,
@@ -607,10 +621,10 @@ func eventToCollectorsNoteAddedToCollectionFeedEventModel(event *sqlc.FeedEvent)
 		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:            event.Action,
 		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
-	}, nil
+	}
 }
 
-func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) (model.TokensAddedToCollectionFeedEvent, error) {
+func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) model.TokensAddedToCollectionFeedEvent {
 	return model.TokensAddedToCollectionFeedEvent{
 		Dbid:       event.ID,
 		EventTime:  event.EventTime,
@@ -618,30 +632,38 @@ func eventToTokensAddedToCollectionFeedEventModel(event *sqlc.FeedEvent) (model.
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
-	}, nil
+	}
 }
 
-func eventsToFeed(ctx context.Context, token *persist.DBID, events []sqlc.FeedEvent) (*model.Feed, error) {
-	evts := make([]model.FeedEvent, len(events))
+func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedConnection, error) {
+	evts := make([]*model.FeedEdge, len(events))
+
+	var pageInfo model.PageInfo
+
+	if first != nil && len(events) > *first {
+		events = events[:*first]
+		pageInfo.HasNextPage = true
+	}
+
+	if last != nil && len(events) > *last {
+		events = events[len(events)-*last:]
+		pageInfo.HasPreviousPage = true
+	}
 
 	for i, e := range events {
-		evt, err := feedEventToModel(ctx, &e)
-
+		evt, err := feedEventToEdge(&e)
 		if err != nil {
 			return nil, err
 		}
-
 		evts[i] = evt
 	}
 
-	return &model.Feed{
-		Events: evts,
-		PageInfo: &model.PageInfo{
-			NextToken:   token,
-			Size:        util.IntToPointer(len(evts)),
-			HasNextPage: util.BoolToPointer(token != nil),
-		},
-	}, nil
+	if len(events) > 0 {
+		pageInfo.StartCursor = evts[0].Cursor
+		pageInfo.EndCursor = evts[len(evts)-1].Cursor
+	}
+
+	return &model.FeedConnection{Edges: evts, PageInfo: &pageInfo}, nil
 }
 
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {

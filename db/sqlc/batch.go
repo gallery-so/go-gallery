@@ -561,11 +561,17 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 }
 
 const getGlobalFeedViewBatch = `-- name: GetGlobalFeedViewBatch :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
-    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
-    AND deleted = false
+WITH cursors AS (
+    SELECT
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_after
+), edges AS (
+    SELECT id
+    FROM feed_events
+    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors) AND deleted = false
     ORDER BY event_time DESC
-    LIMIT $2
+)
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges) AND $1::bool = $1::bool
 `
 
 type GetGlobalFeedViewBatchBatchResults struct {
@@ -574,16 +580,18 @@ type GetGlobalFeedViewBatchBatchResults struct {
 }
 
 type GetGlobalFeedViewBatchParams struct {
-	ID    persist.DBID
-	Limit int32
+	Column1   bool
+	CurBefore string
+	CurAfter  string
 }
 
 func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFeedViewBatchParams) *GetGlobalFeedViewBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.ID,
-			a.Limit,
+			a.Column1,
+			a.CurBefore,
+			a.CurAfter,
 		}
 		batch.Queue(getGlobalFeedViewBatch, vals...)
 	}
@@ -1131,11 +1139,19 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 }
 
 const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
-SELECT fd.id, fd.version, fd.owner_id, fd.action, fd.data, fd.event_time, fd.event_ids, fd.deleted, fd.last_updated, fd.created_at FROM feed_events fd
-    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $2 AND fd.deleted = false and fl.deleted = false
-    WHERE event_time <= COALESCE((SELECT event_time FROM feed_events fe WHERE fe.id = $1), NOW())
-    ORDER BY fd.event_time DESC
-    LIMIT $3
+WITH cursors AS (
+    SELECT id, COALESCE(event_time, '1970-01-01'::timestamptz) event_time FROM feed_events fe WHERE fe.id = $2 AND deleted = false
+    UNION ALL
+    SELECT id, COALESCE(event_time, now()) event_time FROM feed_events fe WHERE fe.id = $3 AND deleted = false
+), edges AS (
+    SELECT fd.id
+    FROM feed_events fd
+    INNER JOIN follows fl ON fd.owner_id = fl.followee AND fl.follower = $1 AND fd.deleted = false and fl.deleted = false
+    WHERE event_time > (SELECT event_time FROM cursors LIMIT 1 OFFSET 0)
+    AND event_time < (SELECT event_time FROM cursors LIMIT 1 OFFSET 1)
+    ORDER BY event_time DESC
+)
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT cur FROM edges)
 `
 
 type GetUserFeedViewBatchBatchResults struct {
@@ -1144,18 +1160,18 @@ type GetUserFeedViewBatchBatchResults struct {
 }
 
 type GetUserFeedViewBatchParams struct {
-	ID       persist.DBID
-	Follower persist.DBID
-	Limit    int32
+	Follower  persist.DBID
+	CurBefore string
+	CurAfter  string
 }
 
 func (q *Queries) GetUserFeedViewBatch(ctx context.Context, arg []GetUserFeedViewBatchParams) *GetUserFeedViewBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
-			a.ID,
 			a.Follower,
-			a.Limit,
+			a.CurBefore,
+			a.CurAfter,
 		}
 		batch.Queue(getUserFeedViewBatch, vals...)
 	}

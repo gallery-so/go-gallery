@@ -339,7 +339,7 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(page: Pagination): Feed @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -365,18 +365,6 @@ union CollectionTokenByIdOrError =
     | ErrTokenNotFound
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
-
-# Input for queries that support pagination
-input Pagination {
-    token: DBID
-    limit: Int
-}
-
-type PageInfo {
-    size: Int
-    hasNextPage: Boolean
-    nextToken: DBID
-}
 
 # Actions a user can take on a resource
 enum Action {
@@ -457,11 +445,6 @@ type TokensAddedToCollectionFeedEvent implements Node & FeedEvent {
     newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
-type Feed {
-    events: [FeedEvent]
-    pageInfo: PageInfo!
-}
-
 type ErrUnknownAction implements Error {
     message: String!
 }
@@ -470,7 +453,12 @@ type ErrFeedEventNotFoundByID implements Error {
     message: String!
 }
 
-union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrFeedEventNotFoundByID
+union FeedConnectionOrError = 
+    FeedConnection
+    | ErrNotAuthorized
+    | ErrUnknownAction
+    | ErrFeedEventNotFoundByID
+
 union FeedEventByIdOrError =
     | UserCreatedFeedEvent
     | UserFollowedUsersFeedEvent
@@ -480,6 +468,23 @@ union FeedEventByIdOrError =
     | TokensAddedToCollectionFeedEvent
     | ErrFeedEventNotFoundByID
     | ErrUnknownAction
+
+type PageInfo {
+    hasPreviousPage: Boolean!
+    hasNextPage: Boolean!
+    startCursor: String!
+    endCursor: String!
+}
+
+type FeedEdge {
+    node: FeedEvent
+    cursor: String!
+}
+
+type FeedConnection {
+    edges: [FeedEdge]
+    pageInfo: PageInfo!
+}
 
 type Query {
     node(id: ID!): Node
@@ -492,7 +497,7 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    globalFeed(page: Pagination): FeedOrError
+    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnectionOrError
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
 

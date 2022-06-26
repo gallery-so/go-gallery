@@ -238,9 +238,14 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	Feed struct {
-		Events   func(childComplexity int) int
+	FeedConnection struct {
+		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
+	}
+
+	FeedEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 
 	FollowInfo struct {
@@ -352,9 +357,10 @@ type ComplexityRoot struct {
 	}
 
 	PageInfo struct {
-		HasNextPage func(childComplexity int) int
-		NextToken   func(childComplexity int) int
-		Size        func(childComplexity int) int
+		EndCursor       func(childComplexity int) int
+		HasNextPage     func(childComplexity int) int
+		HasPreviousPage func(childComplexity int) int
+		StartCursor     func(childComplexity int) int
 	}
 
 	PreviewURLSet struct {
@@ -372,7 +378,7 @@ type ComplexityRoot struct {
 		CommunityByAddress  func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID       func(childComplexity int, id persist.DBID) int
 		GeneralAllowlist    func(childComplexity int) int
-		GlobalFeed          func(childComplexity int, page *model.Pagination) int
+		GlobalFeed          func(childComplexity int, before *string, after *string, first *int, last *int) int
 		MembershipTiers     func(childComplexity int, forceRefresh *bool) int
 		Node                func(childComplexity int, id model.GqlID) int
 		TokenByID           func(childComplexity int, id persist.DBID) int
@@ -506,7 +512,7 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
-		Feed            func(childComplexity int, page *model.Pagination) int
+		Feed            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User            func(childComplexity int) int
 		ViewerGalleries func(childComplexity int) int
 	}
@@ -596,7 +602,7 @@ type QueryResolver interface {
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
-	GlobalFeed(ctx context.Context, page *model.Pagination) (model.FeedOrError, error)
+	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (model.FeedConnectionOrError, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
 type TokenResolver interface {
@@ -627,7 +633,7 @@ type UserFollowedUsersFeedEventResolver interface {
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
-	Feed(ctx context.Context, obj *model.Viewer, page *model.Pagination) (*model.Feed, error)
+	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -1227,19 +1233,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrUserNotFound.Message(childComplexity), true
 
-	case "Feed.events":
-		if e.complexity.Feed.Events == nil {
+	case "FeedConnection.edges":
+		if e.complexity.FeedConnection.Edges == nil {
 			break
 		}
 
-		return e.complexity.Feed.Events(childComplexity), true
+		return e.complexity.FeedConnection.Edges(childComplexity), true
 
-	case "Feed.pageInfo":
-		if e.complexity.Feed.PageInfo == nil {
+	case "FeedConnection.pageInfo":
+		if e.complexity.FeedConnection.PageInfo == nil {
 			break
 		}
 
-		return e.complexity.Feed.PageInfo(childComplexity), true
+		return e.complexity.FeedConnection.PageInfo(childComplexity), true
+
+	case "FeedEdge.cursor":
+		if e.complexity.FeedEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.FeedEdge.Cursor(childComplexity), true
+
+	case "FeedEdge.node":
+		if e.complexity.FeedEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.FeedEdge.Node(childComplexity), true
 
 	case "FollowInfo.followedBack":
 		if e.complexity.FollowInfo.FollowedBack == nil {
@@ -1778,6 +1798,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.OwnerAtBlock.Owner(childComplexity), true
 
+	case "PageInfo.endCursor":
+		if e.complexity.PageInfo.EndCursor == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.EndCursor(childComplexity), true
+
 	case "PageInfo.hasNextPage":
 		if e.complexity.PageInfo.HasNextPage == nil {
 			break
@@ -1785,19 +1812,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PageInfo.HasNextPage(childComplexity), true
 
-	case "PageInfo.nextToken":
-		if e.complexity.PageInfo.NextToken == nil {
+	case "PageInfo.hasPreviousPage":
+		if e.complexity.PageInfo.HasPreviousPage == nil {
 			break
 		}
 
-		return e.complexity.PageInfo.NextToken(childComplexity), true
+		return e.complexity.PageInfo.HasPreviousPage(childComplexity), true
 
-	case "PageInfo.size":
-		if e.complexity.PageInfo.Size == nil {
+	case "PageInfo.startCursor":
+		if e.complexity.PageInfo.StartCursor == nil {
 			break
 		}
 
-		return e.complexity.PageInfo.Size(childComplexity), true
+		return e.complexity.PageInfo.StartCursor(childComplexity), true
 
 	case "PreviewURLSet.large":
 		if e.complexity.PreviewURLSet.Large == nil {
@@ -1906,7 +1933,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.GlobalFeed(childComplexity, args["page"].(*model.Pagination)), true
+		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
@@ -2475,7 +2502,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Viewer.Feed(childComplexity, args["page"].(*model.Pagination)), true
+		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
@@ -2945,7 +2972,7 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(page: Pagination): Feed @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -2971,18 +2998,6 @@ union CollectionTokenByIdOrError =
     | ErrTokenNotFound
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
-
-# Input for queries that support pagination
-input Pagination {
-    token: DBID
-    limit: Int
-}
-
-type PageInfo {
-    size: Int
-    hasNextPage: Boolean
-    nextToken: DBID
-}
 
 # Actions a user can take on a resource
 enum Action {
@@ -3063,11 +3078,6 @@ type TokensAddedToCollectionFeedEvent implements Node & FeedEvent {
     newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
-type Feed {
-    events: [FeedEvent]
-    pageInfo: PageInfo!
-}
-
 type ErrUnknownAction implements Error {
     message: String!
 }
@@ -3076,7 +3086,12 @@ type ErrFeedEventNotFoundByID implements Error {
     message: String!
 }
 
-union FeedOrError = Feed | ErrNotAuthorized | ErrUnknownAction | ErrFeedEventNotFoundByID
+union FeedConnectionOrError = 
+    FeedConnection
+    | ErrNotAuthorized
+    | ErrUnknownAction
+    | ErrFeedEventNotFoundByID
+
 union FeedEventByIdOrError =
     | UserCreatedFeedEvent
     | UserFollowedUsersFeedEvent
@@ -3086,6 +3101,23 @@ union FeedEventByIdOrError =
     | TokensAddedToCollectionFeedEvent
     | ErrFeedEventNotFoundByID
     | ErrUnknownAction
+
+type PageInfo {
+    hasPreviousPage: Boolean!
+    hasNextPage: Boolean!
+    startCursor: String!
+    endCursor: String!
+}
+
+type FeedEdge {
+    node: FeedEvent
+    cursor: String!
+}
+
+type FeedConnection {
+    edges: [FeedEdge]
+    pageInfo: PageInfo!
+}
 
 type Query {
     node(id: ID!): Node
@@ -3098,7 +3130,7 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    globalFeed(page: Pagination): FeedOrError
+    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnectionOrError
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
 
@@ -3771,15 +3803,42 @@ func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, 
 func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *model.Pagination
-	if tmp, ok := rawArgs["page"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
-		arg0, err = ec.unmarshalOPagination2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPagination(ctx, tmp)
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["page"] = arg0
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -3861,15 +3920,42 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 func (ec *executionContext) field_Viewer_feed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *model.Pagination
-	if tmp, ok := rawArgs["page"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
-		arg0, err = ec.unmarshalOPagination2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPagination(ctx, tmp)
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["page"] = arg0
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -6652,7 +6738,7 @@ func (ec *executionContext) _ErrUserNotFound_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Feed_events(ctx context.Context, field graphql.CollectedField, obj *model.Feed) (ret graphql.Marshaler) {
+func (ec *executionContext) _FeedConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedConnection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6660,7 +6746,7 @@ func (ec *executionContext) _Feed_events(ctx context.Context, field graphql.Coll
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Feed",
+		Object:     "FeedConnection",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6670,7 +6756,7 @@ func (ec *executionContext) _Feed_events(ctx context.Context, field graphql.Coll
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Events, nil
+		return obj.Edges, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6679,12 +6765,12 @@ func (ec *executionContext) _Feed_events(ctx context.Context, field graphql.Coll
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]model.FeedEvent)
+	res := resTmp.([]*model.FeedEdge)
 	fc.Result = res
-	return ec.marshalOFeedEvent2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
+	return ec.marshalOFeedEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEdge(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Feed_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.Feed) (ret graphql.Marshaler) {
+func (ec *executionContext) _FeedConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.FeedConnection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6692,7 +6778,7 @@ func (ec *executionContext) _Feed_pageInfo(ctx context.Context, field graphql.Co
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Feed",
+		Object:     "FeedConnection",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6717,6 +6803,73 @@ func (ec *executionContext) _Feed_pageInfo(ctx context.Context, field graphql.Co
 	res := resTmp.(*model.PageInfo)
 	fc.Result = res
 	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.FeedEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.FeedEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FollowInfo_user(ctx context.Context, field graphql.CollectedField, obj *model.FollowInfo) (ret graphql.Marshaler) {
@@ -9214,7 +9367,7 @@ func (ec *executionContext) _OwnerAtBlock_blockNumber(ctx context.Context, field
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PageInfo_size(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _PageInfo_hasPreviousPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9232,18 +9385,21 @@ func (ec *executionContext) _PageInfo_size(ctx context.Context, field graphql.Co
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Size, nil
+		return obj.HasPreviousPage, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
@@ -9271,14 +9427,17 @@ func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PageInfo_nextToken(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _PageInfo_startCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -9296,18 +9455,56 @@ func (ec *executionContext) _PageInfo_nextToken(ctx context.Context, field graph
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.NextToken, nil
+		return obj.StartCursor, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*persist.DBID)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EndCursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PreviewURLSet_raw(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
@@ -9923,7 +10120,7 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().GlobalFeed(rctx, args["page"].(*model.Pagination))
+		return ec.resolvers.Query().GlobalFeed(rctx, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9932,9 +10129,9 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.FeedOrError)
+	res := resTmp.(model.FeedConnectionOrError)
 	fc.Result = res
-	return ec.marshalOFeedOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedOrError(ctx, field.Selections, res)
+	return ec.marshalOFeedConnectionOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnectionOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_feedEventById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -12427,7 +12624,7 @@ func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.Coll
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Viewer().Feed(rctx, obj, args["page"].(*model.Pagination))
+		return ec.resolvers.Viewer().Feed(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12436,9 +12633,9 @@ func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.Coll
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Feed)
+	res := resTmp.(*model.FeedConnection)
 	fc.Result = res
-	return ec.marshalOFeed2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeed(ctx, field.Selections, res)
+	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ViewerGallery_gallery(ctx context.Context, field graphql.CollectedField, obj *model.ViewerGallery) (ret graphql.Marshaler) {
@@ -14186,37 +14383,6 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputPagination(ctx context.Context, obj interface{}) (model.Pagination, error) {
-	var it model.Pagination
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	for k, v := range asMap {
-		switch k {
-		case "token":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
-			it.Token, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "limit":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
-			it.Limit, err = ec.unmarshalOInt2ᚖint(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputUpdateCollectionHiddenInput(ctx context.Context, obj interface{}) (model.UpdateCollectionHiddenInput, error) {
 	var it model.UpdateCollectionHiddenInput
 	asMap := map[string]interface{}{}
@@ -14806,6 +14972,43 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	}
 }
 
+func (ec *executionContext) _FeedConnectionOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedConnectionOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.FeedConnection:
+		return ec._FeedConnection(ctx, sel, &obj)
+	case *model.FeedConnection:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FeedConnection(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrUnknownAction:
+		return ec._ErrUnknownAction(ctx, sel, &obj)
+	case *model.ErrUnknownAction:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUnknownAction(ctx, sel, obj)
+	case model.ErrFeedEventNotFoundByID:
+		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFoundByID:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet, obj model.FeedEvent) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -14917,43 +15120,6 @@ func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._ErrUnknownAction(ctx, sel, obj)
-	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
-	}
-}
-
-func (ec *executionContext) _FeedOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedOrError) graphql.Marshaler {
-	switch obj := (obj).(type) {
-	case nil:
-		return graphql.Null
-	case model.Feed:
-		return ec._Feed(ctx, sel, &obj)
-	case *model.Feed:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._Feed(ctx, sel, obj)
-	case model.ErrNotAuthorized:
-		return ec._ErrNotAuthorized(ctx, sel, &obj)
-	case *model.ErrNotAuthorized:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrUnknownAction:
-		return ec._ErrUnknownAction(ctx, sel, &obj)
-	case *model.ErrUnknownAction:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUnknownAction(ctx, sel, obj)
-	case model.ErrFeedEventNotFoundByID:
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
-	case *model.ErrFeedEventNotFoundByID:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -16818,7 +16984,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errFeedEventNotFoundByIDImplementors = []string{"ErrFeedEventNotFoundByID", "Error", "FeedOrError", "FeedEventByIdOrError"}
+var errFeedEventNotFoundByIDImplementors = []string{"ErrFeedEventNotFoundByID", "Error", "FeedConnectionOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrFeedEventNotFoundByID(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFoundByID) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundByIDImplementors)
@@ -16962,7 +17128,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "FeedOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "FeedConnectionOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -17065,7 +17231,7 @@ func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedOrError", "FeedEventByIdOrError"}
+var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedConnectionOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrUnknownAction(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUnknownAction) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUnknownActionImplementors)
@@ -17158,26 +17324,64 @@ func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.Select
 	return out
 }
 
-var feedImplementors = []string{"Feed", "FeedOrError"}
+var feedConnectionImplementors = []string{"FeedConnection", "FeedConnectionOrError"}
 
-func (ec *executionContext) _Feed(ctx context.Context, sel ast.SelectionSet, obj *model.Feed) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, feedImplementors)
+func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.SelectionSet, obj *model.FeedConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedConnectionImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("Feed")
-		case "events":
+			out.Values[i] = graphql.MarshalString("FeedConnection")
+		case "edges":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Feed_events(ctx, field, obj)
+				return ec._FeedConnection_edges(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Feed_pageInfo(ctx, field, obj)
+				return ec._FeedConnection_pageInfo(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var feedEdgeImplementors = []string{"FeedEdge"}
+
+func (ec *executionContext) _FeedEdge(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEdge")
+		case "node":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._FeedEdge_node(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._FeedEdge_cursor(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -18089,13 +18293,16 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("PageInfo")
-		case "size":
+		case "hasPreviousPage":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PageInfo_size(ctx, field, obj)
+				return ec._PageInfo_hasPreviousPage(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "hasNextPage":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._PageInfo_hasNextPage(ctx, field, obj)
@@ -18103,13 +18310,29 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "nextToken":
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "startCursor":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._PageInfo_nextToken(ctx, field, obj)
+				return ec._PageInfo_startCursor(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "endCursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PageInfo_endCursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21007,21 +21230,21 @@ func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOFeed2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeed(ctx context.Context, sel ast.SelectionSet, v *model.Feed) graphql.Marshaler {
+func (ec *executionContext) marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedConnection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._Feed(ctx, sel, v)
+	return ec._FeedConnection(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v model.FeedEvent) graphql.Marshaler {
+func (ec *executionContext) marshalOFeedConnectionOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnectionOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedConnectionOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._FeedEvent(ctx, sel, v)
+	return ec._FeedConnectionOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOFeedEvent2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v []model.FeedEvent) graphql.Marshaler {
+func (ec *executionContext) marshalOFeedEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEdge(ctx context.Context, sel ast.SelectionSet, v []*model.FeedEdge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -21048,7 +21271,7 @@ func (ec *executionContext) marshalOFeedEvent2ᚕgithubᚗcomᚋmikeydubᚋgoᚑ
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, sel, v[i])
+			ret[i] = ec.marshalOFeedEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEdge(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -21062,18 +21285,25 @@ func (ec *executionContext) marshalOFeedEvent2ᚕgithubᚗcomᚋmikeydubᚋgoᚑ
 	return ret
 }
 
+func (ec *executionContext) marshalOFeedEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEdge(ctx context.Context, sel ast.SelectionSet, v *model.FeedEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v model.FeedEvent) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEvent(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventByIDOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._FeedEventByIdOrError(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOFeedOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FeedOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx context.Context, sel ast.SelectionSet, v []*model.FollowInfo) graphql.Marshaler {
@@ -21419,14 +21649,6 @@ func (ec *executionContext) marshalOOwnerAtBlock2ᚖgithubᚗcomᚋmikeydubᚋgo
 		return graphql.Null
 	}
 	return ec._OwnerAtBlock(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOPagination2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPagination(ctx context.Context, v interface{}) (*model.Pagination, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputPagination(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx context.Context, sel ast.SelectionSet, v *model.PreviewURLSet) graphql.Marshaler {

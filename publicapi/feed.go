@@ -7,7 +7,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/publicapi/option"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -35,79 +34,65 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sql
 	return &event, nil
 }
 
-func (api FeedAPI) ViewerFeed(ctx context.Context, opts ...option.FeedOption) ([]sqlc.FeedEvent, *persist.DBID, error) {
-	settings := option.FeedSearchSettings{}
-
+func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	opts = append(option.DefaultFeedOptions(), opts...)
-
-	for _, opt := range opts {
-		opt.Apply(&settings)
+		return nil, err
 	}
 
 	// Validate
+	// Note that pagination that includes both `first` and `last` is discouraged because it makes pagination confusing
+	// but the server does support it.
 	if err := validateFields(api.validator, validationMap{
-		"limit": {settings.Limit, "gte=0"},
+		"userID": {userID, "required"},
+		"first":  {first, "omitempty,gte=0"},
+		"last":   {last, "omitempty,gte=0"},
 	}); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	params := sqlc.GetUserFeedViewBatchParams{
-		Follower: userID,
-		ID:       settings.Token,
-		// fetch one extra to check if there are more results
-		Limit: int32(settings.Limit + 1),
+	var params = sqlc.GetUserFeedViewBatchParams{Follower: userID}
+	if before != nil {
+		params.CurBefore = string(*before)
+	}
+	if after != nil {
+		params.CurAfter = string(*after)
 	}
 
 	events, err := api.loaders.FeedByUserId.Load(params)
+
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	if len(events) > settings.Limit {
-		token := events[settings.Limit].ID
-		events = events[:settings.Limit]
-		return events, &token, nil
-	}
-
-	return events, nil, nil
+	return events, nil
 }
 
-func (api FeedAPI) GlobalFeed(ctx context.Context, opts ...option.FeedOption) ([]sqlc.FeedEvent, *persist.DBID, error) {
-	settings := option.FeedSearchSettings{}
-
-	opts = append(option.DefaultFeedOptions(), opts...)
-	for _, opt := range opts {
-		opt.Apply(&settings)
-	}
-
+func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
 	// Validate
+	// Note that pagination that includes both `first` and `last` is discouraged because it makes pagination confusing
+	// but the server does support it.
 	if err := validateFields(api.validator, validationMap{
-		"limit": {settings.Limit, "gte=0"},
+		"first": {first, "omitempty,gte=0"},
+		"last":  {last, "omitempty,gte=0"},
 	}); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	params := sqlc.GetGlobalFeedViewBatchParams{
-		ID: settings.Token,
-		// fetch one extra to check if there are more results
-		Limit: int32(settings.Limit + 1),
+	params := sqlc.GetGlobalFeedViewBatchParams{}
+
+	if before != nil {
+		params.CurBefore = string(*before)
+	}
+
+	if after != nil {
+		params.CurAfter = string(*after)
 	}
 
 	events, err := api.loaders.GlobalFeed.Load(params)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	if len(events) > settings.Limit {
-		token := events[settings.Limit].ID
-		events = events[:settings.Limit]
-		return events, &token, nil
-	}
-
-	return events, nil, nil
+	return events, nil
 }

@@ -503,8 +503,8 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainA
 	return resolveGeneralAllowlist(ctx)
 }
 
-func (r *queryResolver) GlobalFeed(ctx context.Context, page *model.Pagination) (model.FeedOrError, error) {
-	feed, err := resolveGlobalFeed(ctx, page)
+func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (model.FeedConnectionOrError, error) {
+	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
@@ -522,17 +522,17 @@ func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (mod
 
 	switch event.Action {
 	case persist.ActionUserCreated:
-		return eventToUserCreatedFeedEventModel(event)
+		return eventToUserCreatedFeedEventModel(event), nil
 	case persist.ActionUserFollowedUsers:
-		return eventToUserFollowedUsersFeedEventModel(event)
+		return eventToUserFollowedUsersFeedEventModel(event), nil
 	case persist.ActionCollectorsNoteAddedToToken:
-		return eventToCollectorsNoteAddedToTokenFeedEventModel(event)
+		return eventToCollectorsNoteAddedToTokenFeedEventModel(event), nil
 	case persist.ActionCollectionCreated:
-		return eventToCollectionCreatedFeedEventModel(event)
+		return eventToCollectionCreatedFeedEventModel(event), nil
 	case persist.ActionCollectorsNoteAddedToCollection:
-		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event)
+		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event), nil
 	case persist.ActionTokensAddedToCollection:
-		return eventToTokensAddedToCollectionFeedEventModel(event)
+		return eventToTokensAddedToCollectionFeedEventModel(event), nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
@@ -626,8 +626,8 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
-func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, page *model.Pagination) (*model.Feed, error) {
-	feed, err := resolveViewerFeed(ctx, page)
+func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	feed, err := resolveViewerFeed(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
