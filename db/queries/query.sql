@@ -187,21 +187,42 @@ SELECT EXISTS(
 -- name: GetGlobalFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), now())) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), make_date(1970, 1, 1))) cur_after
+    (
+        SELECT CASE WHEN @cur_before = @unset_flag
+        THEN now()
+        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false)
+        END
+    ) AS cur_before,
+    (
+        SELECT CASE WHEN @cur_after = @unset_flag
+        THEN make_date(1970, 1, 1)
+        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false)
+        END
+    ) AS cur_after
 ), edges AS (
     SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors) AND deleted = false
+    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors)
+    AND deleted = false
 )
 SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    AND $1::bool = $1::bool -- sqlc bug requiring at least one positional param
+    AND $1::bool= $1::bool -- sqlc bug requiring at least one positional param
     ORDER BY event_time ASC;
 
 -- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), now())) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), make_date(1970, 1, 1))) cur_after
+    (
+        SELECT CASE WHEN @cur_before = @unset_flag
+        THEN now()
+        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false)
+        END
+    ) AS cur_before,
+    (
+        SELECT CASE WHEN @cur_after = @unset_flag
+        THEN make_date(1970, 1, 1)
+        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false)
+        END
+    ) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false

@@ -462,6 +462,7 @@ union FeedConnectionOrError =
 union FeedEventByIdOrError =
     | UserCreatedFeedEvent
     | UserFollowedUsersFeedEvent
+    | UserFollowedBackEvent
     | CollectorsNoteAddedToTokenFeedEvent
     | CollectionCreatedFeedEvent
     | CollectorsNoteAddedToCollectionFeedEvent

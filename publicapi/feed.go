@@ -10,6 +10,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+var defaultTokenParam = "<notset>"
+
 type FeedAPI struct {
 	repos     *persist.Repositories
 	queries   *sqlc.Queries
@@ -49,7 +51,12 @@ func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *
 		return nil, err
 	}
 
-	var params = sqlc.GetUserFeedViewBatchParams{Follower: userID}
+	params := sqlc.GetUserFeedViewBatchParams{
+		Follower:  userID,
+		CurBefore: defaultTokenParam,
+		CurAfter:  defaultTokenParam,
+		UnsetFlag: defaultTokenParam,
+	}
 
 	if before != nil {
 		params.CurBefore = string(*before)
@@ -77,7 +84,11 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 		return nil, err
 	}
 
-	params := sqlc.GetGlobalFeedViewBatchParams{}
+	params := sqlc.GetGlobalFeedViewBatchParams{
+		CurBefore: defaultTokenParam,
+		CurAfter:  defaultTokenParam,
+		UnsetFlag: defaultTokenParam,
+	}
 
 	if before != nil {
 		params.CurBefore = string(*before)
