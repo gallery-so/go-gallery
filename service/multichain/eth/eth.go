@@ -52,14 +52,14 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts?address=%s", d.indexerBaseURL, addr), nil)
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?address=%s", d.indexerBaseURL, addr), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	res, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer res.Body.Close()
 
@@ -67,30 +67,30 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return nil, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+		return nil, nil, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
 	}
 
 	var tokens indexer.GetTokensOutput
 	err = json.NewDecoder(res.Body).Decode(&tokens)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return tokensToChainAgnostic(tokens.NFTs), nil
+	return tokensToChainAgnostic(tokens.NFTs), contractsToChainAgnostic(tokens.Contracts), nil
 
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=-1", d.indexerBaseURL, contractAddress), nil)
 	if err != nil {
-		return nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	res, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	defer res.Body.Close()
 
@@ -98,29 +98,33 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
-			return nil, err
+			return nil, multichain.ChainAgnosticContract{}, err
 		}
-		return nil, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
 	}
 
 	var tokens indexer.GetTokensOutput
 	err = json.NewDecoder(res.Body).Decode(&tokens)
 	if err != nil {
-		return nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	return tokensToChainAgnostic(tokens.NFTs), nil
+	contract := multichain.ChainAgnosticContract{}
+	if len(tokens.Contracts) > 0 {
+		contract = contractToChainAgnostic(tokens.Contracts[0])
+	}
+	return tokensToChainAgnostic(tokens.NFTs), contract, nil
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=-1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	res, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer res.Body.Close()
 
@@ -128,18 +132,18 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		errResp := util.ErrorResponse{}
 		err = json.NewDecoder(res.Body).Decode(&errResp)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return nil, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
+		return nil, nil, fmt.Errorf("unexpected status: %s | err: %s ", res.Status, errResp.Error)
 	}
 
 	var tokens indexer.GetTokensOutput
 	err = json.NewDecoder(res.Body).Decode(&tokens)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return tokensToChainAgnostic(tokens.NFTs), nil
+	return tokensToChainAgnostic(tokens.NFTs), contractsToChainAgnostic(tokens.Contracts), nil
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
@@ -450,6 +454,14 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 		}
 	}
 	return res
+}
+
+func contractsToChainAgnostic(contracts []persist.Contract) []multichain.ChainAgnosticContract {
+	result := make([]multichain.ChainAgnosticContract, len(contracts))
+	for _, contract := range contracts {
+		result = append(result, contractToChainAgnostic(contract))
+	}
+	return result
 }
 
 func contractToChainAgnostic(contract persist.Contract) multichain.ChainAgnosticContract {

@@ -282,7 +282,7 @@ type ContractCollectionNFT struct {
 type TokenRepository interface {
 	CreateBulk(context.Context, []Token) ([]DBID, error)
 	Create(context.Context, Token) (DBID, error)
-	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, error)
+	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)

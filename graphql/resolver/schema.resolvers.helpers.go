@@ -7,10 +7,11 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -627,7 +628,11 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 }
 
 func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
-	preview := remapLargeImageUrls(media.ThumbnailURL.String())
+	url := media.ThumbnailURL.String()
+	if media.MediaType == persist.MediaTypeImage {
+		url = media.MediaURL.String()
+	}
+	preview := remapLargeImageUrls(url)
 	mm := mediamapper.For(ctx)
 
 	return &model.PreviewURLSet{

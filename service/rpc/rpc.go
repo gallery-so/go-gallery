@@ -322,7 +322,7 @@ func removeBOM(bs []byte) []byte {
 }
 
 func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
-	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+	url := fmt.Sprintf("https://cloudflare-ipfs.com/ipfs/%s", path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
@@ -348,7 +348,7 @@ func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
 func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
-	url := fmt.Sprintf("https://ipfs.io/ipfs/%s", path)
+	url := fmt.Sprintf("https://cloudfare-ipfs.com/ipfs/%s", path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {

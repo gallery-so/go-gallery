@@ -58,12 +58,14 @@ type getTokensInput struct {
 
 // GetTokenOutput is the response of the get token handler
 type GetTokenOutput struct {
-	NFT persist.Token `json:"nft"`
+	NFT      persist.Token    `json:"nft"`
+	Contract persist.Contract `json:"contract"`
 }
 
 // GetTokensOutput is the response of the get tokens handler
 type GetTokensOutput struct {
-	NFTs []persist.Token `json:"nfts"`
+	NFTs      []persist.Token    `json:"nfts"`
+	Contracts []persist.Contract `json:"contracts"`
 }
 
 // ValidateUsersNFTsInput is the input for the validate users NFTs endpoint that will return
@@ -80,7 +82,7 @@ type ValidateUsersNFTsOutput struct {
 	Message string `json:"message,omitempty"`
 }
 
-func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
+func getTokens(nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
 
@@ -94,7 +96,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 
-		token, err := getTokenFromDB(c, input, nftRepository)
+		token, contract, err := getTokenFromDB(c, input, nftRepository, contractRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrTokenNotFoundByID); ok {
@@ -105,10 +107,10 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 		}
 
 		if token.ID != "" {
-			c.JSON(http.StatusOK, GetTokenOutput{NFT: token})
+			c.JSON(http.StatusOK, GetTokenOutput{NFT: token, Contract: contract})
 			return
 		}
-		tokens, err := getTokensFromDB(c, input, nftRepository)
+		tokens, contracts, err := getTokensFromDB(c, input, nftRepository, contractRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
@@ -118,8 +120,7 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 			return
 		}
 		if tokens != nil {
-
-			c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens})
+			c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens, Contracts: contracts})
 			return
 		}
 
@@ -127,21 +128,33 @@ func getTokens(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, e
 	}
 }
 
-func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) (persist.Token, error) {
-	switch {
-	case input.ID != "":
-		return tokenRepo.GetByID(pCtx, input.ID)
-	}
-	return persist.Token{}, nil
-}
-func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository) ([]persist.Token, error) {
+func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) (persist.Token, persist.Contract, error) {
 	switch {
 	case input.ID != "":
 		token, err := tokenRepo.GetByID(pCtx, input.ID)
 		if err != nil {
-			return nil, err
+			return persist.Token{}, persist.Contract{}, nil
 		}
-		return []persist.Token{token}, nil
+		contract, err := contractRepo.GetByAddress(pCtx, token.ContractAddress)
+		if err != nil {
+			return persist.Token{}, persist.Contract{}, nil
+		}
+		return token, contract, nil
+	}
+	return persist.Token{}, persist.Contract{}, nil
+}
+func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
+	switch {
+	case input.ID != "":
+		token, err := tokenRepo.GetByID(pCtx, input.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		contract, err := contractRepo.GetByAddress(pCtx, token.ContractAddress)
+		if err != nil {
+			return nil, nil, err
+		}
+		return []persist.Token{token}, []persist.Contract{contract}, nil
 	case input.WalletAddress != "":
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":
@@ -151,12 +164,28 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 			input.TokenID = persist.TokenID(input.TokenID.BigInt().Text(16))
 		}
 
-		return tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
+		tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
+		if err != nil {
+			return nil, nil, err
+		}
+		contract, err := contractRepo.GetByAddress(pCtx, input.ContractAddress)
+		if err != nil {
+			return nil, nil, err
+		}
+		return tokens, []persist.Contract{contract}, nil
 	case input.ContractAddress != "":
-		return tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
+		tokens, err := tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
+		if err != nil {
+			return nil, nil, err
+		}
+		contract, err := contractRepo.GetByAddress(pCtx, input.ContractAddress)
+		if err != nil {
+			return nil, nil, err
+		}
+		return tokens, []persist.Contract{contract}, nil
+	default:
+		return nil, nil, errors.New("must specify at least one of id, address, contract_address, token_id")
 	}
-	return nil, nil
-
 }
 
 func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
@@ -179,7 +208,7 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 // validateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
 func validateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepository persist.UserRepository, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
 
-	currentNFTs, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
+	currentNFTs, _, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
 	if err != nil {
 		return ValidateUsersNFTsOutput{}, err
 	}
@@ -425,7 +454,7 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 	var tokens []persist.Token
 	var err error
 	if input.OwnerAddress != "" {
-		tokens, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
+		tokens, _, err = tokenRepository.GetByWallet(c, input.OwnerAddress, -1, -1)
 	} else if input.ContractAddress != "" {
 		tokens, err = tokenRepository.GetByContract(c, input.ContractAddress, -1, -1)
 	} else {
