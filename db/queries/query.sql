@@ -190,7 +190,7 @@ WITH cursors AS (
     WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors) AND deleted = false
 )
 SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    AND $1::bool = $1::bool -- sqlc bug requiring at least one param by position
+    AND $1::bool = $1::bool -- sqlc bug requiring at least one positional param
     ORDER BY event_time ASC;
 
 -- name: GetUserFeedViewBatch :batchmany

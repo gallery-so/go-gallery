@@ -88,6 +88,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	events, err := api.loaders.GlobalFeed.Load(params)
+
 	if err != nil {
 		return nil, err
 	}

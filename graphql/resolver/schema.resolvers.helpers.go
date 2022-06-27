@@ -550,7 +550,7 @@ func feedEventToEdge(event *sqlc.FeedEvent) (*model.FeedEdge, error) {
 		node := eventToCollectionCreatedFeedEventModel(event)
 		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionCollectorsNoteAddedToCollection:
-		node := eventToCollectionCreatedFeedEventModel(event)
+		node := eventToCollectorsNoteAddedToCollectionFeedEventModel(event)
 		return &model.FeedEdge{Node: node, Cursor: cursor.DBIDEncodeToCursor(node.Dbid)}, nil
 	case persist.ActionTokensAddedToCollection:
 		node := eventToTokensAddedToCollectionFeedEventModel(event)
