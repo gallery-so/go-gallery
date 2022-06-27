@@ -563,15 +563,15 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 const getGlobalFeedViewBatch = `-- name: GetGlobalFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_after
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_after,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_before
 ), edges AS (
     SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors) AND deleted = false
+    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors) AND deleted = false
 )
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges)
     AND $1::bool = $1::bool -- sqlc bug requiring at least one param by position
-    ORDER BY event_time DESC
+    ORDER BY event_time ASC
 `
 
 type GetGlobalFeedViewBatchBatchResults struct {
@@ -581,8 +581,8 @@ type GetGlobalFeedViewBatchBatchResults struct {
 
 type GetGlobalFeedViewBatchParams struct {
 	Column1   bool
-	CurBefore string
 	CurAfter  string
+	CurBefore string
 }
 
 func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFeedViewBatchParams) *GetGlobalFeedViewBatchBatchResults {
@@ -590,8 +590,8 @@ func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFee
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Column1,
-			a.CurBefore,
 			a.CurAfter,
+			a.CurBefore,
 		}
 		batch.Queue(getGlobalFeedViewBatch, vals...)
 	}

@@ -183,27 +183,27 @@ SELECT EXISTS(
 -- name: GetGlobalFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), make_date(1970, 1, 1))) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), now())) cur_after
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), now())) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), make_date(1970, 1, 1))) cur_after
 ), edges AS (
     SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors) AND deleted = false
+    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors) AND deleted = false
 )
 SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
     AND $1::bool = $1::bool -- sqlc bug requiring at least one param by position
-    ORDER BY event_time DESC;
+    ORDER BY event_time ASC;
 
 -- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), make_date(1970, 1, 1))) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), now())) cur_after
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false), now())) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false), make_date(1970, 1, 1))) cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
-    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors)
+    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors)
 )
-SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time DESC;
+SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time ASC;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
