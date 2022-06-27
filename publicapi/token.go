@@ -67,6 +67,9 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
+// GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
+// Since its possible for tokens to be deleted, the return size may not be the same size of
+// the tokens added, so the caller should handle the matching of arguments to response if used in that context.
 func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

@@ -67,7 +67,11 @@ SELECT t.* FROM users u, collections c, unnest(c.nfts)
     AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
-SELECT * FROM tokens WHERE id = ANY(SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') FROM feed_events fe where fe.id = $1);
+WITH new_tokens AS (
+    SELECT added.id, row_number() OVER () added_order
+    FROM (SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') id FROM feed_events f WHERE f.id = $1 AND f.deleted = false) added
+)
+SELECT t.* FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order;
 
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;

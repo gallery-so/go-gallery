@@ -563,14 +563,14 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 const getGlobalFeedViewBatch = `-- name: GetGlobalFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_after,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_before
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), now())) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), make_date(1970, 1, 1))) cur_after
 ), edges AS (
     SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors) AND deleted = false
 )
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    AND $1::bool = $1::bool -- sqlc bug requiring at least one param by position
+    AND $1::bool = $1::bool -- sqlc bug requiring at least one positional param
     ORDER BY event_time ASC
 `
 
@@ -581,8 +581,8 @@ type GetGlobalFeedViewBatchBatchResults struct {
 
 type GetGlobalFeedViewBatchParams struct {
 	Column1   bool
-	CurAfter  string
 	CurBefore string
+	CurAfter  string
 }
 
 func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFeedViewBatchParams) *GetGlobalFeedViewBatchBatchResults {
@@ -590,8 +590,8 @@ func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFee
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Column1,
-			a.CurAfter,
 			a.CurBefore,
+			a.CurAfter,
 		}
 		batch.Queue(getGlobalFeedViewBatch, vals...)
 	}
@@ -688,7 +688,11 @@ func (b *GetMembershipByMembershipIdBatchBatchResults) Close() error {
 }
 
 const getNewTokensByFeedEventIdBatch = `-- name: GetNewTokensByFeedEventIdBatch :batchmany
-SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract FROM tokens WHERE id = ANY(SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') FROM feed_events fe where fe.id = $1)
+WITH new_tokens AS (
+    SELECT added.id, row_number() OVER () added_order
+    FROM (SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') id FROM feed_events f WHERE f.id = $1 AND f.deleted = false) added
+)
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order
 `
 
 type GetNewTokensByFeedEventIdBatchBatchResults struct {
@@ -1141,14 +1145,14 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), make_date(1970, 1, 1))) cur_before,
-    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), now())) cur_after
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $2 AND deleted = false), now())) cur_before,
+    (SELECT COALESCE((SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false), make_date(1970, 1, 1))) cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
-    WHERE event_time > (SELECT cur_before FROM cursors) AND event_time < (SELECT cur_after FROM cursors)
+    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors)
 )
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time DESC
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time ASC
 `
 
 type GetUserFeedViewBatchBatchResults struct {
