@@ -515,6 +515,17 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainA
 	return resolveGeneralAllowlist(ctx)
 }
 
+func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error) {
+	winners, err := publicapi.For(ctx).Misc.GetGalleryOfTheWeekWinners(ctx)
+
+	var output = make([]*model.GalleryUser, len(winners))
+	for i, user := range winners {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, err
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
