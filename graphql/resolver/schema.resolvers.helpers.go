@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/graphql/model/cursor"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/mikeydub/go-gallery/debugtools"
@@ -408,12 +407,12 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 }
 
 func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	beforeToken, err := cursor.DecodeToDBID(before)
+	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
 		return nil, err
 	}
 
-	afterToken, err := cursor.DecodeToDBID(after)
+	afterToken, err := model.Cursor.DecodeToDBID(after)
 	if err != nil {
 		return nil, err
 	}
@@ -428,12 +427,12 @@ func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *strin
 }
 
 func resolveGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	beforeToken, err := cursor.DecodeToDBID(before)
+	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
 		return nil, err
 	}
 
-	afterToken, err := cursor.DecodeToDBID(after)
+	afterToken, err := model.Cursor.DecodeToDBID(after)
 	if err != nil {
 		return nil, err
 	}
@@ -592,20 +591,22 @@ func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedCo
 	edges := make([]*model.FeedEdge, len(events))
 	pageInfo.Size = len(edges)
 
-	for i, e := range events {
-		data, err := feedEventToDataModel(&e)
+	for i, evt := range events {
+		data, err := feedEventToDataModel(&evt)
 
 		var node model.FeedEventOrError
 
-		if err != nil {
-			node = model.ErrUnknownAction{Message: err.Error()}
+		if e, ok := err.(*persist.ErrUnknownAction); ok {
+			node = model.ErrUnknownAction{Message: e.Error()}
+		} else if err != nil {
+			return nil, err
 		} else {
-			node = model.FeedEvent{Dbid: e.ID, EventData: data}
+			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
 		}
 
 		edges[i] = &model.FeedEdge{
 			Node:   node,
-			Cursor: cursor.DBIDEncodeToCursor(e.ID),
+			Cursor: model.Cursor.DBIDEncodeToCursor(evt.ID),
 		}
 	}
 
